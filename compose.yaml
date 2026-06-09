@@ -1,0 +1,72 @@
+name: persefonia
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    user: "postgres"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_password
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    tmpfs:
+      - /tmp
+      - /var/run/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+    networks:
+      - persefonia-internal
+
+  redis:
+    image: redis:8-alpine
+    user: "redis"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    command: ["redis-server", "/run/secrets/redis.conf", "--save", "", "--appendonly", "no"]
+    secrets:
+      - source: redis_config
+        target: redis.conf
+    tmpfs:
+      - /tmp
+      - /data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "redis-cli -a \"$$(awk '/^requirepass / {print $$2}' /run/secrets/redis.conf)\" ping | grep -q PONG"
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+    networks:
+      - persefonia-internal
+
+volumes:
+  postgres-data:
+
+networks:
+  persefonia-internal:
+    name: persefonia-internal
+    internal: true
+
+secrets:
+  postgres_password:
+    file: ${PERSEFONIA_POSTGRES_PASSWORD_FILE:?PERSEFONIA_POSTGRES_PASSWORD_FILE is required}
+  redis_config:
+    file: ${PERSEFONIA_REDIS_CONFIG_FILE:?PERSEFONIA_REDIS_CONFIG_FILE is required}

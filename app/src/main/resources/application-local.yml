@@ -1,0 +1,17 @@
+spring:
+  datasource:
+    url: ${PERSEFONIA_DATASOURCE_URL}
+    username: ${PERSEFONIA_DATASOURCE_USERNAME}
+    password: ${PERSEFONIA_DATASOURCE_PASSWORD}
+    hikari:
+      maximum-pool-size: 10
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    default-schema: operations
+    schemas: operations
+    create-schemas: true
+  data:
+    redis:
+      host: ${PERSEFONIA_REDIS_HOST:localhost}
+      port: ${PERSEFONIA_REDIS_PORT:6379}

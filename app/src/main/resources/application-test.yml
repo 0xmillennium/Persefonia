@@ -1,0 +1,7 @@
+spring:
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    default-schema: operations
+    schemas: operations
+    create-schemas: true

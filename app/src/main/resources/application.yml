@@ -1,0 +1,47 @@
+spring:
+  application:
+    name: persefonia
+  profiles:
+    default: local
+  threads:
+    virtual:
+      enabled: true
+
+management:
+  server:
+    port: ${PERSEFONIA_MANAGEMENT_PORT:9001}
+    address: ${PERSEFONIA_MANAGEMENT_ADDRESS:127.0.0.1}
+  endpoints:
+    web:
+      base-path: /actuator
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      application: persefonia
+
+persefonia:
+  observability:
+    request-id:
+      response-header: X-Request-Id
+      incoming-header: X-Request-Id
+      trust-incoming-header: false
+      max-length: 80
+
+logging:
+  structured:
+    format:
+      console: logstash
+
+site:
+  public-base-url: ${PERSEFONIA_PUBLIC_BASE_URL:https://0xmillennium.dev}
+  owner-alias: ${PERSEFONIA_OWNER_ALIAS:0xmillennium}
+
+gg:
+  jte:
+    use-precompiled-templates: true
