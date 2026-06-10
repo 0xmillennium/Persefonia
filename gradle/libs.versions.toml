@@ -28,3 +28,6 @@ testcontainers-postgresql = { module = "org.testcontainers:testcontainers-postgr
 jte-spring-boot4-starter = { module = "gg.jte:jte-spring-boot-starter-4", version.ref = "jte" }
 spring-webmvc = { module = "org.springframework:spring-webmvc" }
 archunit-junit5 = { module = "com.tngtech.archunit:archunit-junit5", version.ref = "archunit" }
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+assertj-core = { module = "org.assertj:assertj-core" }

@@ -17,7 +17,7 @@ import org.springframework.test.web.servlet.MockMvc;
         "spring.flyway.enabled=false"
 })
 @AutoConfigureMockMvc
-class AdminRouteNotExposedYetTest {
+class AdminRouteProtectionRegressionTest {
     @Autowired
     private MockMvc mockMvc;
 
