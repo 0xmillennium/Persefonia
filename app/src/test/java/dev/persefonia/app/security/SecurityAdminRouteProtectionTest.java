@@ -38,9 +38,9 @@ class SecurityAdminRouteProtectionTest {
 
             assertFalse(response.statusCode() >= 200 && response.statusCode() < 300, path);
             assertTrue(response.headers().firstValue("X-Request-Id").orElse("").matches("[A-Za-z0-9._-]+"), path);
-            assertFalse(body.contains("persefonia admin shell"), path);
-            assertFalse(body.contains("authentication will be added"), path);
-            assertFalse(body.contains("admin shell"), path);
+            assertTrue(response.headers().firstValue("Cache-Control").orElse("").contains("no-store"), path);
+            assertFalse(body.contains("persefonia admin"), path);
+            assertFalse(body.contains("logout"), path);
         }
     }
 

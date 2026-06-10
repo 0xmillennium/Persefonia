@@ -25,9 +25,11 @@ class AdminRouteProtectionRegressionTest {
     void adminRoutesRemainUnexposed() throws Exception {
         mockMvc.perform(get("/admin"))
                 .andExpect(status().is4xxClientError())
-                .andExpect(content().string(not(containsString("Persefonia Admin Shell"))));
+                .andExpect(content().string(not(containsString("Persefonia Admin"))))
+                .andExpect(content().string(not(containsString("Logout"))));
         mockMvc.perform(get("/admin/"))
                 .andExpect(status().is4xxClientError())
-                .andExpect(content().string(not(containsString("Persefonia Admin Shell"))));
+                .andExpect(content().string(not(containsString("Persefonia Admin"))))
+                .andExpect(content().string(not(containsString("Logout"))));
     }
 }

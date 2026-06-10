@@ -1,6 +1,7 @@
 package dev.persefonia.app.security.oidc;
 
 import static org.mockito.Mockito.mock;
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -50,6 +51,10 @@ class OidcLoginSecurityConfigurationTest {
     void oauth2AuthorizationEndpointIsAvailableForAuthelia() throws Exception {
         mockMvc.perform(get("/oauth2/authorization/authelia"))
                 .andExpect(status().is3xxRedirection())
+                .andExpect(header().string("Cache-Control", containsString("no-store")))
+                .andExpect(header().string("Cache-Control", containsString("private")))
+                .andExpect(header().string("Pragma", "no-cache"))
+                .andExpect(header().dateValue("Expires", 0))
                 .andExpect(header().string("Location", org.hamcrest.Matchers.startsWith("https://auth.example/authorize")));
     }
 
