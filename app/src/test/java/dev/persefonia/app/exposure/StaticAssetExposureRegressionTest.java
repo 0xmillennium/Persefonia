@@ -45,7 +45,7 @@ class StaticAssetExposureRegressionTest {
         }
 
         for (String path : FORBIDDEN_RESOURCES) {
-            ExposureTestSupport.assertStatus(applicationPort, path, 404);
+            ExposureTestSupport.assertNotSuccessful(applicationPort, path);
         }
     }
 }

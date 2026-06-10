@@ -45,13 +45,13 @@ class ActuatorExposureRegressionTest {
     @Test
     void actuatorIsLimitedToTheManagementPortAllowlist() throws Exception {
         for (String path : ALLOWED_ENDPOINTS) {
-            ExposureTestSupport.assertStatus(applicationPort, path, 404);
+            ExposureTestSupport.assertNotSuccessful(applicationPort, path);
             ExposureTestSupport.assertStatus(managementPort, path, 200);
         }
 
         for (String path : SENSITIVE_ENDPOINTS) {
-            ExposureTestSupport.assertStatus(applicationPort, path, 404);
-            ExposureTestSupport.assertStatus(managementPort, path, 404);
+            ExposureTestSupport.assertNotSuccessful(applicationPort, path);
+            ExposureTestSupport.assertNotSuccessful(managementPort, path);
         }
     }
 }

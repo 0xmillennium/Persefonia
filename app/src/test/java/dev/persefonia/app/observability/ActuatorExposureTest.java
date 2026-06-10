@@ -1,6 +1,7 @@
 package dev.persefonia.app.observability;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -35,7 +36,7 @@ class ActuatorExposureTest {
 
     @Test
     void exposesOnlySafeEndpointsOnTheManagementPort() throws Exception {
-        assertStatus(applicationPort, "/actuator/health", 404);
+        assertNotSuccessful(applicationPort, "/actuator/health");
 
         assertStatus(managementPort, "/actuator/health", 200);
         assertStatus(managementPort, "/actuator/info", 200);
@@ -43,10 +44,10 @@ class ActuatorExposureTest {
         assertStatus(managementPort, "/actuator/prometheus", 200);
         assertRequestIdHeader(managementPort, "/actuator/health");
 
-        assertStatus(managementPort, "/actuator/env", 404);
-        assertStatus(managementPort, "/actuator/beans", 404);
-        assertStatus(managementPort, "/actuator/mappings", 404);
-        assertStatus(managementPort, "/actuator/loggers", 404);
+        assertNotSuccessful(managementPort, "/actuator/env");
+        assertNotSuccessful(managementPort, "/actuator/beans");
+        assertNotSuccessful(managementPort, "/actuator/mappings");
+        assertNotSuccessful(managementPort, "/actuator/loggers");
     }
 
     private void assertStatus(int port, String path, int expectedStatus) throws IOException, InterruptedException {
@@ -54,6 +55,13 @@ class ActuatorExposureTest {
         HttpResponse<Void> response = httpClient.send(request, HttpResponse.BodyHandlers.discarding());
 
         assertEquals(expectedStatus, response.statusCode(), path);
+    }
+
+    private void assertNotSuccessful(int port, String path) throws IOException, InterruptedException {
+        HttpRequest request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + path)).GET().build();
+        HttpResponse<Void> response = httpClient.send(request, HttpResponse.BodyHandlers.discarding());
+
+        assertFalse(response.statusCode() >= 200 && response.statusCode() < 300, path);
     }
 
     private void assertRequestIdHeader(int port, String path) throws IOException, InterruptedException {

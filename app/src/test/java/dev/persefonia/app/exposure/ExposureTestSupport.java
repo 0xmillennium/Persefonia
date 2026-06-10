@@ -1,6 +1,7 @@
 package dev.persefonia.app.exposure;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import java.io.IOException;
 import java.net.URI;
@@ -23,5 +24,10 @@ final class ExposureTestSupport {
 
     static void assertStatus(int port, String path, int expectedStatus) throws IOException, InterruptedException {
         assertEquals(expectedStatus, get(port, path).statusCode(), path);
+    }
+
+    static void assertNotSuccessful(int port, String path) throws IOException, InterruptedException {
+        int statusCode = get(port, path).statusCode();
+        assertFalse(statusCode >= 200 && statusCode < 300, path);
     }
 }

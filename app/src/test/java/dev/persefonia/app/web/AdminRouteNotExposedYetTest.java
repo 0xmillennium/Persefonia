@@ -1,6 +1,9 @@
 package dev.persefonia.app.web;
 
+import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import org.junit.jupiter.api.Test;
@@ -21,8 +24,10 @@ class AdminRouteNotExposedYetTest {
     @Test
     void adminRoutesRemainUnexposed() throws Exception {
         mockMvc.perform(get("/admin"))
-                .andExpect(status().isNotFound());
+                .andExpect(status().is4xxClientError())
+                .andExpect(content().string(not(containsString("Persefonia Admin Shell"))));
         mockMvc.perform(get("/admin/"))
-                .andExpect(status().isNotFound());
+                .andExpect(status().is4xxClientError())
+                .andExpect(content().string(not(containsString("Persefonia Admin Shell"))));
     }
 }

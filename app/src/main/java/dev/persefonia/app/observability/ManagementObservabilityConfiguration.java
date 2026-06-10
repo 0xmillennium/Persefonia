@@ -9,8 +9,9 @@ import org.springframework.core.Ordered;
 @ManagementContextConfiguration(value = ManagementContextType.CHILD, proxyBeanMethods = false)
 public class ManagementObservabilityConfiguration {
     @Bean
-    FilterRegistrationBean<RequestIdFilter> managementRequestIdFilterRegistration(RequestIdFilter requestIdFilter) {
-        FilterRegistrationBean<RequestIdFilter> registration = new FilterRegistrationBean<>(requestIdFilter);
+    FilterRegistrationBean<RequestIdFilter> managementRequestIdFilterRegistration(RequestIdProperties properties) {
+        FilterRegistrationBean<RequestIdFilter> registration =
+                new FilterRegistrationBean<>(new RequestIdFilter(properties));
         registration.setName("managementRequestIdFilter");
         registration.setOrder(Ordered.HIGHEST_PRECEDENCE);
         return registration;
