@@ -32,6 +32,12 @@ persefonia:
       incoming-header: X-Request-Id
       trust-incoming-header: false
       max-length: 80
+  security:
+    admin-access:
+      allowlisted-subjects: ${PERSEFONIA_ADMIN_ALLOWLISTED_SUBJECTS:}
+      allowlisted-emails: ${PERSEFONIA_ADMIN_ALLOWLISTED_EMAILS:}
+      automatic-provisioning-enabled: false
+      initial-owner-bootstrap-enabled: true
 
 logging:
   structured:

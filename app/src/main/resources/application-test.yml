@@ -5,3 +5,11 @@ spring:
     default-schema: operations
     schemas: operations
     create-schemas: true
+
+persefonia:
+  security:
+    admin-access:
+      allowlisted-subjects: []
+      allowlisted-emails: []
+      automatic-provisioning-enabled: false
+      initial-owner-bootstrap-enabled: true
