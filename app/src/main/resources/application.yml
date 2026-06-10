@@ -7,6 +7,14 @@ spring:
     virtual:
       enabled: true
 
+server:
+  servlet:
+    session:
+      cookie:
+        http-only: true
+        same-site: lax
+        secure: ${PERSEFONIA_SESSION_COOKIE_SECURE:false}
+
 management:
   server:
     port: ${PERSEFONIA_MANAGEMENT_PORT:9001}
