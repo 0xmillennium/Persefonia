@@ -86,7 +86,10 @@ class CompositionBoundaryArchitectureTest {
                         "org.springframework.data..",
                         "org.springframework.jdbc..",
                         "java.sql..",
-                        "javax.sql..")
+                        "javax.sql..",
+                        "dev.persefonia.app..",
+                        "dev.persefonia.webadmin..",
+                        "dev.persefonia.webpublic..")
                 .allowEmptyShould(true)
                 .check(ArchitectureTestSupport.PRODUCTION_CLASSES);
     }
