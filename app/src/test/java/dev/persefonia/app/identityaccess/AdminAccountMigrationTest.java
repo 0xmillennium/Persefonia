@@ -97,7 +97,18 @@ class AdminAccountMigrationTest {
                         "chk_admin_accounts_email_not_blank",
                         "chk_admin_accounts_normalized_email_not_blank",
                         "chk_admin_accounts_display_name_not_blank",
+                        "chk_admin_accounts_oidc_subject_max_length",
+                        "chk_admin_accounts_email_max_length",
+                        "chk_admin_accounts_normalized_email_max_length",
+                        "chk_admin_accounts_display_name_max_length",
+                        "chk_admin_accounts_normalized_email_lowercase",
+                        "chk_admin_accounts_oidc_subject_trimmed",
+                        "chk_admin_accounts_email_trimmed",
+                        "chk_admin_accounts_normalized_email_trimmed",
+                        "chk_admin_accounts_display_name_trimmed",
                         "chk_admin_accounts_status",
+                        "chk_admin_accounts_updated_at_not_before_created_at",
+                        "chk_admin_accounts_last_login_at_not_before_created_at",
                         "chk_admin_accounts_version_non_negative",
                         "pk_admin_account_roles",
                         "fk_admin_account_roles_admin_account",
@@ -167,6 +178,122 @@ class AdminAccountMigrationTest {
     }
 
     @Test
+    void rejectsTooLongOidcSubject() {
+        assertAccountRejected(
+                UUID.randomUUID(),
+                "s".repeat(513),
+                "owner@example.com",
+                "owner@example.com",
+                "Owner",
+                "ACTIVE");
+    }
+
+    @Test
+    void rejectsTooLongEmail() {
+        assertAccountRejected(
+                UUID.randomUUID(),
+                "subject-too-long-email",
+                "a".repeat(309) + "@example.com",
+                "owner@example.com",
+                "Owner",
+                "ACTIVE");
+    }
+
+    @Test
+    void rejectsTooLongNormalizedEmail() {
+        assertAccountRejected(
+                UUID.randomUUID(),
+                "subject-too-long-normalized-email",
+                "owner@example.com",
+                "a".repeat(309) + "@example.com",
+                "Owner",
+                "ACTIVE");
+    }
+
+    @Test
+    void rejectsTooLongDisplayName() {
+        assertAccountRejected(
+                UUID.randomUUID(),
+                "subject-too-long-display-name",
+                "owner@example.com",
+                "owner@example.com",
+                "O".repeat(201),
+                "ACTIVE");
+    }
+
+    @Test
+    void rejectsUppercaseNormalizedEmail() {
+        assertAccountRejected(
+                UUID.randomUUID(),
+                "subject-uppercase-normalized-email",
+                "owner@example.com",
+                "Owner@Example.com",
+                "Owner",
+                "ACTIVE");
+    }
+
+    @Test
+    void rejectsUpdatedAtBeforeCreatedAt() {
+        assertTimedAccountRejected(
+                UUID.randomUUID(),
+                "subject-updated-before-created",
+                "owner@example.com",
+                "owner@example.com",
+                "Owner",
+                "ACTIVE",
+                "'2026-06-11T08:00:00Z'::timestamp with time zone",
+                "'2026-06-11T07:59:59Z'::timestamp with time zone",
+                null);
+    }
+
+    @Test
+    void rejectsLastLoginAtBeforeCreatedAt() {
+        assertTimedAccountRejected(
+                UUID.randomUUID(),
+                "subject-login-before-created",
+                "owner@example.com",
+                "owner@example.com",
+                "Owner",
+                "ACTIVE",
+                "'2026-06-11T08:00:00Z'::timestamp with time zone",
+                "'2026-06-11T08:00:00Z'::timestamp with time zone",
+                "2026-06-11T07:59:59Z");
+    }
+
+    @Test
+    void rejectsUntrimmedEmail() {
+        assertAccountRejected(
+                UUID.randomUUID(),
+                "subject-untrimmed-email",
+                " owner@example.com",
+                "owner@example.com",
+                "Owner",
+                "ACTIVE");
+    }
+
+    @Test
+    void rejectsUntrimmedNormalizedEmail() {
+        assertAccountRejected(
+                UUID.randomUUID(),
+                "subject-untrimmed-normalized-email",
+                "owner@example.com",
+                "owner@example.com ",
+                "Owner",
+                "ACTIVE");
+    }
+
+    @Test
+    void rejectsUntrimmedDisplayName() {
+        assertAccountRejected(
+                UUID.randomUUID(),
+                "subject-untrimmed-display-name",
+                "owner@example.com",
+                "owner@example.com",
+                " Owner",
+                "ACTIVE");
+    }
+
+    @Test
     void roleRowsCascadeWhenAccountDeleted() throws SQLException {
         String accountId = UUID.randomUUID().toString();
         insertAccount(accountId, "cascade-subject", "cascade@example.com", "ACTIVE");
@@ -211,6 +338,29 @@ class AdminAccountMigrationTest {
                 .isInstanceOf(SQLException.class);
     }
 
+    private static void assertTimedAccountRejected(
+            UUID id,
+            String oidcSubject,
+            String email,
+            String normalizedEmail,
+            String displayName,
+            String status,
+            String createdAt,
+            String updatedAt,
+            String lastLoginAt) {
+        assertThatThrownBy(() -> insertAccount(
+                id.toString(),
+                oidcSubject,
+                email,
+                normalizedEmail,
+                displayName,
+                status,
+                createdAt,
+                updatedAt,
+                lastLoginAt))
+                .isInstanceOf(SQLException.class);
+    }
+
     private static void assertSqlRejected(String sql) {
         assertThatThrownBy(() -> execute(sql)).isInstanceOf(SQLException.class);
     }
@@ -239,19 +389,45 @@ class AdminAccountMigrationTest {
             String normalizedEmail,
             String displayName,
             String status) throws SQLException {
+        insertAccount(
+                id,
+                oidcSubject,
+                email,
+                normalizedEmail,
+                displayName,
+                status,
+                "now()",
+                "now()",
+                null);
+    }
+
+    private static void insertAccount(
+            String id,
+            String oidcSubject,
+            String email,
+            String normalizedEmail,
+            String displayName,
+            String status,
+            String createdAt,
+            String updatedAt,
+            String lastLoginAt) throws SQLException {
+        String lastLoginValue = lastLoginAt == null ? "NULL" : "?::timestamp with time zone";
         try (Connection connection = POSTGRES.createConnection("");
                 PreparedStatement statement = connection.prepareStatement("""
                         INSERT INTO iam.admin_accounts (
                             id, oidc_subject, email, normalized_email, display_name,
-                            status, created_at, updated_at, version
-                        ) VALUES (?::uuid, ?, ?, ?, ?, ?, now(), now(), 0)
-                        """)) {
+                            status, created_at, updated_at, last_login_at, version
+                        ) VALUES (?::uuid, ?, ?, ?, ?, ?, %s, %s, %s, 0)
+                        """.formatted(createdAt, updatedAt, lastLoginValue))) {
             statement.setString(1, id);
             statement.setString(2, oidcSubject);
             statement.setString(3, email);
             statement.setString(4, normalizedEmail);
             statement.setString(5, displayName);
             statement.setString(6, status);
+            if (lastLoginAt != null) {
+                statement.setString(7, lastLoginAt);
+            }
             statement.executeUpdate();
         }
     }

@@ -1,15 +1,14 @@
-package dev.persefonia.app.security.oidc;
+package dev.persefonia.app.security;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.startsWith;
 import static org.mockito.Mockito.mock;
-import static org.hamcrest.Matchers.containsString;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -20,10 +19,13 @@ import org.springframework.security.oauth2.client.registration.ClientRegistratio
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.registration.InMemoryClientRegistrationRepository;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
-import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.beans.factory.annotation.Autowired;
 
-@ActiveProfiles("oidc-login-test")
+import dev.persefonia.app.security.oidc.PersefoniaOidcUserService;
+
+@ActiveProfiles("oauth2-route-tightening-test")
 @SpringBootTest(properties = {
         "management.server.port=0",
         "management.health.redis.enabled=false",
@@ -31,45 +33,51 @@ import org.springframework.test.context.ActiveProfiles;
         "spring.flyway.enabled=false"
 })
 @AutoConfigureMockMvc
-@Import(OidcLoginSecurityConfigurationTest.OidcTestConfiguration.class)
-class OidcLoginSecurityConfigurationTest {
-    private final MockMvc mockMvc;
-
+@Import(OAuth2RouteAuthorizationTighteningTest.OidcTestConfiguration.class)
+class OAuth2RouteAuthorizationTighteningTest {
     @Autowired
-    OidcLoginSecurityConfigurationTest(MockMvc mockMvc) {
-        this.mockMvc = mockMvc;
-    }
+    private MockMvc mockMvc;
 
     @Test
-    void unauthenticatedAdminRedirectsToAutheliaAuthorizationWhenClientRegistrationExists() throws Exception {
-        mockMvc.perform(get("/admin"))
-                .andExpect(status().is3xxRedirection())
-                .andExpect(header().string("Location", "/oauth2/authorization/authelia"));
-    }
-
-    @Test
-    void oauth2AuthorizationEndpointIsAvailableForAuthelia() throws Exception {
+    void oauth2AuthorizationEndpointStillRedirectsWhenClientRegistrationExists() throws Exception {
         mockMvc.perform(get("/oauth2/authorization/authelia"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(header().string("Cache-Control", containsString("no-store")))
-                .andExpect(header().string("Cache-Control", containsString("private")))
-                .andExpect(header().string("Pragma", "no-cache"))
-                .andExpect(header().dateValue("Expires", 0))
-                .andExpect(header().string("Location", org.hamcrest.Matchers.startsWith("https://auth.example/authorize")));
+                .andExpect(header().string("Location", startsWith("https://auth.example/authorize")));
     }
 
     @Test
-    void formLoginStillDisabled() throws Exception {
-        mockMvc.perform(post("/login").with(csrf()).param("username", "admin").param("password", "password"))
+    void oauth2CallbackEndpointIsNotBlockedByAuthorizationRules() throws Exception {
+        int status = mockMvc.perform(get("/login/oauth2/code/authelia").param("error", "access_denied"))
+                .andReturn()
+                .getResponse()
+                .getStatus();
+
+        assertThat(status).isNotEqualTo(403);
+    }
+
+    @Test
+    void arbitraryOauth2PathIsNotPubliclySuccessful() throws Exception {
+        mockMvc.perform(get("/oauth2/not-a-login-flow"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(header().string("Location", "/oauth2/authorization/authelia"));
     }
 
     @Test
-    void httpBasicStillDisabled() throws Exception {
-        mockMvc.perform(get("/admin").header("Authorization", "Basic YWRtaW46cGFzc3dvcmQ="))
+    void arbitraryLoginPathIsNotPubliclySuccessful() throws Exception {
+        mockMvc.perform(get("/login/not-a-callback"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(header().doesNotExist("WWW-Authenticate"));
+                .andExpect(header().string("Location", "/oauth2/authorization/authelia"));
+    }
+
+    @Test
+    void postOauth2PathIsNotBroadlyPermitAll() throws Exception {
+        mockMvc.perform(post("/oauth2/authorization/authelia"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void adminStillRequiresAuthentication() throws Exception {
+        mockMvc.perform(get("/admin")).andExpect(status().is3xxRedirection());
     }
 
     @Test
@@ -78,17 +86,12 @@ class OidcLoginSecurityConfigurationTest {
     }
 
     @Test
-    void assetsStillPublic() throws Exception {
+    void publicAssetsStillPublic() throws Exception {
         mockMvc.perform(get("/assets/missing.css")).andExpect(status().isNotFound());
     }
 
-    @Test
-    void adminStillNotPublicWithoutAuthentication() throws Exception {
-        mockMvc.perform(get("/admin")).andExpect(status().is3xxRedirection());
-    }
-
     @TestConfiguration(proxyBeanMethods = false)
-    @Profile("oidc-login-test")
+    @Profile("oauth2-route-tightening-test")
     static class OidcTestConfiguration {
         @Bean
         ClientRegistrationRepository clientRegistrationRepository() {

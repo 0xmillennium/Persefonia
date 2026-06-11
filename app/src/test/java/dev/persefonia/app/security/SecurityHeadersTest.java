@@ -1,40 +1,103 @@
 package dev.persefonia.app.security;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.nullValue;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.test.web.servlet.MockMvc;
+
+import dev.persefonia.app.security.admin.AdminAuthenticationTestSupport;
+import dev.persefonia.identityaccess.domain.admin.AdminRole;
 
 @SpringBootTest(
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {
                 "management.server.port=0",
                 "management.health.redis.enabled=false",
                 "spring.autoconfigure.exclude=org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration",
                 "spring.flyway.enabled=false"
         })
+@AutoConfigureMockMvc
 class SecurityHeadersTest {
-    @LocalServerPort
-    private int applicationPort;
+    private static final String CONTENT_SECURITY_POLICY =
+            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
+                    + "object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'";
+    private static final String PERMISSIONS_POLICY =
+            "camera=(), microphone=(), geolocation=(), payment=(), usb=()";
+
+    @Autowired
+    private MockMvc mockMvc;
 
     @Test
-    void publicResponsesIncludeBaselineSecurityHeaders() throws Exception {
-        HttpRequest request = HttpRequest.newBuilder(
-                        URI.create("http://127.0.0.1:" + applicationPort + "/"))
-                .GET()
-                .build();
-        HttpResponse<Void> response =
-                HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.discarding());
+    void publicHomeHasContentSecurityPolicy() throws Exception {
+        mockMvc.perform(get("/"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Security-Policy", CONTENT_SECURITY_POLICY));
+    }
 
-        assertEquals("nosniff", response.headers().firstValue("X-Content-Type-Options").orElse(""));
-        assertFalse(response.headers().firstValue("X-Frame-Options").orElse("").isBlank());
-        assertEquals("no-referrer", response.headers().firstValue("Referrer-Policy").orElse(""));
+    @Test
+    void authenticatedAdminHasContentSecurityPolicy() throws Exception {
+        mockMvc.perform(get("/admin")
+                        .with(authentication(AdminAuthenticationTestSupport.authentication(AdminRole.OWNER))))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Security-Policy", CONTENT_SECURITY_POLICY));
+    }
+
+    @Test
+    void publicHomeHasPermissionsPolicy() throws Exception {
+        mockMvc.perform(get("/"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Permissions-Policy", PERMISSIONS_POLICY));
+    }
+
+    @Test
+    void authenticatedAdminHasPermissionsPolicy() throws Exception {
+        mockMvc.perform(get("/admin")
+                        .with(authentication(AdminAuthenticationTestSupport.authentication(AdminRole.OWNER))))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Permissions-Policy", PERMISSIONS_POLICY));
+    }
+
+    @Test
+    void nosniffStillPresent() throws Exception {
+        mockMvc.perform(get("/"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("X-Content-Type-Options", "nosniff"));
+    }
+
+    @Test
+    void frameOptionsStillPresent() throws Exception {
+        mockMvc.perform(get("/"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("X-Frame-Options", not(nullValue())));
+    }
+
+    @Test
+    void referrerPolicyStillNoReferrer() throws Exception {
+        mockMvc.perform(get("/"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Referrer-Policy", "no-referrer"));
+    }
+
+    @Test
+    void hstsIsNotRequiredInLocalHttpProfile() throws Exception {
+        mockMvc.perform(get("/"))
+                .andExpect(status().isOk())
+                .andExpect(header().doesNotExist("Strict-Transport-Security"));
+    }
+
+    @Test
+    void unauthenticatedAdminRedirectHasSecurityHeaders() throws Exception {
+        mockMvc.perform(get("/admin"))
+                .andExpect(status().is4xxClientError())
+                .andExpect(header().string("Content-Security-Policy", containsString("default-src 'self'")))
+                .andExpect(header().string("Permissions-Policy", PERMISSIONS_POLICY));
     }
 }

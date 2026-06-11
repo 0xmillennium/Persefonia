@@ -54,8 +54,8 @@ class SensitiveRouteCacheHeadersTest {
     }
 
     @Test
-    void loginRouteHasNoStoreIfPresent() throws Exception {
-        assertNoStore(mockMvc.perform(get("/login/missing")).andExpect(status().isNotFound()));
+    void loginOauth2CallbackRouteHasNoStoreIfPresent() throws Exception {
+        assertNoStore(mockMvc.perform(get("/login/oauth2/code/authelia")).andExpect(status().isNotFound()));
     }
 
     @Test

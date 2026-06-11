@@ -17,7 +17,7 @@ public final class SensitiveRouteCacheHeadersFilter extends OncePerRequestFilter
             HttpServletRequest request,
             HttpServletResponse response,
             FilterChain filterChain) throws ServletException, IOException {
-        if (isSensitivePath(request.getRequestURI())) {
+        if (isSensitivePath(pathWithinApplication(request))) {
             response.setHeader("Cache-Control", CACHE_CONTROL);
             response.setHeader("Pragma", "no-cache");
             response.setDateHeader("Expires", 0);
@@ -25,11 +25,24 @@ public final class SensitiveRouteCacheHeadersFilter extends OncePerRequestFilter
         filterChain.doFilter(request, response);
     }
 
+    private static String pathWithinApplication(HttpServletRequest request) {
+        String requestUri = request.getRequestURI();
+        String contextPath = request.getContextPath();
+        if (contextPath == null || contextPath.isEmpty()) {
+            return requestUri;
+        }
+        if (requestUri.startsWith(contextPath)) {
+            String path = requestUri.substring(contextPath.length());
+            return path.isEmpty() ? "/" : path;
+        }
+        return requestUri;
+    }
+
     private static boolean isSensitivePath(String path) {
         return path.equals("/admin")
                 || path.startsWith("/admin/")
-                || path.startsWith("/login/")
-                || path.startsWith("/oauth2/")
+                || path.startsWith("/login/oauth2/code/")
+                || path.startsWith("/oauth2/authorization/")
                 || path.equals("/logout");
     }
 }

@@ -16,7 +16,20 @@ CREATE TABLE iam.admin_accounts (
     CONSTRAINT chk_admin_accounts_email_not_blank CHECK (btrim(email) <> ''),
     CONSTRAINT chk_admin_accounts_normalized_email_not_blank CHECK (btrim(normalized_email) <> ''),
     CONSTRAINT chk_admin_accounts_display_name_not_blank CHECK (btrim(display_name) <> ''),
+    CONSTRAINT chk_admin_accounts_oidc_subject_max_length CHECK (char_length(oidc_subject) <= 512),
+    CONSTRAINT chk_admin_accounts_email_max_length CHECK (char_length(email) <= 320),
+    CONSTRAINT chk_admin_accounts_normalized_email_max_length CHECK (char_length(normalized_email) <= 320),
+    CONSTRAINT chk_admin_accounts_display_name_max_length CHECK (char_length(display_name) <= 200),
+    CONSTRAINT chk_admin_accounts_normalized_email_lowercase CHECK (normalized_email = lower(normalized_email)),
+    CONSTRAINT chk_admin_accounts_oidc_subject_trimmed CHECK (oidc_subject = btrim(oidc_subject)),
+    CONSTRAINT chk_admin_accounts_email_trimmed CHECK (email = btrim(email)),
+    CONSTRAINT chk_admin_accounts_normalized_email_trimmed CHECK (normalized_email = btrim(normalized_email)),
+    CONSTRAINT chk_admin_accounts_display_name_trimmed CHECK (display_name = btrim(display_name)),
     CONSTRAINT chk_admin_accounts_status CHECK (status IN ('ACTIVE', 'DISABLED')),
+    CONSTRAINT chk_admin_accounts_updated_at_not_before_created_at CHECK (updated_at >= created_at),
+    CONSTRAINT chk_admin_accounts_last_login_at_not_before_created_at CHECK (
+        last_login_at IS NULL OR last_login_at >= created_at
+    ),
     CONSTRAINT chk_admin_accounts_version_non_negative CHECK (version >= 0)
 );
 

@@ -11,6 +11,8 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.header.writers.ContentSecurityPolicyHeaderWriter;
+import org.springframework.security.web.header.writers.PermissionsPolicyHeaderWriter;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 import org.springframework.security.web.util.matcher.NegatedRequestMatcher;
 
@@ -19,6 +21,11 @@ import dev.persefonia.app.security.oidc.PersefoniaOidcUserService;
 @Configuration(proxyBeanMethods = false)
 @EnableWebSecurity
 public class SecurityConfiguration {
+    static final String CONTENT_SECURITY_POLICY =
+            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
+                    + "object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'";
+    static final String PERMISSIONS_POLICY = "camera=(), microphone=(), geolocation=(), payment=(), usb=()";
+
     @Bean
     SecurityFilterChain applicationSecurityFilterChain(
             HttpSecurity http,
@@ -29,7 +36,8 @@ public class SecurityConfiguration {
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.GET, "/").permitAll()
                         .requestMatchers(HttpMethod.GET, "/assets/**").permitAll()
-                        .requestMatchers("/login/**", "/oauth2/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/oauth2/authorization/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/login/oauth2/code/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/logout").authenticated()
                         .requestMatchers("/admin", "/admin/**").authenticated()
                         .anyRequest().denyAll())
@@ -43,6 +51,8 @@ public class SecurityConfiguration {
                         .clearAuthentication(true)
                         .deleteCookies("JSESSIONID"))
                 .headers(headers -> headers
+                        .addHeaderWriter(new ContentSecurityPolicyHeaderWriter(CONTENT_SECURITY_POLICY))
+                        .addHeaderWriter(new PermissionsPolicyHeaderWriter(PERMISSIONS_POLICY))
                         .referrerPolicy(referrer -> referrer
                                 .policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER)));
 
