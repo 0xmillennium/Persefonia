@@ -22,7 +22,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
-import dev.persefonia.app.identityaccess.bootstrap.AdminBootstrapService;
+import dev.persefonia.app.identityaccess.bootstrap.TransactionalAdminBootstrapGateway;
 import dev.persefonia.identityaccess.domain.admin.AdminAccountRepository;
 import dev.persefonia.identityaccess.domain.admin.OidcSubject;
 
@@ -57,7 +57,7 @@ class OidcAdminBootstrapIntegrationTest {
     private OidcClaimMapper claimMapper;
 
     @Autowired
-    private AdminBootstrapService bootstrapService;
+    private TransactionalAdminBootstrapGateway bootstrapGateway;
 
     @Autowired
     private AdminAccountRepository repository;
@@ -149,7 +149,7 @@ class OidcAdminBootstrapIntegrationTest {
     private PersefoniaOidcUser loadUser(String subject, String email) {
         PersefoniaOidcUserService service = new PersefoniaOidcUserService(
                 claimMapper,
-                bootstrapService,
+                bootstrapGateway,
                 request -> OidcTestFixtures.user(Map.of(
                         "sub", subject,
                         "email", email,

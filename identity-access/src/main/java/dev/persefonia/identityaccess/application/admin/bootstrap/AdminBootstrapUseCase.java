@@ -1,13 +1,9 @@
-package dev.persefonia.app.identityaccess.bootstrap;
+package dev.persefonia.identityaccess.application.admin.bootstrap;
 
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Set;
-
-import org.springframework.context.annotation.Lazy;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import dev.persefonia.identityaccess.domain.admin.AdminAccount;
 import dev.persefonia.identityaccess.domain.admin.AdminAccountId;
@@ -19,26 +15,23 @@ import dev.persefonia.identityaccess.domain.admin.access.AdminAccessDenialReason
 import dev.persefonia.identityaccess.domain.admin.access.AdminAccessPolicy;
 import dev.persefonia.identityaccess.domain.admin.access.AdminIdentityClaims;
 
-@Service
-@Lazy
-public class AdminBootstrapService {
+public final class AdminBootstrapUseCase {
     private final AdminAccountRepository repository;
     private final AdminAccessPolicy accessPolicy;
     private final AdminBootstrapLock bootstrapLock;
     private final Clock clock;
 
-    public AdminBootstrapService(
+    public AdminBootstrapUseCase(
             AdminAccountRepository repository,
             AdminAccessPolicy accessPolicy,
             AdminBootstrapLock bootstrapLock,
             Clock clock) {
-        this.repository = repository;
-        this.accessPolicy = accessPolicy;
-        this.bootstrapLock = bootstrapLock;
-        this.clock = clock;
+        this.repository = Objects.requireNonNull(repository, "repository");
+        this.accessPolicy = Objects.requireNonNull(accessPolicy, "accessPolicy");
+        this.bootstrapLock = Objects.requireNonNull(bootstrapLock, "bootstrapLock");
+        this.clock = Objects.requireNonNull(clock, "clock");
     }
 
-    @Transactional
     public AdminBootstrapResult resolveOrBootstrap(AdminIdentityClaims claims) {
         Objects.requireNonNull(claims, "claims");
         bootstrapLock.acquire();

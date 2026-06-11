@@ -15,7 +15,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 
-import dev.persefonia.app.identityaccess.bootstrap.AdminBootstrapService;
+import dev.persefonia.app.identityaccess.bootstrap.TransactionalAdminBootstrapGateway;
+import dev.persefonia.identityaccess.application.admin.bootstrap.AdminBootstrapUseCase;
 import dev.persefonia.identityaccess.domain.admin.AdminAccount;
 import dev.persefonia.identityaccess.domain.admin.AdminAccountId;
 import dev.persefonia.identityaccess.domain.admin.AdminAccountRepository;
@@ -40,7 +41,7 @@ class PersefoniaOidcUserServiceTest {
     }
 
     @Test
-    void callsAdminBootstrapServiceWithMappedClaims() {
+    void callsAdminBootstrapGatewayWithMappedClaims() {
         var user = (PersefoniaOidcUser) ownerService(OidcTestFixtures.validUser()).loadUser(null);
 
         assertThat(user.adminPrincipal().oidcSubject().value()).isEqualTo("opaque-subject");
@@ -144,13 +145,16 @@ class PersefoniaOidcUserServiceTest {
             org.springframework.security.oauth2.core.oidc.user.OidcUser delegateUser,
             AdminAccountRepository repository,
             AdminAccessPolicy policy) {
-        AdminBootstrapService bootstrapService = new AdminBootstrapService(
+        AdminBootstrapUseCase useCase = new AdminBootstrapUseCase(
                 repository,
                 policy,
                 () -> {
                 },
                 Clock.fixed(NOW, ZoneOffset.UTC));
-        return new PersefoniaOidcUserService(new OidcClaimMapper(), bootstrapService, request -> delegateUser);
+        return new PersefoniaOidcUserService(
+                new OidcClaimMapper(),
+                new TransactionalAdminBootstrapGateway(useCase),
+                request -> delegateUser);
     }
 
     private static AdminAccount account(String subject, String email, AdminRole role) {

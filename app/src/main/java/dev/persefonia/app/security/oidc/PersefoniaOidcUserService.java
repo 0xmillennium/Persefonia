@@ -12,7 +12,7 @@ import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Component;
 
-import dev.persefonia.app.identityaccess.bootstrap.AdminBootstrapService;
+import dev.persefonia.app.identityaccess.bootstrap.TransactionalAdminBootstrapGateway;
 import dev.persefonia.app.security.admin.AdminPrincipal;
 import dev.persefonia.identityaccess.domain.admin.AdminAccount;
 import dev.persefonia.identityaccess.domain.admin.access.AdminAccessDeniedException;
@@ -22,20 +22,22 @@ import dev.persefonia.identityaccess.domain.admin.access.AdminIdentityClaims;
 @Lazy
 public final class PersefoniaOidcUserService implements OAuth2UserService<OidcUserRequest, OidcUser> {
     private final OidcClaimMapper claimMapper;
-    private final AdminBootstrapService adminBootstrapService;
+    private final TransactionalAdminBootstrapGateway adminBootstrapGateway;
     private final OAuth2UserService<OidcUserRequest, OidcUser> delegate;
 
     @Autowired
-    public PersefoniaOidcUserService(OidcClaimMapper claimMapper, AdminBootstrapService adminBootstrapService) {
-        this(claimMapper, adminBootstrapService, new OidcUserService());
+    public PersefoniaOidcUserService(
+            OidcClaimMapper claimMapper,
+            TransactionalAdminBootstrapGateway adminBootstrapGateway) {
+        this(claimMapper, adminBootstrapGateway, new OidcUserService());
     }
 
     PersefoniaOidcUserService(
             OidcClaimMapper claimMapper,
-            AdminBootstrapService adminBootstrapService,
+            TransactionalAdminBootstrapGateway adminBootstrapGateway,
             OAuth2UserService<OidcUserRequest, OidcUser> delegate) {
         this.claimMapper = Objects.requireNonNull(claimMapper, "claimMapper");
-        this.adminBootstrapService = Objects.requireNonNull(adminBootstrapService, "adminBootstrapService");
+        this.adminBootstrapGateway = Objects.requireNonNull(adminBootstrapGateway, "adminBootstrapGateway");
         this.delegate = Objects.requireNonNull(delegate, "delegate");
     }
 
@@ -44,7 +46,7 @@ public final class PersefoniaOidcUserService implements OAuth2UserService<OidcUs
         try {
             OidcUser delegateUser = delegate.loadUser(userRequest);
             AdminIdentityClaims claims = claimMapper.toAdminIdentityClaims(delegateUser);
-            AdminAccount account = adminBootstrapService.resolveOrBootstrap(claims).account();
+            AdminAccount account = adminBootstrapGateway.resolveOrBootstrap(claims).account();
             return new PersefoniaOidcUser(delegateUser, principalFrom(account));
         } catch (OAuth2AuthenticationException exception) {
             throw exception;

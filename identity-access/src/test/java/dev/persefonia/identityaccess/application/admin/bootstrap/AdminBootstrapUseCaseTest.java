@@ -1,4 +1,4 @@
-package dev.persefonia.app.identityaccess.bootstrap;
+package dev.persefonia.identityaccess.application.admin.bootstrap;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -6,7 +6,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -26,7 +28,7 @@ import dev.persefonia.identityaccess.domain.admin.access.AdminAccessDenialReason
 import dev.persefonia.identityaccess.domain.admin.access.AdminAccessPolicy;
 import dev.persefonia.identityaccess.domain.admin.access.AdminIdentityClaims;
 
-class AdminBootstrapServiceTest {
+class AdminBootstrapUseCaseTest {
     private static final Instant NOW = Instant.parse("2026-06-11T08:00:00Z");
     private static final Clock CLOCK = Clock.fixed(NOW, ZoneOffset.UTC);
     private static final AdminIdentityClaims OWNER_CLAIMS = claims("owner-subject", "Owner@Example.COM", "Owner");
@@ -138,9 +140,41 @@ class AdminBootstrapServiceTest {
                 publicIdentity);
     }
 
-    private static AdminBootstrapService service(AdminAccessPolicy policy, AdminAccountRepository repository) {
-        return new AdminBootstrapService(repository, policy, () -> {
-        }, CLOCK);
+    @Test
+    void lockIsAcquired() {
+        RecordingLock lock = new RecordingLock(new ArrayList<>());
+
+        service(subjectPolicy(OWNER_CLAIMS, true, false), new InMemoryRepository(), lock)
+                .resolveOrBootstrap(OWNER_CLAIMS);
+
+        assertThat(lock.acquired()).isTrue();
+    }
+
+    @Test
+    void lockIsAcquiredBeforeRepositoryMutationOrProvisioning() {
+        List<String> operations = new ArrayList<>();
+
+        service(
+                        subjectPolicy(OWNER_CLAIMS, true, false),
+                        new InMemoryRepository(operations),
+                        new RecordingLock(operations))
+                .resolveOrBootstrap(OWNER_CLAIMS);
+
+        assertThat(operations).isNotEmpty();
+        assertThat(operations.getFirst()).isEqualTo("lock.acquire");
+        assertThat(operations).containsSubsequence("lock.acquire", "repository.findByOidcSubject", "repository.save");
+    }
+
+    private static AdminBootstrapUseCase service(AdminAccessPolicy policy, AdminAccountRepository repository) {
+        return service(policy, repository, () -> {
+        });
+    }
+
+    private static AdminBootstrapUseCase service(
+            AdminAccessPolicy policy,
+            AdminAccountRepository repository,
+            AdminBootstrapLock lock) {
+        return new AdminBootstrapUseCase(repository, policy, lock, CLOCK);
     }
 
     private static AdminAccessPolicy subjectPolicy(AdminIdentityClaims claims, boolean bootstrap, boolean provisioning) {
@@ -193,9 +227,19 @@ class AdminBootstrapServiceTest {
 
     private static final class InMemoryRepository implements AdminAccountRepository {
         private final Map<AdminAccountId, AdminAccount> accounts = new LinkedHashMap<>();
+        private final List<String> operations;
+
+        private InMemoryRepository() {
+            this(new ArrayList<>());
+        }
+
+        private InMemoryRepository(List<String> operations) {
+            this.operations = operations;
+        }
 
         @Override
         public AdminAccount save(AdminAccount account) {
+            operations.add("repository.save");
             accounts.put(account.id(), account);
             return account;
         }
@@ -207,6 +251,7 @@ class AdminBootstrapServiceTest {
 
         @Override
         public Optional<AdminAccount> findByOidcSubject(OidcSubject oidcSubject) {
+            operations.add("repository.findByOidcSubject");
             return accounts.values().stream().filter(account -> account.oidcSubject().equals(oidcSubject)).findFirst();
         }
 
@@ -231,6 +276,25 @@ class AdminBootstrapServiceTest {
         @Override
         public long countAll() {
             return accounts.size();
+        }
+    }
+
+    private static final class RecordingLock implements AdminBootstrapLock {
+        private final List<String> operations;
+        private boolean acquired;
+
+        private RecordingLock(List<String> operations) {
+            this.operations = operations;
+        }
+
+        @Override
+        public void acquire() {
+            acquired = true;
+            operations.add("lock.acquire");
+        }
+
+        private boolean acquired() {
+            return acquired;
         }
     }
 }

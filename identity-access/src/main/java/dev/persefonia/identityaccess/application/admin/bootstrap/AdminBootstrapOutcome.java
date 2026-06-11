@@ -1,4 +1,4 @@
-package dev.persefonia.app.identityaccess.bootstrap;
+package dev.persefonia.identityaccess.application.admin.bootstrap;
 
 public enum AdminBootstrapOutcome {
     EXISTING_ACCOUNT,

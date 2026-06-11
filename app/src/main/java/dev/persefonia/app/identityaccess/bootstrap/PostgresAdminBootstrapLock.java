@@ -4,6 +4,8 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
+import dev.persefonia.identityaccess.application.admin.bootstrap.AdminBootstrapLock;
+
 @Component
 @Lazy
 final class PostgresAdminBootstrapLock implements AdminBootstrapLock {

@@ -1,22 +1,15 @@
 package dev.persefonia.app.architecture;
 
-import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 import org.junit.jupiter.api.Test;
 
-class BaselineClosureArchitectureTest {
+class CompositionBoundaryArchitectureTest {
     @Test
     void appDoesNotContainFeatureApplicationServices() {
         noClasses()
                 .that().resideInAPackage("dev.persefonia.app..")
-                .should().haveSimpleName("ContentApplicationService")
-                .orShould().haveSimpleName("ProjectApplicationService")
-                .orShould().haveSimpleName("MediaApplicationService")
-                .orShould().haveSimpleName("ContactApplicationService")
-                .orShould().haveSimpleName("AnalyticsApplicationService")
-                .orShould().haveSimpleName("AuditApplicationService")
-                .orShould().haveSimpleName("SettingsApplicationService")
+                .should().haveSimpleNameEndingWith("ApplicationService")
                 .allowEmptyShould(true)
                 .check(ArchitectureTestSupport.PRODUCTION_CLASSES);
     }
@@ -25,13 +18,7 @@ class BaselineClosureArchitectureTest {
     void appDoesNotContainProductionFeatureCommandHandlers() {
         noClasses()
                 .that().resideInAPackage("dev.persefonia.app..")
-                .should().haveSimpleName("ContentCommandHandler")
-                .orShould().haveSimpleName("ProjectCommandHandler")
-                .orShould().haveSimpleName("MediaCommandHandler")
-                .orShould().haveSimpleName("ContactCommandHandler")
-                .orShould().haveSimpleName("AnalyticsCommandHandler")
-                .orShould().haveSimpleName("AuditCommandHandler")
-                .orShould().haveSimpleName("SettingsCommandHandler")
+                .should().haveSimpleNameEndingWith("CommandHandler")
                 .allowEmptyShould(true)
                 .check(ArchitectureTestSupport.PRODUCTION_CLASSES);
     }
@@ -40,28 +27,20 @@ class BaselineClosureArchitectureTest {
     void appDoesNotContainProductionFeatureAdminControllers() {
         noClasses()
                 .that().resideInAPackage("dev.persefonia.app..")
-                .should().haveSimpleName("AdminContentController")
-                .orShould().haveSimpleName("AdminProjectController")
-                .orShould().haveSimpleName("AdminMediaController")
-                .orShould().haveSimpleName("AdminContactController")
-                .orShould().haveSimpleName("AdminAnalyticsController")
-                .orShould().haveSimpleName("AdminAuditController")
-                .orShould().haveSimpleName("AdminSettingsController")
+                .should().haveSimpleNameStartingWith("Admin")
+                .andShould().haveSimpleNameEndingWith("Controller")
                 .allowEmptyShould(true)
                 .check(ArchitectureTestSupport.PRODUCTION_CLASSES);
     }
 
     @Test
-    void adminBootstrapServiceIsTheOnlyDocumentedAppApplicationServiceException() {
-        classes()
-                .that().resideInAPackage("dev.persefonia.app..")
-                .and().haveSimpleNameEndingWith("Service")
-                .should().haveSimpleName("AdminBootstrapService")
-                .orShould().resideInAnyPackage(
-                        "dev.persefonia.app.security..",
-                        "dev.persefonia.app.assets..",
-                        "dev.persefonia.app.web..",
-                        "dev.persefonia.app.webadmin..")
+    void appIdentityAccessBootstrapContainsOnlyAdaptersConfigurationAndTransactionBoundary() {
+        noClasses()
+                .that().resideInAPackage("dev.persefonia.app.identityaccess.bootstrap..")
+                .should().haveSimpleNameEndingWith("Service")
+                .orShould().haveSimpleNameEndingWith("UseCase")
+                .orShould().haveSimpleNameEndingWith("CommandHandler")
+                .orShould().haveSimpleNameEndingWith("ApplicationService")
                 .allowEmptyShould(true)
                 .check(ArchitectureTestSupport.PRODUCTION_CLASSES);
     }
@@ -85,7 +64,7 @@ class BaselineClosureArchitectureTest {
     }
 
     @Test
-    void identityAccessHasNoSpringSecurityOrJdbcDependency() {
+    void identityAccessProductionCodeIsFrameworkFree() {
         noClasses()
                 .that().resideInAPackage("dev.persefonia.identityaccess..")
                 .should().dependOnClassesThat().resideInAnyPackage(
