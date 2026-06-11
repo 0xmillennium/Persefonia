@@ -35,6 +35,7 @@ dependencies {
     implementation(project(":web-admin"))
 
     implementation(libs.spring.boot.starter.actuator)
+    implementation(libs.spring.boot.starter.data.jdbc)
     implementation(libs.spring.boot.starter.data.redis)
     implementation(libs.spring.boot.starter.jdbc)
     implementation(libs.spring.boot.starter.oauth2.client)

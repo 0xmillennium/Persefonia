@@ -76,4 +76,18 @@ class CompositionBoundaryArchitectureTest {
                 .allowEmptyShould(true)
                 .check(ArchitectureTestSupport.PRODUCTION_CLASSES);
     }
+
+    @Test
+    void contentPublishingProductionCodeDoesNotDependOnSpringDataJdbcOrSqlApis() {
+        noClasses()
+                .that().resideInAPackage("dev.persefonia.contentpublishing..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "org.springframework..",
+                        "org.springframework.data..",
+                        "org.springframework.jdbc..",
+                        "java.sql..",
+                        "javax.sql..")
+                .allowEmptyShould(true)
+                .check(ArchitectureTestSupport.PRODUCTION_CLASSES);
+    }
 }
