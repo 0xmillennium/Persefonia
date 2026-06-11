@@ -54,7 +54,10 @@ import dev.persefonia.identityaccess.domain.admin.AdminRole;
         "spring.flyway.enabled=false"
 })
 @AutoConfigureMockMvc
-@Import(AdminCommandCsrfAndAuthorizationPatternTest.TestCommandConfiguration.class)
+@Import({
+        AdminCommandCsrfAndAuthorizationPatternTest.TestCommandConfiguration.class,
+        AdminCommandCsrfAndAuthorizationPatternTest.TestAdminCommandEndpoint.class
+})
 class AdminCommandCsrfAndAuthorizationPatternTest {
     private static final String TEST_COMMAND_PATH = "/admin/__test__/command";
 

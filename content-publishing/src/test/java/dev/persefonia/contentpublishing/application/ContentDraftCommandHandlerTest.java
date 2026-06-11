@@ -68,4 +68,29 @@ class ContentDraftCommandHandlerTest {
         assertThat(items.saveCount()).isZero();
         assertThat(events.events()).isEmpty();
     }
+
+    @Test
+    void updatesUnpublishedContent() {
+        var unpublished = ContentItemTestFixtures.published(ContentVisibility.PUBLIC);
+        unpublished.unpublish(NOW.minusSeconds(60));
+        items.add(unpublished);
+
+        var result = handler.update(ContentApplicationFixtures.titleAndRouteUpdate(unpublished));
+
+        assertThat(result.status()).isEqualTo(ContentStatus.UNPUBLISHED);
+        assertThat(result.title().orElseThrow().value()).isEqualTo("Updated title");
+        assertThat(items.saveCount()).isEqualTo(1);
+    }
+
+    @Test
+    void rejectsArchivedContentUpdate() {
+        var archived = ContentItemTestFixtures.completeDraft();
+        archived.archive(NOW.minusSeconds(60));
+        items.add(archived);
+
+        assertThatThrownBy(() -> handler.update(ContentApplicationFixtures.titleAndRouteUpdate(archived)))
+                .isInstanceOf(ContentCommandRejectedException.class)
+                .hasMessageContaining("draft or unpublished");
+        assertThat(items.saveCount()).isZero();
+    }
 }

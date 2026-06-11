@@ -64,6 +64,20 @@ class CompositionBoundaryArchitectureTest {
     }
 
     @Test
+    void webAdminDoesNotDependOnContentPersistenceOrJdbc() {
+        noClasses()
+                .that().resideInAPackage("dev.persefonia.webadmin..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "dev.persefonia.app.contentpublishing.persistence..",
+                        "org.springframework.data..",
+                        "org.springframework.jdbc..",
+                        "java.sql..",
+                        "javax.sql..")
+                .allowEmptyShould(true)
+                .check(ArchitectureTestSupport.PRODUCTION_CLASSES);
+    }
+
+    @Test
     void identityAccessProductionCodeIsFrameworkFree() {
         noClasses()
                 .that().resideInAPackage("dev.persefonia.identityaccess..")

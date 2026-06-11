@@ -26,7 +26,7 @@ public record AdminDashboardViewModel(
                 admin,
                 List.of(
                         AdminNavigationItem.activeLink("Dashboard", "/admin"),
-                        AdminNavigationItem.disabled("Content"),
+                        AdminNavigationItem.link("Content", "/admin/content"),
                         AdminNavigationItem.disabled("Projects"),
                         AdminNavigationItem.disabled("Media"),
                         AdminNavigationItem.disabled("Contact"),

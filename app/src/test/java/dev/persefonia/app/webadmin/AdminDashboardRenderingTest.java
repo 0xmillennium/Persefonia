@@ -16,7 +16,6 @@ import gg.jte.output.StringOutput;
 
 class AdminDashboardRenderingTest {
     private static final List<String> UNIMPLEMENTED_ROUTES = List.of(
-            "/admin/content",
             "/admin/projects",
             "/admin/media",
             "/admin/contact",
@@ -34,6 +33,11 @@ class AdminDashboardRenderingTest {
         assertThat(render())
                 .contains("aria-disabled=\"true\"")
                 .doesNotContain(UNIMPLEMENTED_ROUTES.toArray(String[]::new));
+    }
+
+    @Test
+    void dashboardLinksToContentAdmin() {
+        assertThat(render()).contains("href=\"/admin/content\"");
     }
 
     @Test

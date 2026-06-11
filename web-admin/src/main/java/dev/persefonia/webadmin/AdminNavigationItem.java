@@ -24,6 +24,10 @@ public record AdminNavigationItem(
         return new AdminNavigationItem(label, href, true, false);
     }
 
+    public static AdminNavigationItem link(String label, String href) {
+        return new AdminNavigationItem(label, href, false, false);
+    }
+
     public static AdminNavigationItem disabled(String label) {
         return new AdminNavigationItem(label, null, false, true);
     }

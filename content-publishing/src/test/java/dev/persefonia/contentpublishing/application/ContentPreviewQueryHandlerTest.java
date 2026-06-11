@@ -8,6 +8,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dev.persefonia.contentpublishing.application.command.PreviewContentCommand;
 import dev.persefonia.contentpublishing.application.exception.ContentNotFoundException;
+import dev.persefonia.contentpublishing.application.exception.ContentCommandRejectedException;
 import dev.persefonia.contentpublishing.application.service.ContentPreviewQueryHandler;
 import dev.persefonia.contentpublishing.application.support.ContentApplicationFixtures;
 import dev.persefonia.contentpublishing.application.support.FakeMarkdownRenderingService;
@@ -43,5 +44,18 @@ class ContentPreviewQueryHandlerTest {
         assertThatThrownBy(() -> handler.preview(new PreviewContentCommand(OWNER, missing, NOW)))
                 .isInstanceOf(ContentNotFoundException.class);
         assertThat(renderer.renderCount()).isZero();
+    }
+
+    @Test
+    void previewWithoutMarkdownSourceFailsClearly() {
+        var item = ContentApplicationFixtures.completeDraft();
+        item.clearMarkdownSource(NOW);
+        items.add(item);
+
+        assertThatThrownBy(() -> handler.preview(new PreviewContentCommand(OWNER, item.id(), NOW)))
+                .isInstanceOf(ContentCommandRejectedException.class)
+                .hasMessageContaining("markdown source");
+        assertThat(renderer.renderCount()).isZero();
+        assertThat(items.saveCount()).isZero();
     }
 }

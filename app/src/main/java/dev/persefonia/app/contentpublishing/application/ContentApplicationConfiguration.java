@@ -5,6 +5,7 @@ import dev.persefonia.contentpublishing.application.authorization.ContentCommand
 import dev.persefonia.contentpublishing.application.port.ContentPublishingEventPublisher;
 import dev.persefonia.contentpublishing.application.rendering.MarkdownRenderingService;
 import dev.persefonia.contentpublishing.application.service.ContentCommandService;
+import dev.persefonia.contentpublishing.application.service.ContentAdminQueryService;
 import dev.persefonia.contentpublishing.application.service.ContentDraftCommandHandler;
 import dev.persefonia.contentpublishing.application.service.ContentLifecycleCommandHandler;
 import dev.persefonia.contentpublishing.application.service.ContentPreviewQueryHandler;
@@ -46,5 +47,12 @@ class ContentApplicationConfiguration {
                 new ContentPublishCommandHandler(contentItems, revisions, renderer, authorization, events),
                 new ContentLifecycleCommandHandler(contentItems, authorization, events),
                 new ContentRevisionQueryHandler(revisions, authorization));
+    }
+
+    @Bean
+    ContentAdminQueryService contentAdminQueryService(
+            ContentItemRepository contentItems,
+            ContentCommandAuthorizationPolicy authorization) {
+        return new ContentAdminQueryService(contentItems, authorization);
     }
 }
