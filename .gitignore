@@ -111,3 +111,6 @@ app/jte-classes/
 
 # Keep Gradle wrapper jar
 !gradle/wrapper/gradle-wrapper.jar
+
+# Local-only notes and scratch decisions
+.local/
