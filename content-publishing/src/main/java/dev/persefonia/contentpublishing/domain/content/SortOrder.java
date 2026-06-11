@@ -2,8 +2,8 @@ package dev.persefonia.contentpublishing.domain.content;
 
 public record SortOrder(int value) {
     public SortOrder {
-        if (value < 0) {
-            throw new ContentValidationException("sort order must not be negative");
+        if (value < 1) {
+            throw new ContentValidationException("sort order must be positive");
         }
     }
 

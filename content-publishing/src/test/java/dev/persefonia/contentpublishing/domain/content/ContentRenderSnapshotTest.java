@@ -32,7 +32,7 @@ class ContentRenderSnapshotTest {
                 new ArrayList<>());
 
         assertThat(snapshot.headings()).isEmpty();
-        assertThatThrownBy(() -> snapshot.headings().add(RenderedHeading.of(1, "Heading", "heading", 0)))
+        assertThatThrownBy(() -> snapshot.headings().add(RenderedHeading.of(1, "Heading", "heading", 1)))
                 .isInstanceOf(UnsupportedOperationException.class);
     }
 
@@ -44,8 +44,8 @@ class ContentRenderSnapshotTest {
                 RendererVersion.of("v1"),
                 ReadingTime.minutes(1),
                 List.of(
-                        RenderedHeading.of(2, "One", "one", 0),
-                        RenderedHeading.of(2, "Two", "two", 0))))
+                        RenderedHeading.of(2, "One", "one", 1),
+                        RenderedHeading.of(2, "Two", "two", 1))))
                 .isInstanceOf(ContentValidationException.class);
 
         assertThatThrownBy(() -> snapshot(
@@ -54,8 +54,8 @@ class ContentRenderSnapshotTest {
                 RendererVersion.of("v1"),
                 ReadingTime.minutes(1),
                 List.of(
-                        RenderedHeading.of(2, "One", "same", 0),
-                        RenderedHeading.of(2, "Two", "same", 1))))
+                        RenderedHeading.of(2, "One", "same", 1),
+                        RenderedHeading.of(2, "Two", "same", 2))))
                 .isInstanceOf(ContentValidationException.class);
     }
 

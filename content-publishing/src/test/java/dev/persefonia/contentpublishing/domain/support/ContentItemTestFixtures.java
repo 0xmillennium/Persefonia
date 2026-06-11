@@ -91,6 +91,6 @@ public final class ContentItemTestFixtures {
                 RendererVersion.of("renderer-1"),
                 ReadingTime.minutes(3),
                 false,
-                List.of(RenderedHeading.of(1, "Content baseline", "content-baseline", 0)));
+                List.of(RenderedHeading.of(1, "Content baseline", "content-baseline", 1)));
     }
 }

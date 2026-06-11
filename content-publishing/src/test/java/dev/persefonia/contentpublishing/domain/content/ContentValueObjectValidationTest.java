@@ -39,7 +39,9 @@ class ContentValueObjectValidationTest {
     void numericValueObjectsValidateBounds() {
         assertThatThrownBy(() -> ReadingTime.minutes(0)).isInstanceOf(ContentValidationException.class);
         assertThatThrownBy(() -> ReadingTime.minutes(-1)).isInstanceOf(ContentValidationException.class);
+        assertThatThrownBy(() -> SortOrder.of(0)).isInstanceOf(ContentValidationException.class);
         assertThatThrownBy(() -> SortOrder.of(-1)).isInstanceOf(ContentValidationException.class);
+        assertThat(SortOrder.of(1).value()).isEqualTo(1);
         assertThatThrownBy(() -> Version.of(-1)).isInstanceOf(ContentValidationException.class);
     }
 

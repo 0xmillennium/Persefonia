@@ -85,6 +85,7 @@ class CompositionBoundaryArchitectureTest {
                         "org.springframework..",
                         "org.springframework.data..",
                         "org.springframework.jdbc..",
+                        "org.flywaydb..",
                         "java.sql..",
                         "javax.sql..",
                         "dev.persefonia.app..",
