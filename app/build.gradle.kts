@@ -42,6 +42,8 @@ dependencies {
     implementation(libs.spring.boot.starter.security)
     implementation(libs.spring.boot.starter.web)
     implementation(libs.jte.spring.boot4.starter)
+    implementation(libs.commonmark)
+    implementation(libs.jsoup)
     implementation(libs.flyway.core)
     implementation(libs.flyway.database.postgresql)
     runtimeOnly(libs.micrometer.registry.prometheus)

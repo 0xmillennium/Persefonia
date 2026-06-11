@@ -2,6 +2,8 @@
 spring-boot = "4.0.6"
 jte = "3.2.4"
 archunit = "1.4.2"
+commonmark = "0.24.0"
+jsoup = "1.21.2"
 
 [plugins]
 spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
@@ -31,6 +33,8 @@ testcontainers-postgresql = { module = "org.testcontainers:testcontainers-postgr
 jte-spring-boot4-starter = { module = "gg.jte:jte-spring-boot-starter-4", version.ref = "jte" }
 spring-webmvc = { module = "org.springframework:spring-webmvc" }
 archunit-junit5 = { module = "com.tngtech.archunit:archunit-junit5", version.ref = "archunit" }
+commonmark = { module = "org.commonmark:commonmark", version.ref = "commonmark" }
+jsoup = { module = "org.jsoup:jsoup", version.ref = "jsoup" }
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
 assertj-core = { module = "org.assertj:assertj-core" }
