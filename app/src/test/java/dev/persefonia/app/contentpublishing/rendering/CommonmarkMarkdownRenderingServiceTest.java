@@ -33,13 +33,28 @@ class CommonmarkMarkdownRenderingServiceTest {
         assertThat(snapshot.readingTime().minutes()).isEqualTo(1);
         assertThat(snapshot.containsMermaid()).isFalse();
         assertThat(snapshot.renderedHtml().value())
-                .contains("<h1>Main Heading</h1>", "<p>A paragraph with <em>emphasis</em> and <strong>strong text</strong>.</p>")
+                .contains("<h1 id=\"main-heading\">Main Heading</h1>", "<p>A paragraph with <em>emphasis</em> and <strong>strong text</strong>.</p>")
                 .contains("<ul>", "<li>one</li>", "<pre><code class=\"language-java\">");
         assertThat(snapshot.headings()).singleElement().satisfies(heading -> {
             assertThat(heading.text().value()).isEqualTo("Main Heading");
             assertThat(heading.anchor().value()).isEqualTo("main-heading");
             assertThat(heading.position().value()).isEqualTo(1);
         });
+    }
+
+    @Test
+    void injectsDeterministicTurkishAndDuplicateHeadingIds() {
+        ContentRenderSnapshot snapshot = service.render(MarkdownSource.of("""
+                ## İçerik Başlığı
+                ## İçerik Başlığı
+                """), RENDERED_AT);
+
+        assertThat(snapshot.renderedHtml().value())
+                .contains("<h2 id=\"icerik-basligi\">İçerik Başlığı</h2>")
+                .contains("<h2 id=\"icerik-basligi-2\">İçerik Başlığı</h2>");
+        assertThat(snapshot.headings())
+                .extracting(heading -> heading.anchor().value())
+                .containsExactly("icerik-basligi", "icerik-basligi-2");
     }
 
     @Test

@@ -15,6 +15,7 @@ public final class CommonmarkMarkdownRenderingService implements MarkdownRenderi
     private final MermaidBlockDetector mermaidBlockDetector;
     private final CommonmarkHtmlRenderer htmlRenderer;
     private final JsoupHtmlSanitizer htmlSanitizer;
+    private final RenderedHeadingIdInjector headingIdInjector;
     private final MarkdownReadingTimeCalculator readingTimeCalculator;
     private final MarkdownRendererVersion rendererVersion;
 
@@ -25,6 +26,7 @@ public final class CommonmarkMarkdownRenderingService implements MarkdownRenderi
                 new MermaidBlockDetector(),
                 new CommonmarkHtmlRenderer(),
                 new JsoupHtmlSanitizer(),
+                new RenderedHeadingIdInjector(),
                 new MarkdownReadingTimeCalculator(),
                 new MarkdownRendererVersion());
     }
@@ -35,6 +37,7 @@ public final class CommonmarkMarkdownRenderingService implements MarkdownRenderi
             MermaidBlockDetector mermaidBlockDetector,
             CommonmarkHtmlRenderer htmlRenderer,
             JsoupHtmlSanitizer htmlSanitizer,
+            RenderedHeadingIdInjector headingIdInjector,
             MarkdownReadingTimeCalculator readingTimeCalculator,
             MarkdownRendererVersion rendererVersion) {
         this.parser = parser;
@@ -42,6 +45,7 @@ public final class CommonmarkMarkdownRenderingService implements MarkdownRenderi
         this.mermaidBlockDetector = mermaidBlockDetector;
         this.htmlRenderer = htmlRenderer;
         this.htmlSanitizer = htmlSanitizer;
+        this.headingIdInjector = headingIdInjector;
         this.readingTimeCalculator = readingTimeCalculator;
         this.rendererVersion = rendererVersion;
     }
@@ -57,8 +61,10 @@ public final class CommonmarkMarkdownRenderingService implements MarkdownRenderi
             boolean containsMermaid = mermaidBlockDetector.containsMermaid(document);
             String rawHtml = htmlRenderer.render(document);
             String sanitizedHtml = htmlSanitizer.sanitize(rawHtml);
+            String htmlWithHeadingIds = headingIdInjector.inject(sanitizedHtml, headings);
+            String finalHtml = htmlSanitizer.sanitize(htmlWithHeadingIds);
             return ContentRenderSnapshot.of(
-                    RenderedHtml.sanitized(sanitizedHtml),
+                    RenderedHtml.sanitized(finalHtml),
                     renderedAt,
                     rendererVersion.current(),
                     readingTimeCalculator.calculate(source),
