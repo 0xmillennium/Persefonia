@@ -92,6 +92,44 @@ public final class ContentItem {
                 Version.initial());
     }
 
+    public static ContentItem rehydrate(
+            ContentId id,
+            ContentType type,
+            ContentStatus status,
+            ContentVisibility visibility,
+            ContentLanguage language,
+            Slug slug,
+            Title title,
+            Summary summary,
+            MarkdownSource markdownSource,
+            ContentMetadata metadata,
+            ContentRenderSnapshot renderSnapshot,
+            Set<TagId> tagIds,
+            Instant publishedAt,
+            Instant unpublishedAt,
+            Instant createdAt,
+            Instant updatedAt,
+            Version version) {
+        return new ContentItem(
+                id,
+                type,
+                status,
+                visibility,
+                language,
+                slug,
+                title,
+                summary,
+                markdownSource,
+                metadata,
+                renderSnapshot,
+                tagIds,
+                publishedAt,
+                unpublishedAt,
+                createdAt,
+                updatedAt,
+                version);
+    }
+
     public void changeTitle(Title title, Instant now) {
         rejectArchivedEdit();
         this.title = Objects.requireNonNull(title, "title");
