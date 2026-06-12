@@ -21,19 +21,22 @@ class ContentAdminQueryServiceTest {
             new ContentAdminQueryService(items, new TestContentAuthorizationPolicy());
 
     @Test
-    void listsOnlyDraftAndUnpublishedContentForOwner() {
+    void listsManageableContentForOwnerAndExcludesArchivedByDefault() {
         var draft = ContentItemTestFixtures.completeDraft();
         var unpublished = ContentItemTestFixtures.published(ContentVisibility.PRIVATE);
         unpublished.unpublish(NOW);
         var published = ContentItemTestFixtures.published(ContentVisibility.PUBLIC);
+        var archived = ContentItemTestFixtures.completeDraft();
+        archived.archive(NOW);
         items.add(draft);
         items.add(unpublished);
         items.add(published);
+        items.add(archived);
 
-        assertThat(queries.listEditableContent(OWNER))
+        assertThat(queries.listManageableContent(OWNER))
                 .extracting(item -> item.status())
-                .containsExactlyInAnyOrder(ContentStatus.DRAFT, ContentStatus.UNPUBLISHED);
-        assertThatThrownBy(() -> queries.listEditableContent(EDITOR)).isInstanceOf(SecurityException.class);
+                .containsExactlyInAnyOrder(ContentStatus.DRAFT, ContentStatus.UNPUBLISHED, ContentStatus.PUBLISHED);
+        assertThatThrownBy(() -> queries.listManageableContent(EDITOR)).isInstanceOf(SecurityException.class);
     }
 
     @Test

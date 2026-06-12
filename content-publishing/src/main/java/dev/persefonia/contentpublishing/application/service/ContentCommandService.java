@@ -11,9 +11,6 @@ import dev.persefonia.contentpublishing.application.command.PreviewContentComman
 import dev.persefonia.contentpublishing.application.command.PublishContentCommand;
 import dev.persefonia.contentpublishing.application.command.UnpublishContentCommand;
 import dev.persefonia.contentpublishing.application.command.UpdateContentDraftCommand;
-import dev.persefonia.contentpublishing.application.query.ContentRevisionResult;
-import dev.persefonia.contentpublishing.application.query.ListContentRevisionsQuery;
-import java.util.List;
 import java.util.Objects;
 
 public final class ContentCommandService {
@@ -21,19 +18,16 @@ public final class ContentCommandService {
     private final ContentPreviewQueryHandler previews;
     private final ContentPublishCommandHandler publishing;
     private final ContentLifecycleCommandHandler lifecycle;
-    private final ContentRevisionQueryHandler revisionQueries;
 
     public ContentCommandService(
             ContentDraftCommandHandler drafts,
             ContentPreviewQueryHandler previews,
             ContentPublishCommandHandler publishing,
-            ContentLifecycleCommandHandler lifecycle,
-            ContentRevisionQueryHandler revisionQueries) {
+            ContentLifecycleCommandHandler lifecycle) {
         this.drafts = Objects.requireNonNull(drafts, "drafts");
         this.previews = Objects.requireNonNull(previews, "previews");
         this.publishing = Objects.requireNonNull(publishing, "publishing");
         this.lifecycle = Objects.requireNonNull(lifecycle, "lifecycle");
-        this.revisionQueries = Objects.requireNonNull(revisionQueries, "revisionQueries");
     }
 
     public ContentDraftResult createDraft(CreateContentDraftCommand command) {
@@ -58,9 +52,5 @@ public final class ContentCommandService {
 
     public ContentArchiveResult archiveContent(ArchiveContentCommand command) {
         return lifecycle.archive(command);
-    }
-
-    public List<ContentRevisionResult> listRevisions(ListContentRevisionsQuery query) {
-        return revisionQueries.list(query);
     }
 }

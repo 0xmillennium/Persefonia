@@ -36,7 +36,7 @@
         <p role="status">${page.successMessage()}</p>
     @endif
     @if(page.items().isEmpty())
-        <p>No editable content yet.</p>
+        <p>No manageable content yet.</p>
     @else
         <table>
             <thead><tr><th>Title</th><th>Status</th><th>Visibility</th><th>Language</th><th>Updated</th><th>Actions</th></tr></thead>

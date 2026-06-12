@@ -36,7 +36,7 @@ public final class AdminContentListController {
         var actor = actors.resolve(authentication);
         model.addAttribute("page", views.list(
                 chrome.create(authentication, csrfToken),
-                queries.listEditableContent(actor),
+                queries.listManageableContent(actor),
                 archived != null ? "Content archived." : null));
         return "admin/content/list";
     }

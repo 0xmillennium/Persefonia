@@ -27,11 +27,13 @@ public final class ContentAdminQueryService {
         this.authorization = Objects.requireNonNull(authorization, "authorization");
     }
 
-    public List<AdminContentListItem> listEditableContent(ContentCommandActor actor) {
+    public List<AdminContentListItem> listManageableContent(ContentCommandActor actor) {
         authorization.requireOwner(actor, "content.admin-list");
-        return Stream.concat(
-                        contentItems.findByStatus(ContentStatus.DRAFT).stream(),
-                        contentItems.findByStatus(ContentStatus.UNPUBLISHED).stream())
+        return Stream.of(
+                        ContentStatus.DRAFT,
+                        ContentStatus.UNPUBLISHED,
+                        ContentStatus.PUBLISHED)
+                .flatMap(status -> contentItems.findByStatus(status).stream())
                 .sorted(Comparator.comparing(ContentItem::updatedAt).reversed())
                 .map(ContentAdminQueryService::listItem)
                 .toList();

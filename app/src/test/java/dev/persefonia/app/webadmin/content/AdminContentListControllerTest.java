@@ -9,7 +9,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import dev.persefonia.app.security.admin.AdminAuthenticationTestSupport;
+import dev.persefonia.contentpublishing.application.service.ContentAdminQueryService;
+import dev.persefonia.contentpublishing.domain.content.port.ContentItemRepository;
 import dev.persefonia.identityaccess.domain.admin.AdminRole;
+import dev.persefonia.webadmin.content.AdminContentListController;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,7 +42,7 @@ class AdminContentListControllerTest {
         mockMvc.perform(get("/admin/content")
                         .with(authentication(AdminAuthenticationTestSupport.authentication(AdminRole.OWNER))))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("No editable content yet.")))
+                .andExpect(content().string(containsString("No manageable content yet.")))
                 .andExpect(header().string("Cache-Control", containsString("no-store")))
                 .andExpect(header().string("Cache-Control", containsString("private")));
     }
@@ -52,15 +56,19 @@ class AdminContentListControllerTest {
     }
 
     @Test
-    void listRendersDraftAndUnpublishedWithoutPublicLinks() throws Exception {
+    void listRendersManageableContentWithoutArchivedOrPublicLinks() throws Exception {
         items.add(AdminContentTestFixtures.completeDraft());
         items.add(AdminContentTestFixtures.unpublished());
+        items.add(AdminContentTestFixtures.published());
+        items.add(AdminContentTestFixtures.archived());
 
         mockMvc.perform(get("/admin/content")
                         .with(authentication(AdminAuthenticationTestSupport.authentication(AdminRole.OWNER))))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("DRAFT")))
                 .andExpect(content().string(containsString("UNPUBLISHED")))
+                .andExpect(content().string(containsString("PUBLISHED")))
+                .andExpect(content().string(not(containsString("ARCHIVED"))))
                 .andExpect(content().string(containsString("/edit")))
                 .andExpect(content().string(containsString("/preview")))
                 .andExpect(content().string(not(containsString("/articles/admin-draft"))));
@@ -70,7 +78,16 @@ class AdminContentListControllerTest {
     void listRequiresAuthenticationAndOwnerApplicationAuthorization() throws Exception {
         mockMvc.perform(get("/admin/content")).andExpect(status().is4xxClientError());
         mockMvc.perform(get("/admin/content")
-                        .with(authentication(AdminAuthenticationTestSupport.authentication(AdminRole.EDITOR))))
+                .with(authentication(AdminAuthenticationTestSupport.authentication(AdminRole.EDITOR))))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void listControllerUsesApplicationQueryServiceRatherThanRepositories() {
+        Assertions.assertThat(AdminContentListController.class.getDeclaredConstructors())
+                .singleElement()
+                .satisfies(constructor -> Assertions.assertThat(constructor.getParameterTypes())
+                        .contains(ContentAdminQueryService.class)
+                        .doesNotContain(ContentItemRepository.class));
     }
 }

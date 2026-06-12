@@ -11,11 +11,8 @@ import dev.persefonia.contentpublishing.application.command.PreviewContentComman
 import dev.persefonia.contentpublishing.application.command.PublishContentCommand;
 import dev.persefonia.contentpublishing.application.command.UnpublishContentCommand;
 import dev.persefonia.contentpublishing.application.command.UpdateContentDraftCommand;
-import dev.persefonia.contentpublishing.application.query.ContentRevisionResult;
-import dev.persefonia.contentpublishing.application.query.ListContentRevisionsQuery;
 import dev.persefonia.contentpublishing.application.service.ContentCommandGateway;
 import dev.persefonia.contentpublishing.application.service.ContentCommandService;
-import java.util.List;
 import java.util.Objects;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -62,10 +59,5 @@ public class TransactionalContentApplicationGateway implements ContentCommandGat
     @Transactional
     public ContentArchiveResult archiveContent(ArchiveContentCommand command) {
         return service.archiveContent(command);
-    }
-
-    @Transactional(readOnly = true)
-    public List<ContentRevisionResult> listRevisions(ListContentRevisionsQuery query) {
-        return service.listRevisions(query);
     }
 }
