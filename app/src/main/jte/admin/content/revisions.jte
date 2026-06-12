@@ -1,0 +1,62 @@
+@import dev.persefonia.webadmin.content.AdminContentRevisionListPage
+@param AdminContentRevisionListPage page
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex,nofollow,noarchive">
+    <title>Revision history | Persefonia Admin</title>
+</head>
+<body>
+<header>
+    <p>Signed in as <strong>${page.chrome().admin().displayName()}</strong></p>
+    <form method="post" action="${page.chrome().logoutForm().action()}">
+        <input type="hidden" name="${page.chrome().logoutForm().csrfParameterName()}" value="${page.chrome().logoutForm().csrfToken()}">
+        <button type="submit">Logout</button>
+    </form>
+</header>
+<nav aria-label="Admin navigation">
+    <ul>
+        @for(var item : page.chrome().navigation())
+            <li>
+                @if(item.disabled())
+                    <span aria-disabled="true">${item.label()}</span>
+                @else
+                    <a href="${item.href()}" aria-current="${item.active() ? "page" : null}">${item.label()}</a>
+                @endif
+            </li>
+        @endfor
+    </ul>
+</nav>
+<main>
+    <h1>Revision history</h1>
+    <p><a href="${page.editLink()}">Back to edit</a></p>
+    <p>Content: <strong>${page.contentTitle()}</strong></p>
+    <p>Status: <strong>${page.contentStatus()}</strong></p>
+    @if(page.revisions().isEmpty())
+        <p>No revisions have been created yet.</p>
+    @else
+        <table>
+            <thead>
+            <tr><th>Revision</th><th>Type</th><th>Title</th><th>Slug</th><th>Created by</th><th>Created at</th><th>Change note</th><th>Rendered HTML</th></tr>
+            </thead>
+            <tbody>
+            @for(var revision : page.revisions())
+                <tr>
+                    <td>${revision.revisionNumber()}</td>
+                    <td>${revision.revisionType()}</td>
+                    <td>${revision.title()}</td>
+                    <td>${revision.slug()}</td>
+                    <td>${revision.createdBy()}</td>
+                    <td>${revision.createdAt()}</td>
+                    <td>${revision.changeNote() == null ? "None" : revision.changeNote()}</td>
+                    <td>${revision.renderedHtmlPresent() ? "Present" : "Absent"}</td>
+                </tr>
+            @endfor
+            </tbody>
+        </table>
+    @endif
+</main>
+</body>
+</html>

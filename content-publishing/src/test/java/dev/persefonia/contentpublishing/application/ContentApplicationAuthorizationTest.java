@@ -42,7 +42,7 @@ class ContentApplicationAuthorizationTest {
         var previews = new ContentPreviewQueryHandler(items, renderer, authorization);
         var publishing = new ContentPublishCommandHandler(items, revisions, renderer, authorization, events);
         var lifecycle = new ContentLifecycleCommandHandler(items, authorization, events);
-        var revisionQueries = new ContentRevisionQueryHandler(revisions, authorization);
+        var revisionQueries = new ContentRevisionQueryHandler(items, revisions, authorization);
 
         assertDenied(() -> drafts.create(new CreateContentDraftCommand(
                 EDITOR, ContentType.ARTICLE, ContentVisibility.PUBLIC, ContentLanguage.EN, NOW)));

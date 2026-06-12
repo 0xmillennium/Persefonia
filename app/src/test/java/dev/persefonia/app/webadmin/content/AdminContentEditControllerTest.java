@@ -78,6 +78,9 @@ class AdminContentEditControllerTest {
                             .params(validUpdate()))
                     .andExpect(status().isOk())
                     .andExpect(content().string(containsString("could not be updated")))
+                    .andExpect(content().string(containsString(item.status().name())))
+                    .andExpect(content().string(containsString("read-only")))
+                    .andExpect(content().string(not(containsString("Save changes"))))
                     .andExpect(content().string(not(containsString("Exception"))));
         }
     }

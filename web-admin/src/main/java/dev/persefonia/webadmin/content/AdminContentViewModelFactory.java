@@ -15,7 +15,7 @@ public final class AdminContentViewModelFactory {
 
     public AdminContentFormPage create(AdminContentPageChrome chrome, AdminContentForm form) {
         return formPage(
-                chrome, "Create draft", "/admin/content", true, form, List.of(), List.of(), null, null,
+                chrome, "Create draft", "/admin/content", true, form, List.of(), List.of(), null, null, null,
                 true, null, AdminContentLifecycleActionView.none(), null);
     }
 
@@ -32,6 +32,7 @@ public final class AdminContentViewModelFactory {
                 List.of(),
                 result.status().name(),
                 result.markdownSource().isPresent() ? "/admin/content/" + id + "/preview" : null,
+                "/admin/content/" + id + "/revisions",
                 editable(result.status()),
                 readOnlyMessage(result.status()),
                 lifecycleActions(id, result.status()),
@@ -49,6 +50,7 @@ public final class AdminContentViewModelFactory {
                 List.of(),
                 null,
                 "/admin/content/" + contentId + "/preview",
+                "/admin/content/" + contentId + "/revisions",
                 true,
                 null,
                 AdminContentLifecycleActionView.none(),
@@ -59,7 +61,8 @@ public final class AdminContentViewModelFactory {
             AdminContentFormPage page, List<AdminContentFieldError> fieldErrors, List<String> globalErrors) {
         return formPage(
                 page.chrome(), page.heading(), page.action(), page.create(), page.form(), fieldErrors, globalErrors,
-                page.status(), page.previewLink(), page.editable(), page.readOnlyMessage(), page.lifecycleActions(), null);
+                page.status(), page.previewLink(), page.revisionsLink(), page.editable(), page.readOnlyMessage(),
+                page.lifecycleActions(), null);
     }
 
     private AdminContentListItemView listItem(AdminContentListItem item) {
@@ -87,13 +90,14 @@ public final class AdminContentViewModelFactory {
             List<String> globalErrors,
             String status,
             String previewLink,
+            String revisionsLink,
             boolean editable,
             String readOnlyMessage,
             AdminContentLifecycleActionView lifecycleActions,
             String successMessage) {
         return new AdminContentFormPage(
                 chrome, heading, action, create, form, fieldErrors, globalErrors, status, previewLink,
-                editable, readOnlyMessage, lifecycleActions, successMessage);
+                revisionsLink, editable, readOnlyMessage, lifecycleActions, successMessage);
     }
 
     private static boolean editable(ContentStatus status) {

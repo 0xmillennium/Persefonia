@@ -40,13 +40,22 @@ class ContentApplicationConfiguration {
             ContentRevisionRepository revisions,
             MarkdownRenderingService renderer,
             ContentCommandAuthorizationPolicy authorization,
-            ContentPublishingEventPublisher events) {
+            ContentPublishingEventPublisher events,
+            ContentRevisionQueryHandler revisionQueries) {
         return new ContentCommandService(
                 new ContentDraftCommandHandler(contentItems, authorization, events),
                 new ContentPreviewQueryHandler(contentItems, renderer, authorization),
                 new ContentPublishCommandHandler(contentItems, revisions, renderer, authorization, events),
                 new ContentLifecycleCommandHandler(contentItems, authorization, events),
-                new ContentRevisionQueryHandler(revisions, authorization));
+                revisionQueries);
+    }
+
+    @Bean
+    ContentRevisionQueryHandler contentRevisionQueryHandler(
+            ContentItemRepository contentItems,
+            ContentRevisionRepository revisions,
+            ContentCommandAuthorizationPolicy authorization) {
+        return new ContentRevisionQueryHandler(contentItems, revisions, authorization);
     }
 
     @Bean

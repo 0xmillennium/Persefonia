@@ -13,6 +13,7 @@ public record AdminContentFormPage(
         List<String> globalErrors,
         String status,
         String previewLink,
+        String revisionsLink,
         boolean editable,
         String readOnlyMessage,
         AdminContentLifecycleActionView lifecycleActions,

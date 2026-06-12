@@ -44,6 +44,9 @@
     @if(page.previewLink() != null)
         <p><a href="${page.previewLink()}">Preview persisted content</a></p>
     @endif
+    @if(page.revisionsLink() != null)
+        <p><a href="${page.revisionsLink()}">Revision history</a></p>
+    @endif
     @if(page.hasErrors())
         <section aria-label="Errors">
             @for(var error : page.globalErrors())

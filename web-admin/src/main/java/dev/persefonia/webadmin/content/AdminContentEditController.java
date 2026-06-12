@@ -1,6 +1,7 @@
 package dev.persefonia.webadmin.content;
 
 import dev.persefonia.contentpublishing.application.exception.ContentApplicationException;
+import dev.persefonia.contentpublishing.application.exception.ContentCommandRejectedException;
 import dev.persefonia.contentpublishing.application.exception.ContentNotFoundException;
 import dev.persefonia.contentpublishing.application.service.ContentAdminQueryService;
 import dev.persefonia.contentpublishing.application.service.ContentCommandGateway;
@@ -98,6 +99,16 @@ public final class AdminContentEditController {
             return "redirect:/admin/content/" + contentId + "/edit?saved";
         } catch (ContentNotFoundException exception) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, NOT_FOUND);
+        } catch (ContentCommandRejectedException exception) {
+            try {
+                var result = queries.getContentForAdmin(actors.resolve(authentication), id);
+                var statusAwarePage = views.edit(
+                        chrome.create(authentication, csrfToken), result, mapper.from(result), null);
+                model.addAttribute(
+                        "page", views.withErrors(statusAwarePage, List.of(), List.of(UPDATE_FAILED)));
+            } catch (ContentNotFoundException missing) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, NOT_FOUND);
+            }
         } catch (ContentApplicationException | IllegalArgumentException | IllegalStateException exception) {
             model.addAttribute("page", views.withErrors(page, List.of(), List.of(UPDATE_FAILED)));
         }

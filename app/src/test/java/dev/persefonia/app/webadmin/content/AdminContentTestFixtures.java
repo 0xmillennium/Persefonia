@@ -11,6 +11,13 @@ import dev.persefonia.contentpublishing.domain.content.MarkdownSource;
 import dev.persefonia.contentpublishing.domain.content.Slug;
 import dev.persefonia.contentpublishing.domain.content.Summary;
 import dev.persefonia.contentpublishing.domain.content.Title;
+import dev.persefonia.contentpublishing.domain.common.AdminIdentityRef;
+import dev.persefonia.contentpublishing.domain.revision.ChangeNote;
+import dev.persefonia.contentpublishing.domain.revision.CompleteContentSnapshot;
+import dev.persefonia.contentpublishing.domain.revision.ContentRevision;
+import dev.persefonia.contentpublishing.domain.revision.ContentRevisionId;
+import dev.persefonia.contentpublishing.domain.revision.RevisionMetadata;
+import dev.persefonia.contentpublishing.domain.revision.RevisionNumber;
 import java.time.Instant;
 
 final class AdminContentTestFixtures {
@@ -63,5 +70,23 @@ final class AdminContentTestFixtures {
                 false,
                 java.util.List.of()), CREATED.plusSeconds(5));
         return item;
+    }
+
+    static ContentRevision revision(ContentItem item, int number, String title) {
+        return ContentRevision.publishSnapshot(
+                ContentRevisionId.newId(),
+                item.id(),
+                RevisionNumber.of(number),
+                CompleteContentSnapshot.of(
+                        Title.of(title),
+                        Slug.of("revision-" + number),
+                        Summary.of("Revision summary " + number),
+                        MarkdownSource.of("# Revision " + number),
+                        dev.persefonia.contentpublishing.domain.content.RenderedHtml.sanitized(
+                                "<h1>Revision " + number + "</h1>"),
+                        RevisionMetadata.from(ContentMetadata.empty())),
+                AdminIdentityRef.newId(),
+                CREATED.plusSeconds(number),
+                ChangeNote.of("Change " + number));
     }
 }
