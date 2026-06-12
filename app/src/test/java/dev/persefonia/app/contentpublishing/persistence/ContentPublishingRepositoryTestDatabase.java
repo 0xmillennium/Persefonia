@@ -20,13 +20,18 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 })
 @ActiveProfiles("test")
 abstract class ContentPublishingRepositoryTestDatabase {
-    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:17-alpine")
-            .withDatabaseName("persefonia_repository_test")
-            .withUsername("persefonia")
-            .withPassword("persefonia_dev");
+    static final PostgreSQLContainer POSTGRES = postgresContainer();
 
     static {
         POSTGRES.start();
+    }
+
+    private static PostgreSQLContainer postgresContainer() {
+        PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:17-alpine");
+        postgres.withDatabaseName("persefonia_repository_test");
+        postgres.withUsername("persefonia");
+        postgres.withPassword("persefonia_dev");
+        return postgres;
     }
 
     private static boolean migrated;

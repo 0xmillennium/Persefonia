@@ -50,8 +50,7 @@ class ContentDraftCommandHandlerTest {
 
         assertThat(result.slug().orElseThrow().value()).isEqualTo("updated-route");
         assertThat(result.visibility()).isEqualTo(ContentVisibility.UNLISTED);
-        assertThat(events.events())
-                .extracting(Object::getClass)
+        assertThat(events.eventTypes())
                 .containsExactly(ContentDraftUpdated.class, ContentSlugChanged.class, ContentVisibilityChanged.class);
     }
 

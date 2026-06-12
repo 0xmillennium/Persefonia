@@ -6,7 +6,6 @@ import dev.persefonia.contentpublishing.domain.content.ContentRenderSnapshot;
 import dev.persefonia.contentpublishing.domain.content.MarkdownSource;
 import dev.persefonia.contentpublishing.domain.content.RenderedHtml;
 import java.time.Instant;
-import java.util.Objects;
 import org.commonmark.node.Node;
 
 public final class CommonmarkMarkdownRenderingService implements MarkdownRenderingService {

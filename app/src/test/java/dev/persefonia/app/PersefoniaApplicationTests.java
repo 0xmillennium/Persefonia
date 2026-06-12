@@ -14,10 +14,15 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 @ActiveProfiles("test")
 class PersefoniaApplicationTests {
     @Container
-    static final PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:17-alpine")
-            .withDatabaseName("persefonia_test")
-            .withUsername("persefonia")
-            .withPassword("persefonia_dev");
+    static final PostgreSQLContainer postgres = postgresContainer();
+
+    private static PostgreSQLContainer postgresContainer() {
+        PostgreSQLContainer container = new PostgreSQLContainer("postgres:17-alpine");
+        container.withDatabaseName("persefonia_test");
+        container.withUsername("persefonia");
+        container.withPassword("persefonia_dev");
+        return container;
+    }
 
     @DynamicPropertySource
     static void datasourceProperties(DynamicPropertyRegistry registry) {

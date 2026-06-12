@@ -13,9 +13,10 @@ class RedisConnectivityTest {
 
     @Test
     void respondsToPing() {
-        try (GenericContainer<?> redis = new GenericContainer<>("redis:8-alpine")
-                .withCommand("redis-server", "--save", "", "--appendonly", "no")
-                .withExposedPorts(REDIS_PORT)) {
+        GenericContainer<?> redis = new GenericContainer<>("redis:8-alpine");
+        redis.withCommand("redis-server", "--save", "", "--appendonly", "no");
+        redis.withExposedPorts(REDIS_PORT);
+        try (redis) {
             redis.start();
 
             RedisClient client = RedisClient.create(

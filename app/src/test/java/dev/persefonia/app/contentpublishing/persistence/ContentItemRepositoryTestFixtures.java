@@ -7,7 +7,6 @@ import dev.persefonia.contentpublishing.domain.content.ContentItem;
 import dev.persefonia.contentpublishing.domain.content.ContentLanguage;
 import dev.persefonia.contentpublishing.domain.content.ContentMetadata;
 import dev.persefonia.contentpublishing.domain.content.ContentRenderSnapshot;
-import dev.persefonia.contentpublishing.domain.content.ContentStatus;
 import dev.persefonia.contentpublishing.domain.content.ContentType;
 import dev.persefonia.contentpublishing.domain.content.ContentVisibility;
 import dev.persefonia.contentpublishing.domain.content.MarkdownSource;

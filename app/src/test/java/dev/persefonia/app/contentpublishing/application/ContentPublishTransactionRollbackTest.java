@@ -49,13 +49,18 @@ class ContentPublishTransactionRollbackTest {
     private static final Instant CREATED_AT = Instant.parse("2026-06-12T08:00:00Z");
     private static final Instant PUBLISHED_AT = Instant.parse("2026-06-12T09:00:00Z");
     private static final ContentCommandActor OWNER = new ContentCommandActor(AdminIdentityRef.newId(), true, true);
-    private static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:17-alpine")
-            .withDatabaseName("persefonia_publish_rollback")
-            .withUsername("persefonia")
-            .withPassword("persefonia_dev");
+    private static final PostgreSQLContainer POSTGRES = postgresContainer();
 
     static {
         POSTGRES.start();
+    }
+
+    private static PostgreSQLContainer postgresContainer() {
+        PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:17-alpine");
+        postgres.withDatabaseName("persefonia_publish_rollback");
+        postgres.withUsername("persefonia");
+        postgres.withPassword("persefonia_dev");
+        return postgres;
     }
 
     @Autowired

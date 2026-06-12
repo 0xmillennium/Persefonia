@@ -14,7 +14,9 @@ final class HeadingAnchorGenerator {
         List<HeadingAnchor> anchors = new ArrayList<>(headingTexts.size());
         for (String headingText : headingTexts) {
             String base = normalize(headingText);
-            int occurrence = occurrences.merge(base, 1, Integer::sum);
+            Integer previousOccurrence = occurrences.get(base);
+            int occurrence = previousOccurrence == null ? 1 : previousOccurrence + 1;
+            occurrences.put(base, occurrence);
             anchors.add(HeadingAnchor.of(occurrence == 1 ? base : base + "-" + occurrence));
         }
         return List.copyOf(anchors);

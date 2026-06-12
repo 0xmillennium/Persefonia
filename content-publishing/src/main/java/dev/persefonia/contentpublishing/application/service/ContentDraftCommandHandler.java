@@ -16,12 +16,8 @@ import dev.persefonia.contentpublishing.application.exception.ContentCommandReje
 import dev.persefonia.contentpublishing.application.port.ContentPublishingEventPublisher;
 import dev.persefonia.contentpublishing.domain.content.ContentId;
 import dev.persefonia.contentpublishing.domain.content.ContentItem;
-import dev.persefonia.contentpublishing.domain.content.ContentMetadata;
 import dev.persefonia.contentpublishing.domain.content.ContentVisibility;
-import dev.persefonia.contentpublishing.domain.content.MarkdownSource;
 import dev.persefonia.contentpublishing.domain.content.Slug;
-import dev.persefonia.contentpublishing.domain.content.Summary;
-import dev.persefonia.contentpublishing.domain.content.Title;
 import dev.persefonia.contentpublishing.domain.content.port.ContentItemRepository;
 import java.time.Instant;
 import java.util.Objects;

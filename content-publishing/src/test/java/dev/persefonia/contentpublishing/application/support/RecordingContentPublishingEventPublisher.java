@@ -16,4 +16,8 @@ public final class RecordingContentPublishingEventPublisher implements ContentPu
     public List<ContentPublishingEvent> events() {
         return List.copyOf(events);
     }
+
+    public List<Class<?>> eventTypes() {
+        return events.stream().<Class<?>>map(Object::getClass).toList();
+    }
 }

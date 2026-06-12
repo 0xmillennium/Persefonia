@@ -32,7 +32,7 @@ class ContentLifecycleCommandHandlerTest {
         assertThat(unpublished.status()).isEqualTo(ContentStatus.UNPUBLISHED);
         assertThat(archived.status()).isEqualTo(ContentStatus.ARCHIVED);
         assertThat(item.publishedAt()).isPresent();
-        assertThat(events.events()).extracting(Object::getClass)
+        assertThat(events.eventTypes())
                 .containsExactly(ContentUnpublished.class, ContentArchived.class);
     }
 }

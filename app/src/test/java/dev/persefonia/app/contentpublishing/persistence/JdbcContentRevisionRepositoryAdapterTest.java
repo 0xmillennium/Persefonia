@@ -10,7 +10,6 @@ import dev.persefonia.contentpublishing.domain.revision.CompleteContentSnapshot;
 import dev.persefonia.contentpublishing.domain.revision.ContentRevision;
 import dev.persefonia.contentpublishing.domain.revision.ContentRevisionId;
 import dev.persefonia.contentpublishing.domain.revision.RevisionMetadata;
-import dev.persefonia.contentpublishing.domain.revision.RevisionNumber;
 import dev.persefonia.contentpublishing.domain.revision.RevisionType;
 import java.util.UUID;
 

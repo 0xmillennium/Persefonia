@@ -48,7 +48,7 @@ class ContentPublishCommandHandlerTest {
             assertThat(revision.revisionType()).isEqualTo(RevisionType.PUBLISH);
             assertThat(revision.renderedHtml().orElseThrow().value()).contains("id=\"rendered\"");
         });
-        assertThat(events.events()).extracting(Object::getClass)
+        assertThat(events.eventTypes())
                 .containsExactly(ContentPublished.class, PublishedContentChanged.class);
     }
 
