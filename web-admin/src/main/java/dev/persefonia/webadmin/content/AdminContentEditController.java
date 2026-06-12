@@ -3,7 +3,7 @@ package dev.persefonia.webadmin.content;
 import dev.persefonia.contentpublishing.application.exception.ContentApplicationException;
 import dev.persefonia.contentpublishing.application.exception.ContentNotFoundException;
 import dev.persefonia.contentpublishing.application.service.ContentAdminQueryService;
-import dev.persefonia.contentpublishing.application.service.ContentCommandService;
+import dev.persefonia.contentpublishing.application.service.ContentCommandGateway;
 import dev.persefonia.contentpublishing.domain.content.ContentId;
 import java.time.Instant;
 import java.util.List;
@@ -24,10 +24,9 @@ import org.springframework.web.server.ResponseStatusException;
 @Controller
 public final class AdminContentEditController {
     private static final String NOT_FOUND = "Content was not found.";
-    private static final String NOT_EDITABLE = "Only draft or unpublished content can be edited.";
     private static final String UPDATE_FAILED = "The content could not be updated.";
 
-    private final ContentCommandService commands;
+    private final ContentCommandGateway commands;
     private final ContentAdminQueryService queries;
     private final ContentAdminActorResolver actors;
     private final AdminContentPageChromeFactory chrome;
@@ -36,7 +35,7 @@ public final class AdminContentEditController {
     private final AdminContentViewModelFactory views;
 
     public AdminContentEditController(
-            ContentCommandService commands,
+            ContentCommandGateway commands,
             ContentAdminQueryService queries,
             ContentAdminActorResolver actors,
             AdminContentPageChromeFactory chrome,
@@ -59,18 +58,22 @@ public final class AdminContentEditController {
             @PathVariable("contentId") String contentId,
             @RequestParam(name = "created", required = false) String created,
             @RequestParam(name = "saved", required = false) String saved,
+            @RequestParam(name = "published", required = false) String published,
+            @RequestParam(name = "unpublished", required = false) String unpublished,
+            @RequestParam(name = "publishFailed", required = false) String publishFailed,
+            @RequestParam(name = "unpublishFailed", required = false) String unpublishFailed,
+            @RequestParam(name = "archiveFailed", required = false) String archiveFailed,
             Model model) {
         var pageChrome = chrome.create(authentication, csrfToken);
         ContentId id = parseContentId(contentId);
         try {
-            var result = queries.getContentForEditing(actors.resolve(authentication), id);
-            String success = created != null ? "Draft created." : saved != null ? "Changes saved." : null;
-            model.addAttribute("page", views.edit(pageChrome, result, mapper.from(result), success));
+            var result = queries.getContentForAdmin(actors.resolve(authentication), id);
+            String success = successMessage(created, saved, published, unpublished);
+            var page = views.edit(pageChrome, result, mapper.from(result), success);
+            var errors = lifecycleErrors(publishFailed, unpublishFailed, archiveFailed);
+            model.addAttribute("page", errors.isEmpty() ? page : views.withErrors(page, List.of(), errors));
         } catch (ContentNotFoundException exception) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, NOT_FOUND);
-        } catch (ContentApplicationException exception) {
-            model.addAttribute("page", views.withErrors(
-                    views.editSubmission(pageChrome, contentId, new AdminContentForm()), List.of(), List.of(NOT_EDITABLE)));
         }
         return "admin/content/form";
     }
@@ -107,5 +110,31 @@ public final class AdminContentEditController {
         } catch (IllegalArgumentException exception) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, NOT_FOUND);
         }
+    }
+
+    private static String successMessage(String created, String saved, String published, String unpublished) {
+        if (created != null) {
+            return "Draft created.";
+        }
+        if (saved != null) {
+            return "Changes saved.";
+        }
+        if (published != null) {
+            return "Content published.";
+        }
+        return unpublished != null ? "Content unpublished." : null;
+    }
+
+    private static List<String> lifecycleErrors(String publishFailed, String unpublishFailed, String archiveFailed) {
+        if (publishFailed != null) {
+            return List.of("The content could not be published.");
+        }
+        if (unpublishFailed != null) {
+            return List.of("The content could not be unpublished.");
+        }
+        if (archiveFailed != null) {
+            return List.of("The content could not be archived.");
+        }
+        return List.of();
     }
 }

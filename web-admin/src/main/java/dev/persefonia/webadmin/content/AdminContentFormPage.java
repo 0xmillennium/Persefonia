@@ -13,6 +13,9 @@ public record AdminContentFormPage(
         List<String> globalErrors,
         String status,
         String previewLink,
+        boolean editable,
+        String readOnlyMessage,
+        AdminContentLifecycleActionView lifecycleActions,
         String successMessage) {
     public AdminContentFormPage {
         Objects.requireNonNull(chrome, "chrome");
@@ -21,6 +24,7 @@ public record AdminContentFormPage(
         Objects.requireNonNull(form, "form");
         fieldErrors = List.copyOf(Objects.requireNonNull(fieldErrors, "fieldErrors"));
         globalErrors = List.copyOf(Objects.requireNonNull(globalErrors, "globalErrors"));
+        Objects.requireNonNull(lifecycleActions, "lifecycleActions");
     }
 
     public boolean hasErrors() {

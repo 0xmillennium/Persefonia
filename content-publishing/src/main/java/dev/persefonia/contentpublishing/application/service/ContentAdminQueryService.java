@@ -46,6 +46,11 @@ public final class ContentAdminQueryService {
         return editResult(item);
     }
 
+    public AdminContentEditResult getContentForAdmin(ContentCommandActor actor, ContentId contentId) {
+        authorization.requireOwner(actor, "content.admin-view");
+        return editResult(requiredContent(contentItems, contentId));
+    }
+
     private static AdminContentListItem listItem(ContentItem item) {
         return new AdminContentListItem(
                 item.id(),

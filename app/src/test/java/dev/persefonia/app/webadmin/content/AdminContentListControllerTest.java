@@ -44,6 +44,14 @@ class AdminContentListControllerTest {
     }
 
     @Test
+    void archiveSuccessFeedbackIsVisible() throws Exception {
+        mockMvc.perform(get("/admin/content?archived=true")
+                        .with(authentication(AdminAuthenticationTestSupport.authentication(AdminRole.OWNER))))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("Content archived.")));
+    }
+
+    @Test
     void listRendersDraftAndUnpublishedWithoutPublicLinks() throws Exception {
         items.add(AdminContentTestFixtures.completeDraft());
         items.add(AdminContentTestFixtures.unpublished());

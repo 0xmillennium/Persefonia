@@ -3,7 +3,7 @@ package dev.persefonia.webadmin.content;
 import dev.persefonia.contentpublishing.application.command.PreviewContentCommand;
 import dev.persefonia.contentpublishing.application.exception.ContentCommandRejectedException;
 import dev.persefonia.contentpublishing.application.exception.ContentNotFoundException;
-import dev.persefonia.contentpublishing.application.service.ContentCommandService;
+import dev.persefonia.contentpublishing.application.service.ContentCommandGateway;
 import dev.persefonia.contentpublishing.domain.content.ContentId;
 import java.time.Instant;
 import java.util.Objects;
@@ -19,13 +19,13 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Controller
 public final class AdminContentPreviewController {
-    private final ContentCommandService commands;
+    private final ContentCommandGateway commands;
     private final ContentAdminActorResolver actors;
     private final AdminContentPageChromeFactory chrome;
     private final AdminContentPreviewViewModelFactory views;
 
     public AdminContentPreviewController(
-            ContentCommandService commands,
+            ContentCommandGateway commands,
             ContentAdminActorResolver actors,
             AdminContentPageChromeFactory chrome,
             AdminContentPreviewViewModelFactory views) {

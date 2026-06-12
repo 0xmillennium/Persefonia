@@ -36,7 +36,7 @@ class AdminContentEditControllerTest {
     @BeforeEach void reset() { items.reset(); }
 
     @Test
-    void editRendersDraftAndUnpublishedWithoutLifecycleControls() throws Exception {
+    void editRendersDraftAndUnpublishedWithPublishAndArchiveControls() throws Exception {
         for (var item : java.util.List.of(AdminContentTestFixtures.completeDraft(), AdminContentTestFixtures.unpublished())) {
             items.add(item);
             mockMvc.perform(get("/admin/content/" + item.id().value() + "/edit")
@@ -44,9 +44,9 @@ class AdminContentEditControllerTest {
                     .andExpect(status().isOk())
                     .andExpect(content().string(containsString(item.status().name())))
                     .andExpect(content().string(containsString("Admin draft")))
-                    .andExpect(content().string(not(containsString(">Publish<"))))
+                    .andExpect(content().string(containsString(">Publish<")))
                     .andExpect(content().string(not(containsString(">Unpublish<"))))
-                    .andExpect(content().string(not(containsString(">Archive<"))));
+                    .andExpect(content().string(containsString(">Archive<")));
         }
     }
 
@@ -70,7 +70,7 @@ class AdminContentEditControllerTest {
 
     @Test
     void archivedAndPublishedDirectEditsReturnSafeError() throws Exception {
-        for (var item : java.util.List.of(AdminContentTestFixtures.archived(), published())) {
+        for (var item : java.util.List.of(AdminContentTestFixtures.archived(), AdminContentTestFixtures.published())) {
             items.add(item);
             mockMvc.perform(post("/admin/content/" + item.id().value())
                             .with(authentication(AdminAuthenticationTestSupport.authentication(AdminRole.OWNER)))
@@ -83,15 +83,59 @@ class AdminContentEditControllerTest {
     }
 
     @Test
-    void archivedAndPublishedEditPagesShowSafeNonEditableError() throws Exception {
-        for (var item : java.util.List.of(AdminContentTestFixtures.archived(), published())) {
-            items.add(item);
-            mockMvc.perform(get("/admin/content/" + item.id().value() + "/edit")
+    void publishedAndArchivedEditPagesAreReadOnlyWithValidLifecycleControls() throws Exception {
+        var published = AdminContentTestFixtures.published();
+        items.add(published);
+        mockMvc.perform(get("/admin/content/" + published.id().value() + "/edit")
+                        .with(authentication(AdminAuthenticationTestSupport.authentication(AdminRole.OWNER))))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("Published content is read-only")))
+                .andExpect(content().string(containsString(">Unpublish<")))
+                .andExpect(content().string(containsString(">Archive<")))
+                .andExpect(content().string(not(containsString(">Publish<"))))
+                .andExpect(content().string(not(containsString("Save changes"))));
+
+        var archived = AdminContentTestFixtures.archived();
+        items.add(archived);
+        mockMvc.perform(get("/admin/content/" + archived.id().value() + "/edit")
+                        .with(authentication(AdminAuthenticationTestSupport.authentication(AdminRole.OWNER))))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("Archived content is read-only")))
+                .andExpect(content().string(not(containsString("Lifecycle actions"))))
+                .andExpect(content().string(not(containsString("Save changes"))));
+    }
+
+    @Test
+    void lifecycleFeedbackIsSafe() throws Exception {
+        var item = AdminContentTestFixtures.completeDraft();
+        items.add(item);
+        String path = "/admin/content/" + item.id().value() + "/edit?";
+        for (var failure : java.util.Map.of(
+                "publishFailed", "could not be published",
+                "unpublishFailed", "could not be unpublished",
+                "archiveFailed", "could not be archived").entrySet()) {
+            mockMvc.perform(get(path + failure.getKey() + "=true")
                             .with(authentication(AdminAuthenticationTestSupport.authentication(AdminRole.OWNER))))
                     .andExpect(status().isOk())
-                    .andExpect(content().string(containsString("Only draft or unpublished content can be edited.")))
+                    .andExpect(content().string(containsString(failure.getValue())))
                     .andExpect(content().string(not(containsString("Exception"))));
         }
+    }
+
+    @Test
+    void lifecycleSuccessFeedbackIsVisible() throws Exception {
+        var item = AdminContentTestFixtures.published();
+        items.add(item);
+        String path = "/admin/content/" + item.id().value() + "/edit";
+
+        mockMvc.perform(get(path + "?published=true")
+                        .with(authentication(AdminAuthenticationTestSupport.authentication(AdminRole.OWNER))))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("Content published.")));
+        mockMvc.perform(get(path + "?unpublished=true")
+                        .with(authentication(AdminAuthenticationTestSupport.authentication(AdminRole.OWNER))))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("Content unpublished.")));
     }
 
     @Test
@@ -133,17 +177,5 @@ class AdminContentEditControllerTest {
         values.add("markdownSource", "# Updated");
         values.add("canonicalPath", "/articles/updated-admin-draft");
         return values;
-    }
-
-    private static dev.persefonia.contentpublishing.domain.content.ContentItem published() {
-        var item = AdminContentTestFixtures.unpublished();
-        item.publish(dev.persefonia.contentpublishing.domain.content.ContentRenderSnapshot.of(
-                dev.persefonia.contentpublishing.domain.content.RenderedHtml.sanitized("<p>again</p>"),
-                AdminContentTestFixtures.CREATED.plusSeconds(5),
-                dev.persefonia.contentpublishing.domain.content.RendererVersion.of("test"),
-                dev.persefonia.contentpublishing.domain.content.ReadingTime.minutes(1),
-                false,
-                java.util.List.of()), AdminContentTestFixtures.CREATED.plusSeconds(5));
-        return item;
     }
 }

@@ -32,6 +32,9 @@
 <main>
     <h1>Content</h1>
     <p><a href="/admin/content/new">Create draft</a></p>
+    @if(page.successMessage() != null)
+        <p role="status">${page.successMessage()}</p>
+    @endif
     @if(page.items().isEmpty())
         <p>No editable content yet.</p>
     @else

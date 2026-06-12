@@ -13,4 +13,10 @@ class AdminContentTestConfiguration {
     AdminContentTestRepository adminContentTestRepository() {
         return new AdminContentTestRepository();
     }
+
+    @Bean
+    @Primary
+    AdminContentTestRevisionRepository adminContentTestRevisionRepository() {
+        return new AdminContentTestRevisionRepository();
+    }
 }

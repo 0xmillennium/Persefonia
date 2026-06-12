@@ -49,5 +49,9 @@ class ContentAdminQueryServiceTest {
         assertThat(result.markdownSource()).contains("# Content baseline");
         assertThatThrownBy(() -> queries.getContentForEditing(OWNER, published.id()))
                 .isInstanceOf(ContentCommandRejectedException.class);
+        assertThat(queries.getContentForAdmin(OWNER, published.id()).status())
+                .isEqualTo(ContentStatus.PUBLISHED);
+        assertThatThrownBy(() -> queries.getContentForAdmin(EDITOR, published.id()))
+                .isInstanceOf(SecurityException.class);
     }
 }

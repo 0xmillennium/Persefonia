@@ -52,4 +52,16 @@ final class AdminContentTestFixtures {
         item.archive(CREATED.plusSeconds(2));
         return item;
     }
+
+    static ContentItem published() {
+        ContentItem item = unpublished();
+        item.publish(dev.persefonia.contentpublishing.domain.content.ContentRenderSnapshot.of(
+                dev.persefonia.contentpublishing.domain.content.RenderedHtml.sanitized("<p>again</p>"),
+                CREATED.plusSeconds(5),
+                dev.persefonia.contentpublishing.domain.content.RendererVersion.of("test"),
+                dev.persefonia.contentpublishing.domain.content.ReadingTime.minutes(1),
+                false,
+                java.util.List.of()), CREATED.plusSeconds(5));
+        return item;
+    }
 }

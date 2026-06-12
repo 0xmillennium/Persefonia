@@ -1,7 +1,7 @@
 package dev.persefonia.webadmin.content;
 
 import dev.persefonia.contentpublishing.application.exception.ContentApplicationException;
-import dev.persefonia.contentpublishing.application.service.ContentCommandService;
+import dev.persefonia.contentpublishing.application.service.ContentCommandGateway;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 public final class AdminContentDraftController {
     private static final String SAFE_CREATE_ERROR = "The draft could not be created.";
 
-    private final ContentCommandService commands;
+    private final ContentCommandGateway commands;
     private final ContentAdminActorResolver actors;
     private final AdminContentPageChromeFactory chrome;
     private final AdminContentFormValidator validator;
@@ -25,7 +25,7 @@ public final class AdminContentDraftController {
     private final AdminContentViewModelFactory views;
 
     public AdminContentDraftController(
-            ContentCommandService commands,
+            ContentCommandGateway commands,
             ContentAdminActorResolver actors,
             AdminContentPageChromeFactory chrome,
             AdminContentFormValidator validator,

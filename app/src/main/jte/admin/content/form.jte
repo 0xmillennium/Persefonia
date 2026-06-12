@@ -38,6 +38,9 @@
     @if(page.status() != null)
         <p>Status: <strong>${page.status()}</strong></p>
     @endif
+    @if(page.readOnlyMessage() != null)
+        <p>${page.readOnlyMessage()}</p>
+    @endif
     @if(page.previewLink() != null)
         <p><a href="${page.previewLink()}">Preview persisted content</a></p>
     @endif
@@ -53,78 +56,103 @@
             </ul>
         </section>
     @endif
-    <form method="post" action="${page.action()}">
-        <input type="hidden" name="${page.chrome().logoutForm().csrfParameterName()}" value="${page.chrome().logoutForm().csrfToken()}">
-        <label for="type">Type</label>
-        @if(page.create())
-            <select id="type" name="type">
-                <option value="">Choose type</option>
-                @for(String value : java.util.List.of("ARTICLE", "NOTE", "RESEARCH", "PAGE"))
-                    <option value="${value}" selected="${value.equals(page.form().getType())}">${value}</option>
-                @endfor
-            </select>
-        @else
-            <select id="type" name="type" disabled>
-                @for(String value : java.util.List.of("ARTICLE", "NOTE", "RESEARCH", "PAGE"))
-                    <option value="${value}" selected="${value.equals(page.form().getType())}">${value}</option>
-                @endfor
-            </select>
-        @endif
-        @if(!page.create())
-            <input type="hidden" name="type" value="${page.form().getType()}">
-        @endif
+    @if(page.create() || page.editable())
+        <form method="post" action="${page.action()}">
+            <input type="hidden" name="${page.chrome().logoutForm().csrfParameterName()}" value="${page.chrome().logoutForm().csrfToken()}">
+            <label for="type">Type</label>
+            @if(page.create())
+                <select id="type" name="type">
+                    <option value="">Choose type</option>
+                    @for(String value : java.util.List.of("ARTICLE", "NOTE", "RESEARCH", "PAGE"))
+                        <option value="${value}" selected="${value.equals(page.form().getType())}">${value}</option>
+                    @endfor
+                </select>
+            @else
+                <select id="type" name="type" disabled>
+                    @for(String value : java.util.List.of("ARTICLE", "NOTE", "RESEARCH", "PAGE"))
+                        <option value="${value}" selected="${value.equals(page.form().getType())}">${value}</option>
+                    @endfor
+                </select>
+            @endif
+            @if(!page.create())
+                <input type="hidden" name="type" value="${page.form().getType()}">
+            @endif
 
-        <label for="language">Language</label>
-        @if(page.create())
-            <select id="language" name="language">
-                <option value="">Choose language</option>
-                @for(String value : java.util.List.of("TR", "EN"))
-                    <option value="${value}" selected="${value.equals(page.form().getLanguage())}">${value}</option>
+            <label for="language">Language</label>
+            @if(page.create())
+                <select id="language" name="language">
+                    <option value="">Choose language</option>
+                    @for(String value : java.util.List.of("TR", "EN"))
+                        <option value="${value}" selected="${value.equals(page.form().getLanguage())}">${value}</option>
+                    @endfor
+                </select>
+            @else
+                <select id="language" name="language" disabled>
+                    @for(String value : java.util.List.of("TR", "EN"))
+                        <option value="${value}" selected="${value.equals(page.form().getLanguage())}">${value}</option>
+                    @endfor
+                </select>
+            @endif
+            @if(!page.create())
+                <input type="hidden" name="language" value="${page.form().getLanguage()}">
+            @endif
+
+            <label for="visibility">Visibility</label>
+            <select id="visibility" name="visibility">
+                <option value="">Choose visibility</option>
+                @for(String value : java.util.List.of("PUBLIC", "UNLISTED", "PRIVATE"))
+                    <option value="${value}" selected="${value.equals(page.form().getVisibility())}">${value}</option>
                 @endfor
             </select>
-        @else
-            <select id="language" name="language" disabled>
-                @for(String value : java.util.List.of("TR", "EN"))
-                    <option value="${value}" selected="${value.equals(page.form().getLanguage())}">${value}</option>
-                @endfor
-            </select>
-        @endif
-        @if(!page.create())
-            <input type="hidden" name="language" value="${page.form().getLanguage()}">
-        @endif
 
-        <label for="visibility">Visibility</label>
-        <select id="visibility" name="visibility">
-            <option value="">Choose visibility</option>
-            @for(String value : java.util.List.of("PUBLIC", "UNLISTED", "PRIVATE"))
-                <option value="${value}" selected="${value.equals(page.form().getVisibility())}">${value}</option>
-            @endfor
-        </select>
-
-        @if(!page.create())
-            <label for="slug">Slug</label>
-            <input id="slug" name="slug" value="${page.form().getSlug()}">
-            <label for="title">Title</label>
-            <input id="title" name="title" maxlength="200" value="${page.form().getTitle()}">
-            <label for="summary">Summary</label>
-            <textarea id="summary" name="summary" maxlength="500">${page.form().getSummary()}</textarea>
-            <label for="markdownSource">Markdown source</label>
-            <textarea id="markdownSource" name="markdownSource" rows="24">${page.form().getMarkdownSource()}</textarea>
-            <label for="metaTitle">SEO title</label>
-            <input id="metaTitle" name="metaTitle" maxlength="200" value="${page.form().getMetaTitle()}">
-            <label for="metaDescription">SEO description</label>
-            <textarea id="metaDescription" name="metaDescription" maxlength="500">${page.form().getMetaDescription()}</textarea>
-            <label for="canonicalPath">Canonical path</label>
-            <input id="canonicalPath" name="canonicalPath" value="${page.form().getCanonicalPath()}">
-            <label for="ogTitle">Open Graph title</label>
-            <input id="ogTitle" name="ogTitle" maxlength="200" value="${page.form().getOgTitle()}">
-            <label for="ogDescription">Open Graph description</label>
-            <textarea id="ogDescription" name="ogDescription" maxlength="500">${page.form().getOgDescription()}</textarea>
-            <label for="ogImageAssetId">Open Graph image asset ID</label>
-            <input id="ogImageAssetId" name="ogImageAssetId" value="${page.form().getOgImageAssetId()}">
-        @endif
-        <button type="submit">${page.create() ? "Create draft" : "Save changes"}</button>
-    </form>
+            @if(!page.create())
+                <label for="slug">Slug</label>
+                <input id="slug" name="slug" value="${page.form().getSlug()}">
+                <label for="title">Title</label>
+                <input id="title" name="title" maxlength="200" value="${page.form().getTitle()}">
+                <label for="summary">Summary</label>
+                <textarea id="summary" name="summary" maxlength="500">${page.form().getSummary()}</textarea>
+                <label for="markdownSource">Markdown source</label>
+                <textarea id="markdownSource" name="markdownSource" rows="24">${page.form().getMarkdownSource()}</textarea>
+                <label for="metaTitle">SEO title</label>
+                <input id="metaTitle" name="metaTitle" maxlength="200" value="${page.form().getMetaTitle()}">
+                <label for="metaDescription">SEO description</label>
+                <textarea id="metaDescription" name="metaDescription" maxlength="500">${page.form().getMetaDescription()}</textarea>
+                <label for="canonicalPath">Canonical path</label>
+                <input id="canonicalPath" name="canonicalPath" value="${page.form().getCanonicalPath()}">
+                <label for="ogTitle">Open Graph title</label>
+                <input id="ogTitle" name="ogTitle" maxlength="200" value="${page.form().getOgTitle()}">
+                <label for="ogDescription">Open Graph description</label>
+                <textarea id="ogDescription" name="ogDescription" maxlength="500">${page.form().getOgDescription()}</textarea>
+                <label for="ogImageAssetId">Open Graph image asset ID</label>
+                <input id="ogImageAssetId" name="ogImageAssetId" value="${page.form().getOgImageAssetId()}">
+            @endif
+            <button type="submit">${page.create() ? "Create draft" : "Save changes"}</button>
+        </form>
+    @endif
+    @if(page.lifecycleActions().hasActions())
+        <section aria-label="Lifecycle actions">
+            <h2>Lifecycle actions</h2>
+            @if(page.lifecycleActions().canPublish())
+                <form method="post" action="${page.lifecycleActions().publishAction()}">
+                    <input type="hidden" name="${page.chrome().logoutForm().csrfParameterName()}" value="${page.chrome().logoutForm().csrfToken()}">
+                    <button type="submit">Publish</button>
+                </form>
+            @endif
+            @if(page.lifecycleActions().canUnpublish())
+                <form method="post" action="${page.lifecycleActions().unpublishAction()}">
+                    <input type="hidden" name="${page.chrome().logoutForm().csrfParameterName()}" value="${page.chrome().logoutForm().csrfToken()}">
+                    <button type="submit">Unpublish</button>
+                </form>
+            @endif
+            @if(page.lifecycleActions().canArchive())
+                <form method="post" action="${page.lifecycleActions().archiveAction()}">
+                    <input type="hidden" name="${page.chrome().logoutForm().csrfParameterName()}" value="${page.chrome().logoutForm().csrfToken()}">
+                    <button type="submit">Archive</button>
+                </form>
+            @endif
+        </section>
+    @endif
 </main>
 </body>
 </html>
