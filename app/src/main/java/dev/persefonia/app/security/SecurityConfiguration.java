@@ -40,6 +40,7 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.GET, "/login/oauth2/code/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/logout").authenticated()
                         .requestMatchers("/admin", "/admin/**").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/*/*/*").permitAll()
                         .anyRequest().denyAll())
                 .csrf(Customizer.withDefaults())
                 .formLogin(AbstractHttpConfigurer::disable)
