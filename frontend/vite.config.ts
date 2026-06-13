@@ -10,7 +10,10 @@ export default defineConfig({
     emptyOutDir: true,
     assetsDir: ".",
     rollupOptions: {
-      input: "src/main.ts"
+      input: {
+        main: "src/main.ts",
+        "mermaid-loader": "src/mermaid-loader.ts"
+      }
     }
   }
 });

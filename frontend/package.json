@@ -10,7 +10,11 @@
     "build": "vite build"
   },
   "devDependencies": {
+    "type-fest": "^5.7.0",
     "typescript": "6.0.3",
     "vite": "8.0.16"
+  },
+  "dependencies": {
+    "mermaid": "^11.15.0"
   }
 }

@@ -85,5 +85,39 @@ class PublicContentArchitectureTest {
                 .filter(line -> line.contains("$unsafe{"))
                 .count()).isEqualTo(1);
         assertThat(template).contains("$unsafe{page.renderedHtml()}");
+        assertThat(template).contains("@if(page.mermaidScriptPath().isPresent())");
+        assertThat(template).contains("page.headings()");
+        assertThat(template).doesNotContain("markdownSource");
+        assertThat(template).doesNotContain("/admin/content");
+        assertThat(template).doesNotContain("/preview");
+        assertThat(template).doesNotContain("/revisions");
+    }
+
+    @Test
+    void publicFrontendKeepsMermaidOutOfGlobalBundle() throws Exception {
+        String mainEntry = Files.readString(Path.of("../frontend/src/main.ts"));
+        String mermaidEntry = Files.readString(Path.of("../frontend/src/mermaid-loader.ts"));
+
+        assertThat(mainEntry).doesNotContain("mermaid");
+        assertThat(mermaidEntry).contains("from \"mermaid\"");
+    }
+
+    @Test
+    void publicContentRoutesDoNotExposePostHandlers() throws Exception {
+        try (var paths = Files.walk(Path.of("../web-public/src/main/java/dev/persefonia/webpublic"))) {
+            String routeAnnotations = paths
+                    .filter(path -> path.toString().endsWith(".java"))
+                    .map(path -> {
+                        try {
+                            return Files.readString(path);
+                        } catch (java.io.IOException exception) {
+                            throw new IllegalStateException(exception);
+                        }
+                    })
+                    .reduce("", String::concat);
+
+            assertThat(routeAnnotations).doesNotContain("@PostMapping");
+            assertThat(routeAnnotations).doesNotContain("method = RequestMethod.POST");
+        }
     }
 }

@@ -58,7 +58,32 @@ class PublicContentControllerTest {
     void publishedUnlistedContentRendersByDirectUrl() throws Exception {
         items.add(PublicContentTestItems.publishedUnlisted("unlisted"));
 
-        assertRendered("/tr/articles/unlisted");
+        mockMvc.perform(get("/tr/articles/unlisted"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith("text/html"))
+                .andExpect(content().string(containsString("<meta name=\"robots\" content=\"noindex\">")))
+                .andExpect(content().string(containsString("Persisted HTML")));
+    }
+
+    @Test
+    void publicPresentationIncludesMetadataTocAndConditionalMermaidLoader() throws Exception {
+        items.add(PublicContentTestItems.publishedPublic(
+                ContentType.ARTICLE, ContentLanguage.TR, "articles", "metadata"));
+        items.add(PublicContentTestItems.publishedPublicWithMermaid("diagram"));
+
+        mockMvc.perform(get("/tr/articles/metadata").header("Host", "attacker.example"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("<link rel=\"canonical\" href=\"https://0xmillennium.dev/tr/articles/metadata\">")))
+                .andExpect(content().string(containsString("<meta property=\"og:url\" content=\"https://0xmillennium.dev/tr/articles/metadata\">")))
+                .andExpect(content().string(containsString("<meta property=\"og:type\" content=\"article\">")))
+                .andExpect(content().string(containsString("<a href=\"#heading-escaped\">Heading &lt;Escaped&gt;</a>")))
+                .andExpect(content().string(not(containsString("attacker.example"))))
+                .andExpect(content().string(not(containsString("noindex"))))
+                .andExpect(content().string(not(containsString("mermaid-loader-test.js"))));
+
+        mockMvc.perform(get("/tr/articles/diagram"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("mermaid-loader-test.js")));
     }
 
     @Test
@@ -90,9 +115,11 @@ class PublicContentControllerTest {
                 .andExpect(content().contentTypeCompatibleWith("text/html"))
                 .andExpect(content().string(containsString("Public &lt;Title&gt;")))
                 .andExpect(content().string(containsString("Summary &lt;strong&gt;escaped&lt;/strong&gt;")))
+                .andExpect(content().string(containsString("<link rel=\"canonical\" href=\"https://0xmillennium.dev")))
                 .andExpect(content().string(containsString("<strong>Persisted HTML</strong>")))
                 .andExpect(content().string(containsString("4 min read")))
                 .andExpect(content().string(containsString("Heading &lt;Escaped&gt;")))
+                .andExpect(content().string(not(containsString("noindex"))))
                 .andExpect(content().string(not(containsString("markdownSource"))))
                 .andExpect(content().string(not(containsString("/admin/content"))))
                 .andExpect(content().string(not(containsString("/preview"))))

@@ -10,10 +10,14 @@ import dev.persefonia.contentpublishing.domain.content.ContentStatus;
 import dev.persefonia.contentpublishing.domain.content.ContentType;
 import dev.persefonia.contentpublishing.domain.content.ContentVisibility;
 import dev.persefonia.contentpublishing.domain.content.MarkdownSource;
+import dev.persefonia.contentpublishing.domain.content.OpenGraphDescription;
+import dev.persefonia.contentpublishing.domain.content.OpenGraphTitle;
 import dev.persefonia.contentpublishing.domain.content.ReadingTime;
 import dev.persefonia.contentpublishing.domain.content.RenderedHeading;
 import dev.persefonia.contentpublishing.domain.content.RenderedHtml;
 import dev.persefonia.contentpublishing.domain.content.RendererVersion;
+import dev.persefonia.contentpublishing.domain.content.SeoDescription;
+import dev.persefonia.contentpublishing.domain.content.SeoTitle;
 import dev.persefonia.contentpublishing.domain.content.Slug;
 import dev.persefonia.contentpublishing.domain.content.Summary;
 import dev.persefonia.contentpublishing.domain.content.Title;
@@ -30,6 +34,18 @@ public final class PublicContentTestItems {
 
     public static ContentItem publishedPublic(ContentType type, ContentLanguage language, String collection, String slug) {
         return published(type, language, ContentVisibility.PUBLIC, collection, slug);
+    }
+
+    public static ContentItem publishedPublicWithMermaid(String slug) {
+        ContentItem item = completeDraft(ContentType.ARTICLE, ContentLanguage.TR, ContentVisibility.PUBLIC, "articles", slug);
+        item.publish(mermaidSnapshot(), NOW.plusSeconds(1));
+        return item;
+    }
+
+    public static ContentItem publishedPublicWithoutHeadings(String slug) {
+        ContentItem item = completeDraft(ContentType.ARTICLE, ContentLanguage.TR, ContentVisibility.PUBLIC, "articles", slug);
+        item.publish(snapshotWithoutHeadings(), NOW.plusSeconds(1));
+        return item;
     }
 
     public static ContentItem publishedUnlisted(String slug) {
@@ -100,19 +116,44 @@ public final class PublicContentTestItems {
         item.changeSummary(Summary.of("Summary <strong>escaped</strong>"), NOW.minusSeconds(48));
         item.changeMarkdownSource(MarkdownSource.of("# Public title"), NOW.minusSeconds(47));
         item.changeMetadata(
-                ContentMetadata.withCanonicalPath(CanonicalPath.of("/" + language.name().toLowerCase()
-                        + "/" + collection + "/" + slug)),
+                ContentMetadata.of(
+                        SeoTitle.of("SEO <Title>"),
+                        SeoDescription.of("SEO <description>"),
+                        CanonicalPath.of("/" + language.name().toLowerCase() + "/" + collection + "/" + slug),
+                        OpenGraphTitle.of("OG <Title>"),
+                        OpenGraphDescription.of("OG <description>"),
+                        null),
                 NOW.minusSeconds(46));
         return item;
     }
 
     private static ContentRenderSnapshot snapshot() {
         return ContentRenderSnapshot.of(
-                RenderedHtml.sanitized("<p><strong>Persisted HTML</strong></p>"),
+                RenderedHtml.sanitized("<h2 id=\"heading-escaped\">Persisted heading</h2><p><strong>Persisted HTML</strong></p>"),
                 NOW,
                 RendererVersion.of("test-renderer"),
                 ReadingTime.minutes(4),
                 false,
                 List.of(RenderedHeading.of(2, "Heading <Escaped>", "heading-escaped", 1)));
+    }
+
+    private static ContentRenderSnapshot mermaidSnapshot() {
+        return ContentRenderSnapshot.of(
+                RenderedHtml.sanitized("<pre><code class=\"language-mermaid\">graph TD; A-->B;</code></pre>"),
+                NOW,
+                RendererVersion.of("test-renderer"),
+                ReadingTime.minutes(4),
+                true,
+                List.of(RenderedHeading.of(2, "Heading <Escaped>", "heading-escaped", 1)));
+    }
+
+    private static ContentRenderSnapshot snapshotWithoutHeadings() {
+        return ContentRenderSnapshot.of(
+                RenderedHtml.sanitized("<p><strong>Persisted HTML</strong></p>"),
+                NOW,
+                RendererVersion.of("test-renderer"),
+                ReadingTime.minutes(4),
+                false,
+                List.of());
     }
 }

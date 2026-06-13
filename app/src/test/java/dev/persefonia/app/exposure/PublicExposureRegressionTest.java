@@ -48,10 +48,12 @@ class PublicExposureRegressionTest {
 
         mockMvc.perform(get("/tr/articles/public"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(Matchers.containsString("Persisted HTML")));
+                .andExpect(content().string(Matchers.containsString("Persisted HTML")))
+                .andExpect(content().string(Matchers.not(Matchers.containsString("noindex"))));
         mockMvc.perform(get("/tr/articles/unlisted"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(Matchers.containsString("Persisted HTML")));
+                .andExpect(content().string(Matchers.containsString("Persisted HTML")))
+                .andExpect(content().string(Matchers.containsString("<meta name=\"robots\" content=\"noindex\">")));
 
         assertNotFound("/tr/articles/private");
         assertNotFound("/tr/articles/draft");
@@ -78,6 +80,7 @@ class PublicExposureRegressionTest {
     private void assertNotFound(String path) throws Exception {
         mockMvc.perform(get(path))
                 .andExpect(status().isNotFound())
-                .andExpect(content().string(Matchers.containsString("The page you requested was not found.")));
+                .andExpect(content().string(Matchers.containsString("The page you requested was not found.")))
+                .andExpect(content().string(Matchers.containsString("<meta name=\"robots\" content=\"noindex\">")));
     }
 }
