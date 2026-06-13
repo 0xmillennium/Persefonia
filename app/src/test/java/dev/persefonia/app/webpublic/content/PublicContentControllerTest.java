@@ -22,7 +22,7 @@ import org.springframework.test.web.servlet.MockMvc;
         "spring.autoconfigure.exclude=org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration",
         "spring.flyway.enabled=false"
 })
-@AutoConfigureMockMvc
+@AutoConfigureMockMvc(addFilters = false)
 @Import(PublicContentTestConfiguration.class)
 @ActiveProfiles({"test", "public-content-mvc-test"})
 class PublicContentControllerTest {
@@ -135,6 +135,11 @@ class PublicContentControllerTest {
                 .andExpect(content().string(not(containsString("private"))))
                 .andExpect(content().string(not(containsString("draft"))))
                 .andExpect(content().string(not(containsString("unpublished"))))
-                .andExpect(content().string(not(containsString("archived"))));
+                .andExpect(content().string(not(containsString("archived"))))
+                .andExpect(content().string(not(containsString("admin"))))
+                .andExpect(content().string(not(containsString("preview"))))
+                .andExpect(content().string(not(containsString("revision"))))
+                .andExpect(content().string(not(containsString("exception"))))
+                .andExpect(content().string(not(containsString("stack trace"))));
     }
 }

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.persefonia.contentpublishing.application.service.PublicContentQueryHandler;
 import dev.persefonia.webpublic.content.PublicContentController;
+import dev.persefonia.webpublic.content.PublicContentResponseHeaders;
 import dev.persefonia.webpublic.content.PublicContentRouteParser;
 import dev.persefonia.webpublic.content.PublicContentViewModelFactory;
 import java.nio.file.Files;
@@ -21,7 +22,8 @@ class PublicContentArchitectureTest {
                         .containsExactly(
                                 PublicContentRouteParser.class,
                                 PublicContentQueryHandler.class,
-                                PublicContentViewModelFactory.class));
+                                PublicContentViewModelFactory.class,
+                                PublicContentResponseHeaders.class));
     }
 
     @Test
@@ -119,5 +121,15 @@ class PublicContentArchitectureTest {
             assertThat(routeAnnotations).doesNotContain("@PostMapping");
             assertThat(routeAnnotations).doesNotContain("method = RequestMethod.POST");
         }
+    }
+
+    @Test
+    void publicSecurityMatcherDoesNotUseBroadThreeSegmentPermit() throws Exception {
+        String securityConfiguration = Files.readString(Path.of("src/main/java/dev/persefonia/app/security/SecurityConfiguration.java"));
+
+        assertThat(securityConfiguration).doesNotContain("\"/*/*/*\"");
+        assertThat(securityConfiguration).contains("PUBLIC_CONTENT_GET_PATTERNS");
+        assertThat(securityConfiguration).contains("/tr/articles/*");
+        assertThat(securityConfiguration).contains("/en/pages/*");
     }
 }

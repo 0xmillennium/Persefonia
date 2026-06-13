@@ -2,6 +2,7 @@ package dev.persefonia.app.exposure;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import dev.persefonia.app.webpublic.content.PublicContentTestConfiguration;
@@ -48,11 +49,19 @@ class PublicExposureRegressionTest {
 
         mockMvc.perform(get("/tr/articles/public"))
                 .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", Matchers.allOf(
+                        Matchers.containsString("public"),
+                        Matchers.containsString("max-age=60"))))
                 .andExpect(content().string(Matchers.containsString("Persisted HTML")))
+                .andExpect(content().string(Matchers.containsString("<link rel=\"canonical\" href=\"https://0xmillennium.dev/tr/articles/public\">")))
                 .andExpect(content().string(Matchers.not(Matchers.containsString("noindex"))));
         mockMvc.perform(get("/tr/articles/unlisted"))
                 .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", Matchers.allOf(
+                        Matchers.containsString("public"),
+                        Matchers.containsString("max-age=60"))))
                 .andExpect(content().string(Matchers.containsString("Persisted HTML")))
+                .andExpect(content().string(Matchers.containsString("<link rel=\"canonical\" href=\"https://0xmillennium.dev/tr/articles/unlisted\">")))
                 .andExpect(content().string(Matchers.containsString("<meta name=\"robots\" content=\"noindex\">")));
 
         assertNotFound("/tr/articles/private");
@@ -60,9 +69,10 @@ class PublicExposureRegressionTest {
         assertNotFound("/tr/articles/unpublished");
         assertNotFound("/tr/articles/archived");
         assertNotFound("/tr/articles/missing");
-        assertNotFound("/de/articles/public");
-        assertNotFound("/tr/essays/public");
         assertNotFound("/tr/articles/Invalid-Slug");
+
+        assertNotPublicContent("/de/articles/public");
+        assertNotPublicContent("/tr/essays/public");
     }
 
     @Test
@@ -74,13 +84,28 @@ class PublicExposureRegressionTest {
         mockMvc.perform(get("/sitemap.xml")).andExpect(status().is4xxClientError());
         mockMvc.perform(get("/feed")).andExpect(status().is4xxClientError());
         mockMvc.perform(get("/search")).andExpect(status().is4xxClientError());
+        mockMvc.perform(get("/tags/topic")).andExpect(status().is4xxClientError());
+        mockMvc.perform(get("/tr")).andExpect(status().is4xxClientError());
+        mockMvc.perform(get("/en")).andExpect(status().is4xxClientError());
+        mockMvc.perform(get("/articles")).andExpect(status().is4xxClientError());
         mockMvc.perform(get("/tr/articles")).andExpect(status().is4xxClientError());
+        mockMvc.perform(get("/en/articles")).andExpect(status().is4xxClientError());
     }
 
     private void assertNotFound(String path) throws Exception {
         mockMvc.perform(get(path))
                 .andExpect(status().isNotFound())
+                .andExpect(header().string("Cache-Control", Matchers.allOf(
+                        Matchers.containsString("no-store"),
+                        Matchers.containsString("private"))))
                 .andExpect(content().string(Matchers.containsString("The page you requested was not found.")))
                 .andExpect(content().string(Matchers.containsString("<meta name=\"robots\" content=\"noindex\">")));
+    }
+
+    private void assertNotPublicContent(String path) throws Exception {
+        mockMvc.perform(get(path))
+                .andExpect(status().is4xxClientError())
+                .andExpect(header().string("Cache-Control", Matchers.not(Matchers.containsString("public"))))
+                .andExpect(content().string(Matchers.not(Matchers.containsString("Persisted HTML"))));
     }
 }

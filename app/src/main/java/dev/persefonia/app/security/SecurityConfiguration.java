@@ -25,6 +25,16 @@ public class SecurityConfiguration {
             "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
                     + "object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'";
     static final String PERMISSIONS_POLICY = "camera=(), microphone=(), geolocation=(), payment=(), usb=()";
+    static final String[] PUBLIC_CONTENT_GET_PATTERNS = {
+            "/tr/articles/*",
+            "/en/articles/*",
+            "/tr/notes/*",
+            "/en/notes/*",
+            "/tr/research/*",
+            "/en/research/*",
+            "/tr/pages/*",
+            "/en/pages/*"
+    };
 
     @Bean
     SecurityFilterChain applicationSecurityFilterChain(
@@ -40,7 +50,7 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.GET, "/login/oauth2/code/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/logout").authenticated()
                         .requestMatchers("/admin", "/admin/**").authenticated()
-                        .requestMatchers(HttpMethod.GET, "/*/*/*").permitAll()
+                        .requestMatchers(HttpMethod.GET, PUBLIC_CONTENT_GET_PATTERNS).permitAll()
                         .anyRequest().denyAll())
                 .csrf(Customizer.withDefaults())
                 .formLogin(AbstractHttpConfigurer::disable)
