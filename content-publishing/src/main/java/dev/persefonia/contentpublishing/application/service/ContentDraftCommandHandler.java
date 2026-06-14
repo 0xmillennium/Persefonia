@@ -8,6 +8,7 @@ import dev.persefonia.contentpublishing.application.command.ContentDraftResult;
 import dev.persefonia.contentpublishing.application.command.ContentFieldUpdate;
 import dev.persefonia.contentpublishing.application.command.CreateContentDraftCommand;
 import dev.persefonia.contentpublishing.application.command.UpdateContentDraftCommand;
+import dev.persefonia.contentpublishing.application.discovery.ContentDiscoverabilityCoordinator;
 import dev.persefonia.contentpublishing.application.event.ContentCreated;
 import dev.persefonia.contentpublishing.application.event.ContentDraftUpdated;
 import dev.persefonia.contentpublishing.application.event.ContentSlugChanged;
@@ -16,6 +17,7 @@ import dev.persefonia.contentpublishing.application.exception.ContentCommandReje
 import dev.persefonia.contentpublishing.application.port.ContentPublishingEventPublisher;
 import dev.persefonia.contentpublishing.domain.content.ContentId;
 import dev.persefonia.contentpublishing.domain.content.ContentItem;
+import dev.persefonia.contentpublishing.domain.content.ContentStatus;
 import dev.persefonia.contentpublishing.domain.content.ContentVisibility;
 import dev.persefonia.contentpublishing.domain.content.Slug;
 import dev.persefonia.contentpublishing.domain.content.port.ContentItemRepository;
@@ -28,14 +30,17 @@ public final class ContentDraftCommandHandler {
     private final ContentItemRepository contentItems;
     private final ContentCommandAuthorizationPolicy authorization;
     private final ContentPublishingEventPublisher events;
+    private final ContentDiscoverabilityCoordinator discoverability;
 
     public ContentDraftCommandHandler(
             ContentItemRepository contentItems,
             ContentCommandAuthorizationPolicy authorization,
-            ContentPublishingEventPublisher events) {
+            ContentPublishingEventPublisher events,
+            ContentDiscoverabilityCoordinator discoverability) {
         this.contentItems = Objects.requireNonNull(contentItems, "contentItems");
         this.authorization = Objects.requireNonNull(authorization, "authorization");
         this.events = Objects.requireNonNull(events, "events");
+        this.discoverability = Objects.requireNonNull(discoverability, "discoverability");
     }
 
     public ContentDraftResult create(CreateContentDraftCommand command) {
@@ -51,13 +56,20 @@ public final class ContentDraftCommandHandler {
     public ContentDraftResult update(UpdateContentDraftCommand command) {
         authorization.requireOwner(command.actor(), "content.update-draft");
         ContentItem item = requiredContent(contentItems, command.contentId());
-        if (!item.isDraft() && !item.isUnpublished()) {
-            throw new ContentCommandRejectedException("Only draft or unpublished content can be edited");
+        if (!item.isDraft() && !item.isUnpublished() && !item.isPublished()) {
+            throw new ContentCommandRejectedException("Only draft, published, or unpublished content can be edited");
         }
+        if (item.isPublished() && command.markdownSource().specified()) {
+            throw new ContentCommandRejectedException("Published content body changes require republish");
+        }
+        ContentStatus oldStatus = item.status();
         Optional<Slug> oldSlug = item.slug();
         ContentVisibility oldVisibility = item.visibility();
         applyChanges(item, command);
         ContentItem saved = contentItems.save(item);
+        if (oldStatus == ContentStatus.PUBLISHED || saved.isPublished()) {
+            discoverability.syncContentUpdate(saved, oldStatus, oldVisibility, oldSlug);
+        }
         var actor = command.actor().identityRef();
         Instant occurredAt = command.requestedAt();
         events.publish(new ContentDraftUpdated(saved.id(), saved.type(), saved.language(), actor, occurredAt));

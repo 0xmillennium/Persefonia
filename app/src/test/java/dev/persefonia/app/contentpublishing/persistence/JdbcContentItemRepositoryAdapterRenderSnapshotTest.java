@@ -47,7 +47,7 @@ class JdbcContentItemRepositoryAdapterRenderSnapshotTest extends ContentPublishi
                 saved.unpublishedAt().orElse(null),
                 saved.createdAt(),
                 saved.updatedAt(),
-                saved.version());
+                saved.version().next());
 
         contentItems.save(replacement);
 

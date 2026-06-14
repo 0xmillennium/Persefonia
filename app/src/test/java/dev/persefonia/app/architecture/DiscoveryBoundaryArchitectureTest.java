@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
@@ -40,11 +41,25 @@ class DiscoveryBoundaryArchitectureTest {
                 .that().resideInAPackage("dev.persefonia.contentpublishing..")
                 .should().dependOnClassesThat().resideInAnyPackage(
                         "dev.persefonia.discovery.domain..",
+                        "dev.persefonia.discovery.application.service..",
                         "dev.persefonia.discovery.infrastructure..",
                         "dev.persefonia.discovery.application.repository..",
                         "dev.persefonia.app.discovery.persistence..")
                 .allowEmptyShould(true)
                 .check(ArchitectureTestSupport.PRODUCTION_CLASSES);
+    }
+
+    @Test
+    void contentPublishingUsesOnlyDiscoveryApplicationContractsAndPorts() throws IOException {
+        try (Stream<Path> productionSources = Files.walk(Path.of("../content-publishing/src/main/java"))) {
+            List<String> forbiddenImports = productionSources
+                    .filter(path -> path.toString().endsWith(".java"))
+                    .flatMap(DiscoveryBoundaryArchitectureTest::discoveryImports)
+                    .filter(DiscoveryBoundaryArchitectureTest::isForbiddenContentPublishingDiscoveryImport)
+                    .toList();
+
+            assertThat(forbiddenImports).isEmpty();
+        }
     }
 
     @Test
@@ -118,5 +133,24 @@ class DiscoveryBoundaryArchitectureTest {
         } catch (IOException exception) {
             throw new IllegalStateException("Could not read " + source, exception);
         }
+    }
+
+    private static Stream<String> discoveryImports(Path source) {
+        try {
+            return Files.readAllLines(source).stream()
+                    .map(String::trim)
+                    .filter(line -> line.startsWith("import dev.persefonia.discovery."))
+                    .map(line -> line.substring("import ".length(), line.length() - 1));
+        } catch (IOException exception) {
+            throw new IllegalStateException("Could not read " + source, exception);
+        }
+    }
+
+    private static boolean isForbiddenContentPublishingDiscoveryImport(String importedClass) {
+        return !(importedClass.startsWith("dev.persefonia.discovery.application.port.")
+                || importedClass.startsWith("dev.persefonia.discovery.application.projection.")
+                || importedClass.startsWith("dev.persefonia.discovery.application.redirect.")
+                || importedClass.startsWith("dev.persefonia.discovery.application.route.")
+                || importedClass.startsWith("dev.persefonia.discovery.application.contract."));
     }
 }

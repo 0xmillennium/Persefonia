@@ -21,6 +21,7 @@ import dev.persefonia.contentpublishing.application.support.ContentApplicationFi
 import dev.persefonia.contentpublishing.application.support.FakeMarkdownRenderingService;
 import dev.persefonia.contentpublishing.application.support.InMemoryContentItemRepository;
 import dev.persefonia.contentpublishing.application.support.InMemoryContentRevisionRepository;
+import dev.persefonia.contentpublishing.application.support.NoopContentDiscoverabilityCoordinator;
 import dev.persefonia.contentpublishing.application.support.RecordingContentPublishingEventPublisher;
 import dev.persefonia.contentpublishing.application.support.TestContentAuthorizationPolicy;
 import dev.persefonia.contentpublishing.domain.content.ContentLanguage;
@@ -38,10 +39,11 @@ class ContentApplicationAuthorizationTest {
         var authorization = new TestContentAuthorizationPolicy();
         var item = ContentApplicationFixtures.completeDraft();
         items.add(item);
-        var drafts = new ContentDraftCommandHandler(items, authorization, events);
+        var discoverability = NoopContentDiscoverabilityCoordinator.create();
+        var drafts = new ContentDraftCommandHandler(items, authorization, events, discoverability);
         var previews = new ContentPreviewQueryHandler(items, renderer, authorization);
-        var publishing = new ContentPublishCommandHandler(items, revisions, renderer, authorization, events);
-        var lifecycle = new ContentLifecycleCommandHandler(items, authorization, events);
+        var publishing = new ContentPublishCommandHandler(items, revisions, renderer, authorization, events, discoverability);
+        var lifecycle = new ContentLifecycleCommandHandler(items, authorization, events, discoverability);
         var revisionQueries = new ContentRevisionQueryHandler(items, revisions, authorization);
 
         assertDenied(() -> drafts.create(new CreateContentDraftCommand(

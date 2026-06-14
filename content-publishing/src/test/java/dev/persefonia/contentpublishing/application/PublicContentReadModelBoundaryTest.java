@@ -80,16 +80,20 @@ class PublicContentReadModelBoundaryTest {
     }
 
     @Test
-    void contentPublishingStillDoesNotConstructDiscoveryProjection() throws IOException {
+    void contentPublishingUsesOnlyDiscoveryApplicationPortsAndContracts() throws IOException {
         for (Path file : javaFiles(PRODUCTION_ROOT)) {
             String source = Files.readString(file);
             assertThat(source)
-                    .doesNotContain("Discoverable" + "Resource")
                     .doesNotContain("Discoverable" + "ResourceRepository")
+                    .doesNotContain("dev.persefonia.discovery.domain")
+                    .doesNotContain("dev.persefonia.discovery.infrastructure")
+                    .doesNotContain("dev.persefonia.discovery.application.service")
+                    .doesNotContain("dev.persefonia.app.discovery.persistence")
+                    .doesNotContain("JdbcClient")
+                    .doesNotContain("JdbcTemplate")
+                    .doesNotContain("NamedParameterJdbcTemplate")
                     .doesNotContain("Resolve" + "PublicRoutePort")
-                    .doesNotContain("Redirect" + "Rule")
-                    .doesNotContain("Update" + "Discoverable" + "ResourcePort")
-                    .doesNotContain("Remove" + "Discoverable" + "ResourcePort");
+                    .doesNotContain("new Discoverable" + "Resource(");
         }
     }
 

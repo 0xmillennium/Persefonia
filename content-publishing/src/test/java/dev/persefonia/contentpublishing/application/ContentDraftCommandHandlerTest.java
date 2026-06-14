@@ -15,6 +15,7 @@ import dev.persefonia.contentpublishing.application.exception.ContentCommandReje
 import dev.persefonia.contentpublishing.application.service.ContentDraftCommandHandler;
 import dev.persefonia.contentpublishing.application.support.ContentApplicationFixtures;
 import dev.persefonia.contentpublishing.application.support.InMemoryContentItemRepository;
+import dev.persefonia.contentpublishing.application.support.NoopContentDiscoverabilityCoordinator;
 import dev.persefonia.contentpublishing.application.support.RecordingContentPublishingEventPublisher;
 import dev.persefonia.contentpublishing.application.support.TestContentAuthorizationPolicy;
 import dev.persefonia.contentpublishing.domain.content.ContentLanguage;
@@ -28,7 +29,8 @@ class ContentDraftCommandHandlerTest {
     private final InMemoryContentItemRepository items = new InMemoryContentItemRepository();
     private final TestContentAuthorizationPolicy authorization = new TestContentAuthorizationPolicy();
     private final RecordingContentPublishingEventPublisher events = new RecordingContentPublishingEventPublisher();
-    private final ContentDraftCommandHandler handler = new ContentDraftCommandHandler(items, authorization, events);
+    private final ContentDraftCommandHandler handler = new ContentDraftCommandHandler(
+            items, authorization, events, NoopContentDiscoverabilityCoordinator.create());
 
     @Test
     void createsIncompleteDraftAndEmitsEventAfterSave() {
@@ -55,17 +57,19 @@ class ContentDraftCommandHandlerTest {
     }
 
     @Test
-    void rejectsPublishedDirectEditAndAuthorizationFailureBeforeSave() {
+    void updatesPublishedMetadataRouteVisibilityAndAuthorizationFailureBeforeSave() {
         var published = ContentItemTestFixtures.published(ContentVisibility.PUBLIC);
         items.add(published);
-        assertThatThrownBy(() -> handler.update(ContentApplicationFixtures.titleAndRouteUpdate(published)))
-                .isInstanceOf(ContentCommandRejectedException.class);
+
+        var result = handler.update(ContentApplicationFixtures.titleAndRouteUpdate(published));
+
+        assertThat(result.status()).isEqualTo(ContentStatus.PUBLISHED);
+        assertThat(result.slug().orElseThrow().value()).isEqualTo("updated-route");
 
         assertThatThrownBy(() -> handler.create(new CreateContentDraftCommand(
                 EDITOR, ContentType.ARTICLE, ContentVisibility.PUBLIC, ContentLanguage.EN, NOW)))
                 .isInstanceOf(SecurityException.class);
-        assertThat(items.saveCount()).isZero();
-        assertThat(events.events()).isEmpty();
+        assertThat(items.saveCount()).isEqualTo(1);
     }
 
     @Test
@@ -89,7 +93,7 @@ class ContentDraftCommandHandlerTest {
 
         assertThatThrownBy(() -> handler.update(ContentApplicationFixtures.titleAndRouteUpdate(archived)))
                 .isInstanceOf(ContentCommandRejectedException.class)
-                .hasMessageContaining("draft or unpublished");
+                .hasMessageContaining("draft, published, or unpublished");
         assertThat(items.saveCount()).isZero();
     }
 }

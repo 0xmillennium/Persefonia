@@ -7,6 +7,7 @@ import dev.persefonia.contentpublishing.application.command.ArchiveContentComman
 import dev.persefonia.contentpublishing.application.command.ContentArchiveResult;
 import dev.persefonia.contentpublishing.application.command.ContentUnpublishResult;
 import dev.persefonia.contentpublishing.application.command.UnpublishContentCommand;
+import dev.persefonia.contentpublishing.application.discovery.ContentDiscoverabilityCoordinator;
 import dev.persefonia.contentpublishing.application.event.ContentArchived;
 import dev.persefonia.contentpublishing.application.event.ContentUnpublished;
 import dev.persefonia.contentpublishing.application.port.ContentPublishingEventPublisher;
@@ -18,14 +19,17 @@ public final class ContentLifecycleCommandHandler {
     private final ContentItemRepository contentItems;
     private final ContentCommandAuthorizationPolicy authorization;
     private final ContentPublishingEventPublisher events;
+    private final ContentDiscoverabilityCoordinator discoverability;
 
     public ContentLifecycleCommandHandler(
             ContentItemRepository contentItems,
             ContentCommandAuthorizationPolicy authorization,
-            ContentPublishingEventPublisher events) {
+            ContentPublishingEventPublisher events,
+            ContentDiscoverabilityCoordinator discoverability) {
         this.contentItems = Objects.requireNonNull(contentItems, "contentItems");
         this.authorization = Objects.requireNonNull(authorization, "authorization");
         this.events = Objects.requireNonNull(events, "events");
+        this.discoverability = Objects.requireNonNull(discoverability, "discoverability");
     }
 
     public ContentUnpublishResult unpublish(UnpublishContentCommand command) {
@@ -33,6 +37,7 @@ public final class ContentLifecycleCommandHandler {
         ContentItem item = requiredContent(contentItems, command.contentId());
         item.unpublish(command.requestedAt());
         ContentItem saved = contentItems.save(item);
+        discoverability.removeContent(saved);
         events.publish(new ContentUnpublished(
                 saved.id(), saved.type(), saved.language(), command.actor().identityRef(),
                 command.requestedAt(), saved.unpublishedAt().orElseThrow()));
@@ -44,6 +49,7 @@ public final class ContentLifecycleCommandHandler {
         ContentItem item = requiredContent(contentItems, command.contentId());
         item.archive(command.requestedAt());
         ContentItem saved = contentItems.save(item);
+        discoverability.removeContent(saved);
         events.publish(new ContentArchived(
                 saved.id(), saved.type(), saved.language(), command.actor().identityRef(), command.requestedAt()));
         return new ContentArchiveResult(saved.id(), saved.status(), command.requestedAt());

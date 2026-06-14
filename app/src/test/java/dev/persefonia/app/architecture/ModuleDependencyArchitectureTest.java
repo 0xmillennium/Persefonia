@@ -26,6 +26,7 @@ class ModuleDependencyArchitectureTest {
         for (String contextPackage : ArchitectureTestSupport.BOUNDED_CONTEXT_PACKAGES) {
             String[] forbiddenPackages = Arrays.stream(ArchitectureTestSupport.BOUNDED_CONTEXT_PACKAGES)
                     .filter(candidate -> !candidate.equals(contextPackage))
+                    .filter(candidate -> contentPublishingDiscoveryApplicationException(contextPackage, candidate))
                     .toArray(String[]::new);
 
             noClasses()
@@ -43,5 +44,10 @@ class ModuleDependencyArchitectureTest {
                     .allowEmptyShould(true)
                     .check(ArchitectureTestSupport.PRODUCTION_CLASSES);
         }
+    }
+
+    private static boolean contentPublishingDiscoveryApplicationException(String contextPackage, String candidate) {
+        return !contextPackage.equals("dev.persefonia.contentpublishing..")
+                || !candidate.equals("dev.persefonia.discovery..");
     }
 }

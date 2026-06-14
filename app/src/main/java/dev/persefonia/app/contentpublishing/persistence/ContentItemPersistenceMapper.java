@@ -32,6 +32,10 @@ import java.util.Set;
 
 final class ContentItemPersistenceMapper {
     ContentItemPersistenceEntity toEntity(ContentItem item, boolean newRow) {
+        return toEntity(item, newRow ? null : previousJdbcVersion(item.version()));
+    }
+
+    ContentItemPersistenceEntity toEntity(ContentItem item, Long jdbcVersion) {
         return new ContentItemPersistenceEntity(
                 item.id().value(),
                 item.type().name(),
@@ -52,7 +56,7 @@ final class ContentItemPersistenceMapper {
                 item.unpublishedAt().orElse(null),
                 item.createdAt(),
                 item.updatedAt(),
-                newRow ? null : previousJdbcVersion(item.version()));
+                jdbcVersion);
     }
 
     ContentItem toDomain(

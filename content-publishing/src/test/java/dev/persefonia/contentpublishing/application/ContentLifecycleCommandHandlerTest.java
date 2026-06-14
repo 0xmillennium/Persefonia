@@ -10,6 +10,7 @@ import dev.persefonia.contentpublishing.application.event.ContentArchived;
 import dev.persefonia.contentpublishing.application.event.ContentUnpublished;
 import dev.persefonia.contentpublishing.application.service.ContentLifecycleCommandHandler;
 import dev.persefonia.contentpublishing.application.support.InMemoryContentItemRepository;
+import dev.persefonia.contentpublishing.application.support.NoopContentDiscoverabilityCoordinator;
 import dev.persefonia.contentpublishing.application.support.RecordingContentPublishingEventPublisher;
 import dev.persefonia.contentpublishing.application.support.TestContentAuthorizationPolicy;
 import dev.persefonia.contentpublishing.domain.content.ContentStatus;
@@ -22,7 +23,8 @@ class ContentLifecycleCommandHandlerTest {
     void unpublishesThenArchivesWithoutCreatingRevisions() {
         var items = new InMemoryContentItemRepository();
         var events = new RecordingContentPublishingEventPublisher();
-        var handler = new ContentLifecycleCommandHandler(items, new TestContentAuthorizationPolicy(), events);
+        var handler = new ContentLifecycleCommandHandler(
+                items, new TestContentAuthorizationPolicy(), events, NoopContentDiscoverabilityCoordinator.create());
         var item = ContentItemTestFixtures.published(ContentVisibility.PUBLIC);
         items.add(item);
 

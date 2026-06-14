@@ -12,7 +12,11 @@ class PublicContentClosureArchitectureTest {
                         "dev.persefonia.contentpublishing..",
                         "dev.persefonia.app.contentpublishing..",
                         "dev.persefonia.webadmin..")
-                .should().dependOnClassesThat().resideInAPackage("dev.persefonia.discovery..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "dev.persefonia.discovery.domain..",
+                        "dev.persefonia.discovery.infrastructure..",
+                        "dev.persefonia.discovery.application.service..",
+                        "dev.persefonia.app.discovery.persistence..")
                 .allowEmptyShould(true)
                 .check(ArchitectureTestSupport.PRODUCTION_CLASSES);
     }

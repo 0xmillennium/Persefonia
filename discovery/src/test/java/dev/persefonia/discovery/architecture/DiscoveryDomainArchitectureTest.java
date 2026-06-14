@@ -5,9 +5,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
 class DiscoveryDomainArchitectureTest {
+    private static final Pattern DISCOVERABLE_RESOURCE_CONSTRUCTION =
+            Pattern.compile("\\bnew\\s+DiscoverableResource\\s*\\(");
+
     @Test
     void discoveryDomainHasNoFrameworkInfrastructureOrForeignContextImports() throws IOException {
         assertThat(sourceText(projectRoot().resolve("discovery/src/main/java/dev/persefonia/discovery/domain")))
@@ -36,8 +40,8 @@ class DiscoveryDomainArchitectureTest {
                 root.resolve("media-library/src/main/java"),
                 root.resolve("web-public/src/main/java"));
 
-        assertThat(sourceContextText)
-                .doesNotContain("dev.persefonia.discovery.domain", "new DiscoverableResource");
+        assertThat(sourceContextText).doesNotContain("dev.persefonia.discovery.domain");
+        assertThat(DISCOVERABLE_RESOURCE_CONSTRUCTION.matcher(sourceContextText).find()).isFalse();
     }
 
     private static Path projectRoot() {

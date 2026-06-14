@@ -5,12 +5,15 @@ import static dev.persefonia.contentpublishing.application.service.ContentApplic
 import dev.persefonia.contentpublishing.application.authorization.ContentCommandAuthorizationPolicy;
 import dev.persefonia.contentpublishing.application.command.ContentPublishResult;
 import dev.persefonia.contentpublishing.application.command.PublishContentCommand;
+import dev.persefonia.contentpublishing.application.discovery.ContentDiscoverabilityCoordinator;
 import dev.persefonia.contentpublishing.application.event.ContentPublished;
 import dev.persefonia.contentpublishing.application.event.PublishedContentChanged;
 import dev.persefonia.contentpublishing.application.exception.ContentCommandRejectedException;
 import dev.persefonia.contentpublishing.application.port.ContentPublishingEventPublisher;
 import dev.persefonia.contentpublishing.application.rendering.MarkdownRenderingService;
 import dev.persefonia.contentpublishing.domain.content.ContentItem;
+import dev.persefonia.contentpublishing.domain.content.ContentVisibility;
+import dev.persefonia.contentpublishing.domain.content.Slug;
 import dev.persefonia.contentpublishing.domain.content.port.ContentItemRepository;
 import dev.persefonia.contentpublishing.domain.revision.CompleteContentSnapshot;
 import dev.persefonia.contentpublishing.domain.revision.ContentRevision;
@@ -19,6 +22,7 @@ import dev.persefonia.contentpublishing.domain.revision.RevisionMetadata;
 import dev.persefonia.contentpublishing.domain.revision.RevisionNumber;
 import dev.persefonia.contentpublishing.domain.revision.port.ContentRevisionRepository;
 import java.util.Objects;
+import java.util.Optional;
 
 public final class ContentPublishCommandHandler {
     private final ContentItemRepository contentItems;
@@ -26,24 +30,29 @@ public final class ContentPublishCommandHandler {
     private final MarkdownRenderingService renderer;
     private final ContentCommandAuthorizationPolicy authorization;
     private final ContentPublishingEventPublisher events;
+    private final ContentDiscoverabilityCoordinator discoverability;
 
     public ContentPublishCommandHandler(
             ContentItemRepository contentItems,
             ContentRevisionRepository revisions,
             MarkdownRenderingService renderer,
             ContentCommandAuthorizationPolicy authorization,
-            ContentPublishingEventPublisher events) {
+            ContentPublishingEventPublisher events,
+            ContentDiscoverabilityCoordinator discoverability) {
         this.contentItems = Objects.requireNonNull(contentItems, "contentItems");
         this.revisions = Objects.requireNonNull(revisions, "revisions");
         this.renderer = Objects.requireNonNull(renderer, "renderer");
         this.authorization = Objects.requireNonNull(authorization, "authorization");
         this.events = Objects.requireNonNull(events, "events");
+        this.discoverability = Objects.requireNonNull(discoverability, "discoverability");
     }
 
     public ContentPublishResult publish(PublishContentCommand command) {
         authorization.requireOwner(command.actor(), "content.publish");
         ContentItem item = requiredContent(contentItems, command.contentId());
         boolean alreadyPublished = item.isPublished();
+        Optional<Slug> previousSlug = item.slug();
+        ContentVisibility previousVisibility = item.visibility();
         var source = item.markdownSource()
                 .orElseThrow(() -> new ContentCommandRejectedException("Content requires markdown source for publish"));
         var snapshot = renderer.render(source, command.requestedAt());
@@ -68,6 +77,7 @@ public final class ContentPublishCommandHandler {
                 command.requestedAt(),
                 command.changeNote());
         revisions.save(revision);
+        discoverability.syncPublishedContent(saved, alreadyPublished, previousVisibility, previousSlug);
 
         if (alreadyPublished) {
             events.publish(new PublishedContentChanged(

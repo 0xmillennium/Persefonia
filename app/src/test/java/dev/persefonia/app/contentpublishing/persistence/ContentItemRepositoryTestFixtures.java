@@ -137,6 +137,6 @@ final class ContentItemRepositoryTestFixtures {
                 item.unpublishedAt().orElse(null),
                 item.createdAt(),
                 item.updatedAt(),
-                item.version());
+                item.version().next());
     }
 }

@@ -13,6 +13,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -44,8 +45,11 @@ public class JdbcContentItemRepositoryAdapter implements ContentItemRepository {
         }
         return transactionTemplate().execute(status -> {
             SpringDataContentItemRows rows = rootRows();
-            boolean newRow = !rows.existsById(item.id().value());
-            ContentItemPersistenceEntity saved = rows.save(mapper.toEntity(item, newRow));
+            Optional<ContentItemPersistenceEntity> existing = rows.findById(item.id().value());
+            Long jdbcVersion = existing
+                    .map(current -> jdbcVersionForSave(item, current.version()))
+                    .orElse(null);
+            ContentItemPersistenceEntity saved = rows.save(mapper.toEntity(item, jdbcVersion));
             replaceRenderSnapshot(saved.id(), item);
             return load(saved).orElseThrow(() -> new ContentPublishingPersistenceException(
                     "Saved content item could not be reloaded: " + saved.id()));
@@ -148,6 +152,18 @@ public class JdbcContentItemRepositoryAdapter implements ContentItemRepository {
 
     private TransactionTemplate transactionTemplate() {
         return required(transactions, "JDBC transaction infrastructure is not available.");
+    }
+
+    private Long jdbcVersionForSave(ContentItem item, Long currentVersion) {
+        if (currentVersion == null) {
+            throw new ContentPublishingPersistenceException(
+                    "Existing content item has no optimistic lock version: " + item.id().value());
+        }
+        if (item.version().value() <= currentVersion) {
+            throw new OptimisticLockingFailureException(
+                    "Content item save is stale for id " + item.id().value());
+        }
+        return currentVersion;
     }
 
     private <T> T required(ObjectProvider<T> provider, String message) {

@@ -13,6 +13,7 @@ import dev.persefonia.contentpublishing.application.support.ContentApplicationFi
 import dev.persefonia.contentpublishing.application.support.FakeMarkdownRenderingService;
 import dev.persefonia.contentpublishing.application.support.InMemoryContentItemRepository;
 import dev.persefonia.contentpublishing.application.support.InMemoryContentRevisionRepository;
+import dev.persefonia.contentpublishing.application.support.NoopContentDiscoverabilityCoordinator;
 import dev.persefonia.contentpublishing.application.support.RecordingContentPublishingEventPublisher;
 import dev.persefonia.contentpublishing.application.support.TestContentAuthorizationPolicy;
 import dev.persefonia.contentpublishing.domain.content.ContentStatus;
@@ -32,7 +33,8 @@ class ContentPublishCommandHandlerTest {
     private final FakeMarkdownRenderingService renderer = new FakeMarkdownRenderingService();
     private final RecordingContentPublishingEventPublisher events = new RecordingContentPublishingEventPublisher();
     private final ContentPublishCommandHandler handler = new ContentPublishCommandHandler(
-            items, revisions, renderer, new TestContentAuthorizationPolicy(), events);
+            items, revisions, renderer, new TestContentAuthorizationPolicy(), events,
+            NoopContentDiscoverabilityCoordinator.create());
 
     @Test
     void publishesWithCompleteSanitizedRevisionAndSpecificEvents() {
@@ -79,7 +81,8 @@ class ContentPublishCommandHandlerTest {
             }
         };
         var failingHandler = new ContentPublishCommandHandler(
-                items, failingRevisions, renderer, new TestContentAuthorizationPolicy(), events);
+                items, failingRevisions, renderer, new TestContentAuthorizationPolicy(), events,
+                NoopContentDiscoverabilityCoordinator.create());
 
         assertThatThrownBy(() -> failingHandler.publish(new PublishContentCommand(OWNER, item.id(), NOW, null)))
                 .isInstanceOf(IllegalStateException.class);
