@@ -5,7 +5,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import dev.persefonia.contentpublishing.domain.content.ContentLanguage;
+import dev.persefonia.contentpublishing.domain.content.ContentItem;
 import dev.persefonia.contentpublishing.domain.content.ContentType;
+import dev.persefonia.discovery.application.contract.RedirectStatusCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,16 +29,18 @@ import org.springframework.test.web.servlet.MvcResult;
 class PublicContentCacheHeaderTest {
     @Autowired MockMvc mockMvc;
     @Autowired PublicContentTestRepository items;
+    @Autowired InMemoryPublicRouteResolver routes;
 
     @BeforeEach
     void reset() {
         items.reset();
+        routes.clear();
     }
 
     @Test
     void publishedPublicContentUsesShortPublicCache() throws Exception {
-        items.add(PublicContentTestItems.publishedPublic(
-                ContentType.ARTICLE, ContentLanguage.TR, "articles", "public-cache"));
+        addProjected(PublicContentTestItems.publishedPublic(
+                ContentType.ARTICLE, ContentLanguage.TR, "articles", "public-cache"), "/tr/articles/public-cache");
 
         assertPublicHtmlCache(mockMvc.perform(get("/tr/articles/public-cache"))
                 .andExpect(status().isOk())
@@ -45,7 +49,7 @@ class PublicContentCacheHeaderTest {
 
     @Test
     void publishedUnlistedContentUsesShortPublicCache() throws Exception {
-        items.add(PublicContentTestItems.publishedUnlisted("unlisted-cache"));
+        addProjected(PublicContentTestItems.publishedUnlisted("unlisted-cache"), "/tr/articles/unlisted-cache");
 
         assertPublicHtmlCache(mockMvc.perform(get("/tr/articles/unlisted-cache"))
                 .andExpect(status().isOk())
@@ -54,17 +58,29 @@ class PublicContentCacheHeaderTest {
 
     @Test
     void nonPublicContentUsesNoStorePrivateCache() throws Exception {
-        items.add(PublicContentTestItems.draft("draft-cache"));
-        items.add(PublicContentTestItems.unpublished("unpublished-cache"));
-        items.add(PublicContentTestItems.archived("archived-cache"));
-        items.add(PublicContentTestItems.publishedPrivate("private-cache"));
-        items.add(PublicContentTestItems.publishedWithoutSnapshot("without-snapshot-cache"));
+        addProjected(PublicContentTestItems.draft("draft-cache"), "/tr/articles/draft-cache");
+        addProjected(PublicContentTestItems.unpublished("unpublished-cache"), "/tr/articles/unpublished-cache");
+        addProjected(PublicContentTestItems.archived("archived-cache"), "/tr/articles/archived-cache");
+        addProjected(PublicContentTestItems.publishedPrivate("private-cache"), "/tr/articles/private-cache");
+        addProjected(PublicContentTestItems.publishedWithoutSnapshot("without-snapshot-cache"), "/tr/articles/without-snapshot-cache");
 
         assertNoStorePrivate("/tr/articles/draft-cache");
         assertNoStorePrivate("/tr/articles/unpublished-cache");
         assertNoStorePrivate("/tr/articles/archived-cache");
         assertNoStorePrivate("/tr/articles/private-cache");
         assertNoStorePrivate("/tr/articles/without-snapshot-cache");
+    }
+
+    @Test
+    void redirectUsesShortPublicCache() throws Exception {
+        routes.addRedirect(
+                "/tr/articles/old-cache",
+                "/tr/articles/new-cache",
+                RedirectStatusCode.PERMANENT_REDIRECT_308);
+
+        assertPublicHtmlCache(mockMvc.perform(get("/tr/articles/old-cache"))
+                .andExpect(status().isPermanentRedirect())
+                .andReturn());
     }
 
     @Test
@@ -87,6 +103,11 @@ class PublicContentCacheHeaderTest {
 
     private static void assertNoStorePrivate(MvcResult result) {
         assertThat(cacheControlTokens(result)).contains("no-store", "private");
+    }
+
+    private void addProjected(ContentItem item, String publicPath) {
+        items.add(item);
+        routes.addFound(publicPath, item.id().value());
     }
 
     private static String[] cacheControlTokens(MvcResult result) {

@@ -7,10 +7,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import dev.persefonia.app.webpublic.content.InMemoryPublicRouteResolver;
 import dev.persefonia.app.webpublic.content.PublicContentTestConfiguration;
 import dev.persefonia.app.webpublic.content.PublicContentTestItems;
 import dev.persefonia.app.webpublic.content.PublicContentTestRepository;
 import dev.persefonia.contentpublishing.domain.content.ContentLanguage;
+import dev.persefonia.contentpublishing.domain.content.ContentItem;
 import dev.persefonia.contentpublishing.domain.content.ContentType;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -37,18 +39,20 @@ import org.springframework.test.web.servlet.MvcResult;
 class PublicContentSecurityMatcherTest {
     @Autowired MockMvc mockMvc;
     @Autowired PublicContentTestRepository items;
+    @Autowired InMemoryPublicRouteResolver routes;
 
     @BeforeEach
     void reset() {
         items.reset();
+        routes.clear();
     }
 
     @Test
     void supportedPublicContentGetRoutesArePermitted() throws Exception {
-        items.add(PublicContentTestItems.publishedPublic(
-                ContentType.ARTICLE, ContentLanguage.TR, "articles", "valid-public-slug"));
-        items.add(PublicContentTestItems.publishedPublic(
-                ContentType.PAGE, ContentLanguage.EN, "pages", "valid-page-slug"));
+        addProjected(PublicContentTestItems.publishedPublic(
+                ContentType.ARTICLE, ContentLanguage.TR, "articles", "valid-public-slug"), "/tr/articles/valid-public-slug");
+        addProjected(PublicContentTestItems.publishedPublic(
+                ContentType.PAGE, ContentLanguage.EN, "pages", "valid-page-slug"), "/en/pages/valid-page-slug");
 
         mockMvc.perform(get("/tr/articles/valid-public-slug"))
                 .andExpect(status().isOk())
@@ -109,5 +113,10 @@ class PublicContentSecurityMatcherTest {
 
     private static String quoted(String value, char quote) {
         return quote + value + quote;
+    }
+
+    private void addProjected(ContentItem item, String publicPath) {
+        items.add(item);
+        routes.addFound(publicPath, item.id().value());
     }
 }

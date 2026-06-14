@@ -1,7 +1,7 @@
 package dev.persefonia.webpublic.content;
 
 import dev.persefonia.contentpublishing.application.query.PublicContentLookupResult;
-import dev.persefonia.contentpublishing.application.service.PublicContentQueryHandler;
+import dev.persefonia.contentpublishing.application.service.PublicContentBySourceQueryHandler;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
@@ -12,16 +12,19 @@ import org.springframework.web.servlet.ModelAndView;
 @Controller
 public final class PublicContentController {
     private final PublicContentRouteParser routeParser;
-    private final PublicContentQueryHandler queryHandler;
+    private final DiscoveryPublicContentRouteResolver routeResolver;
+    private final PublicContentBySourceQueryHandler queryHandler;
     private final PublicContentViewModelFactory viewModelFactory;
     private final PublicContentResponseHeaders responseHeaders;
 
     public PublicContentController(
             PublicContentRouteParser routeParser,
-            PublicContentQueryHandler queryHandler,
+            DiscoveryPublicContentRouteResolver routeResolver,
+            PublicContentBySourceQueryHandler queryHandler,
             PublicContentViewModelFactory viewModelFactory,
             PublicContentResponseHeaders responseHeaders) {
         this.routeParser = routeParser;
+        this.routeResolver = routeResolver;
         this.queryHandler = queryHandler;
         this.viewModelFactory = viewModelFactory;
         this.responseHeaders = responseHeaders;
@@ -34,9 +37,25 @@ public final class PublicContentController {
             @PathVariable("slug") String slug,
             HttpServletResponse response) {
         return routeParser.parse(language, collection, slug)
-                .map(queryHandler::lookup)
-                .map(result -> render(result, response))
+                .map(routeResolver::resolve)
+                .map(outcome -> handle(outcome, response))
                 .orElseGet(() -> notFound(response));
+    }
+
+    private ModelAndView handle(DiscoveryPublicRouteOutcome outcome, HttpServletResponse response) {
+        return switch (outcome) {
+            case DiscoveryPublicRouteOutcome.Redirect redirect -> redirect(redirect, response);
+            case DiscoveryPublicRouteOutcome.Content content -> render(queryHandler.lookup(content.query()), response);
+            case DiscoveryPublicRouteOutcome.NotFound ignored -> notFound(response);
+        };
+    }
+
+    private ModelAndView redirect(DiscoveryPublicRouteOutcome.Redirect redirect, HttpServletResponse response) {
+        responseHeaders.applyPublicRedirectHeaders(response);
+        response.setHeader("Location", redirect.targetPath());
+        ModelAndView modelAndView = new ModelAndView();
+        modelAndView.setStatus(HttpStatus.valueOf(redirect.statusCode()));
+        return modelAndView;
     }
 
     private ModelAndView render(PublicContentLookupResult result, HttpServletResponse response) {

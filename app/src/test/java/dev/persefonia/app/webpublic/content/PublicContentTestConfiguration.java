@@ -18,6 +18,12 @@ public class PublicContentTestConfiguration {
 
     @Bean
     @Primary
+    InMemoryPublicRouteResolver publicContentTestRouteResolver() {
+        return new InMemoryPublicRouteResolver();
+    }
+
+    @Bean
+    @Primary
     PublicContentTestRevisionRepository publicContentTestRevisionRepository() {
         return new PublicContentTestRevisionRepository();
     }

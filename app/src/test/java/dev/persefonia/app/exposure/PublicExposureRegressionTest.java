@@ -5,10 +5,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import dev.persefonia.app.webpublic.content.InMemoryPublicRouteResolver;
 import dev.persefonia.app.webpublic.content.PublicContentTestConfiguration;
 import dev.persefonia.app.webpublic.content.PublicContentTestRepository;
 import dev.persefonia.app.webpublic.content.PublicContentTestItems;
 import dev.persefonia.contentpublishing.domain.content.ContentLanguage;
+import dev.persefonia.contentpublishing.domain.content.ContentItem;
 import dev.persefonia.contentpublishing.domain.content.ContentType;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,21 +33,23 @@ import org.springframework.test.web.servlet.MockMvc;
 class PublicExposureRegressionTest {
     @Autowired MockMvc mockMvc;
     @Autowired PublicContentTestRepository items;
+    @Autowired InMemoryPublicRouteResolver routes;
 
     @BeforeEach
     void reset() {
         items.reset();
+        routes.clear();
     }
 
     @Test
     void publicDetailRouteExposesOnlyDirectlyRenderableContent() throws Exception {
-        items.add(PublicContentTestItems.publishedPublic(
-                ContentType.ARTICLE, ContentLanguage.TR, "articles", "public"));
-        items.add(PublicContentTestItems.publishedUnlisted("unlisted"));
-        items.add(PublicContentTestItems.publishedPrivate("private"));
-        items.add(PublicContentTestItems.draft("draft"));
-        items.add(PublicContentTestItems.unpublished("unpublished"));
-        items.add(PublicContentTestItems.archived("archived"));
+        addProjected(PublicContentTestItems.publishedPublic(
+                ContentType.ARTICLE, ContentLanguage.TR, "articles", "public"), "/tr/articles/public");
+        addProjected(PublicContentTestItems.publishedUnlisted("unlisted"), "/tr/articles/unlisted");
+        addProjected(PublicContentTestItems.publishedPrivate("private"), "/tr/articles/private");
+        addProjected(PublicContentTestItems.draft("draft"), "/tr/articles/draft");
+        addProjected(PublicContentTestItems.unpublished("unpublished"), "/tr/articles/unpublished");
+        addProjected(PublicContentTestItems.archived("archived"), "/tr/articles/archived");
 
         mockMvc.perform(get("/tr/articles/public"))
                 .andExpect(status().isOk())
@@ -107,5 +111,10 @@ class PublicExposureRegressionTest {
                 .andExpect(status().is4xxClientError())
                 .andExpect(header().string("Cache-Control", Matchers.not(Matchers.containsString("public"))))
                 .andExpect(content().string(Matchers.not(Matchers.containsString("Persisted HTML"))));
+    }
+
+    private void addProjected(ContentItem item, String publicPath) {
+        items.add(item);
+        routes.addFound(publicPath, item.id().value());
     }
 }

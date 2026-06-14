@@ -32,6 +32,10 @@ class DiscoveryRouteContractTest {
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new PublicUrl("en/articles/contract"))
                 .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new PublicUrl("/en/articles/contract?preview=true"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new PublicUrl("/en/articles/contract#heading"))
+                .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new PublicRouteLookup(null))
                 .isInstanceOf(NullPointerException.class);
     }

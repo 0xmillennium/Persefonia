@@ -16,6 +16,7 @@ import dev.persefonia.contentpublishing.application.service.ContentLifecycleComm
 import dev.persefonia.contentpublishing.application.service.ContentPreviewQueryHandler;
 import dev.persefonia.contentpublishing.application.service.ContentPublishCommandHandler;
 import dev.persefonia.contentpublishing.application.service.ContentRevisionQueryHandler;
+import dev.persefonia.contentpublishing.application.service.PublicContentBySourceQueryHandler;
 import dev.persefonia.contentpublishing.application.service.PublicContentQueryHandler;
 import dev.persefonia.contentpublishing.domain.content.port.ContentItemRepository;
 import dev.persefonia.contentpublishing.domain.revision.port.ContentRevisionRepository;
@@ -110,5 +111,12 @@ class ContentApplicationConfiguration {
     @Bean
     PublicContentQueryHandler publicContentQueryHandler(ContentItemRepository contentItems) {
         return new PublicContentQueryHandler(contentItems);
+    }
+
+    @Bean
+    PublicContentBySourceQueryHandler publicContentBySourceQueryHandler(
+            ContentItemRepository contentItems,
+            ContentPublicRouteFactory routeFactory) {
+        return new PublicContentBySourceQueryHandler(contentItems, routeFactory);
     }
 }

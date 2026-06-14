@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import dev.persefonia.contentpublishing.domain.content.ContentLanguage;
+import dev.persefonia.contentpublishing.domain.content.ContentItem;
 import dev.persefonia.contentpublishing.domain.content.ContentType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,16 +29,18 @@ import org.springframework.test.web.servlet.MockMvc;
 class PublicContentIndexingTest {
     @Autowired MockMvc mockMvc;
     @Autowired PublicContentTestRepository items;
+    @Autowired InMemoryPublicRouteResolver routes;
 
     @BeforeEach
     void reset() {
         items.reset();
+        routes.clear();
     }
 
     @Test
     void publicContentDoesNotRenderNoindex() throws Exception {
-        items.add(PublicContentTestItems.publishedPublic(
-                ContentType.ARTICLE, ContentLanguage.TR, "articles", "indexable"));
+        addProjected(PublicContentTestItems.publishedPublic(
+                ContentType.ARTICLE, ContentLanguage.TR, "articles", "indexable"), "/tr/articles/indexable");
 
         mockMvc.perform(get("/tr/articles/indexable"))
                 .andExpect(status().isOk())
@@ -46,7 +49,7 @@ class PublicContentIndexingTest {
 
     @Test
     void unlistedContentRendersNoindex() throws Exception {
-        items.add(PublicContentTestItems.publishedUnlisted("unlisted-indexing"));
+        addProjected(PublicContentTestItems.publishedUnlisted("unlisted-indexing"), "/tr/articles/unlisted-indexing");
 
         mockMvc.perform(get("/tr/articles/unlisted-indexing"))
                 .andExpect(status().isOk())
@@ -58,5 +61,10 @@ class PublicContentIndexingTest {
         mockMvc.perform(get("/tr/articles/missing-indexing"))
                 .andExpect(status().isNotFound())
                 .andExpect(content().string(containsString("<meta name=\"robots\" content=\"noindex\">")));
+    }
+
+    private void addProjected(ContentItem item, String publicPath) {
+        items.add(item);
+        routes.addFound(publicPath, item.id().value());
     }
 }

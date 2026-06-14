@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import dev.persefonia.contentpublishing.domain.content.ContentLanguage;
+import dev.persefonia.contentpublishing.domain.content.ContentItem;
 import dev.persefonia.contentpublishing.domain.content.ContentType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,16 +29,18 @@ import org.springframework.test.web.servlet.MockMvc;
 class PublicContentTemplateSmokeTest {
     @Autowired MockMvc mockMvc;
     @Autowired PublicContentTestRepository items;
+    @Autowired InMemoryPublicRouteResolver routes;
 
     @BeforeEach
     void reset() {
         items.reset();
+        routes.clear();
     }
 
     @Test
     void contentTemplateRendersSnapshotAndEscapesPublicFields() throws Exception {
-        items.add(PublicContentTestItems.publishedPublic(
-                ContentType.ARTICLE, ContentLanguage.TR, "articles", "template-smoke"));
+        addProjected(PublicContentTestItems.publishedPublic(
+                ContentType.ARTICLE, ContentLanguage.TR, "articles", "template-smoke"), "/tr/articles/template-smoke");
 
         mockMvc.perform(get("/tr/articles/template-smoke"))
                 .andExpect(status().isOk())
@@ -69,8 +72,8 @@ class PublicContentTemplateSmokeTest {
 
     @Test
     void contentTemplateOmitsTocWhenHeadingsAreEmptyAndLoadsMermaidConditionally() throws Exception {
-        items.add(PublicContentTestItems.publishedPublicWithoutHeadings("without-headings"));
-        items.add(PublicContentTestItems.publishedPublicWithMermaid("with-mermaid"));
+        addProjected(PublicContentTestItems.publishedPublicWithoutHeadings("without-headings"), "/tr/articles/without-headings");
+        addProjected(PublicContentTestItems.publishedPublicWithMermaid("with-mermaid"), "/tr/articles/with-mermaid");
 
         mockMvc.perform(get("/tr/articles/without-headings"))
                 .andExpect(status().isOk())
@@ -85,7 +88,7 @@ class PublicContentTemplateSmokeTest {
 
     @Test
     void unlistedContentRendersNoindex() throws Exception {
-        items.add(PublicContentTestItems.publishedUnlisted("template-unlisted"));
+        addProjected(PublicContentTestItems.publishedUnlisted("template-unlisted"), "/tr/articles/template-unlisted");
 
         mockMvc.perform(get("/tr/articles/template-unlisted"))
                 .andExpect(status().isOk())
@@ -102,5 +105,10 @@ class PublicContentTemplateSmokeTest {
                 .andExpect(content().string(not(containsString("draft"))))
                 .andExpect(content().string(not(containsString("private"))))
                 .andExpect(content().string(not(containsString("/admin/content"))));
+    }
+
+    private void addProjected(ContentItem item, String publicPath) {
+        items.add(item);
+        routes.addFound(publicPath, item.id().value());
     }
 }
