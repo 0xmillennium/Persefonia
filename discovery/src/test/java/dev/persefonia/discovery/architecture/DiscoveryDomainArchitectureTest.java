@@ -34,8 +34,7 @@ class DiscoveryDomainArchitectureTest {
                 root.resolve("profile-portfolio/src/main/java"),
                 root.resolve("taxonomy/src/main/java"),
                 root.resolve("media-library/src/main/java"),
-                root.resolve("web-public/src/main/java"),
-                root.resolve("app/src/main/java"));
+                root.resolve("web-public/src/main/java"));
 
         assertThat(sourceContextText)
                 .doesNotContain("dev.persefonia.discovery.domain", "new DiscoverableResource");

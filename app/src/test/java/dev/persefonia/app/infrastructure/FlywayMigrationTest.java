@@ -45,7 +45,7 @@ class FlywayMigrationTest {
 
             assertDoesNotThrow(flyway::clean);
             var migrationResult = assertDoesNotThrow(flyway::migrate);
-            assertEquals(3, migrationResult.migrationsExecuted, "V1, V2, and V3 should be executable");
+            assertEquals(4, migrationResult.migrationsExecuted, "V1, V2, V3, and V4 should be executable");
 
             try (Connection connection = postgres.createConnection("")) {
                 for (String schema : LOCKED_SCHEMAS) {

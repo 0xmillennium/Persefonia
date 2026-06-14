@@ -9,6 +9,7 @@ class ApplicationCompositionArchitectureTest {
     void appPackageContainsNoFeatureLogicByNamingConvention() {
         noClasses()
                 .that().resideInAPackage("dev.persefonia.app..")
+                .and().resideOutsideOfPackage("dev.persefonia.app.discovery.persistence..")
                 .should().haveSimpleNameEndingWith("Controller")
                 .orShould().haveSimpleNameEndingWith("Repository")
                 .orShould().haveSimpleNameEndingWith("JdbcRepository")

@@ -41,7 +41,19 @@ class DiscoveryBoundaryArchitectureTest {
                 .should().dependOnClassesThat().resideInAnyPackage(
                         "dev.persefonia.discovery.domain..",
                         "dev.persefonia.discovery.infrastructure..",
-                        "dev.persefonia.discovery.application.repository..")
+                        "dev.persefonia.discovery.application.repository..",
+                        "dev.persefonia.app.discovery.persistence..")
+                .allowEmptyShould(true)
+                .check(ArchitectureTestSupport.PRODUCTION_CLASSES);
+    }
+
+    @Test
+    void discoveryPersistenceIsOwnedByAppAndDoesNotLeakToSourceOrWebContexts() {
+        noClasses()
+                .that().resideInAnyPackage(
+                        "dev.persefonia.contentpublishing..",
+                        "dev.persefonia.webpublic..")
+                .should().dependOnClassesThat().resideInAPackage("dev.persefonia.app.discovery.persistence..")
                 .allowEmptyShould(true)
                 .check(ArchitectureTestSupport.PRODUCTION_CLASSES);
     }
@@ -77,9 +89,32 @@ class DiscoveryBoundaryArchitectureTest {
         }
     }
 
+    @Test
+    void sourceAndWebContextsDoNotWriteDiscoveryTablesDirectly() throws IOException {
+        try (Stream<Path> productionSources = Files.walk(Path.of(".."))) {
+            assertThat(productionSources
+                            .filter(path -> path.toString().contains("/src/main/java/"))
+                            .filter(path -> path.toString().endsWith(".java"))
+                            .filter(path -> path.toString().contains("/content-publishing/")
+                                    || path.toString().contains("/web-public/"))
+                            .filter(DiscoveryBoundaryArchitectureTest::referencesDiscoveryTable))
+                    .isEmpty();
+        }
+    }
+
     private static boolean constructsDiscoverableResource(Path source) {
         try {
             return DISCOVERABLE_RESOURCE_CONSTRUCTION.matcher(Files.readString(source)).find();
+        } catch (IOException exception) {
+            throw new IllegalStateException("Could not read " + source, exception);
+        }
+    }
+
+    private static boolean referencesDiscoveryTable(Path source) {
+        try {
+            String sourceText = Files.readString(source);
+            return sourceText.contains("discovery.discoverable_resources")
+                    || sourceText.contains("discovery.redirect_rules");
         } catch (IOException exception) {
             throw new IllegalStateException("Could not read " + source, exception);
         }
