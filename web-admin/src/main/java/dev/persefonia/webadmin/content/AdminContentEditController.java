@@ -9,6 +9,7 @@ import dev.persefonia.contentpublishing.application.service.ContentAdminQuerySer
 import dev.persefonia.contentpublishing.application.service.ContentCommandGateway;
 import dev.persefonia.contentpublishing.application.service.ContentTagAssignmentGateway;
 import dev.persefonia.contentpublishing.application.service.ContentTagAssignmentService;
+import dev.persefonia.contentpublishing.application.service.TranslationGroupAdminQueryService;
 import dev.persefonia.contentpublishing.domain.content.ContentId;
 import dev.persefonia.contentpublishing.domain.content.ReferencedTagId;
 import java.time.Instant;
@@ -42,6 +43,7 @@ public final class AdminContentEditController {
     private final AdminContentViewModelFactory views;
     private final ContentTagAssignmentService tagAssignments;
     private final ContentTagAssignmentGateway tagAssignmentCommands;
+    private final TranslationGroupAdminQueryService translations;
 
     public AdminContentEditController(
             ContentCommandGateway commands,
@@ -52,7 +54,8 @@ public final class AdminContentEditController {
             AdminContentFormMapper mapper,
             AdminContentViewModelFactory views,
             ContentTagAssignmentService tagAssignments,
-            ContentTagAssignmentGateway tagAssignmentCommands) {
+            ContentTagAssignmentGateway tagAssignmentCommands,
+            TranslationGroupAdminQueryService translations) {
         this.commands = Objects.requireNonNull(commands, "commands");
         this.queries = Objects.requireNonNull(queries, "queries");
         this.actors = Objects.requireNonNull(actors, "actors");
@@ -62,6 +65,7 @@ public final class AdminContentEditController {
         this.views = Objects.requireNonNull(views, "views");
         this.tagAssignments = Objects.requireNonNull(tagAssignments, "tagAssignments");
         this.tagAssignmentCommands = Objects.requireNonNull(tagAssignmentCommands, "tagAssignmentCommands");
+        this.translations = Objects.requireNonNull(translations, "translations");
     }
 
     @GetMapping("/admin/content/{contentId}/edit")
@@ -77,6 +81,10 @@ public final class AdminContentEditController {
             @RequestParam(name = "unpublishFailed", required = false) String unpublishFailed,
             @RequestParam(name = "archiveFailed", required = false) String archiveFailed,
             @RequestParam(name = "tagsSaved", required = false) String tagsSaved,
+            @RequestParam(name = "translationGroupCreated", required = false) String translationGroupCreated,
+            @RequestParam(name = "translationEntryAdded", required = false) String translationEntryAdded,
+            @RequestParam(name = "translationEntryRemoved", required = false) String translationEntryRemoved,
+            @RequestParam(name = "translationError", required = false) String translationError,
             Model model) {
         var pageChrome = chrome.create(authentication, csrfToken);
         ContentId id = parseContentId(contentId);
@@ -92,10 +100,38 @@ public final class AdminContentEditController {
                     tagsSaved != null ? "Tag assignments saved." : null);
             var errors = lifecycleErrors(publishFailed, unpublishFailed, archiveFailed);
             model.addAttribute("page", errors.isEmpty() ? page : views.withErrors(page, List.of(), errors));
+            model.addAttribute("translationSection", translations.loadSection(actors.resolve(authentication), id));
+            model.addAttribute("translationMessage", translationMessage(
+                    translationGroupCreated, translationEntryAdded, translationEntryRemoved));
+            model.addAttribute("translationError", translationError(translationError));
         } catch (ContentNotFoundException exception) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, NOT_FOUND);
         }
         return "admin/content/form";
+    }
+
+    private static String translationMessage(String created, String added, String removed) {
+        if (created != null) {
+            return "Translation group created.";
+        }
+        if (added != null) {
+            return "Translation added to the group.";
+        }
+        return removed != null ? "Translation removed from the group." : null;
+    }
+
+    private static String translationError(String code) {
+        if (code == null) {
+            return null;
+        }
+        return switch (code) {
+            case "ALREADY_IN_GROUP" -> "That content item already belongs to a translation group.";
+            case "DUPLICATE_LANGUAGE" -> "The translation group already contains that language.";
+            case "DIFFERENT_CONTENT_TYPE" -> "Translation entries must share the same content type.";
+            case "LAST_ENTRY" -> "A translation group must keep at least one entry.";
+            case "ENTRY_NOT_FOUND" -> "That translation entry no longer exists.";
+            default -> "The translation group could not be updated.";
+        };
     }
 
     @PostMapping("/admin/content/{contentId}/tags")

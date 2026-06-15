@@ -30,8 +30,6 @@ class PublishingSchemaBoundaryTest {
     @Test
     void outOfScopePublishingTablesDoNotExist() throws SQLException {
         assertThat(PublishingSchemaCatalog.publishingTablesNamed("""
-                    'translation_groups',
-                    'translation_group_entries',
                     'series',
                     'series_entries'
                 """))
@@ -70,7 +68,10 @@ class PublishingSchemaBoundaryTest {
                         "ix_content_revisions__content_revision_number",
                         "ix_content_revisions__created_at",
                         "ix_content_revisions__revision_type",
-                        "ix_content_item_tags_tag_id");
+                        "ix_content_item_tags_tag_id",
+                        "ix_translation_group_entries_group_id",
+                        "ix_translation_group_entries_content_item_id",
+                        "ix_translation_group_entries_language");
     }
 
     @Test
@@ -140,7 +141,17 @@ class PublishingSchemaBoundaryTest {
                 "ck_content_revisions__canonical_path_length",
                 "ck_content_revisions__change_note_length",
                 "pk_content_item_tags",
-                "fk_content_item_tags__content_items");
+                "fk_content_item_tags__content_items",
+                "pk_translation_groups",
+                "ck_translation_groups__updated_not_before_created",
+                "ck_translation_groups__version_non_negative",
+                "pk_translation_group_entries",
+                "fk_translation_group_entries__translation_groups",
+                "fk_translation_group_entries__content_items",
+                "uq_translation_group_entries__content_item",
+                "uq_translation_group_entries__group_language",
+                "ck_translation_group_entries__language",
+                "ck_translation_group_entries__content_type");
     }
 
     private static List<String> constraintAndIndexNames() throws SQLException {

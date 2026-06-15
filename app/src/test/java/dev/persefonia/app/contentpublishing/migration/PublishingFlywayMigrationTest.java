@@ -30,7 +30,9 @@ class PublishingFlywayMigrationTest {
                 "content_render_snapshots",
                 "content_rendered_headings",
                 "content_revisions",
-                "content_item_tags");
+                "content_item_tags",
+                "translation_groups",
+                "translation_group_entries");
     }
 
     private static List<String> existingPublishingTables() throws SQLException {
@@ -43,7 +45,9 @@ class PublishingFlywayMigrationTest {
                     'content_render_snapshots',
                     'content_rendered_headings',
                     'content_revisions',
-                    'content_item_tags'
+                    'content_item_tags',
+                    'translation_groups',
+                    'translation_group_entries'
                   )
                 """);
     }

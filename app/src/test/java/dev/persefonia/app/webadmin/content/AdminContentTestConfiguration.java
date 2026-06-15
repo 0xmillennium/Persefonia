@@ -33,6 +33,12 @@ class AdminContentTestConfiguration {
 
     @Bean
     @Primary
+    AdminTranslationGroupTestRepository adminTranslationGroupTestRepository() {
+        return new AdminTranslationGroupTestRepository();
+    }
+
+    @Bean
+    @Primary
     UpdateDiscoverableResourcePort adminContentTestUpdateDiscoverableResourcePort() {
         return input -> new DiscoverableResourceProjectionResult.Updated();
     }

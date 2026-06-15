@@ -1,5 +1,9 @@
 @import dev.persefonia.webadmin.content.AdminContentFormPage
+@import dev.persefonia.contentpublishing.application.query.ContentTranslationSectionView
 @param AdminContentFormPage page
+@param ContentTranslationSectionView translationSection = null
+@param String translationMessage = null
+@param String translationError = null
 <!doctype html>
 <html lang="en">
 <head>
@@ -152,6 +156,55 @@
                 @endif
                 <button type="submit">Save tags</button>
             </form>
+        </section>
+    @endif
+    @if(translationSection != null)
+        <section aria-label="Translations">
+            <h2>Translations</h2>
+            @if(translationMessage != null)
+                <p role="status">${translationMessage}</p>
+            @endif
+            @if(translationError != null)
+                <p role="alert">${translationError}</p>
+            @endif
+            @if(translationSection.hasGroup())
+                <ul>
+                    @for(var entry : translationSection.group().get().entries())
+                        <li>
+                            <strong>${entry.language().name()}</strong>
+                            <a href="/admin/content/${entry.contentItemId().value().toString()}/edit">${entry.title().orElse("Untitled")}</a>
+                            @if(translationSection.group().get().canRemoveEntries())
+                                <form method="post" action="/admin/translation-groups/${translationSection.group().get().groupId().value().toString()}/entries/${entry.entryId().value().toString()}/remove">
+                                    @template.admin.components.csrfField(page.chrome().logoutForm())
+                                    <input type="hidden" name="returnContentId" value="${translationSection.contentItemId().value().toString()}">
+                                    <button type="submit">Remove</button>
+                                </form>
+                            @endif
+                        </li>
+                    @endfor
+                </ul>
+                @if(translationSection.candidates().isEmpty())
+                    <p>No content items are available to add as translations.</p>
+                @else
+                    <form method="post" action="/admin/translation-groups/${translationSection.group().get().groupId().value().toString()}/entries">
+                        @template.admin.components.csrfField(page.chrome().logoutForm())
+                        <input type="hidden" name="returnContentId" value="${translationSection.contentItemId().value().toString()}">
+                        <label for="translationCandidate">Add translation</label>
+                        <select id="translationCandidate" name="contentItemId">
+                            @for(var candidate : translationSection.candidates())
+                                <option value="${candidate.contentItemId().value().toString()}">${candidate.language().name()} — ${candidate.title().orElse("Untitled")}</option>
+                            @endfor
+                        </select>
+                        <button type="submit">Add translation</button>
+                    </form>
+                @endif
+            @else
+                <p>This content item is not part of a translation group.</p>
+                <form method="post" action="/admin/content/${translationSection.contentItemId().value().toString()}/translation-group">
+                    @template.admin.components.csrfField(page.chrome().logoutForm())
+                    <button type="submit">Create translation group</button>
+                </form>
+            @endif
         </section>
     @endif
     @if(page.lifecycleActions().hasActions())

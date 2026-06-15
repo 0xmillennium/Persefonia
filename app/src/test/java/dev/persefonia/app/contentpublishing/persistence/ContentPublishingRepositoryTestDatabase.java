@@ -59,7 +59,9 @@ abstract class ContentPublishingRepositoryTestDatabase {
     void truncatePublishingTables() {
         migrateOnce();
         jdbc.execute("""
-                TRUNCATE publishing.content_revisions,
+                TRUNCATE publishing.translation_group_entries,
+                    publishing.translation_groups,
+                    publishing.content_revisions,
                     publishing.content_rendered_headings,
                     publishing.content_render_snapshots,
                     publishing.content_items

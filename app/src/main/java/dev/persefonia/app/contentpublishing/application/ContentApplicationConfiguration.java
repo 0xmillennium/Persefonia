@@ -22,8 +22,11 @@ import dev.persefonia.contentpublishing.application.service.ContentTagAssignment
 import dev.persefonia.contentpublishing.application.service.PublicContentBySourceQueryHandler;
 import dev.persefonia.contentpublishing.application.service.PublicContentQueryHandler;
 import dev.persefonia.contentpublishing.application.service.PublicTaggedContentQueryHandler;
+import dev.persefonia.contentpublishing.application.service.TranslationGroupAdminQueryService;
+import dev.persefonia.contentpublishing.application.service.TranslationGroupCommandService;
 import dev.persefonia.contentpublishing.domain.content.port.ContentItemRepository;
 import dev.persefonia.contentpublishing.domain.revision.port.ContentRevisionRepository;
+import dev.persefonia.contentpublishing.domain.translation.port.TranslationGroupRepository;
 import dev.persefonia.discovery.application.port.CreateRedirectRulePort;
 import dev.persefonia.discovery.application.port.RemoveDiscoverableResourcePort;
 import dev.persefonia.discovery.application.port.UpdateDiscoverableResourcePort;
@@ -125,6 +128,22 @@ class ContentApplicationConfiguration {
             ContentTagVocabularyPort vocabulary,
             ContentCommandAuthorizationPolicy authorization) {
         return new ContentTagAssignmentService(contentItems, assignments, vocabulary, authorization);
+    }
+
+    @Bean
+    TranslationGroupCommandService translationGroupCommandService(
+            ContentItemRepository contentItems,
+            TranslationGroupRepository translationGroups,
+            ContentCommandAuthorizationPolicy authorization) {
+        return new TranslationGroupCommandService(contentItems, translationGroups, authorization);
+    }
+
+    @Bean
+    TranslationGroupAdminQueryService translationGroupAdminQueryService(
+            ContentItemRepository contentItems,
+            TranslationGroupRepository translationGroups,
+            ContentCommandAuthorizationPolicy authorization) {
+        return new TranslationGroupAdminQueryService(contentItems, translationGroups, authorization);
     }
 
     @Bean
