@@ -14,6 +14,7 @@ import dev.persefonia.discovery.application.contract.RoutePurpose;
 import dev.persefonia.discovery.application.contract.SourceContext;
 import dev.persefonia.discovery.application.contract.SourceEntityId;
 import dev.persefonia.discovery.application.contract.SourceType;
+import dev.persefonia.discovery.application.redirect.RedirectRuleStatusFilter;
 import dev.persefonia.discovery.application.route.PublicRouteLookup;
 import dev.persefonia.discovery.application.route.PublicRouteResolution;
 import dev.persefonia.discovery.domain.DiscoverableResource;
@@ -158,6 +159,11 @@ class PublicRouteResolutionServiceTest {
         @Override
         public List<RedirectRule> findBySourceRef(SourceEntityRef sourceRef) {
             return List.of();
+        }
+
+        @Override
+        public List<RedirectRule> list(RedirectRuleStatusFilter status, int limit) {
+            return rule.stream().limit(limit).toList();
         }
 
         @Override

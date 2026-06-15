@@ -11,6 +11,7 @@ import dev.persefonia.discovery.application.contract.SourceEntityId;
 import dev.persefonia.discovery.application.contract.SourceType;
 import dev.persefonia.discovery.application.redirect.CreateRedirectRuleCommand;
 import dev.persefonia.discovery.application.redirect.RedirectRuleCreationResult;
+import dev.persefonia.discovery.application.redirect.RedirectRuleStatusFilter;
 import dev.persefonia.discovery.domain.RedirectRule;
 import dev.persefonia.discovery.domain.RedirectRuleId;
 import dev.persefonia.discovery.domain.RedirectRuleRepository;
@@ -188,6 +189,11 @@ class RedirectRuleCommandServiceTest {
         @Override
         public List<RedirectRule> findBySourceRef(SourceEntityRef sourceRef) {
             return active.stream().filter(rule -> rule.sourceRef().equals(Optional.of(sourceRef))).toList();
+        }
+
+        @Override
+        public List<RedirectRule> list(RedirectRuleStatusFilter status, int limit) {
+            return active.stream().limit(limit).toList();
         }
 
         @Override

@@ -1,6 +1,7 @@
 package dev.persefonia.app.discovery.persistence;
 
 import dev.persefonia.discovery.application.contract.PublicUrl;
+import dev.persefonia.discovery.application.redirect.RedirectRuleStatusFilter;
 import dev.persefonia.discovery.domain.RedirectRule;
 import dev.persefonia.discovery.domain.RedirectRuleId;
 import dev.persefonia.discovery.domain.RedirectRuleRepository;
@@ -75,6 +76,26 @@ public class PostgresRedirectRuleRepository implements RedirectRuleRepository {
                   AND source_entity_id = :sourceEntityId
                 ORDER BY created_at, id
                 """, sourceRefParameters(sourceRef));
+    }
+
+    @Override
+    public List<RedirectRule> list(RedirectRuleStatusFilter status, int limit) {
+        Objects.requireNonNull(status, "status");
+        if (limit < 1) {
+            throw new IllegalArgumentException("limit must be positive");
+        }
+
+        String activePredicate = switch (status) {
+            case ACTIVE -> "WHERE active = true\n";
+            case INACTIVE -> "WHERE active = false\n";
+            case ALL -> "";
+        };
+        return query("SELECT " + COLUMNS + """
+                FROM discovery.redirect_rules
+                """ + activePredicate + """
+                ORDER BY active DESC, created_at DESC, source_url ASC
+                LIMIT :limit
+                """, new MapSqlParameterSource("limit", limit));
     }
 
     @Override

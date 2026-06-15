@@ -27,6 +27,7 @@ public record AdminDashboardViewModel(
                 List.of(
                         AdminNavigationItem.activeLink("Dashboard", "/admin"),
                         AdminNavigationItem.link("Content", "/admin/content"),
+                        AdminNavigationItem.link("Redirects", "/admin/discovery/redirects"),
                         AdminNavigationItem.disabled("Projects"),
                         AdminNavigationItem.disabled("Media"),
                         AdminNavigationItem.disabled("Contact"),

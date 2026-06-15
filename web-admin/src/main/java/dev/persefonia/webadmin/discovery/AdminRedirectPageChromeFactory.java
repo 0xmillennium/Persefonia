@@ -1,4 +1,4 @@
-package dev.persefonia.webadmin.content;
+package dev.persefonia.webadmin.discovery;
 
 import dev.persefonia.webadmin.AdminNavigationItem;
 import dev.persefonia.webadmin.AuthenticatedAdminViewResolver;
@@ -10,21 +10,21 @@ import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.stereotype.Component;
 
 @Component
-public final class AdminContentPageChromeFactory {
+public final class AdminRedirectPageChromeFactory {
     private final AuthenticatedAdminViewResolver adminViews;
 
-    public AdminContentPageChromeFactory(AuthenticatedAdminViewResolver adminViews) {
+    public AdminRedirectPageChromeFactory(AuthenticatedAdminViewResolver adminViews) {
         this.adminViews = Objects.requireNonNull(adminViews, "adminViews");
     }
 
-    public AdminContentPageChrome create(Authentication authentication, CsrfToken csrfToken) {
+    public AdminRedirectPageChrome create(Authentication authentication, CsrfToken csrfToken) {
         Objects.requireNonNull(csrfToken, "csrfToken");
-        return new AdminContentPageChrome(
+        return new AdminRedirectPageChrome(
                 adminViews.resolve(authentication),
                 List.of(
                         AdminNavigationItem.link("Dashboard", "/admin"),
-                        AdminNavigationItem.activeLink("Content", "/admin/content"),
-                        AdminNavigationItem.link("Redirects", "/admin/discovery/redirects"),
+                        AdminNavigationItem.link("Content", "/admin/content"),
+                        AdminNavigationItem.activeLink("Redirects", "/admin/discovery/redirects"),
                         AdminNavigationItem.disabled("Projects"),
                         AdminNavigationItem.disabled("Media"),
                         AdminNavigationItem.disabled("Contact"),
