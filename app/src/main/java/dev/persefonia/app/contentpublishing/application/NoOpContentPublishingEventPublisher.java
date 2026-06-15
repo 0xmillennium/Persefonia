@@ -6,6 +6,6 @@ import dev.persefonia.contentpublishing.application.port.ContentPublishingEventP
 final class NoOpContentPublishingEventPublisher implements ContentPublishingEventPublisher {
     @Override
     public void publish(ContentPublishingEvent event) {
-        // Downstream event listeners are intentionally deferred beyond Milestone 3.
+        // Durable downstream subscriber semantics are intentionally not wired yet.
     }
 }

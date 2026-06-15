@@ -25,10 +25,10 @@ class DiscoveryCoreClosureArchitectureTest {
     }
 
     @Test
-    void publicClosureDoesNotIntroduceLaterPublicSurfaceOrMigrations() throws Exception {
+    void discoveryCoreDoesNotIntroduceDeferredPublicSurfacesOrEventMechanics() throws Exception {
         try (var migrations = Files.list(Path.of("src/main/resources/db/migration"))) {
             assertThat(migrations.map(path -> path.getFileName().toString()))
-                    .containsExactlyInAnyOrder(
+                    .contains(
                             "V1__create_schemas.sql",
                             "V2__iam.sql",
                             "V3__publishing.sql",

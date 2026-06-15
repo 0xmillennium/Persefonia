@@ -30,7 +30,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @AutoConfigureMockMvc
 @Import(PublicContentTestConfiguration.class)
 @ActiveProfiles({"test", "public-content-mvc-test"})
-class PublicExposureRegressionTest {
+class PublicContentExposureRegressionTest {
     @Autowired MockMvc mockMvc;
     @Autowired PublicContentTestRepository items;
     @Autowired InMemoryPublicRouteResolver routes;

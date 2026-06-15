@@ -10,7 +10,7 @@ import dev.persefonia.contentpublishing.domain.content.ContentLanguage;
 import dev.persefonia.contentpublishing.domain.content.ContentType;
 import org.junit.jupiter.api.Test;
 
-class PublicRouteClosureTest extends PublicContentMvcTestSupport {
+class PublicContentDiscoveryRouteResolutionTest extends PublicContentMvcTestSupport {
     @Test
     void publicContentRequiresCurrentDiscoveryProjection() throws Exception {
         ContentItem item = PublicContentTestItems.publishedPublic(

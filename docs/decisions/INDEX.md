@@ -58,3 +58,4 @@ Use [TEMPLATE.md](TEMPLATE.md) for new decision records.
 - [ADR 0008: Require OWNER Authorization for Admin Mutations](0008-require-owner-authorization-for-admin-mutations.md) — requires application-layer authorization for state-changing admin commands.
 - [ADR 0009: Keep Redis Auxiliary-only](0009-keep-redis-auxiliary-only.md) — prevents Redis from becoming durable domain or authorization state.
 - [ADR 0010: Use Spring Data JDBC Through Persistence Adapters](0010-use-spring-data-jdbc-through-persistence-adapters.md) — permits Spring Data JDBC in app-level adapters while keeping Content Publishing domain code framework-free.
+- [ADR 0011: Reserve Tag and Series Public Route Projections](0011-reserve-tag-and-series-public-route-projections.md) — reserves tag and series public route/projection shapes without implementing the feature surface.
