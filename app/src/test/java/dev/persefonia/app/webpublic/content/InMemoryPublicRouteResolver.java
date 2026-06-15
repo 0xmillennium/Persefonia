@@ -47,6 +47,20 @@ public final class InMemoryPublicRouteResolver implements ResolvePublicRoutePort
         redirects.put(sourcePath, new PublicRouteResolution.Redirect(statusCode, new PublicUrl(targetPath)));
     }
 
+    public void addTagFound(String publicPath, UUID tagId) {
+        PublicUrl publicUrl = new PublicUrl(publicPath);
+        foundRoutes.put(publicPath, new PublicRouteResolution.Found(
+                SourceContext.TAXONOMY,
+                SourceType.TAG,
+                new SourceEntityId(tagId),
+                DiscoverableResourceType.TAG,
+                RoutePurpose.TAG_PAGE,
+                publicPath.startsWith("/tr/") ? DiscoveryLanguage.TR : DiscoveryLanguage.EN,
+                publicUrl,
+                new CanonicalUrl("https://0xmillennium.dev" + publicPath),
+                IndexingPolicy.NO_INDEX));
+    }
+
     public void clear() {
         foundRoutes.clear();
         redirects.clear();

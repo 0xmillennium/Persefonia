@@ -166,6 +166,10 @@ class ContentTagAssignmentServiceTest {
         @Override public List<ContentItem> findByStatus(dev.persefonia.contentpublishing.domain.content.ContentStatus status) {
             return List.of();
         }
+        @Override public List<ContentItem> findByAssignedTagId(
+                dev.persefonia.contentpublishing.domain.content.TagId tagId) {
+            return List.of();
+        }
         @Override public boolean existsSlugInNamespace(
                 ContentType type, ContentLanguage language, dev.persefonia.contentpublishing.domain.content.Slug slug) {
             return false;

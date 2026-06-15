@@ -6,6 +6,7 @@ import dev.persefonia.contentpublishing.domain.content.ContentLanguage;
 import dev.persefonia.contentpublishing.domain.content.ContentStatus;
 import dev.persefonia.contentpublishing.domain.content.ContentType;
 import dev.persefonia.contentpublishing.domain.content.Slug;
+import dev.persefonia.contentpublishing.domain.content.TagId;
 import java.util.List;
 import java.util.Optional;
 
@@ -27,6 +28,8 @@ public interface ContentItemRepository {
     List<ContentItem> findDrafts();
 
     List<ContentItem> findByStatus(ContentStatus status);
+
+    List<ContentItem> findByAssignedTagId(TagId tagId);
 
     boolean existsSlugInNamespace(
             ContentType type,

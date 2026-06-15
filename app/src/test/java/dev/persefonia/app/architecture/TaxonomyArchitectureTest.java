@@ -32,10 +32,14 @@ class TaxonomyArchitectureTest {
     }
 
     @Test
-    void taxonomyDoesNotDependOnDiscoveryAndContentPublishingDoesNotDependOnTaxonomyInfrastructure() {
+    void taxonomyDoesNotDependOnDiscoveryDomainPersistenceOrServicesAndContentPublishingAvoidsTaxonomyInfrastructure() {
         noClasses()
                 .that().resideInAPackage("dev.persefonia.taxonomy..")
-                .should().dependOnClassesThat().resideInAPackage("dev.persefonia.discovery..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "dev.persefonia.discovery.domain..",
+                        "dev.persefonia.discovery.application.service..",
+                        "dev.persefonia.discovery.infrastructure..",
+                        "dev.persefonia.app.discovery..")
                 .allowEmptyShould(false)
                 .check(ArchitectureTestSupport.PRODUCTION_CLASSES);
         noClasses()

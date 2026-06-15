@@ -8,6 +8,7 @@ import dev.persefonia.taxonomy.application.command.UpdateTagCommand;
 import dev.persefonia.taxonomy.application.exception.TagCommandRejectedException;
 import dev.persefonia.taxonomy.application.exception.TagCommandRejectedException.Reason;
 import dev.persefonia.taxonomy.application.exception.TagNotFoundException;
+import dev.persefonia.taxonomy.application.discovery.TagDiscoverabilityCoordinator;
 import dev.persefonia.taxonomy.domain.model.NormalizedTagName;
 import dev.persefonia.taxonomy.domain.model.Tag;
 import dev.persefonia.taxonomy.domain.model.TagDescription;
@@ -22,14 +23,17 @@ public final class TagCommandService {
     private final TagRepository tags;
     private final TagNormalizationService normalization;
     private final TaxonomyCommandAuthorizationPolicy authorization;
+    private final TagDiscoverabilityCoordinator discoverability;
 
     public TagCommandService(
             TagRepository tags,
             TagNormalizationService normalization,
-            TaxonomyCommandAuthorizationPolicy authorization) {
+            TaxonomyCommandAuthorizationPolicy authorization,
+            TagDiscoverabilityCoordinator discoverability) {
         this.tags = Objects.requireNonNull(tags, "tags");
         this.normalization = Objects.requireNonNull(normalization, "normalization");
         this.authorization = Objects.requireNonNull(authorization, "authorization");
+        this.discoverability = Objects.requireNonNull(discoverability, "discoverability");
     }
 
     public TagCommandResult create(CreateTagCommand command) {
@@ -41,6 +45,7 @@ public final class TagCommandService {
         Tag saved = tags.save(Tag.create(
                 TagId.newId(), name, normalizedName, slug, TagDescription.ofNullable(command.description()),
                 command.requestedAt()));
+        discoverability.sync(saved);
         return result(saved);
     }
 
@@ -52,7 +57,9 @@ public final class TagCommandService {
         TagSlug slug = slug(command.slug(), name);
         requireUnique(tag.id(), slug, normalizedName);
         tag.update(name, normalizedName, slug, TagDescription.ofNullable(command.description()), command.requestedAt());
-        return result(tags.save(tag));
+        Tag saved = tags.save(tag);
+        discoverability.sync(saved);
+        return result(saved);
     }
 
     public TagCommandResult archive(ArchiveTagCommand command) {
@@ -62,6 +69,7 @@ public final class TagCommandService {
             tag.archive(command.requestedAt());
             tag = tags.save(tag);
         }
+        discoverability.sync(tag);
         return result(tag);
     }
 

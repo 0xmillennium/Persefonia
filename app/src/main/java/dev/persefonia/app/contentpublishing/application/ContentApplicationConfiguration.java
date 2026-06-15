@@ -21,6 +21,7 @@ import dev.persefonia.contentpublishing.application.service.ContentRevisionQuery
 import dev.persefonia.contentpublishing.application.service.ContentTagAssignmentService;
 import dev.persefonia.contentpublishing.application.service.PublicContentBySourceQueryHandler;
 import dev.persefonia.contentpublishing.application.service.PublicContentQueryHandler;
+import dev.persefonia.contentpublishing.application.service.PublicTaggedContentQueryHandler;
 import dev.persefonia.contentpublishing.domain.content.port.ContentItemRepository;
 import dev.persefonia.contentpublishing.domain.revision.port.ContentRevisionRepository;
 import dev.persefonia.discovery.application.port.CreateRedirectRulePort;
@@ -136,5 +137,12 @@ class ContentApplicationConfiguration {
             ContentItemRepository contentItems,
             ContentPublicRouteFactory routeFactory) {
         return new PublicContentBySourceQueryHandler(contentItems, routeFactory);
+    }
+
+    @Bean
+    PublicTaggedContentQueryHandler publicTaggedContentQueryHandler(
+            ContentItemRepository contentItems,
+            ContentPublicRouteFactory routeFactory) {
+        return new PublicTaggedContentQueryHandler(contentItems, routeFactory);
     }
 }

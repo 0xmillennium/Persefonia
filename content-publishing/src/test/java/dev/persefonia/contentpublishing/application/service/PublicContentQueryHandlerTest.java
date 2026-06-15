@@ -360,6 +360,14 @@ class PublicContentQueryHandlerTest {
             }
 
             @Override
+            public List<ContentItem> findByAssignedTagId(
+                    dev.persefonia.contentpublishing.domain.content.TagId tagId) {
+                return itemsById.values().stream()
+                        .filter(candidate -> candidate.tagIds().contains(tagId))
+                        .toList();
+            }
+
+            @Override
             public boolean existsSlugInNamespace(ContentType type, ContentLanguage language, Slug slug) {
                 return findBySlugAndTypeAndLanguage(slug, type, language).isPresent();
             }

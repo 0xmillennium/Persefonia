@@ -76,6 +76,19 @@ final class ContentItemRowQueries {
                 rowMapper);
     }
 
+    List<ContentItemPersistenceEntity> findByAssignedTagId(UUID tagId) {
+        return jdbc.query("""
+                SELECT content_items.*
+                FROM publishing.content_items content_items
+                INNER JOIN publishing.content_item_tags content_tags
+                    ON content_tags.content_item_id = content_items.id
+                WHERE content_tags.tag_id = :tagId
+                ORDER BY content_items.published_at DESC NULLS LAST, content_items.id ASC
+                """,
+                Map.of("tagId", tagId),
+                rowMapper);
+    }
+
     boolean existsSlugInNamespace(String type, String language, String slug) {
         Boolean exists = jdbc.queryForObject("""
                 SELECT EXISTS (

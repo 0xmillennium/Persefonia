@@ -1,0 +1,43 @@
+@import dev.persefonia.webpublic.tags.PublicTagContentItemView
+@import dev.persefonia.webpublic.tags.PublicTagPage
+@param PublicTagPage page
+<!doctype html>
+<html lang="${page.htmlLanguage()}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${page.name()}</title>
+    <link rel="canonical" href="${page.canonicalUrl()}">
+    @if(page.noindex())
+        <meta name="robots" content="noindex">
+    @endif
+    @for(String stylesheetPath : page.stylesheetPaths())
+        <link rel="stylesheet" href="${stylesheetPath}">
+    @endfor
+</head>
+<body>
+    <main class="public-page">
+        <header>
+            <h1>${page.name()}</h1>
+            @if(!page.description().isBlank())
+                <p>${page.description()}</p>
+            @endif
+        </header>
+        @if(page.items().isEmpty())
+            <p>No public content is currently available for this tag.</p>
+        @else
+            <ol>
+                @for(PublicTagContentItemView item : page.items())
+                    <li>
+                        <article>
+                            <h2><a href="${item.publicUrl()}">${item.title()}</a></h2>
+                            <p>${item.summary()}</p>
+                            <time datetime="${item.publishedAt()}">${item.publishedAt()}</time>
+                        </article>
+                    </li>
+                @endfor
+            </ol>
+        @endif
+    </main>
+</body>
+</html>

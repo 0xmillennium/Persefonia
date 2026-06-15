@@ -19,6 +19,14 @@ import org.junit.jupiter.api.Test;
 
 class DiscoveryProjectionContractTest {
     @Test
+    void tagProjectionContractValuesAreAccepted() {
+        assertThat(SourceContext.valueOf("TAXONOMY")).isEqualTo(SourceContext.TAXONOMY);
+        assertThat(SourceType.valueOf("TAG")).isEqualTo(SourceType.TAG);
+        assertThat(DiscoverableResourceType.valueOf("TAG")).isEqualTo(DiscoverableResourceType.TAG);
+        assertThat(RoutePurpose.valueOf("TAG_PAGE")).isEqualTo(RoutePurpose.TAG_PAGE);
+    }
+
+    @Test
     void projectionInputAcceptsValidCurrentProjectionInput() {
         assertThat(validInput(UnaryOperator.identity()))
                 .extracting(

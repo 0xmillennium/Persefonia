@@ -9,6 +9,7 @@ dependencies {
     implementation(project(":shared-kernel"))
     implementation(project(":content-publishing"))
     implementation(project(":discovery"))
+    implementation(project(":taxonomy"))
     implementation(libs.spring.webmvc)
 
     compileOnly("jakarta.servlet:jakarta.servlet-api")

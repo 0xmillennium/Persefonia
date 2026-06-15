@@ -6,6 +6,7 @@ import dev.persefonia.contentpublishing.domain.content.ContentLanguage;
 import dev.persefonia.contentpublishing.domain.content.ContentStatus;
 import dev.persefonia.contentpublishing.domain.content.ContentType;
 import dev.persefonia.contentpublishing.domain.content.Slug;
+import dev.persefonia.contentpublishing.domain.content.TagId;
 import dev.persefonia.contentpublishing.domain.content.port.ContentItemRepository;
 import java.util.List;
 import java.util.Objects;
@@ -92,6 +93,14 @@ public class JdbcContentItemRepositoryAdapter implements ContentItemRepository {
     public List<ContentItem> findByStatus(ContentStatus status) {
         Objects.requireNonNull(status, "status");
         return rowQueries().findByStatus(status.name()).stream()
+                .map(this::loadRequired)
+                .toList();
+    }
+
+    @Override
+    public List<ContentItem> findByAssignedTagId(TagId tagId) {
+        Objects.requireNonNull(tagId, "tagId");
+        return rowQueries().findByAssignedTagId(tagId.value()).stream()
                 .map(this::loadRequired)
                 .toList();
     }

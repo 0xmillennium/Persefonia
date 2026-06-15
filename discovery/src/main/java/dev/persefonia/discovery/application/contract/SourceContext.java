@@ -1,5 +1,6 @@
 package dev.persefonia.discovery.application.contract;
 
 public enum SourceContext {
-    CONTENT_PUBLISHING
+    CONTENT_PUBLISHING,
+    TAXONOMY
 }

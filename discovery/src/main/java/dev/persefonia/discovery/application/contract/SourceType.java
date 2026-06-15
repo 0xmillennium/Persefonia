@@ -1,5 +1,6 @@
 package dev.persefonia.discovery.application.contract;
 
 public enum SourceType {
-    CONTENT_ITEM
+    CONTENT_ITEM,
+    TAG
 }

@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dev.persefonia.taxonomy.application.authorization.TaxonomyCommandActor;
 import dev.persefonia.taxonomy.application.authorization.TaxonomyCommandAuthorizationPolicy;
+import dev.persefonia.taxonomy.application.discovery.TagDiscoverabilityCoordinator;
+import dev.persefonia.taxonomy.application.discovery.TagDiscoveryProjectionFactory;
 import dev.persefonia.taxonomy.application.command.ArchiveTagCommand;
 import dev.persefonia.taxonomy.application.command.CreateTagCommand;
 import dev.persefonia.taxonomy.application.command.UpdateTagCommand;
@@ -25,6 +27,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import dev.persefonia.discovery.application.projection.DiscoverableResourceProjectionResult;
 
 class TagCommandServiceTest {
     private static final Instant NOW = Instant.parse("2026-06-15T10:00:00Z");
@@ -32,7 +35,8 @@ class TagCommandServiceTest {
     private static final TaxonomyCommandActor EDITOR = new TaxonomyCommandActor(UUID.randomUUID(), true, false);
 
     private final InMemoryTags tags = new InMemoryTags();
-    private final TagCommandService service = new TagCommandService(tags, new TagNormalizationService(), ownerPolicy());
+    private final TagCommandService service =
+            new TagCommandService(tags, new TagNormalizationService(), ownerPolicy(), discoverability());
 
     @Test
     void ownerCanCreateUpdateAndArchiveTag() {
@@ -86,6 +90,12 @@ class TagCommandServiceTest {
                 throw new SecurityException("OWNER authorization required for " + command);
             }
         };
+    }
+
+    private static TagDiscoverabilityCoordinator discoverability() {
+        return new TagDiscoverabilityCoordinator(
+                input -> new DiscoverableResourceProjectionResult.Updated(),
+                new TagDiscoveryProjectionFactory("https://example.test"));
     }
 
     private static final class InMemoryTags implements TagRepository {

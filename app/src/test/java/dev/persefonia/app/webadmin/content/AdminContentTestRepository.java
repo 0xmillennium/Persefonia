@@ -6,6 +6,7 @@ import dev.persefonia.contentpublishing.domain.content.ContentLanguage;
 import dev.persefonia.contentpublishing.domain.content.ContentStatus;
 import dev.persefonia.contentpublishing.domain.content.ContentType;
 import dev.persefonia.contentpublishing.domain.content.Slug;
+import dev.persefonia.contentpublishing.domain.content.TagId;
 import dev.persefonia.contentpublishing.domain.content.port.ContentItemRepository;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -50,6 +51,11 @@ final class AdminContentTestRepository implements ContentItemRepository {
     @Override
     public List<ContentItem> findByStatus(ContentStatus status) {
         return items.values().stream().filter(item -> item.status() == status).toList();
+    }
+
+    @Override
+    public List<ContentItem> findByAssignedTagId(TagId tagId) {
+        return items.values().stream().filter(item -> item.tagIds().contains(tagId)).toList();
     }
 
     @Override

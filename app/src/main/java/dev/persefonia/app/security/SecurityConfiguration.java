@@ -35,6 +35,10 @@ public class SecurityConfiguration {
             "/tr/pages/*",
             "/en/pages/*"
     };
+    static final String[] PUBLIC_TAG_GET_PATTERNS = {
+            "/tr/tags/*",
+            "/en/tags/*"
+    };
 
     @Bean
     SecurityFilterChain applicationSecurityFilterChain(
@@ -51,6 +55,7 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.POST, "/logout").authenticated()
                         .requestMatchers("/admin", "/admin/**").authenticated()
                         .requestMatchers(HttpMethod.GET, PUBLIC_CONTENT_GET_PATTERNS).permitAll()
+                        .requestMatchers(HttpMethod.GET, PUBLIC_TAG_GET_PATTERNS).permitAll()
                         .anyRequest().denyAll())
                 .csrf(Customizer.withDefaults())
                 .formLogin(AbstractHttpConfigurer::disable)

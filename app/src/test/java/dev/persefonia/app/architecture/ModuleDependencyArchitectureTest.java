@@ -26,7 +26,7 @@ class ModuleDependencyArchitectureTest {
         for (String contextPackage : ArchitectureTestSupport.BOUNDED_CONTEXT_PACKAGES) {
             String[] forbiddenPackages = Arrays.stream(ArchitectureTestSupport.BOUNDED_CONTEXT_PACKAGES)
                     .filter(candidate -> !candidate.equals(contextPackage))
-                    .filter(candidate -> contentPublishingDiscoveryApplicationException(contextPackage, candidate))
+                    .filter(candidate -> allowedApplicationContractException(contextPackage, candidate))
                     .toArray(String[]::new);
 
             noClasses()
@@ -46,8 +46,11 @@ class ModuleDependencyArchitectureTest {
         }
     }
 
-    private static boolean contentPublishingDiscoveryApplicationException(String contextPackage, String candidate) {
-        return !contextPackage.equals("dev.persefonia.contentpublishing..")
-                || !candidate.equals("dev.persefonia.discovery..");
+    private static boolean allowedApplicationContractException(String contextPackage, String candidate) {
+        boolean discoveryContractConsumer =
+                (contextPackage.equals("dev.persefonia.contentpublishing..")
+                                || contextPackage.equals("dev.persefonia.taxonomy.."))
+                        && candidate.equals("dev.persefonia.discovery..");
+        return !discoveryContractConsumer;
     }
 }

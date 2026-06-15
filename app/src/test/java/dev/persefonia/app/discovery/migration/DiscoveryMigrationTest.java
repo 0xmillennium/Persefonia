@@ -1,11 +1,80 @@
 package dev.persefonia.app.discovery.migration;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class DiscoveryMigrationTest extends DiscoveryMigrationDatabase {
+    @Test
+    void discoveryAcceptsTagPageProjection() {
+        insertResource(java.util.Map.of(
+                "sourceContext", "TAXONOMY",
+                "sourceType", "TAG",
+                "resourceType", "TAG",
+                "routePurpose", "TAG_PAGE",
+                "publicUrl", "/en/tags/spring",
+                "canonicalUrl", "https://example.test/en/tags/spring",
+                "indexingPolicy", "NO_INDEX",
+                "searchEligibility", "NOT_ELIGIBLE",
+                "sitemapEligibility", "NOT_ELIGIBLE",
+                "feedEligibility", "NOT_ELIGIBLE"));
+
+        assertThat(jdbc().queryForObject("""
+                SELECT count(*) FROM discovery.discoverable_resources
+                WHERE source_context = 'TAXONOMY' AND source_type = 'TAG'
+                """, Integer.class)).isEqualTo(1);
+    }
+
+    @Test
+    void discoveryRejectsInvalidTagProjectionValues() {
+        assertThatThrownBy(() -> insertResource(java.util.Map.of(
+                "sourceContext", "TAXONOMY",
+                "sourceType", "TAG",
+                "resourceType", "ARTICLE",
+                "routePurpose", "TAG_PAGE")))
+                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> insertResource(java.util.Map.of(
+                "sourceContext", "TAXONOMY",
+                "sourceType", "TAG",
+                "resourceType", "TAG",
+                "routePurpose", "TAG_PAGE",
+                "indexingPolicy", "INDEX")))
+                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void sourceRefCanHaveMultipleLanguagesForSameTag() {
+        java.util.UUID tagId = java.util.UUID.randomUUID();
+        java.util.Map<String, Object> common = new java.util.HashMap<>();
+        common.put("sourceContext", "TAXONOMY");
+        common.put("sourceType", "TAG");
+        common.put("sourceEntityId", tagId);
+        common.put("resourceType", "TAG");
+        common.put("routePurpose", "TAG_PAGE");
+        common.put("indexingPolicy", "NO_INDEX");
+        common.put("searchEligibility", "NOT_ELIGIBLE");
+        common.put("sitemapEligibility", "NOT_ELIGIBLE");
+        common.put("feedEligibility", "NOT_ELIGIBLE");
+        var english = new java.util.HashMap<>(common);
+        english.put("language", "EN");
+        english.put("publicUrl", "/en/tags/spring");
+        english.put("canonicalUrl", "https://example.test/en/tags/spring");
+        var turkish = new java.util.HashMap<>(common);
+        turkish.put("language", "TR");
+        turkish.put("publicUrl", "/tr/tags/spring");
+        turkish.put("canonicalUrl", "https://example.test/tr/tags/spring");
+
+        insertResource(english);
+        insertResource(turkish);
+
+        assertThat(jdbc().queryForObject("""
+                SELECT count(*) FROM discovery.discoverable_resources
+                WHERE source_entity_id = ?
+                """, Integer.class, tagId)).isEqualTo(2);
+    }
+
     @Test
     void cleanMigrationCreatesDiscoveryTablesAndRequiredConstraintsAndIndexes() {
         cleanMigrate();
@@ -50,5 +119,8 @@ class DiscoveryMigrationTest extends DiscoveryMigrationDatabase {
                 "search_vector", "metadata_json", "payload_json", "source_payload");
         assertThat(columns).contains("id", "public_url", "canonical_url", "search_text");
         assertThat(foreignKeys).isZero();
+        assertThat(jdbc().queryForObject(
+                "SELECT to_regclass('discovery.discoverable_resource_history')",
+                String.class)).isNull();
     }
 }
