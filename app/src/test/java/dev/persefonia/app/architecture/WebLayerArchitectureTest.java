@@ -48,7 +48,7 @@ class WebLayerArchitectureTest {
                 .should().dependOnClassesThat().resideInAnyPackage(
                         "dev.persefonia.app..",
                         "dev.persefonia.identityaccess..",
-                        "dev.persefonia.taxonomy..",
+                        "dev.persefonia.taxonomy.domain.port..",
                         "dev.persefonia.contentpublishing.domain.content.port..",
                         "dev.persefonia.contentpublishing.domain.revision..",
                         "dev.persefonia.contentpublishing.infrastructure..",
