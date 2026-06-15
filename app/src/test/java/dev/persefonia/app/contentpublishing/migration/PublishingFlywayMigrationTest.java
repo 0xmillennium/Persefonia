@@ -29,7 +29,8 @@ class PublishingFlywayMigrationTest {
                 "content_items",
                 "content_render_snapshots",
                 "content_rendered_headings",
-                "content_revisions");
+                "content_revisions",
+                "content_item_tags");
     }
 
     private static List<String> existingPublishingTables() throws SQLException {
@@ -41,7 +42,8 @@ class PublishingFlywayMigrationTest {
                     'content_items',
                     'content_render_snapshots',
                     'content_rendered_headings',
-                    'content_revisions'
+                    'content_revisions',
+                    'content_item_tags'
                   )
                 """);
     }

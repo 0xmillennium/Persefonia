@@ -43,7 +43,8 @@ class AdminContentPreviewControllerTest {
                         .with(authentication(AdminAuthenticationTestSupport.authentication(AdminRole.OWNER))))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("<h1 id=\"safe-preview\">Safe preview</h1>")))
-                .andExpect(content().string(containsString("<meta name=\"robots\" content=\"noindex,nofollow\">")))
+                .andExpect(content().string(containsString(
+                        "<meta name=\"robots\" content=\"noindex,nofollow,noarchive\">")))
                 .andExpect(content().string(not(containsString("<script"))))
                 .andExpect(content().string(not(containsString("onerror"))))
                 .andExpect(content().string(not(containsString("# Safe preview"))))

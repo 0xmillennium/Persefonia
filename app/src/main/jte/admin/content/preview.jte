@@ -5,17 +5,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="robots" content="noindex,nofollow">
+    <meta name="robots" content="noindex,nofollow,noarchive">
     <title>${page.heading()} | Persefonia Admin</title>
 </head>
 <body>
-<header>
-    <p>Signed in as <strong>${page.chrome().admin().displayName()}</strong></p>
-    <form method="post" action="${page.chrome().logoutForm().action()}">
-        <input type="hidden" name="${page.chrome().logoutForm().csrfParameterName()}" value="${page.chrome().logoutForm().csrfToken()}">
-        <button type="submit">Logout</button>
-    </form>
-</header>
+@template.admin.components.adminHeader(page.chrome().admin(), page.chrome().logoutForm(), false)
 <main>
     <h1>${page.heading()}</h1>
     <p><a href="${page.editLink()}">Back to edit</a></p>

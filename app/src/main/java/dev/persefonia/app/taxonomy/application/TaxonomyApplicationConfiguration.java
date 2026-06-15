@@ -4,6 +4,7 @@ import dev.persefonia.identityaccess.application.admin.authorization.AdminComman
 import dev.persefonia.taxonomy.application.authorization.TaxonomyCommandAuthorizationPolicy;
 import dev.persefonia.taxonomy.application.service.TagAdminQueryService;
 import dev.persefonia.taxonomy.application.service.TagCommandService;
+import dev.persefonia.taxonomy.application.service.TagVocabularyQueryService;
 import dev.persefonia.taxonomy.domain.port.TagRepository;
 import dev.persefonia.taxonomy.domain.service.TagNormalizationService;
 import org.springframework.context.annotation.Bean;
@@ -32,5 +33,10 @@ class TaxonomyApplicationConfiguration {
     @Bean
     TagAdminQueryService tagAdminQueryService(TagRepository tags, TaxonomyCommandAuthorizationPolicy authorization) {
         return new TagAdminQueryService(tags, authorization);
+    }
+
+    @Bean
+    TagVocabularyQueryService tagVocabularyQueryService(TagRepository tags) {
+        return new TagVocabularyQueryService(tags);
     }
 }

@@ -32,8 +32,9 @@ import org.springframework.test.web.servlet.MockMvc;
 class AdminContentEditControllerTest {
     @Autowired MockMvc mockMvc;
     @Autowired AdminContentTestRepository items;
+    @Autowired AdminContentTagAssignmentTestSupport tags;
 
-    @BeforeEach void reset() { items.reset(); }
+    @BeforeEach void reset() { items.reset(); tags.reset(); }
 
     @Test
     void editRendersDraftAndUnpublishedWithPublishAndArchiveControls() throws Exception {
@@ -167,6 +168,52 @@ class AdminContentEditControllerTest {
                         .with(authentication(AdminAuthenticationTestSupport.authentication(AdminRole.EDITOR)))
                         .with(csrf()).params(validUpdate()))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void ownerCanAssignActiveTagsAndRemoveAssignedArchivedTag() throws Exception {
+        var item = AdminContentTestFixtures.completeDraft();
+        items.add(item);
+        var active = tags.active("Active tag");
+        var archived = tags.archived("Archived tag");
+        tags.archived("Hidden archived tag");
+        tags.assign(item.id(), archived);
+        var owner = authentication(AdminAuthenticationTestSupport.authentication(AdminRole.OWNER));
+        String path = "/admin/content/" + item.id().value() + "/tags";
+
+        mockMvc.perform(get("/admin/content/" + item.id().value() + "/edit").with(owner))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("Active tag")))
+                .andExpect(content().string(containsString("Archived tag")))
+                .andExpect(content().string(containsString("ARCHIVED")))
+                .andExpect(content().string(not(containsString("Hidden archived tag"))));
+
+        mockMvc.perform(post(path).with(owner).with(csrf()).param("tagId", active.value().toString()))
+                .andExpect(status().is3xxRedirection());
+        org.assertj.core.api.Assertions.assertThat(tags.assigned(item.id())).containsExactly(active);
+    }
+
+    @Test
+    void tagAssignmentRequiresOwnerAndCsrfAndRejectsNewArchivedTag() throws Exception {
+        var item = AdminContentTestFixtures.completeDraft();
+        items.add(item);
+        var archived = tags.archived("Archived tag");
+        String path = "/admin/content/" + item.id().value() + "/tags";
+        var owner = authentication(AdminAuthenticationTestSupport.authentication(AdminRole.OWNER));
+
+        mockMvc.perform(post(path).with(csrf()).param("tagId", archived.value().toString()))
+                .andExpect(status().is4xxClientError());
+        mockMvc.perform(post(path).with(owner).param("tagId", archived.value().toString()))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post(path)
+                        .with(authentication(AdminAuthenticationTestSupport.authentication(AdminRole.EDITOR)))
+                        .with(csrf())
+                        .param("tagId", archived.value().toString()))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post(path).with(owner).with(csrf()).param("tagId", archived.value().toString()))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("Archived tags cannot be newly assigned.")));
+        org.assertj.core.api.Assertions.assertThat(tags.assigned(item.id())).isEmpty();
     }
 
     private static org.springframework.util.LinkedMultiValueMap<String, String> validUpdate() {

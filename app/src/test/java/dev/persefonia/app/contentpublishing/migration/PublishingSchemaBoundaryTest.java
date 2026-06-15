@@ -30,7 +30,6 @@ class PublishingSchemaBoundaryTest {
     @Test
     void outOfScopePublishingTablesDoNotExist() throws SQLException {
         assertThat(PublishingSchemaCatalog.publishingTablesNamed("""
-                    'content_item_tags',
                     'translation_groups',
                     'translation_group_entries',
                     'series',
@@ -70,7 +69,8 @@ class PublishingSchemaBoundaryTest {
                         "ix_content_revisions__content_item_id",
                         "ix_content_revisions__content_revision_number",
                         "ix_content_revisions__created_at",
-                        "ix_content_revisions__revision_type");
+                        "ix_content_revisions__revision_type",
+                        "ix_content_item_tags_tag_id");
     }
 
     @Test
@@ -138,7 +138,9 @@ class PublishingSchemaBoundaryTest {
                 "ck_content_revisions__og_title_length",
                 "ck_content_revisions__og_description_length",
                 "ck_content_revisions__canonical_path_length",
-                "ck_content_revisions__change_note_length");
+                "ck_content_revisions__change_note_length",
+                "pk_content_item_tags",
+                "fk_content_item_tags__content_items");
     }
 
     private static List<String> constraintAndIndexNames() throws SQLException {

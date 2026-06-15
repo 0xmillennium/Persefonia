@@ -1,7 +1,7 @@
 package dev.persefonia.app.infrastructure;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.sql.Connection;
@@ -45,13 +45,16 @@ class FlywayMigrationTest {
 
             assertDoesNotThrow(flyway::clean);
             var migrationResult = assertDoesNotThrow(flyway::migrate);
-            assertEquals(5, migrationResult.migrationsExecuted, "V1 through V5 should be executable");
+            assertTrue(
+                    migrationResult.migrationsExecuted >= 5,
+                    "Required baseline migrations should be executable without forbidding future migrations");
 
             try (Connection connection = postgres.createConnection("")) {
                 for (String schema : LOCKED_SCHEMAS) {
                     assertSchemaExists(connection, schema);
                 }
                 assertFlywayHistoryTableExists(connection);
+                assertTableExists(connection, "taxonomy.tags");
             }
         }
     }
@@ -75,6 +78,16 @@ class FlywayMigrationTest {
             try (ResultSet result = statement.executeQuery()) {
                 result.next();
                 assertNotNull(result.getString(1), "Missing operations.flyway_schema_history");
+            }
+        }
+    }
+
+    private static void assertTableExists(Connection connection, String qualifiedName) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("SELECT to_regclass(?)")) {
+            statement.setString(1, qualifiedName);
+            try (ResultSet result = statement.executeQuery()) {
+                result.next();
+                assertNotNull(result.getString(1), "Missing table: " + qualifiedName);
             }
         }
     }

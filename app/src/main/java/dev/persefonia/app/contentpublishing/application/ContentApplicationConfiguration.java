@@ -8,6 +8,8 @@ import dev.persefonia.contentpublishing.application.discovery.ContentDiscoveryPr
 import dev.persefonia.contentpublishing.application.discovery.ContentDiscoveryRedirectFactory;
 import dev.persefonia.contentpublishing.application.discovery.ContentPublicRouteFactory;
 import dev.persefonia.contentpublishing.application.port.ContentPublishingEventPublisher;
+import dev.persefonia.contentpublishing.application.port.ContentTagAssignmentStore;
+import dev.persefonia.contentpublishing.application.port.ContentTagVocabularyPort;
 import dev.persefonia.contentpublishing.application.rendering.MarkdownRenderingService;
 import dev.persefonia.contentpublishing.application.service.ContentCommandService;
 import dev.persefonia.contentpublishing.application.service.ContentAdminQueryService;
@@ -16,6 +18,7 @@ import dev.persefonia.contentpublishing.application.service.ContentLifecycleComm
 import dev.persefonia.contentpublishing.application.service.ContentPreviewQueryHandler;
 import dev.persefonia.contentpublishing.application.service.ContentPublishCommandHandler;
 import dev.persefonia.contentpublishing.application.service.ContentRevisionQueryHandler;
+import dev.persefonia.contentpublishing.application.service.ContentTagAssignmentService;
 import dev.persefonia.contentpublishing.application.service.PublicContentBySourceQueryHandler;
 import dev.persefonia.contentpublishing.application.service.PublicContentQueryHandler;
 import dev.persefonia.contentpublishing.domain.content.port.ContentItemRepository;
@@ -24,6 +27,7 @@ import dev.persefonia.discovery.application.port.CreateRedirectRulePort;
 import dev.persefonia.discovery.application.port.RemoveDiscoverableResourcePort;
 import dev.persefonia.discovery.application.port.UpdateDiscoverableResourcePort;
 import dev.persefonia.identityaccess.application.admin.authorization.AdminCommandAuthorizationPolicy;
+import dev.persefonia.taxonomy.application.service.TagVocabularyQueryService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -106,6 +110,20 @@ class ContentApplicationConfiguration {
             ContentItemRepository contentItems,
             ContentCommandAuthorizationPolicy authorization) {
         return new ContentAdminQueryService(contentItems, authorization);
+    }
+
+    @Bean
+    ContentTagVocabularyPort contentTagVocabularyPort(TagVocabularyQueryService vocabulary) {
+        return new TaxonomyContentTagVocabularyAdapter(vocabulary);
+    }
+
+    @Bean
+    ContentTagAssignmentService contentTagAssignmentService(
+            ContentItemRepository contentItems,
+            ContentTagAssignmentStore assignments,
+            ContentTagVocabularyPort vocabulary,
+            ContentCommandAuthorizationPolicy authorization) {
+        return new ContentTagAssignmentService(contentItems, assignments, vocabulary, authorization);
     }
 
     @Bean

@@ -2,8 +2,10 @@ package dev.persefonia.webadmin.content;
 
 import dev.persefonia.contentpublishing.application.query.AdminContentEditResult;
 import dev.persefonia.contentpublishing.application.query.AdminContentListItem;
+import dev.persefonia.contentpublishing.application.query.ContentTagAssignmentView;
 import dev.persefonia.contentpublishing.domain.content.ContentStatus;
 import java.util.List;
+import java.util.Set;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -62,7 +64,21 @@ public final class AdminContentViewModelFactory {
         return formPage(
                 page.chrome(), page.heading(), page.action(), page.create(), page.form(), fieldErrors, globalErrors,
                 page.status(), page.previewLink(), page.revisionsLink(), page.editable(), page.readOnlyMessage(),
-                page.lifecycleActions(), null);
+                page.lifecycleActions(), null, page.tagAssignment(), page.selectedTagIds(), page.tagAssignmentErrors(),
+                page.tagAssignmentSuccessMessage());
+    }
+
+    public AdminContentFormPage withTagAssignment(
+            AdminContentFormPage page,
+            ContentTagAssignmentView assignment,
+            Set<String> selectedTagIds,
+            List<String> errors,
+            String successMessage) {
+        return formPage(
+                page.chrome(), page.heading(), page.action(), page.create(), page.form(), page.fieldErrors(),
+                page.globalErrors(), page.status(), page.previewLink(), page.revisionsLink(), page.editable(),
+                page.readOnlyMessage(), page.lifecycleActions(), page.successMessage(), assignment, selectedTagIds,
+                errors, successMessage);
     }
 
     private AdminContentListItemView listItem(AdminContentListItem item) {
@@ -95,9 +111,34 @@ public final class AdminContentViewModelFactory {
             String readOnlyMessage,
             AdminContentLifecycleActionView lifecycleActions,
             String successMessage) {
+        return formPage(
+                chrome, heading, action, create, form, fieldErrors, globalErrors, status, previewLink, revisionsLink,
+                editable, readOnlyMessage, lifecycleActions, successMessage, null, Set.of(), List.of(), null);
+    }
+
+    private static AdminContentFormPage formPage(
+            AdminContentPageChrome chrome,
+            String heading,
+            String action,
+            boolean create,
+            AdminContentForm form,
+            List<AdminContentFieldError> fieldErrors,
+            List<String> globalErrors,
+            String status,
+            String previewLink,
+            String revisionsLink,
+            boolean editable,
+            String readOnlyMessage,
+            AdminContentLifecycleActionView lifecycleActions,
+            String successMessage,
+            ContentTagAssignmentView tagAssignment,
+            Set<String> selectedTagIds,
+            List<String> tagAssignmentErrors,
+            String tagAssignmentSuccessMessage) {
         return new AdminContentFormPage(
                 chrome, heading, action, create, form, fieldErrors, globalErrors, status, previewLink,
-                revisionsLink, editable, readOnlyMessage, lifecycleActions, successMessage);
+                revisionsLink, editable, readOnlyMessage, lifecycleActions, successMessage, tagAssignment,
+                selectedTagIds, tagAssignmentErrors, tagAssignmentSuccessMessage);
     }
 
     private static boolean editable(ContentStatus status) {

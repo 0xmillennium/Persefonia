@@ -9,26 +9,8 @@
     <title>${page.heading()} | Persefonia Admin</title>
 </head>
 <body>
-<header>
-    <p>Signed in as <strong>${page.chrome().admin().displayName()}</strong></p>
-    <form method="post" action="${page.chrome().logoutForm().action()}">
-        <input type="hidden" name="${page.chrome().logoutForm().csrfParameterName()}" value="${page.chrome().logoutForm().csrfToken()}">
-        <button type="submit">Logout</button>
-    </form>
-</header>
-<nav aria-label="Admin navigation">
-    <ul>
-        @for(var item : page.chrome().navigation())
-            <li>
-                @if(item.disabled())
-                    <span aria-disabled="true">${item.label()}</span>
-                @else
-                    <a href="${item.href()}" aria-current="${item.active() ? "page" : null}">${item.label()}</a>
-                @endif
-            </li>
-        @endfor
-    </ul>
-</nav>
+@template.admin.components.adminHeader(page.chrome().admin(), page.chrome().logoutForm(), false)
+@template.admin.components.adminNavigation(page.chrome().navigation())
 <main>
     <h1>${page.heading()}</h1>
     <p><a href="/admin/content">Back to content</a></p>
@@ -61,7 +43,7 @@
     @endif
     @if(page.create() || page.editable())
         <form method="post" action="${page.action()}">
-            <input type="hidden" name="${page.chrome().logoutForm().csrfParameterName()}" value="${page.chrome().logoutForm().csrfToken()}">
+            @template.admin.components.csrfField(page.chrome().logoutForm())
             <label for="type">Type</label>
             @if(page.create())
                 <select id="type" name="type">
@@ -133,24 +115,63 @@
             <button type="submit">${page.create() ? "Create draft" : "Save changes"}</button>
         </form>
     @endif
+    @if(page.tagAssignment() != null)
+        <section aria-label="Tag assignments">
+            <h2>Tags</h2>
+            @if(page.tagAssignmentSuccessMessage() != null)
+                <p role="status">${page.tagAssignmentSuccessMessage()}</p>
+            @endif
+            @for(var error : page.tagAssignmentErrors())
+                <p role="alert">${error}</p>
+            @endfor
+            <form method="post" action="/admin/content/${page.tagAssignment().contentId().value().toString()}/tags">
+                @template.admin.components.csrfField(page.chrome().logoutForm())
+                @if(page.tagAssignment().assignableTags().isEmpty() && page.tagAssignment().assignedTags().stream().noneMatch(tag -> tag.archived()))
+                    <p>No assignable tags are available.</p>
+                @else
+                    @for(var tag : page.tagAssignment().assignableTags())
+                        <label>
+                            <input type="checkbox"
+                                   name="tagId"
+                                   value="${tag.id().value().toString()}"
+                                   checked="${page.selectedTagIds().contains(tag.id().value().toString())}">
+                            ${tag.name()}
+                        </label>
+                    @endfor
+                    @for(var tag : page.tagAssignment().assignedTags())
+                        @if(tag.archived())
+                            <label>
+                                <input type="checkbox"
+                                       name="tagId"
+                                       value="${tag.id().value().toString()}"
+                                       checked="${page.selectedTagIds().contains(tag.id().value().toString())}">
+                                ${tag.name()} <strong>ARCHIVED</strong>
+                            </label>
+                        @endif
+                    @endfor
+                @endif
+                <button type="submit">Save tags</button>
+            </form>
+        </section>
+    @endif
     @if(page.lifecycleActions().hasActions())
         <section aria-label="Lifecycle actions">
             <h2>Lifecycle actions</h2>
             @if(page.lifecycleActions().canPublish())
                 <form method="post" action="${page.lifecycleActions().publishAction()}">
-                    <input type="hidden" name="${page.chrome().logoutForm().csrfParameterName()}" value="${page.chrome().logoutForm().csrfToken()}">
+                    @template.admin.components.csrfField(page.chrome().logoutForm())
                     <button type="submit">Publish</button>
                 </form>
             @endif
             @if(page.lifecycleActions().canUnpublish())
                 <form method="post" action="${page.lifecycleActions().unpublishAction()}">
-                    <input type="hidden" name="${page.chrome().logoutForm().csrfParameterName()}" value="${page.chrome().logoutForm().csrfToken()}">
+                    @template.admin.components.csrfField(page.chrome().logoutForm())
                     <button type="submit">Unpublish</button>
                 </form>
             @endif
             @if(page.lifecycleActions().canArchive())
                 <form method="post" action="${page.lifecycleActions().archiveAction()}">
-                    <input type="hidden" name="${page.chrome().logoutForm().csrfParameterName()}" value="${page.chrome().logoutForm().csrfToken()}">
+                    @template.admin.components.csrfField(page.chrome().logoutForm())
                     <button type="submit">Archive</button>
                 </form>
             @endif

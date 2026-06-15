@@ -20,8 +20,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @Repository
 public class JdbcContentItemRepositoryAdapter implements ContentItemRepository {
-    private static final String TAG_PERSISTENCE_DEFERRED =
-            "Content tag persistence is not available until taxonomy/content tagging is implemented.";
+    private static final String TAG_PERSISTENCE_REQUIRES_ASSIGNMENT_STORE =
+            "Content tag assignments must be persisted through ContentTagAssignmentStore.";
 
     private final ObjectProvider<SpringDataContentItemRows> rootRows;
     private final ObjectProvider<NamedParameterJdbcTemplate> jdbc;
@@ -41,7 +41,7 @@ public class JdbcContentItemRepositoryAdapter implements ContentItemRepository {
     public ContentItem save(ContentItem item) {
         Objects.requireNonNull(item, "item");
         if (!item.tagIds().isEmpty()) {
-            throw new UnsupportedOperationException(TAG_PERSISTENCE_DEFERRED);
+            throw new UnsupportedOperationException(TAG_PERSISTENCE_REQUIRES_ASSIGNMENT_STORE);
         }
         return transactionTemplate().execute(status -> {
             SpringDataContentItemRows rows = rootRows();

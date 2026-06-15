@@ -44,4 +44,34 @@ class TaxonomyArchitectureTest {
                 .allowEmptyShould(false)
                 .check(ArchitectureTestSupport.PRODUCTION_CLASSES);
     }
+
+    @Test
+    void contentPublishingDoesNotAccessTaxonomyPersistenceOrTagRepository() {
+        noClasses()
+                .that().resideInAPackage("dev.persefonia.contentpublishing..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "dev.persefonia.app.taxonomy.persistence..",
+                        "dev.persefonia.taxonomy.domain.port..")
+                .orShould().dependOnClassesThat().haveSimpleName("TagRepository")
+                .allowEmptyShould(false)
+                .check(ArchitectureTestSupport.PRODUCTION_CLASSES);
+    }
+
+    @Test
+    void taxonomyDoesNotDependOnContentPublishing() {
+        noClasses()
+                .that().resideInAPackage("dev.persefonia.taxonomy..")
+                .should().dependOnClassesThat().resideInAPackage("dev.persefonia.contentpublishing..")
+                .allowEmptyShould(false)
+                .check(ArchitectureTestSupport.PRODUCTION_CLASSES);
+    }
+
+    @Test
+    void contentTagAssignmentDoesNotTouchDiscovery() {
+        noClasses()
+                .that().haveSimpleNameContaining("ContentTagAssignment")
+                .should().dependOnClassesThat().resideInAPackage("dev.persefonia.discovery..")
+                .allowEmptyShould(false)
+                .check(ArchitectureTestSupport.PRODUCTION_CLASSES);
+    }
 }

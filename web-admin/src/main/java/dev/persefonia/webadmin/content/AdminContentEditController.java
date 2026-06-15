@@ -3,12 +3,18 @@ package dev.persefonia.webadmin.content;
 import dev.persefonia.contentpublishing.application.exception.ContentApplicationException;
 import dev.persefonia.contentpublishing.application.exception.ContentCommandRejectedException;
 import dev.persefonia.contentpublishing.application.exception.ContentNotFoundException;
+import dev.persefonia.contentpublishing.application.exception.ContentTagAssignmentRejectedException;
+import dev.persefonia.contentpublishing.application.command.AssignContentTagsCommand;
 import dev.persefonia.contentpublishing.application.service.ContentAdminQueryService;
 import dev.persefonia.contentpublishing.application.service.ContentCommandGateway;
+import dev.persefonia.contentpublishing.application.service.ContentTagAssignmentGateway;
+import dev.persefonia.contentpublishing.application.service.ContentTagAssignmentService;
 import dev.persefonia.contentpublishing.domain.content.ContentId;
+import dev.persefonia.contentpublishing.domain.content.ReferencedTagId;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
@@ -34,6 +40,8 @@ public final class AdminContentEditController {
     private final AdminContentFormValidator validator;
     private final AdminContentFormMapper mapper;
     private final AdminContentViewModelFactory views;
+    private final ContentTagAssignmentService tagAssignments;
+    private final ContentTagAssignmentGateway tagAssignmentCommands;
 
     public AdminContentEditController(
             ContentCommandGateway commands,
@@ -42,7 +50,9 @@ public final class AdminContentEditController {
             AdminContentPageChromeFactory chrome,
             AdminContentFormValidator validator,
             AdminContentFormMapper mapper,
-            AdminContentViewModelFactory views) {
+            AdminContentViewModelFactory views,
+            ContentTagAssignmentService tagAssignments,
+            ContentTagAssignmentGateway tagAssignmentCommands) {
         this.commands = Objects.requireNonNull(commands, "commands");
         this.queries = Objects.requireNonNull(queries, "queries");
         this.actors = Objects.requireNonNull(actors, "actors");
@@ -50,6 +60,8 @@ public final class AdminContentEditController {
         this.validator = Objects.requireNonNull(validator, "validator");
         this.mapper = Objects.requireNonNull(mapper, "mapper");
         this.views = Objects.requireNonNull(views, "views");
+        this.tagAssignments = Objects.requireNonNull(tagAssignments, "tagAssignments");
+        this.tagAssignmentCommands = Objects.requireNonNull(tagAssignmentCommands, "tagAssignmentCommands");
     }
 
     @GetMapping("/admin/content/{contentId}/edit")
@@ -64,19 +76,54 @@ public final class AdminContentEditController {
             @RequestParam(name = "publishFailed", required = false) String publishFailed,
             @RequestParam(name = "unpublishFailed", required = false) String unpublishFailed,
             @RequestParam(name = "archiveFailed", required = false) String archiveFailed,
+            @RequestParam(name = "tagsSaved", required = false) String tagsSaved,
             Model model) {
         var pageChrome = chrome.create(authentication, csrfToken);
         ContentId id = parseContentId(contentId);
         try {
             var result = queries.getContentForAdmin(actors.resolve(authentication), id);
             String success = successMessage(created, saved, published, unpublished);
-            var page = views.edit(pageChrome, result, mapper.from(result), success);
+            var page = withTagAssignment(
+                    views.edit(pageChrome, result, mapper.from(result), success),
+                    authentication,
+                    id,
+                    Set.of(),
+                    List.of(),
+                    tagsSaved != null ? "Tag assignments saved." : null);
             var errors = lifecycleErrors(publishFailed, unpublishFailed, archiveFailed);
             model.addAttribute("page", errors.isEmpty() ? page : views.withErrors(page, List.of(), errors));
         } catch (ContentNotFoundException exception) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, NOT_FOUND);
         }
         return "admin/content/form";
+    }
+
+    @PostMapping("/admin/content/{contentId}/tags")
+    public String assignTags(
+            Authentication authentication,
+            CsrfToken csrfToken,
+            @PathVariable("contentId") String contentId,
+            @RequestParam(name = "tagId", required = false) List<String> tagIds,
+            Model model) {
+        ContentId id = parseContentId(contentId);
+        List<String> submitted = tagIds == null ? List.of() : tagIds;
+        Set<String> selected = Set.copyOf(submitted);
+        try {
+            List<ReferencedTagId> requested = submitted.stream()
+                    .map(UUID::fromString)
+                    .map(ReferencedTagId::from)
+                    .toList();
+            tagAssignmentCommands.assign(new AssignContentTagsCommand(
+                    actors.resolve(authentication), id, requested, Instant.now()));
+            return "redirect:/admin/content/" + contentId + "/edit?tagsSaved";
+        } catch (ContentNotFoundException exception) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, NOT_FOUND);
+        } catch (ContentTagAssignmentRejectedException exception) {
+            return renderTagAssignmentError(authentication, csrfToken, id, selected, exception.getMessage(), model);
+        } catch (IllegalArgumentException exception) {
+            return renderTagAssignmentError(
+                    authentication, csrfToken, id, selected, "One or more requested tags are invalid.", model);
+        }
     }
 
     @PostMapping("/admin/content/{contentId}")
@@ -102,8 +149,13 @@ public final class AdminContentEditController {
         } catch (ContentCommandRejectedException exception) {
             try {
                 var result = queries.getContentForAdmin(actors.resolve(authentication), id);
-                var statusAwarePage = views.edit(
-                        chrome.create(authentication, csrfToken), result, mapper.from(result), null);
+                var statusAwarePage = withTagAssignment(
+                        views.edit(chrome.create(authentication, csrfToken), result, mapper.from(result), null),
+                        authentication,
+                        id,
+                        Set.of(),
+                        List.of(),
+                        null);
                 model.addAttribute(
                         "page", views.withErrors(statusAwarePage, List.of(), List.of(UPDATE_FAILED)));
             } catch (ContentNotFoundException missing) {
@@ -147,5 +199,34 @@ public final class AdminContentEditController {
             return List.of("The content could not be archived.");
         }
         return List.of();
+    }
+
+    private String renderTagAssignmentError(
+            Authentication authentication,
+            CsrfToken csrfToken,
+            ContentId id,
+            Set<String> selected,
+            String error,
+            Model model) {
+        var result = queries.getContentForAdmin(actors.resolve(authentication), id);
+        var page = views.edit(chrome.create(authentication, csrfToken), result, mapper.from(result), null);
+        model.addAttribute("page", withTagAssignment(page, authentication, id, selected, List.of(error), null));
+        return "admin/content/form";
+    }
+
+    private AdminContentFormPage withTagAssignment(
+            AdminContentFormPage page,
+            Authentication authentication,
+            ContentId id,
+            Set<String> selected,
+            List<String> errors,
+            String successMessage) {
+        var assignment = tagAssignments.view(actors.resolve(authentication), id);
+        Set<String> effectiveSelection = selected.isEmpty() && errors.isEmpty()
+                ? assignment.assignedTags().stream()
+                        .map(tag -> tag.id().value().toString())
+                        .collect(java.util.stream.Collectors.toSet())
+                : selected;
+        return views.withTagAssignment(page, assignment, effectiveSelection, errors, successMessage);
     }
 }

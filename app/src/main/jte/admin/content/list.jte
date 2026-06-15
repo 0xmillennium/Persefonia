@@ -9,26 +9,8 @@
     <title>Content | Persefonia Admin</title>
 </head>
 <body>
-<header>
-    <p>Signed in as <strong>${page.chrome().admin().displayName()}</strong></p>
-    <form method="post" action="${page.chrome().logoutForm().action()}">
-        <input type="hidden" name="${page.chrome().logoutForm().csrfParameterName()}" value="${page.chrome().logoutForm().csrfToken()}">
-        <button type="submit">Logout</button>
-    </form>
-</header>
-<nav aria-label="Admin navigation">
-    <ul>
-        @for(var item : page.chrome().navigation())
-            <li>
-                @if(item.disabled())
-                    <span aria-disabled="true">${item.label()}</span>
-                @else
-                    <a href="${item.href()}" aria-current="${item.active() ? "page" : null}">${item.label()}</a>
-                @endif
-            </li>
-        @endfor
-    </ul>
-</nav>
+@template.admin.components.adminHeader(page.chrome().admin(), page.chrome().logoutForm(), false)
+@template.admin.components.adminNavigation(page.chrome().navigation())
 <main>
     <h1>Content</h1>
     <p><a href="/admin/content/new">Create draft</a></p>

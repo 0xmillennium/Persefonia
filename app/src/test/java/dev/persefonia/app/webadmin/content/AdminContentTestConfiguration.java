@@ -27,6 +27,12 @@ class AdminContentTestConfiguration {
 
     @Bean
     @Primary
+    AdminContentTagAssignmentTestSupport adminContentTagAssignmentTestSupport() {
+        return new AdminContentTagAssignmentTestSupport();
+    }
+
+    @Bean
+    @Primary
     UpdateDiscoverableResourcePort adminContentTestUpdateDiscoverableResourcePort() {
         return input -> new DiscoverableResourceProjectionResult.Updated();
     }

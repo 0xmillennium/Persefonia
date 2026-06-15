@@ -25,11 +25,11 @@ class JdbcContentItemRepositoryAdapterUnsupportedTagsTest extends ContentPublish
 
         assertThatThrownBy(() -> contentItems.save(item))
                 .isInstanceOf(UnsupportedOperationException.class)
-                .hasMessageContaining("Content tag persistence is not available until taxonomy/content tagging is implemented.");
+                .hasMessageContaining("Content tag assignments must be persisted through ContentTagAssignmentStore.");
     }
 
     @Test
-    void contentItemTagsTableDoesNotExist() {
+    void contentItemTagsTableExistsOutsideContentItemRepositoryMapping() {
         Boolean exists = namedJdbc.queryForObject("""
                 SELECT EXISTS (
                     SELECT 1
@@ -41,6 +41,6 @@ class JdbcContentItemRepositoryAdapterUnsupportedTagsTest extends ContentPublish
                 Map.of(),
                 Boolean.class);
 
-        assertThat(exists).isFalse();
+        assertThat(exists).isTrue();
     }
 }
