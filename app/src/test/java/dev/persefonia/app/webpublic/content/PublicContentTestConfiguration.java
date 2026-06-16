@@ -30,6 +30,12 @@ public class PublicContentTestConfiguration {
 
     @Bean
     @Primary
+    PublicContentTestTranslationGroupRepository publicContentTestTranslationGroupRepository() {
+        return new PublicContentTestTranslationGroupRepository();
+    }
+
+    @Bean
+    @Primary
     FrontendAssetResolver publicContentTestAssetResolver() {
         return new FrontendAssetResolver() {
             @Override

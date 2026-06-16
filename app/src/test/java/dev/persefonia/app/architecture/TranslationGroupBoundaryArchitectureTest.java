@@ -34,9 +34,32 @@ class TranslationGroupBoundaryArchitectureTest {
     }
 
     @Test
+    void webPublicDoesNotAccessTranslationRepositories() {
+        noClasses()
+                .that().resideInAPackage("dev.persefonia.webpublic..")
+                .should().dependOnClassesThat().haveFullyQualifiedName(TranslationGroupRepository.class.getName())
+                .orShould().dependOnClassesThat().resideInAPackage(
+                        "dev.persefonia.contentpublishing.domain.translation.port..")
+                .allowEmptyShould(true)
+                .check(ArchitectureTestSupport.PRODUCTION_CLASSES);
+    }
+
+    @Test
     void webAdminDoesNotAccessTranslationPersistenceOrJdbc() {
         noClasses()
                 .that().resideInAPackage("dev.persefonia.webadmin..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "dev.persefonia.app.contentpublishing.persistence..",
+                        "org.springframework.jdbc..",
+                        "java.sql..")
+                .allowEmptyShould(true)
+                .check(ArchitectureTestSupport.PRODUCTION_CLASSES);
+    }
+
+    @Test
+    void webPublicDoesNotAccessTranslationPersistenceOrJdbc() {
+        noClasses()
+                .that().resideInAPackage("dev.persefonia.webpublic..")
                 .should().dependOnClassesThat().resideInAnyPackage(
                         "dev.persefonia.app.contentpublishing.persistence..",
                         "org.springframework.jdbc..",

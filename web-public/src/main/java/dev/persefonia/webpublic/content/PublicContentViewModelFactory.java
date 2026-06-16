@@ -2,12 +2,16 @@ package dev.persefonia.webpublic.content;
 
 import dev.persefonia.contentpublishing.application.query.PublicContentHeadingResult;
 import dev.persefonia.contentpublishing.application.query.PublicContentPageResult;
+import dev.persefonia.contentpublishing.application.query.PublicHreflangLink;
+import dev.persefonia.contentpublishing.application.query.PublicTranslationLink;
+import dev.persefonia.contentpublishing.application.query.PublicTranslationLinkSet;
 import dev.persefonia.contentpublishing.domain.content.ContentLanguage;
 import dev.persefonia.contentpublishing.domain.content.ContentType;
 import dev.persefonia.contentpublishing.domain.content.ContentVisibility;
 import dev.persefonia.webpublic.FrontendAssetResolver;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import org.springframework.stereotype.Component;
@@ -29,7 +33,7 @@ public final class PublicContentViewModelFactory {
         this.canonicalUrlFactory = canonicalUrlFactory;
     }
 
-    public PublicContentPage contentPage(PublicContentPageResult page) {
+    public PublicContentPage contentPage(PublicContentPageResult page, PublicTranslationLinkSet translations) {
         String title = page.title().value();
         String summary = page.summary().value();
         String seoTitle = page.seoTitle().map(value -> value.value()).orElse(title);
@@ -61,7 +65,11 @@ public final class PublicContentViewModelFactory {
                 page.visibility() == ContentVisibility.UNLISTED,
                 assetResolver.stylesheetPaths(MAIN_FRONTEND_ENTRY),
                 mermaidScriptPath(page.containsMermaid()),
-                page.headings().stream().map(this::heading).toList());
+                page.headings().stream().map(this::heading).toList(),
+                translations.visibleLinks().stream().map(this::translationLink).toList(),
+                translations.renderHreflang()
+                        ? translations.hreflangLinks().stream().map(this::hreflangLink).toList()
+                        : List.of());
     }
 
     public PublicNotFoundPage notFoundPage() {
@@ -78,6 +86,18 @@ public final class PublicContentViewModelFactory {
                 heading.text().value(),
                 heading.anchor().value(),
                 heading.position().value());
+    }
+
+    private PublicContentTranslationLinkView translationLink(PublicTranslationLink link) {
+        return new PublicContentTranslationLinkView(
+                link.language(),
+                link.label(),
+                link.title(),
+                link.publicUrl());
+    }
+
+    private PublicContentHreflangLinkView hreflangLink(PublicHreflangLink link) {
+        return new PublicContentHreflangLinkView(link.languageCode(), link.href());
     }
 
     private static String typeLabel(ContentType type) {

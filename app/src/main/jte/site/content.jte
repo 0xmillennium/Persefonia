@@ -1,5 +1,7 @@
 @import dev.persefonia.webpublic.content.PublicContentHeadingView
+@import dev.persefonia.webpublic.content.PublicContentHreflangLinkView
 @import dev.persefonia.webpublic.content.PublicContentPage
+@import dev.persefonia.webpublic.content.PublicContentTranslationLinkView
 @param PublicContentPage page
 <!doctype html>
 <html lang="${page.htmlLanguage()}">
@@ -9,6 +11,9 @@
     <title>${page.seoTitle()}</title>
     <meta name="description" content="${page.seoDescription()}">
     <link rel="canonical" href="${page.canonicalUrl()}">
+    @for(PublicContentHreflangLinkView link : page.hreflangLinks())
+        <link rel="alternate" hreflang="${link.languageCode()}" href="${link.href()}">
+    @endfor
     <meta property="og:title" content="${page.openGraphTitle()}">
     <meta property="og:description" content="${page.openGraphDescription()}">
     <meta property="og:url" content="${page.openGraphUrl()}">
@@ -34,6 +39,18 @@
                     <span>${page.readingTimeLabel()}</span>
                 </p>
             </header>
+            @if(!page.translationLinks().isEmpty())
+                <nav class="public-translations" aria-label="Translations">
+                    <p>Available in:</p>
+                    <ul>
+                        @for(PublicContentTranslationLinkView link : page.translationLinks())
+                            <li>
+                                <a href="${link.publicUrl()}" hreflang="${link.language()}" lang="${link.language()}" title="${link.title()}">${link.label()}</a>
+                            </li>
+                        @endfor
+                    </ul>
+                </nav>
+            @endif
             @if(!page.headings().isEmpty())
                 <nav class="public-toc" aria-label="Table of contents">
                     <ol>

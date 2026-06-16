@@ -27,7 +27,9 @@ public record PublicContentPage(
         boolean noindex,
         List<String> stylesheetPaths,
         Optional<String> mermaidScriptPath,
-        List<PublicContentHeadingView> headings) {
+        List<PublicContentHeadingView> headings,
+        List<PublicContentTranslationLinkView> translationLinks,
+        List<PublicContentHreflangLinkView> hreflangLinks) {
     public PublicContentPage {
         title = Objects.requireNonNull(title, "title");
         displayTitle = Objects.requireNonNull(displayTitle, "displayTitle");
@@ -50,5 +52,7 @@ public record PublicContentPage(
         stylesheetPaths = List.copyOf(Objects.requireNonNull(stylesheetPaths, "stylesheetPaths"));
         mermaidScriptPath = Objects.requireNonNull(mermaidScriptPath, "mermaidScriptPath");
         headings = List.copyOf(Objects.requireNonNull(headings, "headings"));
+        translationLinks = List.copyOf(Objects.requireNonNull(translationLinks, "translationLinks"));
+        hreflangLinks = List.copyOf(Objects.requireNonNull(hreflangLinks, "hreflangLinks"));
     }
 }

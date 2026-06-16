@@ -4,6 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.persefonia.contentpublishing.application.query.PublicContentHeadingResult;
 import dev.persefonia.contentpublishing.application.query.PublicContentPageResult;
+import dev.persefonia.contentpublishing.application.query.PublicHreflangLink;
+import dev.persefonia.contentpublishing.application.query.PublicTranslationLink;
+import dev.persefonia.contentpublishing.application.query.PublicTranslationLinkSet;
 import dev.persefonia.contentpublishing.domain.content.CanonicalPath;
 import dev.persefonia.contentpublishing.domain.content.ContentId;
 import dev.persefonia.contentpublishing.domain.content.ContentLanguage;
@@ -43,7 +46,8 @@ class PublicContentViewModelFactoryTest {
                 Optional.of(SeoDescription.of("Custom SEO description")),
                 Optional.of(OpenGraphTitle.of("Custom OG")),
                 Optional.of(OpenGraphDescription.of("Custom OG description")),
-                false));
+                false),
+                PublicTranslationLinkSet.empty());
 
         assertThat(page.seoTitle()).isEqualTo("Custom SEO");
         assertThat(page.seoDescription()).isEqualTo("Custom SEO description");
@@ -68,7 +72,8 @@ class PublicContentViewModelFactoryTest {
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
-                false));
+                false),
+                PublicTranslationLinkSet.empty());
 
         assertThat(page.seoTitle()).isEqualTo("Public Title");
         assertThat(page.seoDescription()).isEqualTo("Public summary");
@@ -86,7 +91,8 @@ class PublicContentViewModelFactoryTest {
                 Optional.of(SeoDescription.of("SEO description fallback")),
                 Optional.empty(),
                 Optional.empty(),
-                false));
+                false),
+                PublicTranslationLinkSet.empty());
 
         assertThat(page.openGraphTitle()).isEqualTo("SEO fallback");
         assertThat(page.openGraphDescription()).isEqualTo("SEO description fallback");
@@ -102,7 +108,8 @@ class PublicContentViewModelFactoryTest {
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
-                true));
+                true),
+                PublicTranslationLinkSet.empty());
         PublicContentPage publicPage = factory.contentPage(page(
                 ContentType.ARTICLE,
                 ContentVisibility.PUBLIC,
@@ -110,7 +117,8 @@ class PublicContentViewModelFactoryTest {
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
-                false));
+                false),
+                PublicTranslationLinkSet.empty());
 
         assertThat(unlisted.noindex()).isTrue();
         assertThat(unlisted.mermaidScriptPath()).contains("/assets/mermaid-loader-test.js");
@@ -127,7 +135,8 @@ class PublicContentViewModelFactoryTest {
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
-                false));
+                false),
+                PublicTranslationLinkSet.empty());
 
         assertThat(page.headings()).singleElement().satisfies(heading -> {
             assertThat(heading.level()).isEqualTo(2);
@@ -136,6 +145,38 @@ class PublicContentViewModelFactoryTest {
             assertThat(heading.href()).isEqualTo("#heading-escaped");
             assertThat(heading.position()).isEqualTo(1);
         });
+    }
+
+    @Test
+    void mapsTranslationLinksAndHreflangLinks() {
+        PublicContentPage page = factory.contentPage(page(
+                        ContentType.ARTICLE,
+                        ContentVisibility.PUBLIC,
+                        Optional.empty(),
+                        Optional.empty(),
+                        Optional.empty(),
+                        Optional.empty(),
+                        false),
+                PublicTranslationLinkSet.withAlternates(
+                        List.of(new PublicTranslationLink(
+                                "en",
+                                "English",
+                                "English <Title>",
+                                "/en/articles/public-title",
+                                "https://example.test/en/articles/public-title")),
+                        List.of(
+                                new PublicHreflangLink("tr", "https://example.test/tr/articles/public-title"),
+                                new PublicHreflangLink("en", "https://example.test/en/articles/public-title"))));
+
+        assertThat(page.translationLinks()).singleElement().satisfies(link -> {
+            assertThat(link.language()).isEqualTo("en");
+            assertThat(link.label()).isEqualTo("English");
+            assertThat(link.title()).isEqualTo("English <Title>");
+            assertThat(link.publicUrl()).isEqualTo("/en/articles/public-title");
+        });
+        assertThat(page.hreflangLinks())
+                .extracting(PublicContentHreflangLinkView::languageCode)
+                .containsExactly("tr", "en");
     }
 
     private static PublicContentPageResult page(

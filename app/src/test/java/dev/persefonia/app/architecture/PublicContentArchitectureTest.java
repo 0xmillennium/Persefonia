@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import dev.persefonia.contentpublishing.application.service.PublicContentBySourceQueryHandler;
+import dev.persefonia.contentpublishing.application.service.PublicTranslationLinkQueryService;
 import dev.persefonia.contentpublishing.domain.content.port.ContentItemRepository;
 import dev.persefonia.discovery.application.port.ResolvePublicRoutePort;
 import dev.persefonia.webpublic.content.DiscoveryPublicContentRouteResolver;
@@ -31,6 +32,7 @@ class PublicContentArchitectureTest {
                                 PublicContentRouteParser.class,
                                 DiscoveryPublicContentRouteResolver.class,
                                 PublicContentBySourceQueryHandler.class,
+                                PublicTranslationLinkQueryService.class,
                                 PublicContentViewModelFactory.class,
                                 PublicContentResponseHeaders.class));
     }

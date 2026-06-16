@@ -25,6 +25,7 @@ import dev.persefonia.contentpublishing.application.service.PublicContentBySourc
 import dev.persefonia.contentpublishing.application.service.PublicContentQueryHandler;
 import dev.persefonia.contentpublishing.application.service.PublicTaggedContentQueryHandler;
 import dev.persefonia.contentpublishing.application.service.PublicSeriesPageQueryService;
+import dev.persefonia.contentpublishing.application.service.PublicTranslationLinkQueryService;
 import dev.persefonia.contentpublishing.application.service.SeriesAdminQueryService;
 import dev.persefonia.contentpublishing.application.service.SeriesCommandService;
 import dev.persefonia.contentpublishing.application.service.TranslationGroupAdminQueryService;
@@ -193,6 +194,15 @@ class ContentApplicationConfiguration {
             ContentItemRepository contentItems,
             ContentPublicRouteFactory routeFactory) {
         return new PublicContentBySourceQueryHandler(contentItems, routeFactory);
+    }
+
+    @Bean
+    PublicTranslationLinkQueryService publicTranslationLinkQueryService(
+            ContentItemRepository contentItems,
+            TranslationGroupRepository translationGroups,
+            ContentPublicRouteFactory routeFactory,
+            ConfiguredContentCanonicalUrlFactory canonicalUrlFactory) {
+        return new PublicTranslationLinkQueryService(contentItems, translationGroups, routeFactory, canonicalUrlFactory);
     }
 
     @Bean

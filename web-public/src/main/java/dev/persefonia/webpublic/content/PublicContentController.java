@@ -2,6 +2,7 @@ package dev.persefonia.webpublic.content;
 
 import dev.persefonia.contentpublishing.application.query.PublicContentLookupResult;
 import dev.persefonia.contentpublishing.application.service.PublicContentBySourceQueryHandler;
+import dev.persefonia.contentpublishing.application.service.PublicTranslationLinkQueryService;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
@@ -14,6 +15,7 @@ public final class PublicContentController {
     private final PublicContentRouteParser routeParser;
     private final DiscoveryPublicContentRouteResolver routeResolver;
     private final PublicContentBySourceQueryHandler queryHandler;
+    private final PublicTranslationLinkQueryService translationLinkQueryService;
     private final PublicContentViewModelFactory viewModelFactory;
     private final PublicContentResponseHeaders responseHeaders;
 
@@ -21,11 +23,13 @@ public final class PublicContentController {
             PublicContentRouteParser routeParser,
             DiscoveryPublicContentRouteResolver routeResolver,
             PublicContentBySourceQueryHandler queryHandler,
+            PublicTranslationLinkQueryService translationLinkQueryService,
             PublicContentViewModelFactory viewModelFactory,
             PublicContentResponseHeaders responseHeaders) {
         this.routeParser = routeParser;
         this.routeResolver = routeResolver;
         this.queryHandler = queryHandler;
+        this.translationLinkQueryService = translationLinkQueryService;
         this.viewModelFactory = viewModelFactory;
         this.responseHeaders = responseHeaders;
     }
@@ -61,7 +65,10 @@ public final class PublicContentController {
     private ModelAndView render(PublicContentLookupResult result, HttpServletResponse response) {
         if (result instanceof PublicContentLookupResult.Found found) {
             responseHeaders.applyPublicContentHeaders(response);
-            return new ModelAndView("site/content", "page", viewModelFactory.contentPage(found.page()));
+            return new ModelAndView(
+                    "site/content",
+                    "page",
+                    viewModelFactory.contentPage(found.page(), translationLinkQueryService.linksFor(found.page())));
         }
         return notFound(response);
     }
