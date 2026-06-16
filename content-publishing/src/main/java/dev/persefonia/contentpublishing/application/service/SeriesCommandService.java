@@ -10,6 +10,7 @@ import dev.persefonia.contentpublishing.application.command.RemoveSeriesEntryCom
 import dev.persefonia.contentpublishing.application.command.ReorderSeriesEntriesCommand;
 import dev.persefonia.contentpublishing.application.command.SeriesResult;
 import dev.persefonia.contentpublishing.application.command.UpdateSeriesCommand;
+import dev.persefonia.contentpublishing.application.discovery.SeriesDiscoverabilityCoordinator;
 import dev.persefonia.contentpublishing.application.exception.SeriesCommandRejectedException;
 import dev.persefonia.contentpublishing.application.exception.SeriesNotFoundException;
 import dev.persefonia.contentpublishing.domain.content.ContentItem;
@@ -29,14 +30,17 @@ public final class SeriesCommandService {
     private final ContentItemRepository contentItems;
     private final SeriesRepository seriesRepository;
     private final ContentCommandAuthorizationPolicy authorization;
+    private final SeriesDiscoverabilityCoordinator discoverability;
 
     public SeriesCommandService(
             ContentItemRepository contentItems,
             SeriesRepository seriesRepository,
-            ContentCommandAuthorizationPolicy authorization) {
+            ContentCommandAuthorizationPolicy authorization,
+            SeriesDiscoverabilityCoordinator discoverability) {
         this.contentItems = Objects.requireNonNull(contentItems, "contentItems");
         this.seriesRepository = Objects.requireNonNull(seriesRepository, "seriesRepository");
         this.authorization = Objects.requireNonNull(authorization, "authorization");
+        this.discoverability = Objects.requireNonNull(discoverability, "discoverability");
     }
 
     public SeriesResult create(CreateSeriesCommand command) {
@@ -53,7 +57,9 @@ public final class SeriesCommandService {
                 SeriesTitle.of(command.title()),
                 SeriesDescription.optional(command.description()).orElse(null),
                 command.requestedAt());
-        return new SeriesResult(seriesRepository.save(series).id());
+        Series saved = seriesRepository.save(series);
+        discoverability.sync(saved);
+        return new SeriesResult(saved.id());
     }
 
     public SeriesResult update(UpdateSeriesCommand command) {
@@ -76,7 +82,9 @@ public final class SeriesCommandService {
         } catch (SeriesValidationException exception) {
             throw translate(exception);
         }
-        return new SeriesResult(seriesRepository.save(series).id());
+        Series saved = seriesRepository.save(series);
+        discoverability.sync(saved);
+        return new SeriesResult(saved.id());
     }
 
     public SeriesResult archive(ArchiveSeriesCommand command) {
@@ -87,7 +95,9 @@ public final class SeriesCommandService {
             return new SeriesResult(series.id());
         }
         series.archive(command.requestedAt());
-        return new SeriesResult(seriesRepository.save(series).id());
+        Series saved = seriesRepository.save(series);
+        discoverability.sync(saved);
+        return new SeriesResult(saved.id());
     }
 
     public SeriesResult addEntry(AddSeriesEntryCommand command) {

@@ -18,15 +18,24 @@ class SeriesFoundationArchitectureTest {
     }
 
     @Test
-    void webPublicDoesNotRenderSeriesLinksYet() throws Exception {
-        assertThat(matches(Path.of("../web-public/src/main"), "series")).isEmpty();
-        assertThat(matches(Path.of("src/main/jte/site"), "series")).isEmpty();
+    void publicSeriesImplementationDoesNotAddForbiddenAdjacentSurfaces() throws Exception {
+        assertThat(matches(Path.of("../web-public/src/main"), "@GetMapping(\"/{language}/series\")")).isEmpty();
+        assertThat(matches(Path.of("../web-public/src/main"), "/search")).isEmpty();
+        assertThat(matches(Path.of("../web-public/src/main"), "/feed")).isEmpty();
+        assertThat(matches(Path.of("../web-public/src/main"), "/sitemap")).isEmpty();
+        assertThat(matches(Path.of("../web-public/src/main"), "/robots")).isEmpty();
+        assertThat(matches(Path.of("src/main/jte/site"), "rel=\"prev\"")).isEmpty();
+        assertThat(matches(Path.of("src/main/jte/site"), "rel=\"next\"")).isEmpty();
     }
 
     @Test
-    void discoveryIsNotTouchedBySeriesFoundation() throws Exception {
-        assertThat(matches(Path.of("../discovery/src/main"), "SERIES")).isEmpty();
-        assertThat(matches(Path.of("../discovery/src/main"), "series")).isEmpty();
+    void discoverySeriesSupportRemainsCurrentOnly() throws Exception {
+        String migration = Files.readString(Path.of("src/main/resources/db/migration/V10__discovery_series_pages.sql"));
+
+        assertThat(migration)
+                .doesNotContain("active")
+                .doesNotContain("history")
+                .doesNotContain("search_vector");
     }
 
     @Test
@@ -37,7 +46,8 @@ class SeriesFoundationArchitectureTest {
                 .doesNotContain("/feed")
                 .doesNotContain("/sitemap")
                 .doesNotContain("/robots")
-                .doesNotContain("/series");
+                .doesNotContain("/series/**")
+                .doesNotContain("/{language}/series/**");
     }
 
     private static List<String> matches(Path root, String needle) throws Exception {

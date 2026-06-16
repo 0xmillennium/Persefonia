@@ -27,6 +27,59 @@ class DiscoveryProjectionContractTest {
     }
 
     @Test
+    void seriesProjectionContractValuesAreAccepted() {
+        assertThat(SourceContext.valueOf("CONTENT_PUBLISHING")).isEqualTo(SourceContext.CONTENT_PUBLISHING);
+        assertThat(SourceType.valueOf("SERIES")).isEqualTo(SourceType.SERIES);
+        assertThat(DiscoverableResourceType.valueOf("SERIES")).isEqualTo(DiscoverableResourceType.SERIES);
+        assertThat(RoutePurpose.valueOf("SERIES_PAGE")).isEqualTo(RoutePurpose.SERIES_PAGE);
+    }
+
+    @Test
+    void seriesPageProjectionUsesNoindexAndIneligibleFlags() {
+        DiscoverableResourceProjectionInput input = new DiscoverableResourceProjectionInput(
+                SourceContext.CONTENT_PUBLISHING,
+                SourceType.SERIES,
+                sourceEntityId(),
+                DiscoverableResourceType.SERIES,
+                RoutePurpose.SERIES_PAGE,
+                DiscoveryLanguage.EN,
+                new PublicUrl("/en/series/spring-boot-notes"),
+                new CanonicalUrl("https://persefonia.dev/en/series/spring-boot-notes"),
+                "Spring Boot Notes",
+                "Ordered Spring Boot notes",
+                IndexingPolicy.NO_INDEX,
+                DiscoveryEligibility.NOT_ELIGIBLE,
+                DiscoveryEligibility.NOT_ELIGIBLE,
+                DiscoveryEligibility.NOT_ELIGIBLE,
+                null,
+                null,
+                null,
+                null,
+                null,
+                "Spring Boot Notes\nOrdered Spring Boot notes");
+
+        assertThat(input)
+                .extracting(
+                        DiscoverableResourceProjectionInput::sourceContext,
+                        DiscoverableResourceProjectionInput::sourceType,
+                        DiscoverableResourceProjectionInput::resourceType,
+                        DiscoverableResourceProjectionInput::routePurpose,
+                        DiscoverableResourceProjectionInput::indexingPolicy,
+                        DiscoverableResourceProjectionInput::searchEligibility,
+                        DiscoverableResourceProjectionInput::sitemapEligibility,
+                        DiscoverableResourceProjectionInput::feedEligibility)
+                .containsExactly(
+                        SourceContext.CONTENT_PUBLISHING,
+                        SourceType.SERIES,
+                        DiscoverableResourceType.SERIES,
+                        RoutePurpose.SERIES_PAGE,
+                        IndexingPolicy.NO_INDEX,
+                        DiscoveryEligibility.NOT_ELIGIBLE,
+                        DiscoveryEligibility.NOT_ELIGIBLE,
+                        DiscoveryEligibility.NOT_ELIGIBLE);
+    }
+
+    @Test
     void projectionInputAcceptsValidCurrentProjectionInput() {
         assertThat(validInput(UnaryOperator.identity()))
                 .extracting(

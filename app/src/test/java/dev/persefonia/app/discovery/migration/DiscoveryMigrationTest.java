@@ -45,6 +45,66 @@ class DiscoveryMigrationTest extends DiscoveryMigrationDatabase {
     }
 
     @Test
+    void discoveryAcceptsSeriesPageProjection() {
+        insertResource(java.util.Map.of(
+                "sourceContext", "CONTENT_PUBLISHING",
+                "sourceType", "SERIES",
+                "resourceType", "SERIES",
+                "routePurpose", "SERIES_PAGE",
+                "publicUrl", "/en/series/spring-boot-notes",
+                "canonicalUrl", "https://example.test/en/series/spring-boot-notes",
+                "indexingPolicy", "NO_INDEX",
+                "searchEligibility", "NOT_ELIGIBLE",
+                "sitemapEligibility", "NOT_ELIGIBLE",
+                "feedEligibility", "NOT_ELIGIBLE"));
+
+        assertThat(jdbc().queryForObject("""
+                SELECT count(*) FROM discovery.discoverable_resources
+                WHERE source_context = 'CONTENT_PUBLISHING' AND source_type = 'SERIES'
+                """, Integer.class)).isEqualTo(1);
+    }
+
+    @Test
+    void discoveryRejectsInvalidSeriesProjectionValues() {
+        assertThatThrownBy(() -> insertResource(java.util.Map.of(
+                "sourceContext", "CONTENT_PUBLISHING",
+                "sourceType", "SERIES",
+                "resourceType", "ARTICLE",
+                "routePurpose", "SERIES_PAGE",
+                "indexingPolicy", "NO_INDEX",
+                "searchEligibility", "NOT_ELIGIBLE",
+                "sitemapEligibility", "NOT_ELIGIBLE",
+                "feedEligibility", "NOT_ELIGIBLE")))
+                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> insertResource(java.util.Map.of(
+                "sourceContext", "CONTENT_PUBLISHING",
+                "sourceType", "SERIES",
+                "resourceType", "SERIES",
+                "routePurpose", "SERIES_PAGE",
+                "indexingPolicy", "INDEX",
+                "searchEligibility", "NOT_ELIGIBLE",
+                "sitemapEligibility", "NOT_ELIGIBLE",
+                "feedEligibility", "NOT_ELIGIBLE")))
+                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void publicUrlAndCanonicalUrlRemainUnique() {
+        insertResource(java.util.Map.of(
+                "publicUrl", "/en/articles/unique",
+                "canonicalUrl", "https://example.test/en/articles/unique"));
+
+        assertThatThrownBy(() -> insertResource(java.util.Map.of(
+                "publicUrl", "/en/articles/unique",
+                "canonicalUrl", "https://example.test/en/articles/another")))
+                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> insertResource(java.util.Map.of(
+                "publicUrl", "/en/articles/another",
+                "canonicalUrl", "https://example.test/en/articles/unique")))
+                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+    }
+
+    @Test
     void sourceRefCanHaveMultipleLanguagesForSameTag() {
         java.util.UUID tagId = java.util.UUID.randomUUID();
         java.util.Map<String, Object> common = new java.util.HashMap<>();
@@ -119,6 +179,23 @@ class DiscoveryMigrationTest extends DiscoveryMigrationDatabase {
                 "search_vector", "metadata_json", "payload_json", "source_payload");
         assertThat(columns).contains("id", "public_url", "canonical_url", "search_text");
         assertThat(foreignKeys).isZero();
+        assertThat(jdbc().queryForObject(
+                "SELECT to_regclass('discovery.discoverable_resource_history')",
+                String.class)).isNull();
+    }
+
+    @Test
+    void discoverableResourcesStillHaveNoActiveFlag() {
+        List<String> columns = jdbc().queryForList("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_schema = 'discovery' AND table_name = 'discoverable_resources'
+                """, String.class);
+
+        assertThat(columns).doesNotContain("active");
+    }
+
+    @Test
+    void discoveryStillHasNoHistoryTable() {
         assertThat(jdbc().queryForObject(
                 "SELECT to_regclass('discovery.discoverable_resource_history')",
                 String.class)).isNull();

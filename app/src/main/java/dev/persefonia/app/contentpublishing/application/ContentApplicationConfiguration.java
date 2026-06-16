@@ -7,6 +7,8 @@ import dev.persefonia.contentpublishing.application.discovery.ContentDiscoverabi
 import dev.persefonia.contentpublishing.application.discovery.ContentDiscoveryProjectionFactory;
 import dev.persefonia.contentpublishing.application.discovery.ContentDiscoveryRedirectFactory;
 import dev.persefonia.contentpublishing.application.discovery.ContentPublicRouteFactory;
+import dev.persefonia.contentpublishing.application.discovery.SeriesDiscoverabilityCoordinator;
+import dev.persefonia.contentpublishing.application.discovery.SeriesDiscoveryProjectionFactory;
 import dev.persefonia.contentpublishing.application.port.ContentPublishingEventPublisher;
 import dev.persefonia.contentpublishing.application.port.ContentTagAssignmentStore;
 import dev.persefonia.contentpublishing.application.port.ContentTagVocabularyPort;
@@ -22,6 +24,7 @@ import dev.persefonia.contentpublishing.application.service.ContentTagAssignment
 import dev.persefonia.contentpublishing.application.service.PublicContentBySourceQueryHandler;
 import dev.persefonia.contentpublishing.application.service.PublicContentQueryHandler;
 import dev.persefonia.contentpublishing.application.service.PublicTaggedContentQueryHandler;
+import dev.persefonia.contentpublishing.application.service.PublicSeriesPageQueryService;
 import dev.persefonia.contentpublishing.application.service.SeriesAdminQueryService;
 import dev.persefonia.contentpublishing.application.service.SeriesCommandService;
 import dev.persefonia.contentpublishing.application.service.TranslationGroupAdminQueryService;
@@ -90,6 +93,20 @@ class ContentApplicationConfiguration {
     }
 
     @Bean
+    SeriesDiscoveryProjectionFactory seriesDiscoveryProjectionFactory(
+            ConfiguredContentCanonicalUrlFactory canonicalUrlFactory) {
+        return new SeriesDiscoveryProjectionFactory(canonicalUrlFactory);
+    }
+
+    @Bean
+    SeriesDiscoverabilityCoordinator seriesDiscoverabilityCoordinator(
+            UpdateDiscoverableResourcePort updatePort,
+            RemoveDiscoverableResourcePort removePort,
+            SeriesDiscoveryProjectionFactory projectionFactory) {
+        return new SeriesDiscoverabilityCoordinator(updatePort, removePort, projectionFactory);
+    }
+
+    @Bean
     ContentCommandService contentCommandService(
             ContentItemRepository contentItems,
             ContentRevisionRepository revisions,
@@ -153,8 +170,9 @@ class ContentApplicationConfiguration {
     SeriesCommandService seriesCommandService(
             ContentItemRepository contentItems,
             SeriesRepository seriesRepository,
-            ContentCommandAuthorizationPolicy authorization) {
-        return new SeriesCommandService(contentItems, seriesRepository, authorization);
+            ContentCommandAuthorizationPolicy authorization,
+            SeriesDiscoverabilityCoordinator discoverability) {
+        return new SeriesCommandService(contentItems, seriesRepository, authorization, discoverability);
     }
 
     @Bean
@@ -182,5 +200,13 @@ class ContentApplicationConfiguration {
             ContentItemRepository contentItems,
             ContentPublicRouteFactory routeFactory) {
         return new PublicTaggedContentQueryHandler(contentItems, routeFactory);
+    }
+
+    @Bean
+    PublicSeriesPageQueryService publicSeriesPageQueryService(
+            ContentItemRepository contentItems,
+            SeriesRepository seriesRepository,
+            ContentPublicRouteFactory routeFactory) {
+        return new PublicSeriesPageQueryService(contentItems, seriesRepository, routeFactory);
     }
 }

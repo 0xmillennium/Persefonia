@@ -85,11 +85,15 @@ class PublicContentSecurityMatcherTest {
                         "/en/pages/*");
         assertThat(List.of(SecurityConfiguration.PUBLIC_TAG_GET_PATTERNS))
                 .containsExactly("/tr/tags/*", "/en/tags/*");
+        assertThat(List.of(SecurityConfiguration.PUBLIC_SERIES_GET_PATTERNS))
+                .containsExactly("/tr/series/*", "/en/series/*");
 
         String securityConfiguration = Files.readString(Path.of("src/main/java/dev/persefonia/app/security/SecurityConfiguration.java"));
         String broadThreeSegmentMatcher = "/" + "*" + "/" + "*" + "/" + "*";
         assertThat(securityConfiguration).doesNotContain(quoted(broadThreeSegmentMatcher, '"'));
         assertThat(securityConfiguration).doesNotContain(quoted(broadThreeSegmentMatcher, '\''));
+        assertThat(securityConfiguration).doesNotContain("\"/{language}/series/**\"");
+        assertThat(securityConfiguration).doesNotContain("\"/series/**\"");
     }
 
     @Test

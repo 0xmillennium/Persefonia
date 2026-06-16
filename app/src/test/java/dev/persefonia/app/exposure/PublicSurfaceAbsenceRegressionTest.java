@@ -29,6 +29,9 @@ class PublicSurfaceAbsenceRegressionTest {
                 "/content/private",
                 "/articles/published",
                 "/content",
+                "/series",
+                "/en/series",
+                "/tr/series",
                 "/sitemap.xml",
                 "/feed",
                 "/search")) {

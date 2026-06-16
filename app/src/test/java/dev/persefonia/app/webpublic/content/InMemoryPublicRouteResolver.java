@@ -61,6 +61,20 @@ public final class InMemoryPublicRouteResolver implements ResolvePublicRoutePort
                 IndexingPolicy.NO_INDEX));
     }
 
+    public void addSeriesFound(String publicPath, UUID seriesId) {
+        PublicUrl publicUrl = new PublicUrl(publicPath);
+        foundRoutes.put(publicPath, new PublicRouteResolution.Found(
+                SourceContext.CONTENT_PUBLISHING,
+                SourceType.SERIES,
+                new SourceEntityId(seriesId),
+                DiscoverableResourceType.SERIES,
+                RoutePurpose.SERIES_PAGE,
+                publicPath.startsWith("/tr/") ? DiscoveryLanguage.TR : DiscoveryLanguage.EN,
+                publicUrl,
+                new CanonicalUrl("https://0xmillennium.dev" + publicPath),
+                IndexingPolicy.NO_INDEX));
+    }
+
     public void clear() {
         foundRoutes.clear();
         redirects.clear();
