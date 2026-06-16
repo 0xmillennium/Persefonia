@@ -19,21 +19,22 @@ public record AdminDashboardViewModel(
 
     public static AdminDashboardViewModel shell(
             AuthenticatedAdminView admin,
+            List<AdminNavigationItem> navigation,
             LogoutFormViewModel logoutForm) {
         return new AdminDashboardViewModel(
                 "Persefonia Admin",
                 "Dashboard",
                 admin,
-                List.of(
-                        AdminNavigationItem.activeLink("Dashboard", "/admin"),
-                        AdminNavigationItem.link("Content", "/admin/content"),
-                        AdminNavigationItem.link("Redirects", "/admin/discovery/redirects"),
-                        AdminNavigationItem.disabled("Projects"),
-                        AdminNavigationItem.disabled("Media"),
-                        AdminNavigationItem.disabled("Contact"),
-                        AdminNavigationItem.disabled("Analytics"),
-                        AdminNavigationItem.disabled("Audit"),
-                        AdminNavigationItem.disabled("Settings")),
+                navigation,
+                logoutForm);
+    }
+
+    public static AdminDashboardViewModel shell(
+            AuthenticatedAdminView admin,
+            LogoutFormViewModel logoutForm) {
+        return shell(
+                admin,
+                new AdminNavigationFactory().create(AdminNavigationSection.DASHBOARD),
                 logoutForm);
     }
 

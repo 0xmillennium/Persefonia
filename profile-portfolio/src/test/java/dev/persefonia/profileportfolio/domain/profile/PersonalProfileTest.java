@@ -1,6 +1,7 @@
 package dev.persefonia.profileportfolio.domain.profile;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.persefonia.profileportfolio.domain.common.ContentLanguage;
 import dev.persefonia.profileportfolio.domain.common.ExternalUrl;
@@ -78,6 +79,87 @@ class PersonalProfileTest {
     void rejectsInvalidExternalUrl() {
         assertThatThrownBy(() -> ExternalUrl.of("not a url"))
                 .isInstanceOf(PortfolioValidationException.class);
+    }
+
+    @Test
+    void updateActiveProfileUpdatesProfileAtomically() {
+        PersonalProfile profile = PersonalProfile.create(
+                ProfileId.newId(),
+                DisplayName.of("Old"),
+                false,
+                List.of(localization(ContentLanguage.TR)),
+                List.of(link(1)),
+                NOW);
+
+        Instant updatedAt = NOW.plusSeconds(60);
+        profile.updateActiveProfile(
+                DisplayName.of("New"),
+                List.of(localization(ContentLanguage.EN)),
+                List.of(link(2)),
+                updatedAt);
+
+        assertThat(profile.displayName().value()).isEqualTo("New");
+        assertThat(profile.active()).isTrue();
+        assertThat(profile.localizations()).extracting(ProfileLocalization::language).containsExactly(ContentLanguage.EN);
+        assertThat(profile.externalLinks()).extracting(link -> link.sortOrder().value()).containsExactly(2);
+        assertThat(profile.updatedAt()).isEqualTo(updatedAt);
+        assertThat(profile.version().value()).isEqualTo(1);
+    }
+
+    @Test
+    void updateActiveProfileRejectsDuplicateLocalizationLanguage() {
+        PersonalProfile profile = profile(List.of(localization(ContentLanguage.TR)), List.of());
+
+        assertThatThrownBy(() -> profile.updateActiveProfile(
+                DisplayName.of("Enes"),
+                List.of(localization(ContentLanguage.EN), localization(ContentLanguage.EN)),
+                List.of(),
+                NOW.plusSeconds(1)))
+                .isInstanceOf(PortfolioValidationException.class);
+    }
+
+    @Test
+    void updateActiveProfileRejectsDuplicateExternalLinkSortOrder() {
+        PersonalProfile profile = profile(List.of(localization(ContentLanguage.TR)), List.of());
+
+        assertThatThrownBy(() -> profile.updateActiveProfile(
+                DisplayName.of("Enes"),
+                List.of(localization(ContentLanguage.TR)),
+                List.of(link(1), link(1)),
+                NOW.plusSeconds(1)))
+                .isInstanceOf(PortfolioValidationException.class);
+    }
+
+    @Test
+    void updateActiveProfileRejectsNullNow() {
+        PersonalProfile profile = profile(List.of(localization(ContentLanguage.TR)), List.of());
+
+        assertThatThrownBy(() -> profile.updateActiveProfile(
+                DisplayName.of("Enes"),
+                List.of(localization(ContentLanguage.TR)),
+                List.of(),
+                null))
+                .isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    void updateActiveProfileRejectsUpdatedAtBeforeCreatedAt() {
+        PersonalProfile profile = profile(List.of(localization(ContentLanguage.TR)), List.of());
+
+        assertThatThrownBy(() -> profile.updateActiveProfile(
+                DisplayName.of("Enes"),
+                List.of(localization(ContentLanguage.TR)),
+                List.of(),
+                NOW.minusSeconds(1)))
+                .isInstanceOf(PortfolioValidationException.class);
+    }
+
+    @Test
+    void hasLocalizationChecksLanguageWithoutFallback() {
+        PersonalProfile profile = profile(List.of(localization(ContentLanguage.TR)), List.of());
+
+        assertThat(profile.hasLocalization(ContentLanguage.TR)).isTrue();
+        assertThat(profile.hasLocalization(ContentLanguage.EN)).isFalse();
     }
 
     private static PersonalProfile profile(List<ProfileLocalization> localizations, List<ExternalProfileLink> links) {

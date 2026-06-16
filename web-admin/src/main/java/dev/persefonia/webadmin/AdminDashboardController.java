@@ -11,10 +11,14 @@ import org.springframework.web.bind.annotation.GetMapping;
 @Controller
 public final class AdminDashboardController {
     private final AuthenticatedAdminViewResolver authenticatedAdminViewResolver;
+    private final AdminNavigationFactory navigation;
 
-    public AdminDashboardController(AuthenticatedAdminViewResolver authenticatedAdminViewResolver) {
+    public AdminDashboardController(
+            AuthenticatedAdminViewResolver authenticatedAdminViewResolver,
+            AdminNavigationFactory navigation) {
         this.authenticatedAdminViewResolver =
                 Objects.requireNonNull(authenticatedAdminViewResolver, "authenticatedAdminViewResolver");
+        this.navigation = Objects.requireNonNull(navigation, "navigation");
     }
 
     @GetMapping("/admin")
@@ -29,7 +33,10 @@ public final class AdminDashboardController {
 
         LogoutFormViewModel logoutForm =
                 new LogoutFormViewModel("/logout", csrfToken.getParameterName(), csrfToken.getToken());
-        model.addAttribute("page", AdminDashboardViewModel.shell(admin, logoutForm));
+        model.addAttribute("page", AdminDashboardViewModel.shell(
+                admin,
+                navigation.create(AdminNavigationSection.DASHBOARD),
+                logoutForm));
         return "admin/shell";
     }
 }

@@ -52,11 +52,15 @@ class JdbcPersonalProfileRepositoryAdapterTest extends PortfolioRepositoryTestDa
     @Test
     void updatesProfileChildCollectionsWithoutLeavingOrphans() {
         PersonalProfile saved = profiles.save(profile(false, localization(ContentLanguage.TR), List.of(link(1))));
-        saved.replaceExternalLinks(List.of(link(2)), NOW.plusSeconds(1));
-        saved.replaceLocalizations(List.of(localization(ContentLanguage.EN)), NOW.plusSeconds(2));
+        saved.updateActiveProfile(
+                DisplayName.of("Updated"),
+                List.of(localization(ContentLanguage.EN)),
+                List.of(link(2)),
+                NOW.plusSeconds(1));
 
         PersonalProfile updated = profiles.save(saved);
 
+        assertThat(updated.displayName().value()).isEqualTo("Updated");
         assertThat(updated.externalLinks()).extracting(link -> link.sortOrder().value()).containsExactly(2);
         assertThat(updated.localizations()).extracting(ProfileLocalization::language).containsExactly(ContentLanguage.EN);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM portfolio.external_profile_links", Long.class)).isEqualTo(1);

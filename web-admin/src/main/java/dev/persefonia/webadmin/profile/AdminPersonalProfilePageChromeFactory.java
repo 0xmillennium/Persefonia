@@ -1,4 +1,4 @@
-package dev.persefonia.webadmin.settings;
+package dev.persefonia.webadmin.profile;
 
 import dev.persefonia.webadmin.AdminNavigationFactory;
 import dev.persefonia.webadmin.AdminNavigationSection;
@@ -10,22 +10,22 @@ import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.stereotype.Component;
 
 @Component
-public final class AdminSiteSettingsPageChromeFactory {
+public final class AdminPersonalProfilePageChromeFactory {
     private final AuthenticatedAdminViewResolver adminViews;
     private final AdminNavigationFactory navigation;
 
-    public AdminSiteSettingsPageChromeFactory(
+    public AdminPersonalProfilePageChromeFactory(
             AuthenticatedAdminViewResolver adminViews,
             AdminNavigationFactory navigation) {
         this.adminViews = Objects.requireNonNull(adminViews, "adminViews");
         this.navigation = Objects.requireNonNull(navigation, "navigation");
     }
 
-    public AdminSiteSettingsPageChrome create(Authentication authentication, CsrfToken csrfToken) {
+    public AdminPersonalProfilePageChrome create(Authentication authentication, CsrfToken csrfToken) {
         Objects.requireNonNull(csrfToken, "csrfToken");
-        return new AdminSiteSettingsPageChrome(
+        return new AdminPersonalProfilePageChrome(
                 adminViews.resolve(authentication),
-                navigation.create(AdminNavigationSection.SETTINGS),
+                navigation.create(AdminNavigationSection.PROFILE),
                 new LogoutFormViewModel("/logout", csrfToken.getParameterName(), csrfToken.getToken()));
     }
 }

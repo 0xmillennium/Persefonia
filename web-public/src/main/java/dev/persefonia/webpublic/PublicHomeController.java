@@ -1,8 +1,11 @@
 package dev.persefonia.webpublic;
 
 import dev.persefonia.profileportfolio.application.query.PublicHomepageSettingsView;
+import dev.persefonia.profileportfolio.application.query.PublicProfileSummaryView;
 import dev.persefonia.profileportfolio.application.service.PublicHomepageSettingsQueryService;
+import dev.persefonia.profileportfolio.application.service.PublicProfileSummaryQueryService;
 import java.util.Objects;
+import java.util.Optional;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -14,16 +17,19 @@ public class PublicHomeController {
 
     private final FrontendAssetResolver assetResolver;
     private final PublicHomepageSettingsQueryService settings;
+    private final PublicProfileSummaryQueryService profiles;
     private final String publicBaseUrl;
     private final String ownerAlias;
 
     public PublicHomeController(
             FrontendAssetResolver assetResolver,
             PublicHomepageSettingsQueryService settings,
+            PublicProfileSummaryQueryService profiles,
             @Value("${site.public-base-url}") String publicBaseUrl,
             @Value("${site.owner-alias}") String ownerAlias) {
         this.assetResolver = Objects.requireNonNull(assetResolver, "assetResolver");
         this.settings = Objects.requireNonNull(settings, "settings");
+        this.profiles = Objects.requireNonNull(profiles, "profiles");
         this.publicBaseUrl = publicBaseUrl;
         this.ownerAlias = ownerAlias;
     }
@@ -31,6 +37,7 @@ public class PublicHomeController {
     @GetMapping("/")
     public String home(Model model) {
         PublicHomepageSettingsView homepage = settings.current();
+        Optional<PublicProfileSummaryView> profile = profiles.currentSummary(homepage.defaultLanguage());
         model.addAttribute("page", new PublicHomeViewModel(
                 homepage.siteName(),
                 pageTitle(homepage),
@@ -39,7 +46,8 @@ public class PublicHomeController {
                 homepage.defaultTheme(),
                 ownerAlias,
                 publicBaseUrl,
-                false,
+                profile.isPresent(),
+                profile,
                 homepage.showFeaturedProjects(),
                 homepage.showLatestWriting(),
                 homepage.showResearchHighlights(),
@@ -56,4 +64,5 @@ public class PublicHomeController {
         }
         return settings.siteName() + " " + settings.titleSuffix();
     }
+
 }

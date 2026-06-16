@@ -105,6 +105,34 @@ public final class PersonalProfile {
         markUpdated(now);
     }
 
+    public void updateActiveProfile(
+            DisplayName displayName,
+            List<ProfileLocalization> localizations,
+            List<ExternalProfileLink> externalLinks,
+            Instant now) {
+        Objects.requireNonNull(now, "now");
+        List<ProfileLocalization> localizationsCopy =
+                List.copyOf(Objects.requireNonNull(localizations, "localizations"));
+        List<ExternalProfileLink> externalLinksCopy =
+                List.copyOf(Objects.requireNonNull(externalLinks, "externalLinks"));
+        rejectDuplicate(localizationsCopy, ProfileLocalization::language, "profile localization language");
+        rejectDuplicate(externalLinksCopy, ExternalProfileLink::sortOrder, "external link sort order");
+        if (now.isBefore(createdAt)) {
+            throw new PortfolioValidationException("updatedAt must not be before createdAt");
+        }
+        this.displayName = Objects.requireNonNull(displayName, "displayName");
+        this.active = true;
+        this.localizations = localizationsCopy;
+        this.externalLinks = externalLinksCopy;
+        this.updatedAt = now;
+        this.version = version.next();
+    }
+
+    public boolean hasLocalization(ContentLanguage language) {
+        Objects.requireNonNull(language, "language");
+        return localizations.stream().anyMatch(localization -> localization.language() == language);
+    }
+
     private void markUpdated(Instant now) {
         updatedAt = Objects.requireNonNull(now, "now");
         if (updatedAt.isBefore(createdAt)) {

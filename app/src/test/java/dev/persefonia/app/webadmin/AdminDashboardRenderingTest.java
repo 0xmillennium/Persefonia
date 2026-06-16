@@ -20,12 +20,20 @@ class AdminDashboardRenderingTest {
             "/admin/media",
             "/admin/contact",
             "/admin/analytics",
-            "/admin/audit",
-            "/admin/settings");
+            "/admin/audit");
 
     @Test
     void dashboardShellRendersNavigationPlaceholders() {
-        assertThat(render()).contains("Dashboard", "Content", "Projects", "Media", "Contact", "Analytics", "Audit", "Settings");
+        assertThat(render()).contains(
+                "Dashboard",
+                "Content",
+                "Profile",
+                "Projects",
+                "Media",
+                "Contact",
+                "Analytics",
+                "Audit",
+                "Settings");
     }
 
     @Test

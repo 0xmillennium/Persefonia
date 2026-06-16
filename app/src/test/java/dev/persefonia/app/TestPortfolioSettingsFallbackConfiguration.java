@@ -1,6 +1,9 @@
 package dev.persefonia.app;
 
 import dev.persefonia.profileportfolio.domain.common.ContentLanguage;
+import dev.persefonia.profileportfolio.domain.profile.PersonalProfile;
+import dev.persefonia.profileportfolio.domain.profile.PersonalProfileRepository;
+import dev.persefonia.profileportfolio.domain.profile.ProfileId;
 import dev.persefonia.profileportfolio.domain.settings.HomepageSettings;
 import dev.persefonia.profileportfolio.domain.settings.PositiveInteger;
 import dev.persefonia.profileportfolio.domain.settings.SeoDescription;
@@ -47,6 +50,27 @@ public class TestPortfolioSettingsFallbackConfiguration {
             @Override
             public Optional<SitePresentationSettings> findById(SitePresentationSettingsId id) {
                 return Optional.of(settings).filter(current -> current.id().equals(id));
+            }
+        };
+    }
+
+    @Bean
+    @Primary
+    PersonalProfileRepository testPersonalProfileRepository() {
+        return new PersonalProfileRepository() {
+            @Override
+            public PersonalProfile save(PersonalProfile profile) {
+                return profile;
+            }
+
+            @Override
+            public Optional<PersonalProfile> findById(ProfileId id) {
+                return Optional.empty();
+            }
+
+            @Override
+            public Optional<PersonalProfile> findActiveProfile() {
+                return Optional.empty();
             }
         };
     }

@@ -69,6 +69,31 @@ class ProfilePortfolioArchitectureTest {
     }
 
     @Test
+    void webAdminProfileDoesNotDependOnRepositoriesOrAdapters() {
+        noClasses()
+                .that().resideInAPackage("dev.persefonia.webadmin.profile..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "dev.persefonia.profileportfolio.domain.profile..",
+                        "dev.persefonia.profileportfolio.domain.project..",
+                        "dev.persefonia.profileportfolio.domain.settings..",
+                        "dev.persefonia.app.profileportfolio.persistence..")
+                .allowEmptyShould(true)
+                .check(ArchitectureTestSupport.PRODUCTION_CLASSES);
+    }
+
+    @Test
+    void webPublicHomepageDoesNotDependOnRepositoriesOrAdapters() {
+        noClasses()
+                .that().resideInAPackage("dev.persefonia.webpublic..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "dev.persefonia.profileportfolio.domain.profile..",
+                        "dev.persefonia.profileportfolio.domain.project..",
+                        "dev.persefonia.app.profileportfolio.persistence..")
+                .allowEmptyShould(true)
+                .check(ArchitectureTestSupport.PRODUCTION_CLASSES);
+    }
+
+    @Test
     void profilePortfolioDoesNotConstructOrMutateDiscoverableResource() {
         noClasses()
                 .that().resideInAnyPackage(

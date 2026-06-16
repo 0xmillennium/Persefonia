@@ -14,8 +14,53 @@
     <main>
         <h1>${page.siteName()}</h1>
         <p>${page.ownerAlias()}</p>
-        @if(page.profileAvailable())
-            <section aria-label="Profile"></section>
+        @if(page.profile().isPresent())
+            <section aria-label="Profile">
+                <h2>${page.profile().get().displayName()}</h2>
+                <p>${page.profile().get().shortBio()}</p>
+                @if(!page.profile().get().locationText().isBlank())
+                    <p>${page.profile().get().locationText()}</p>
+                @endif
+                @if(!page.profile().get().technicalFocusAreas().isEmpty())
+                    <ul>
+                        @for(var area : page.profile().get().technicalFocusAreas())
+                            <li>
+                                <strong>${area.name()}</strong>
+                                @if(!area.description().isBlank())
+                                    <span>${area.description()}</span>
+                                @endif
+                            </li>
+                        @endfor
+                    </ul>
+                @endif
+                @if(!page.profile().get().currentFocusItems().isEmpty())
+                    <ul>
+                        @for(var item : page.profile().get().currentFocusItems())
+                            <li>${item.text()}</li>
+                        @endfor
+                    </ul>
+                @endif
+                @if(!page.profile().get().educationSummaries().isEmpty())
+                    <ul>
+                        @for(var summary : page.profile().get().educationSummaries())
+                            <li>
+                                <span>${summary.institution()}</span>
+                                <span>${summary.program()}</span>
+                                @if(!summary.description().isBlank())
+                                    <span>${summary.description()}</span>
+                                @endif
+                            </li>
+                        @endfor
+                    </ul>
+                @endif
+                @if(!page.profile().get().externalLinks().isEmpty())
+                    <ul>
+                        @for(var link : page.profile().get().externalLinks())
+                            <li><a href="${link.url()}" target="_blank" rel="noopener noreferrer">${link.label()}</a></li>
+                        @endfor
+                    </ul>
+                @endif
+            </section>
         @endif
     </main>
     <script type="module" src="${page.scriptPath()}"></script>
