@@ -23,6 +23,8 @@ import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.context.ActiveProfiles;
 
+import dev.persefonia.app.TestPortfolioSettingsFallbackConfiguration;
+
 @ActiveProfiles("oidc-login-test")
 @SpringBootTest(properties = {
         "management.server.port=0",
@@ -31,7 +33,10 @@ import org.springframework.test.context.ActiveProfiles;
         "spring.flyway.enabled=false"
 })
 @AutoConfigureMockMvc
-@Import(OidcLoginSecurityConfigurationTest.OidcTestConfiguration.class)
+@Import({
+        OidcLoginSecurityConfigurationTest.OidcTestConfiguration.class,
+        TestPortfolioSettingsFallbackConfiguration.class
+})
 class OidcLoginSecurityConfigurationTest {
     private final MockMvc mockMvc;
 

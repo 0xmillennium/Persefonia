@@ -131,6 +131,29 @@ public final class SitePresentationSettings {
         markUpdated(now);
     }
 
+    public void updateSettings(
+            SiteName siteName,
+            ContentLanguage defaultLanguage,
+            Set<ContentLanguage> supportedLanguages,
+            TitleSuffix titleSuffix,
+            SeoDescription defaultMetaDescription,
+            ThemePreference defaultTheme,
+            HomepageSettings homepageSettings,
+            Instant now) {
+        Objects.requireNonNull(now, "now");
+        Set<ContentLanguage> supportedLanguagesCopy =
+                Set.copyOf(Objects.requireNonNull(supportedLanguages, "supportedLanguages"));
+        validateLanguages(Objects.requireNonNull(defaultLanguage, "defaultLanguage"), supportedLanguagesCopy);
+        this.siteName = Objects.requireNonNull(siteName, "siteName");
+        this.defaultLanguage = defaultLanguage;
+        this.supportedLanguages = supportedLanguagesCopy;
+        this.titleSuffix = titleSuffix;
+        this.defaultMetaDescription = defaultMetaDescription;
+        this.defaultTheme = Objects.requireNonNull(defaultTheme, "defaultTheme");
+        this.homepageSettings = Objects.requireNonNull(homepageSettings, "homepageSettings");
+        markUpdated(now);
+    }
+
     private void markUpdated(Instant now) {
         this.updatedAt = Objects.requireNonNull(now, "now");
         this.version = version.next();

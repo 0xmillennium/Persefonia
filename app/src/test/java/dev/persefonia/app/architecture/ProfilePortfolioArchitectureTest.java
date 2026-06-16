@@ -24,6 +24,21 @@ class ProfilePortfolioArchitectureTest {
     }
 
     @Test
+    void profilePortfolioApplicationDoesNotDependOnFrameworkJdbcOrWebApis() {
+        noClasses()
+                .that().resideInAPackage("dev.persefonia.profileportfolio.application..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "org.springframework..",
+                        "java.sql..",
+                        "javax.sql..",
+                        "jakarta.servlet..",
+                        "javax.servlet..",
+                        "gg.jte..")
+                .allowEmptyShould(true)
+                .check(ArchitectureTestSupport.PRODUCTION_CLASSES);
+    }
+
+    @Test
     void profilePortfolioContextDoesNotDependOnDiscoveryTaxonomyOrMediaImplementations() {
         noClasses()
                 .that().resideInAnyPackage(
@@ -37,6 +52,18 @@ class ProfilePortfolioArchitectureTest {
                         "dev.persefonia.app.taxonomy.persistence..",
                         "dev.persefonia.medialibrary.infrastructure..",
                         "dev.persefonia.app.medialibrary.persistence..")
+                .allowEmptyShould(true)
+                .check(ArchitectureTestSupport.PRODUCTION_CLASSES);
+    }
+
+    @Test
+    void appProfilePortfolioApplicationDoesNotDependOnDiscoveryTaxonomyOrMediaRepositories() {
+        noClasses()
+                .that().resideInAPackage("dev.persefonia.app.profileportfolio.application..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "dev.persefonia.discovery..",
+                        "dev.persefonia.taxonomy..",
+                        "dev.persefonia.medialibrary..")
                 .allowEmptyShould(true)
                 .check(ArchitectureTestSupport.PRODUCTION_CLASSES);
     }

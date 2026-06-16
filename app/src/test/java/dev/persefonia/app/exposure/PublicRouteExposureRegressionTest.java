@@ -5,9 +5,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.http.HttpResponse;
 
+import dev.persefonia.app.TestPortfolioSettingsFallbackConfiguration;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.context.annotation.Import;
 
 @SpringBootTest(
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
@@ -17,6 +19,7 @@ import org.springframework.boot.test.web.server.LocalServerPort;
                 "spring.autoconfigure.exclude=org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration",
                 "spring.flyway.enabled=false"
         })
+@Import(TestPortfolioSettingsFallbackConfiguration.class)
 class PublicRouteExposureRegressionTest {
     @LocalServerPort
     private int applicationPort;

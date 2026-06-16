@@ -10,6 +10,7 @@ dependencies {
     implementation(project(":content-publishing"))
     implementation(project(":discovery"))
     implementation(project(":taxonomy"))
+    implementation(project(":profile-portfolio"))
     implementation(libs.spring.webmvc)
 
     compileOnly("jakarta.servlet:jakarta.servlet-api")

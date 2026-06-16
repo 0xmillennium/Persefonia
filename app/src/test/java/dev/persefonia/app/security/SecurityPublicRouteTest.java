@@ -13,7 +13,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.context.annotation.Import;
 
+import dev.persefonia.app.TestPortfolioSettingsFallbackConfiguration;
 import dev.persefonia.app.assets.ViteAssetResolver;
 
 @SpringBootTest(
@@ -24,6 +26,7 @@ import dev.persefonia.app.assets.ViteAssetResolver;
                 "spring.autoconfigure.exclude=org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration",
                 "spring.flyway.enabled=false"
         })
+@Import(TestPortfolioSettingsFallbackConfiguration.class)
 class SecurityPublicRouteTest {
     private static final String FRONTEND_ENTRY = "src/main.ts";
 

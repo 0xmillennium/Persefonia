@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -21,8 +22,8 @@ import org.springframework.security.oauth2.client.registration.InMemoryClientReg
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.beans.factory.annotation.Autowired;
 
+import dev.persefonia.app.TestPortfolioSettingsFallbackConfiguration;
 import dev.persefonia.app.security.oidc.PersefoniaOidcUserService;
 
 @ActiveProfiles("oauth2-route-tightening-test")
@@ -33,7 +34,10 @@ import dev.persefonia.app.security.oidc.PersefoniaOidcUserService;
         "spring.flyway.enabled=false"
 })
 @AutoConfigureMockMvc
-@Import(OAuth2RouteAuthorizationTighteningTest.OidcTestConfiguration.class)
+@Import({
+        OAuth2RouteAuthorizationTighteningTest.OidcTestConfiguration.class,
+        TestPortfolioSettingsFallbackConfiguration.class
+})
 class OAuth2RouteAuthorizationTighteningTest {
     @Autowired
     private MockMvc mockMvc;

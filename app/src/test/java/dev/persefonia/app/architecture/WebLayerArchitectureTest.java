@@ -19,7 +19,8 @@ class WebLayerArchitectureTest {
                         "dev.persefonia.app.taxonomy..",
                         "dev.persefonia.contentpublishing.domain.content.port..",
                         "dev.persefonia.contentpublishing.domain.revision..",
-                        "dev.persefonia.profileportfolio..",
+                        "dev.persefonia.profileportfolio.domain..",
+                        "dev.persefonia.profileportfolio.infrastructure..",
                         "dev.persefonia.medialibrary..",
                         "dev.persefonia.communication..",
                         "dev.persefonia.discovery.domain..",
@@ -55,7 +56,8 @@ class WebLayerArchitectureTest {
                         "dev.persefonia.contentpublishing.domain.model.series.port..",
                         "dev.persefonia.contentpublishing.domain.revision..",
                         "dev.persefonia.contentpublishing.infrastructure..",
-                        "dev.persefonia.profileportfolio..",
+                        "dev.persefonia.profileportfolio.domain..",
+                        "dev.persefonia.profileportfolio.infrastructure..",
                         "dev.persefonia.medialibrary..",
                         "dev.persefonia.communication..",
                         "dev.persefonia.discovery..",
@@ -70,6 +72,28 @@ class WebLayerArchitectureTest {
                         "org.postgresql..",
                         "io.lettuce..",
                         "redis.clients..")
+                .allowEmptyShould(true)
+                .check(ArchitectureTestSupport.PRODUCTION_CLASSES);
+    }
+
+    @Test
+    void adminSettingsWebDoesNotAccessPortfolioRepositoriesOrPersistenceAdapters() {
+        noClasses()
+                .that().resideInAPackage("dev.persefonia.webadmin.settings..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "dev.persefonia.profileportfolio.domain.settings..",
+                        "dev.persefonia.app.profileportfolio.persistence..")
+                .allowEmptyShould(true)
+                .check(ArchitectureTestSupport.PRODUCTION_CLASSES);
+    }
+
+    @Test
+    void publicHomepageWebDoesNotAccessPortfolioRepositoriesOrPersistenceAdapters() {
+        noClasses()
+                .that().resideInAPackage("dev.persefonia.webpublic..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "dev.persefonia.profileportfolio.domain..",
+                        "dev.persefonia.app.profileportfolio.persistence..")
                 .allowEmptyShould(true)
                 .check(ArchitectureTestSupport.PRODUCTION_CLASSES);
     }
