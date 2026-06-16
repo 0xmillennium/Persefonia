@@ -70,13 +70,12 @@ class JdbcTranslationGroupRepositoryAdapterTest extends ContentPublishingReposit
     void uniqueLanguagePerGroupEnforced() {
         ContentId first = saveContent("lang-one", ContentLanguage.EN);
         ContentId second = saveContent("lang-two", ContentLanguage.EN);
-        TranslationGroup group = TranslationGroup.rehydrate(
+
+        assertThatThrownBy(() -> TranslationGroup.rehydrate(
                 TranslationGroupId.newId(),
                 List.of(entry(first, ContentLanguage.EN), entry(second, ContentLanguage.EN)),
-                NOW, NOW, Version.initial());
-
-        assertThatThrownBy(() -> translationGroups.save(group))
-                .isInstanceOf(DataIntegrityViolationException.class);
+                NOW, NOW, Version.initial()))
+                .isInstanceOf(dev.persefonia.contentpublishing.domain.translation.TranslationGroupValidationException.class);
     }
 
     @Test

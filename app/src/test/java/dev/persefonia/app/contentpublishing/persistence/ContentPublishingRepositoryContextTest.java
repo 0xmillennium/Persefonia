@@ -9,6 +9,7 @@ class ContentPublishingRepositoryContextTest extends ContentPublishingRepository
     void usesRealJdbcContentRepositories() {
         assertThat(contentItems).isInstanceOf(JdbcContentItemRepositoryAdapter.class);
         assertThat(contentRevisions).isInstanceOf(JdbcContentRevisionRepositoryAdapter.class);
+        assertThat(seriesRepository).isInstanceOf(JdbcSeriesRepositoryAdapter.class);
         assertThat(contentItems.getClass().getName()).doesNotContain("AdminContentTestRepository");
     }
 }

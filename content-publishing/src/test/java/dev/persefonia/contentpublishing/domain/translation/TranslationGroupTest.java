@@ -68,6 +68,53 @@ class TranslationGroupTest {
     }
 
     @Test
+    void rehydrateRejectsEmptyEntries() {
+        assertThatThrownBy(() -> TranslationGroup.rehydrate(
+                        TranslationGroupId.newId(), java.util.List.of(), CREATED_AT, CREATED_AT, dev.persefonia.contentpublishing.domain.content.Version.initial()))
+                .isInstanceOf(TranslationGroupValidationException.class);
+    }
+
+    @Test
+    void rehydrateRejectsDuplicateContentItem() {
+        ContentId contentId = ContentId.newId();
+        TranslationGroupEntry english = new TranslationGroupEntry(
+                TranslationGroupEntryId.newId(), contentId, ContentLanguage.EN, ContentType.ARTICLE, CREATED_AT);
+        TranslationGroupEntry turkish = new TranslationGroupEntry(
+                TranslationGroupEntryId.newId(), contentId, ContentLanguage.TR, ContentType.ARTICLE, CREATED_AT);
+
+        assertThatThrownBy(() -> TranslationGroup.rehydrate(
+                        TranslationGroupId.newId(), java.util.List.of(english, turkish), CREATED_AT, CREATED_AT,
+                        dev.persefonia.contentpublishing.domain.content.Version.initial()))
+                .isInstanceOf(TranslationGroupValidationException.class);
+    }
+
+    @Test
+    void rehydrateRejectsDuplicateLanguage() {
+        assertThatThrownBy(() -> TranslationGroup.rehydrate(
+                        TranslationGroupId.newId(),
+                        java.util.List.of(
+                                entry(ContentLanguage.EN, ContentType.ARTICLE),
+                                entry(ContentLanguage.EN, ContentType.ARTICLE)),
+                        CREATED_AT,
+                        CREATED_AT,
+                        dev.persefonia.contentpublishing.domain.content.Version.initial()))
+                .isInstanceOf(TranslationGroupValidationException.class);
+    }
+
+    @Test
+    void rehydrateRejectsMixedContentTypes() {
+        assertThatThrownBy(() -> TranslationGroup.rehydrate(
+                        TranslationGroupId.newId(),
+                        java.util.List.of(
+                                entry(ContentLanguage.EN, ContentType.ARTICLE),
+                                entry(ContentLanguage.TR, ContentType.NOTE)),
+                        CREATED_AT,
+                        CREATED_AT,
+                        dev.persefonia.contentpublishing.domain.content.Version.initial()))
+                .isInstanceOf(TranslationGroupValidationException.class);
+    }
+
+    @Test
     void removesEntryWhenMoreThanOneEntryExists() {
         TranslationGroup group = TranslationGroup.create(
                 TranslationGroupId.newId(), entry(ContentLanguage.EN, ContentType.ARTICLE), CREATED_AT);

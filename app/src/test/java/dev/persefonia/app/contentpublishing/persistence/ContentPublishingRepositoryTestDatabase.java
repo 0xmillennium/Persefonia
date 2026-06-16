@@ -1,6 +1,7 @@
 package dev.persefonia.app.contentpublishing.persistence;
 
 import dev.persefonia.contentpublishing.domain.content.port.ContentItemRepository;
+import dev.persefonia.contentpublishing.domain.model.series.port.SeriesRepository;
 import dev.persefonia.contentpublishing.domain.revision.port.ContentRevisionRepository;
 
 import org.flywaydb.core.Flyway;
@@ -43,6 +44,9 @@ abstract class ContentPublishingRepositoryTestDatabase {
     ContentRevisionRepository contentRevisions;
 
     @Autowired
+    SeriesRepository seriesRepository;
+
+    @Autowired
     NamedParameterJdbcTemplate namedJdbc;
 
     @Autowired
@@ -59,7 +63,9 @@ abstract class ContentPublishingRepositoryTestDatabase {
     void truncatePublishingTables() {
         migrateOnce();
         jdbc.execute("""
-                TRUNCATE publishing.translation_group_entries,
+                TRUNCATE publishing.series_entries,
+                    publishing.series,
+                    publishing.translation_group_entries,
                     publishing.translation_groups,
                     publishing.content_revisions,
                     publishing.content_rendered_headings,

@@ -6,8 +6,10 @@ import dev.persefonia.contentpublishing.domain.content.ContentType;
 import dev.persefonia.contentpublishing.domain.content.Version;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 public final class TranslationGroup {
     private final TranslationGroupId id;
@@ -31,6 +33,7 @@ public final class TranslationGroup {
         if (this.entries.isEmpty()) {
             throw new TranslationGroupValidationException("translation group must have at least one entry");
         }
+        validateEntries(this.entries);
         if (updatedAt.isBefore(createdAt)) {
             throw new TranslationGroupValidationException("updatedAt must not be before createdAt");
         }
@@ -49,6 +52,23 @@ public final class TranslationGroup {
             Instant updatedAt,
             Version version) {
         return new TranslationGroup(id, entries, createdAt, updatedAt, version);
+    }
+
+    private static void validateEntries(List<TranslationGroupEntry> entries) {
+        Set<ContentId> contentItemIds = new HashSet<>();
+        Set<ContentLanguage> languages = new HashSet<>();
+        ContentType contentType = entries.getFirst().contentType();
+        for (TranslationGroupEntry entry : entries) {
+            if (!contentItemIds.add(entry.contentItemId())) {
+                throw new TranslationGroupValidationException("translation group contains duplicate content item");
+            }
+            if (!languages.add(entry.language())) {
+                throw new TranslationGroupValidationException("translation group contains duplicate language");
+            }
+            if (entry.contentType() != contentType) {
+                throw new TranslationGroupValidationException("translation group entries must share the same content type");
+            }
+        }
     }
 
     public void addEntry(TranslationGroupEntry entry, Instant now) {

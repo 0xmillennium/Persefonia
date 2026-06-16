@@ -22,9 +22,12 @@ import dev.persefonia.contentpublishing.application.service.ContentTagAssignment
 import dev.persefonia.contentpublishing.application.service.PublicContentBySourceQueryHandler;
 import dev.persefonia.contentpublishing.application.service.PublicContentQueryHandler;
 import dev.persefonia.contentpublishing.application.service.PublicTaggedContentQueryHandler;
+import dev.persefonia.contentpublishing.application.service.SeriesAdminQueryService;
+import dev.persefonia.contentpublishing.application.service.SeriesCommandService;
 import dev.persefonia.contentpublishing.application.service.TranslationGroupAdminQueryService;
 import dev.persefonia.contentpublishing.application.service.TranslationGroupCommandService;
 import dev.persefonia.contentpublishing.domain.content.port.ContentItemRepository;
+import dev.persefonia.contentpublishing.domain.model.series.port.SeriesRepository;
 import dev.persefonia.contentpublishing.domain.revision.port.ContentRevisionRepository;
 import dev.persefonia.contentpublishing.domain.translation.port.TranslationGroupRepository;
 import dev.persefonia.discovery.application.port.CreateRedirectRulePort;
@@ -144,6 +147,22 @@ class ContentApplicationConfiguration {
             TranslationGroupRepository translationGroups,
             ContentCommandAuthorizationPolicy authorization) {
         return new TranslationGroupAdminQueryService(contentItems, translationGroups, authorization);
+    }
+
+    @Bean
+    SeriesCommandService seriesCommandService(
+            ContentItemRepository contentItems,
+            SeriesRepository seriesRepository,
+            ContentCommandAuthorizationPolicy authorization) {
+        return new SeriesCommandService(contentItems, seriesRepository, authorization);
+    }
+
+    @Bean
+    SeriesAdminQueryService seriesAdminQueryService(
+            ContentItemRepository contentItems,
+            SeriesRepository seriesRepository,
+            ContentCommandAuthorizationPolicy authorization) {
+        return new SeriesAdminQueryService(contentItems, seriesRepository, authorization);
     }
 
     @Bean

@@ -28,12 +28,12 @@ class PublishingSchemaBoundaryTest {
     }
 
     @Test
-    void outOfScopePublishingTablesDoNotExist() throws SQLException {
+    void seriesFoundationPublishingTablesExist() throws SQLException {
         assertThat(PublishingSchemaCatalog.publishingTablesNamed("""
                     'series',
                     'series_entries'
                 """))
-                .isEmpty();
+                .containsExactlyInAnyOrder("series", "series_entries");
     }
 
     @Test
@@ -71,7 +71,10 @@ class PublishingSchemaBoundaryTest {
                         "ix_content_item_tags_tag_id",
                         "ix_translation_group_entries_group_id",
                         "ix_translation_group_entries_content_item_id",
-                        "ix_translation_group_entries_language");
+                        "ix_translation_group_entries_language",
+                        "ix_series_status",
+                        "ix_series_updated_at",
+                        "ix_series_entries_content_item_id");
     }
 
     @Test
@@ -151,7 +154,25 @@ class PublishingSchemaBoundaryTest {
                 "uq_translation_group_entries__content_item",
                 "uq_translation_group_entries__group_language",
                 "ck_translation_group_entries__language",
-                "ck_translation_group_entries__content_type");
+                "ck_translation_group_entries__content_type",
+                "pk_series",
+                "uq_series__language_slug",
+                "ck_series__language",
+                "ck_series__status",
+                "ck_series__title_not_blank",
+                "ck_series__slug_not_blank",
+                "ck_series__slug_format",
+                "ck_series__description_not_blank",
+                "ck_series__updated_not_before_created",
+                "ck_series__version_non_negative",
+                "ck_series__title_length",
+                "ck_series__description_length",
+                "pk_series_entries",
+                "fk_series_entries__series",
+                "fk_series_entries__content_items",
+                "uq_series_entries__series_content",
+                "uq_series_entries__series_position",
+                "ck_series_entries__position_positive");
     }
 
     private static List<String> constraintAndIndexNames() throws SQLException {

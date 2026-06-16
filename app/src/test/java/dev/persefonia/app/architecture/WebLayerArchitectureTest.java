@@ -52,6 +52,7 @@ class WebLayerArchitectureTest {
                         "dev.persefonia.identityaccess..",
                         "dev.persefonia.taxonomy.domain.port..",
                         "dev.persefonia.contentpublishing.domain.content.port..",
+                        "dev.persefonia.contentpublishing.domain.model.series.port..",
                         "dev.persefonia.contentpublishing.domain.revision..",
                         "dev.persefonia.contentpublishing.infrastructure..",
                         "dev.persefonia.profileportfolio..",
@@ -69,6 +70,16 @@ class WebLayerArchitectureTest {
                         "org.postgresql..",
                         "io.lettuce..",
                         "redis.clients..")
+                .allowEmptyShould(true)
+                .check(ArchitectureTestSupport.PRODUCTION_CLASSES);
+    }
+
+    @Test
+    void webAdminDoesNotAccessSeriesRepositories() {
+        noClasses()
+                .that().resideInAPackage("dev.persefonia.webadmin..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "dev.persefonia.contentpublishing.domain.model.series.port..")
                 .allowEmptyShould(true)
                 .check(ArchitectureTestSupport.PRODUCTION_CLASSES);
     }

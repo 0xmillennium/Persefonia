@@ -36,7 +36,9 @@ final class PublishingMigrationDatabase {
 
     static void truncatePublishing() throws SQLException {
         PublishingSql.execute("""
-                TRUNCATE publishing.translation_group_entries,
+                TRUNCATE publishing.series_entries,
+                    publishing.series,
+                    publishing.translation_group_entries,
                     publishing.translation_groups,
                     publishing.content_revisions,
                     publishing.content_rendered_headings,
