@@ -1,5 +1,4 @@
 @import dev.persefonia.webpublic.content.PublicContentHeadingView
-@import dev.persefonia.webpublic.content.PublicContentHreflangLinkView
 @import dev.persefonia.webpublic.content.PublicContentPage
 @import dev.persefonia.webpublic.content.PublicContentTranslationLinkView
 @param PublicContentPage page
@@ -10,22 +9,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${page.seoTitle()}</title>
     <meta name="description" content="${page.seoDescription()}">
-    <link rel="canonical" href="${page.canonicalUrl()}">
-    @for(PublicContentHreflangLinkView link : page.hreflangLinks())
-        <link rel="alternate" hreflang="${link.languageCode()}" href="${link.href()}">
-    @endfor
+    @template.site.components.canonicalLink(page.canonicalUrl())
+    @template.site.components.hreflangLinks(page.hreflangLinks())
     <meta property="og:title" content="${page.openGraphTitle()}">
     <meta property="og:description" content="${page.openGraphDescription()}">
     <meta property="og:url" content="${page.openGraphUrl()}">
     <meta property="og:type" content="${page.openGraphType()}">
     <meta property="article:published_time" content="${page.publishedAtIso()}">
     <meta property="article:modified_time" content="${page.updatedAtIso()}">
-    @if(page.noindex())
-        <meta name="robots" content="noindex">
-    @endif
-    @for(String stylesheetPath : page.stylesheetPaths())
-        <link rel="stylesheet" href="${stylesheetPath}">
-    @endfor
+    @template.site.components.robotsMeta(page.noindex())
+    @template.site.components.stylesheetLinks(page.stylesheetPaths())
 </head>
 <body>
     <main class="public-page">

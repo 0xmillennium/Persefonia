@@ -12,6 +12,8 @@ import dev.persefonia.contentpublishing.application.query.TranslationCandidateIt
 import dev.persefonia.contentpublishing.application.service.TranslationGroupAdminQueryService;
 import dev.persefonia.contentpublishing.application.service.TranslationGroupCommandService;
 import dev.persefonia.contentpublishing.application.support.InMemoryContentItemRepository;
+import dev.persefonia.contentpublishing.application.support.InMemoryContentReadModels;
+import dev.persefonia.contentpublishing.application.support.InMemorySeriesRepository;
 import dev.persefonia.contentpublishing.application.support.InMemoryTranslationGroupRepository;
 import dev.persefonia.contentpublishing.application.support.TestContentAuthorizationPolicy;
 import dev.persefonia.contentpublishing.domain.content.ContentId;
@@ -31,7 +33,11 @@ class TranslationGroupAdminQueryServiceTest {
     private final TranslationGroupCommandService commands =
             new TranslationGroupCommandService(contentItems, groups, authorization);
     private final TranslationGroupAdminQueryService queries =
-            new TranslationGroupAdminQueryService(contentItems, groups, authorization);
+            new TranslationGroupAdminQueryService(
+                    contentItems,
+                    groups,
+                    new InMemoryContentReadModels(contentItems, new InMemorySeriesRepository(), groups),
+                    authorization);
 
     @Test
     void loadsCreateSectionWhenContentHasNoGroup() {

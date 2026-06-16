@@ -1,16 +1,6 @@
 @import dev.persefonia.webadmin.content.AdminContentRevisionListPage
 @param AdminContentRevisionListPage page
-<!doctype html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="robots" content="noindex,nofollow,noarchive">
-    <title>Revision history | Persefonia Admin</title>
-</head>
-<body>
-@template.admin.components.adminHeader(page.chrome().admin(), page.chrome().logoutForm(), false)
-@template.admin.components.adminNavigation(page.chrome().navigation())
+@template.admin.components.pageShell("Revision history | Persefonia Admin", page.chrome().admin(), page.chrome().navigation(), page.chrome().logoutForm(), false, content = @`
 <main>
     <h1>Revision history</h1>
     <p><a href="${page.editLink()}">Back to edit</a></p>
@@ -40,5 +30,4 @@
         </table>
     @endif
 </main>
-</body>
-</html>
+`)

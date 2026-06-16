@@ -62,4 +62,22 @@ class PublicContentControllerDiscoveryTest extends PublicContentMvcTestSupport {
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("mermaid-loader-test.js")));
     }
+
+    @Test
+    void renderedCanonicalUsesResolvedCurrentRouteWhenStoredMetadataIsStale() throws Exception {
+        addProjected(PublicContentTestItems.publishedPublicWithCanonicalPath(
+                ContentType.ARTICLE,
+                ContentLanguage.TR,
+                "articles",
+                "current-slug",
+                "/tr/articles/old-slug"), "/tr/articles/current-slug");
+
+        mockMvc.perform(get("/tr/articles/current-slug"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString(
+                        "<link rel=\"canonical\" href=\"https://0xmillennium.dev/tr/articles/current-slug\">")))
+                .andExpect(content().string(containsString(
+                        "<meta property=\"og:url\" content=\"https://0xmillennium.dev/tr/articles/current-slug\">")))
+                .andExpect(content().string(not(containsString("https://0xmillennium.dev/tr/articles/old-slug"))));
+    }
 }

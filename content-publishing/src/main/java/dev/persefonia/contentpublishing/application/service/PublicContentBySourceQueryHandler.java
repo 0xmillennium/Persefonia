@@ -3,6 +3,7 @@ package dev.persefonia.contentpublishing.application.service;
 import dev.persefonia.contentpublishing.application.discovery.ContentPublicRouteFactory;
 import dev.persefonia.contentpublishing.application.query.PublicContentBySourceQuery;
 import dev.persefonia.contentpublishing.application.query.PublicContentLookupResult;
+import dev.persefonia.contentpublishing.domain.content.CanonicalPath;
 import dev.persefonia.contentpublishing.domain.content.ContentId;
 import dev.persefonia.contentpublishing.domain.content.ContentItem;
 import dev.persefonia.contentpublishing.domain.content.ContentStatus;
@@ -24,7 +25,8 @@ public final class PublicContentBySourceQueryHandler {
         return items.findById(ContentId.from(query.contentItemId()))
                 .filter(this::isPublicDirectRouteContent)
                 .filter(item -> currentPublicPathMatches(item, query.expectedPublicPath()))
-                .flatMap(PublicContentReadModelMapper::toPageResult)
+                .flatMap(item -> PublicContentReadModelMapper.toPageResult(
+                        item, CanonicalPath.of(query.expectedPublicPath())))
                 .<PublicContentLookupResult>map(PublicContentLookupResult.Found::new)
                 .orElseGet(PublicContentLookupResult.NotFound::new);
     }

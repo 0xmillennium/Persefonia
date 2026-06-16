@@ -62,7 +62,8 @@ public final class AdminTagController {
 
     @GetMapping("/admin/tags/new")
     public String newForm(Authentication authentication, CsrfToken csrfToken, Model model) {
-        model.addAttribute("page", formPage(chrome.create(authentication, csrfToken), new AdminTagForm(), null, List.of(), List.of()));
+        model.addAttribute("page", createFormPage(
+                chrome.create(authentication, csrfToken), new AdminTagForm(), List.of(), List.of()));
         return "admin/tags/new";
     }
 
@@ -78,9 +79,9 @@ public final class AdminTagController {
                     actors.resolve(authentication), form.getName(), form.getSlug(), form.getDescription(), Instant.now()));
             return "redirect:/admin/tags/" + result.tagId().value() + "/edit?created";
         } catch (TagCommandRejectedException exception) {
-            model.addAttribute("page", formPage(pageChrome, form, null, duplicateError(exception), List.of()));
+            model.addAttribute("page", createFormPage(pageChrome, form, duplicateError(exception), List.of()));
         } catch (IllegalArgumentException exception) {
-            model.addAttribute("page", formPage(pageChrome, form, null, validationError(form), List.of()));
+            model.addAttribute("page", createFormPage(pageChrome, form, validationError(form), List.of()));
         }
         return "admin/tags/new";
     }
@@ -92,7 +93,7 @@ public final class AdminTagController {
             @PathVariable("tagId") String tagId,
             Model model) {
         TagEditView tag = tag(authentication, tagId);
-        model.addAttribute("page", formPage(chrome.create(authentication, csrfToken), form(tag), tag, List.of(), List.of()));
+        model.addAttribute("page", editFormPage(chrome.create(authentication, csrfToken), form(tag), tag, List.of(), List.of()));
         return "admin/tags/edit";
     }
 
@@ -112,15 +113,15 @@ public final class AdminTagController {
             throw notFound();
         } catch (TagCommandRejectedException exception) {
             TagEditView tag = tag(authentication, tagId);
-            model.addAttribute("page", formPage(
+            model.addAttribute("page", editFormPage(
                     chrome.create(authentication, csrfToken), form, tag, duplicateError(exception), List.of()));
         } catch (IllegalArgumentException exception) {
             TagEditView tag = tag(authentication, tagId);
-            model.addAttribute("page", formPage(
+            model.addAttribute("page", editFormPage(
                     chrome.create(authentication, csrfToken), form, tag, validationError(form), List.of()));
         } catch (IllegalStateException exception) {
             TagEditView tag = tag(authentication, tagId);
-            model.addAttribute("page", formPage(
+            model.addAttribute("page", editFormPage(
                     chrome.create(authentication, csrfToken), form, tag, List.of(), List.of("The tag could not be updated.")));
         }
         return "admin/tags/edit";
@@ -144,20 +145,35 @@ public final class AdminTagController {
         }
     }
 
-    private static AdminTagFormPage formPage(
+    private static AdminTagFormPage createFormPage(
+            AdminTagPageChrome chrome,
+            AdminTagForm form,
+            List<AdminTagFieldError> fieldErrors,
+            List<String> globalErrors) {
+        return new AdminTagFormPage(
+                chrome,
+                form,
+                "Create tag",
+                "/admin/tags",
+                null,
+                null,
+                fieldErrors,
+                globalErrors);
+    }
+
+    private static AdminTagFormPage editFormPage(
             AdminTagPageChrome chrome,
             AdminTagForm form,
             TagEditView tag,
             List<AdminTagFieldError> fieldErrors,
             List<String> globalErrors) {
-        boolean create = tag == null;
         return new AdminTagFormPage(
                 chrome,
                 form,
-                create ? "Create tag" : "Edit tag",
-                create ? "/admin/tags" : "/admin/tags/" + tag.tagId().value(),
-                create ? null : tag.status().name(),
-                !create && tag.status().name().equals("ACTIVE") ? "/admin/tags/" + tag.tagId().value() + "/archive" : null,
+                "Edit tag",
+                "/admin/tags/" + tag.tagId().value(),
+                tag.status().name(),
+                tag.status().name().equals("ACTIVE") ? "/admin/tags/" + tag.tagId().value() + "/archive" : null,
                 fieldErrors,
                 globalErrors);
     }

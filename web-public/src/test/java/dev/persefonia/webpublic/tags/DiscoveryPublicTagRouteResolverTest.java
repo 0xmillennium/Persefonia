@@ -12,7 +12,6 @@ import dev.persefonia.discovery.application.contract.SourceContext;
 import dev.persefonia.discovery.application.contract.SourceEntityId;
 import dev.persefonia.discovery.application.contract.SourceType;
 import dev.persefonia.discovery.application.port.ResolvePublicRoutePort;
-import dev.persefonia.discovery.application.route.PublicRouteLookup;
 import dev.persefonia.discovery.application.route.PublicRouteResolution;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;

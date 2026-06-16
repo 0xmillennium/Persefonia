@@ -1,16 +1,6 @@
 @import dev.persefonia.webadmin.discovery.AdminRedirectPage
 @param AdminRedirectPage page
-<!doctype html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="robots" content="noindex,nofollow,noarchive">
-    <title>Redirects | Persefonia Admin</title>
-</head>
-<body>
-@template.admin.components.adminHeader(page.chrome().admin(), page.chrome().logoutForm(), false)
-@template.admin.components.adminNavigation(page.chrome().navigation())
+@template.admin.components.pageShell("Redirects | Persefonia Admin", page.chrome().admin(), page.chrome().navigation(), page.chrome().logoutForm(), false, content = @`
 <main>
     <h1>Redirects</h1>
     @if(page.successMessage() != null)
@@ -92,5 +82,4 @@
         @endif
     </section>
 </main>
-</body>
-</html>
+`)

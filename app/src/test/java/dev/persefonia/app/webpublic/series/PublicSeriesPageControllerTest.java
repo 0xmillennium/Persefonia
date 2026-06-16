@@ -16,7 +16,6 @@ import dev.persefonia.contentpublishing.domain.content.ContentItem;
 import dev.persefonia.contentpublishing.domain.content.ContentLanguage;
 import dev.persefonia.contentpublishing.domain.content.ContentMetadata;
 import dev.persefonia.contentpublishing.domain.content.ContentType;
-import dev.persefonia.contentpublishing.domain.content.ContentVisibility;
 import dev.persefonia.contentpublishing.domain.model.series.Series;
 import dev.persefonia.contentpublishing.domain.model.series.SeriesDescription;
 import dev.persefonia.contentpublishing.domain.model.series.SeriesEntryId;

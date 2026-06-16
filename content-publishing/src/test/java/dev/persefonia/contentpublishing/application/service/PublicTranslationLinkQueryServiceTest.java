@@ -2,11 +2,11 @@ package dev.persefonia.contentpublishing.application.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import dev.persefonia.contentpublishing.application.discovery.ConfiguredContentCanonicalUrlFactory;
-import dev.persefonia.contentpublishing.application.discovery.ContentPublicRouteFactory;
 import dev.persefonia.contentpublishing.application.query.PublicContentPageResult;
 import dev.persefonia.contentpublishing.application.query.PublicTranslationLinkSet;
 import dev.persefonia.contentpublishing.application.support.InMemoryContentItemRepository;
+import dev.persefonia.contentpublishing.application.support.InMemoryContentReadModels;
+import dev.persefonia.contentpublishing.application.support.InMemorySeriesRepository;
 import dev.persefonia.contentpublishing.application.support.InMemoryTranslationGroupRepository;
 import dev.persefonia.contentpublishing.domain.content.CanonicalPath;
 import dev.persefonia.contentpublishing.domain.content.ContentId;
@@ -42,10 +42,7 @@ class PublicTranslationLinkQueryServiceTest {
     private final InMemoryContentItemRepository items = new InMemoryContentItemRepository();
     private final InMemoryTranslationGroupRepository translationGroups = new InMemoryTranslationGroupRepository();
     private final PublicTranslationLinkQueryService service = new PublicTranslationLinkQueryService(
-            items,
-            translationGroups,
-            new ContentPublicRouteFactory(),
-            new ConfiguredContentCanonicalUrlFactory("https://example.test"));
+            new InMemoryContentReadModels(items, new InMemorySeriesRepository(), translationGroups));
 
     @Test
     void noLinksWhenContentHasNoTranslationGroup() {

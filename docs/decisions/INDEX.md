@@ -59,3 +59,4 @@ Use [TEMPLATE.md](TEMPLATE.md) for new decision records.
 - [ADR 0009: Keep Redis Auxiliary-only](0009-keep-redis-auxiliary-only.md) — prevents Redis from becoming durable domain or authorization state.
 - [ADR 0010: Use Spring Data JDBC Through Persistence Adapters](0010-use-spring-data-jdbc-through-persistence-adapters.md) — permits Spring Data JDBC in app-level adapters while keeping Content Publishing domain code framework-free.
 - [ADR 0011: Reserve Tag and Series Public Route Projections](0011-reserve-tag-and-series-public-route-projections.md) — reserves tag and series public route/projection shapes without implementing the feature surface.
+- [ADR 0012: Constrain Public Navigation and Hreflang to Listed Public Content](0012-constrain-public-navigation-and-hreflang-to-listed-public-content.md) — keeps public relationship navigation and hreflang limited to listed public content.

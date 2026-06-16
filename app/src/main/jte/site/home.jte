@@ -6,9 +6,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${page.productName()}</title>
-    @for(String stylesheetPath : page.stylesheetPaths())
-        <link rel="stylesheet" href="${stylesheetPath}">
-    @endfor
+    @template.site.components.stylesheetLinks(page.stylesheetPaths())
 </head>
 <body>
     <main>

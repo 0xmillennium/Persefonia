@@ -2,11 +2,12 @@ package dev.persefonia.contentpublishing.application.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import dev.persefonia.contentpublishing.application.discovery.ContentPublicRouteFactory;
 import dev.persefonia.contentpublishing.application.query.PublicSeriesBySourceQuery;
 import dev.persefonia.contentpublishing.application.query.PublicSeriesLookupResult;
 import dev.persefonia.contentpublishing.application.support.InMemoryContentItemRepository;
+import dev.persefonia.contentpublishing.application.support.InMemoryContentReadModels;
 import dev.persefonia.contentpublishing.application.support.InMemorySeriesRepository;
+import dev.persefonia.contentpublishing.application.support.InMemoryTranslationGroupRepository;
 import dev.persefonia.contentpublishing.domain.content.CanonicalPath;
 import dev.persefonia.contentpublishing.domain.content.ContentId;
 import dev.persefonia.contentpublishing.domain.content.ContentItem;
@@ -41,7 +42,10 @@ class PublicSeriesPageQueryServiceTest {
     private final InMemoryContentItemRepository items = new InMemoryContentItemRepository();
     private final InMemorySeriesRepository seriesRepository = new InMemorySeriesRepository();
     private final PublicSeriesPageQueryService service =
-            new PublicSeriesPageQueryService(items, seriesRepository, new ContentPublicRouteFactory());
+            new PublicSeriesPageQueryService(seriesRepository, new InMemoryContentReadModels(
+                    items,
+                    seriesRepository,
+                    new InMemoryTranslationGroupRepository()));
 
     @Test
     void publicSeriesPageRendersEligibleEntriesInPositionOrder() {

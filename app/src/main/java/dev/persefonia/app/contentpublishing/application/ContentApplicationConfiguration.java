@@ -12,6 +12,11 @@ import dev.persefonia.contentpublishing.application.discovery.SeriesDiscoveryPro
 import dev.persefonia.contentpublishing.application.port.ContentPublishingEventPublisher;
 import dev.persefonia.contentpublishing.application.port.ContentTagAssignmentStore;
 import dev.persefonia.contentpublishing.application.port.ContentTagVocabularyPort;
+import dev.persefonia.contentpublishing.application.port.PublicSeriesEntryReadModel;
+import dev.persefonia.contentpublishing.application.port.PublicTaggedContentReadModel;
+import dev.persefonia.contentpublishing.application.port.PublicTranslationReadModel;
+import dev.persefonia.contentpublishing.application.port.SeriesCandidateContentReadModel;
+import dev.persefonia.contentpublishing.application.port.TranslationCandidateContentReadModel;
 import dev.persefonia.contentpublishing.application.rendering.MarkdownRenderingService;
 import dev.persefonia.contentpublishing.application.service.ContentCommandService;
 import dev.persefonia.contentpublishing.application.service.ContentAdminQueryService;
@@ -163,8 +168,9 @@ class ContentApplicationConfiguration {
     TranslationGroupAdminQueryService translationGroupAdminQueryService(
             ContentItemRepository contentItems,
             TranslationGroupRepository translationGroups,
+            TranslationCandidateContentReadModel translationCandidates,
             ContentCommandAuthorizationPolicy authorization) {
-        return new TranslationGroupAdminQueryService(contentItems, translationGroups, authorization);
+        return new TranslationGroupAdminQueryService(contentItems, translationGroups, translationCandidates, authorization);
     }
 
     @Bean
@@ -180,13 +186,16 @@ class ContentApplicationConfiguration {
     SeriesAdminQueryService seriesAdminQueryService(
             ContentItemRepository contentItems,
             SeriesRepository seriesRepository,
+            SeriesCandidateContentReadModel seriesCandidates,
             ContentCommandAuthorizationPolicy authorization) {
-        return new SeriesAdminQueryService(contentItems, seriesRepository, authorization);
+        return new SeriesAdminQueryService(contentItems, seriesRepository, seriesCandidates, authorization);
     }
 
     @Bean
-    PublicContentQueryHandler publicContentQueryHandler(ContentItemRepository contentItems) {
-        return new PublicContentQueryHandler(contentItems);
+    PublicContentQueryHandler publicContentQueryHandler(
+            ContentItemRepository contentItems,
+            ContentPublicRouteFactory routeFactory) {
+        return new PublicContentQueryHandler(contentItems, routeFactory);
     }
 
     @Bean
@@ -197,26 +206,19 @@ class ContentApplicationConfiguration {
     }
 
     @Bean
-    PublicTranslationLinkQueryService publicTranslationLinkQueryService(
-            ContentItemRepository contentItems,
-            TranslationGroupRepository translationGroups,
-            ContentPublicRouteFactory routeFactory,
-            ConfiguredContentCanonicalUrlFactory canonicalUrlFactory) {
-        return new PublicTranslationLinkQueryService(contentItems, translationGroups, routeFactory, canonicalUrlFactory);
+    PublicTranslationLinkQueryService publicTranslationLinkQueryService(PublicTranslationReadModel readModel) {
+        return new PublicTranslationLinkQueryService(readModel);
     }
 
     @Bean
-    PublicTaggedContentQueryHandler publicTaggedContentQueryHandler(
-            ContentItemRepository contentItems,
-            ContentPublicRouteFactory routeFactory) {
-        return new PublicTaggedContentQueryHandler(contentItems, routeFactory);
+    PublicTaggedContentQueryHandler publicTaggedContentQueryHandler(PublicTaggedContentReadModel readModel) {
+        return new PublicTaggedContentQueryHandler(readModel);
     }
 
     @Bean
     PublicSeriesPageQueryService publicSeriesPageQueryService(
-            ContentItemRepository contentItems,
             SeriesRepository seriesRepository,
-            ContentPublicRouteFactory routeFactory) {
-        return new PublicSeriesPageQueryService(contentItems, seriesRepository, routeFactory);
+            PublicSeriesEntryReadModel entries) {
+        return new PublicSeriesPageQueryService(seriesRepository, entries);
     }
 }

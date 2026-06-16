@@ -5,8 +5,6 @@ import dev.persefonia.discovery.domain.DiscoverableResource;
 import dev.persefonia.discovery.domain.DiscoverableResourceId;
 import dev.persefonia.discovery.domain.DiscoverableResourceKey;
 import dev.persefonia.discovery.domain.DiscoverableResourceRepository;
-import dev.persefonia.discovery.domain.OpenGraphDescription;
-import dev.persefonia.discovery.domain.OpenGraphTitle;
 import dev.persefonia.discovery.domain.SourceEntityRef;
 import java.sql.Timestamp;
 import java.util.List;

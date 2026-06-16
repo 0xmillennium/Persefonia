@@ -7,13 +7,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${page.name()}</title>
-    <link rel="canonical" href="${page.canonicalUrl()}">
-    @if(page.noindex())
-        <meta name="robots" content="noindex">
-    @endif
-    @for(String stylesheetPath : page.stylesheetPaths())
-        <link rel="stylesheet" href="${stylesheetPath}">
-    @endfor
+    @template.site.components.canonicalLink(page.canonicalUrl())
+    @template.site.components.robotsMeta(page.noindex())
+    @template.site.components.stylesheetLinks(page.stylesheetPaths())
 </head>
 <body>
     <main class="public-page">

@@ -73,8 +73,8 @@ public final class AdminSeriesController {
 
     @GetMapping("/admin/series/new")
     public String newForm(Authentication authentication, CsrfToken csrfToken, Model model) {
-        model.addAttribute("page", formPage(
-                chrome.create(authentication, csrfToken), new AdminSeriesForm(), null, List.of(), List.of(), null));
+        model.addAttribute("page", createFormPage(
+                chrome.create(authentication, csrfToken), new AdminSeriesForm(), List.of(), List.of()));
         return "admin/series/new";
     }
 
@@ -94,11 +94,11 @@ public final class AdminSeriesController {
                     Instant.now()));
             return "redirect:/admin/series/" + result.seriesId().value() + "/edit?created";
         } catch (SeriesCommandRejectedException exception) {
-            model.addAttribute("page", formPage(
-                    chrome.create(authentication, csrfToken), form, null, commandError(exception), List.of(), null));
+            model.addAttribute("page", createFormPage(
+                    chrome.create(authentication, csrfToken), form, commandError(exception), List.of()));
         } catch (IllegalArgumentException | SeriesValidationException exception) {
-            model.addAttribute("page", formPage(
-                    chrome.create(authentication, csrfToken), form, null, validationError(form), List.of(), null));
+            model.addAttribute("page", createFormPage(
+                    chrome.create(authentication, csrfToken), form, validationError(form), List.of()));
         }
         return "admin/series/new";
     }
@@ -115,7 +115,7 @@ public final class AdminSeriesController {
             @RequestParam(name = "reordered", required = false) String reordered,
             Model model) {
         SeriesEditView series = series(authentication, seriesId);
-        model.addAttribute("page", formPage(
+        model.addAttribute("page", editFormPage(
                 chrome.create(authentication, csrfToken),
                 form(series),
                 series,
@@ -141,11 +141,11 @@ public final class AdminSeriesController {
             throw notFound();
         } catch (SeriesCommandRejectedException exception) {
             SeriesEditView series = series(authentication, seriesId);
-            model.addAttribute("page", formPage(
+            model.addAttribute("page", editFormPage(
                     chrome.create(authentication, csrfToken), form, series, commandError(exception), List.of(), null));
         } catch (IllegalArgumentException | SeriesValidationException exception) {
             SeriesEditView series = series(authentication, seriesId);
-            model.addAttribute("page", formPage(
+            model.addAttribute("page", editFormPage(
                     chrome.create(authentication, csrfToken), form, series, validationError(form), List.of(), null));
         }
         return "admin/series/edit";
@@ -220,21 +220,37 @@ public final class AdminSeriesController {
         }
     }
 
-    private static AdminSeriesFormPage formPage(
+    private static AdminSeriesFormPage createFormPage(
+            AdminSeriesPageChrome chrome,
+            AdminSeriesForm form,
+            List<AdminSeriesFieldError> fieldErrors,
+            List<String> globalErrors) {
+        return new AdminSeriesFormPage(
+                chrome,
+                form,
+                "Create series",
+                "/admin/series",
+                null,
+                null,
+                fieldErrors,
+                globalErrors,
+                null);
+    }
+
+    private static AdminSeriesFormPage editFormPage(
             AdminSeriesPageChrome chrome,
             AdminSeriesForm form,
             SeriesEditView series,
             List<AdminSeriesFieldError> fieldErrors,
             List<String> globalErrors,
             String successMessage) {
-        boolean create = series == null;
         return new AdminSeriesFormPage(
                 chrome,
                 form,
-                create ? "Create series" : "Edit series",
-                create ? "/admin/series" : "/admin/series/" + series.id().value(),
+                "Edit series",
+                "/admin/series/" + series.id().value(),
                 series,
-                !create && series.status().name().equals("ACTIVE") ? "/admin/series/" + series.id().value() + "/archive" : null,
+                series.status().name().equals("ACTIVE") ? "/admin/series/" + series.id().value() + "/archive" : null,
                 fieldErrors,
                 globalErrors,
                 successMessage);

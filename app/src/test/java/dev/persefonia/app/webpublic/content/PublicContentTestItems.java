@@ -42,6 +42,26 @@ public final class PublicContentTestItems {
         return item;
     }
 
+    public static ContentItem publishedPublicWithCanonicalPath(
+            ContentType type,
+            ContentLanguage language,
+            String collection,
+            String slug,
+            String canonicalPath) {
+        ContentItem item = completeDraft(type, language, ContentVisibility.PUBLIC, collection, slug);
+        item.changeMetadata(
+                ContentMetadata.of(
+                        SeoTitle.of("SEO <Title>"),
+                        SeoDescription.of("SEO <description>"),
+                        CanonicalPath.of(canonicalPath),
+                        OpenGraphTitle.of("OG <Title>"),
+                        OpenGraphDescription.of("OG <description>"),
+                        null),
+                NOW.minusSeconds(45));
+        item.publish(snapshot(), NOW.plusSeconds(1));
+        return item;
+    }
+
     public static ContentItem publishedPublicWithoutHeadings(String slug) {
         ContentItem item = completeDraft(ContentType.ARTICLE, ContentLanguage.TR, ContentVisibility.PUBLIC, "articles", slug);
         item.publish(snapshotWithoutHeadings(), NOW.plusSeconds(1));

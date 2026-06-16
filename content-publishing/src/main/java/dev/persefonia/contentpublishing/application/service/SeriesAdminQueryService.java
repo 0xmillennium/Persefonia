@@ -3,6 +3,7 @@ package dev.persefonia.contentpublishing.application.service;
 import dev.persefonia.contentpublishing.application.authorization.ContentCommandActor;
 import dev.persefonia.contentpublishing.application.authorization.ContentCommandAuthorizationPolicy;
 import dev.persefonia.contentpublishing.application.exception.SeriesNotFoundException;
+import dev.persefonia.contentpublishing.application.port.SeriesCandidateContentReadModel;
 import dev.persefonia.contentpublishing.application.query.SeriesCandidateContentItem;
 import dev.persefonia.contentpublishing.application.query.SeriesEditView;
 import dev.persefonia.contentpublishing.application.query.SeriesEntryView;
@@ -16,23 +17,24 @@ import dev.persefonia.contentpublishing.domain.model.series.SeriesEntry;
 import dev.persefonia.contentpublishing.domain.model.series.SeriesId;
 import dev.persefonia.contentpublishing.domain.model.series.SeriesSummary;
 import dev.persefonia.contentpublishing.domain.model.series.port.SeriesRepository;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.stream.Stream;
 
 public final class SeriesAdminQueryService {
     private final ContentItemRepository contentItems;
     private final SeriesRepository seriesRepository;
+    private final SeriesCandidateContentReadModel candidateReadModel;
     private final ContentCommandAuthorizationPolicy authorization;
 
     public SeriesAdminQueryService(
             ContentItemRepository contentItems,
             SeriesRepository seriesRepository,
+            SeriesCandidateContentReadModel candidateReadModel,
             ContentCommandAuthorizationPolicy authorization) {
         this.contentItems = Objects.requireNonNull(contentItems, "contentItems");
         this.seriesRepository = Objects.requireNonNull(seriesRepository, "seriesRepository");
+        this.candidateReadModel = Objects.requireNonNull(candidateReadModel, "candidateReadModel");
         this.authorization = Objects.requireNonNull(authorization, "authorization");
     }
 
@@ -95,21 +97,6 @@ public final class SeriesAdminQueryService {
     }
 
     private List<SeriesCandidateContentItem> candidates(Series series) {
-        return manageableContent()
-                .filter(item -> item.language() == series.language())
-                .filter(item -> item.status() != ContentStatus.ARCHIVED)
-                .filter(item -> !series.containsContentItem(item.id()))
-                .sorted(Comparator.comparing(ContentItem::updatedAt).reversed())
-                .map(item -> new SeriesCandidateContentItem(
-                        item.id(),
-                        item.type(),
-                        item.status(),
-                        item.title().map(Title::value)))
-                .toList();
-    }
-
-    private Stream<ContentItem> manageableContent() {
-        return Stream.of(ContentStatus.DRAFT, ContentStatus.UNPUBLISHED, ContentStatus.PUBLISHED)
-                .flatMap(status -> contentItems.findByStatus(status).stream());
+        return candidateReadModel.candidatesFor(series.id(), series.language());
     }
 }

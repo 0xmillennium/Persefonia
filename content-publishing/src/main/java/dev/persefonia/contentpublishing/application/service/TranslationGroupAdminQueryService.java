@@ -4,36 +4,36 @@ import static dev.persefonia.contentpublishing.application.service.ContentApplic
 
 import dev.persefonia.contentpublishing.application.authorization.ContentCommandActor;
 import dev.persefonia.contentpublishing.application.authorization.ContentCommandAuthorizationPolicy;
+import dev.persefonia.contentpublishing.application.port.TranslationCandidateContentReadModel;
 import dev.persefonia.contentpublishing.application.query.ContentTranslationSectionView;
 import dev.persefonia.contentpublishing.application.query.TranslationCandidateItem;
 import dev.persefonia.contentpublishing.application.query.TranslationGroupDetailsView;
 import dev.persefonia.contentpublishing.application.query.TranslationGroupEntryView;
 import dev.persefonia.contentpublishing.domain.content.ContentId;
 import dev.persefonia.contentpublishing.domain.content.ContentItem;
-import dev.persefonia.contentpublishing.domain.content.ContentStatus;
-import dev.persefonia.contentpublishing.domain.content.ContentType;
 import dev.persefonia.contentpublishing.domain.content.Title;
 import dev.persefonia.contentpublishing.domain.content.port.ContentItemRepository;
 import dev.persefonia.contentpublishing.domain.translation.TranslationGroup;
 import dev.persefonia.contentpublishing.domain.translation.TranslationGroupEntry;
 import dev.persefonia.contentpublishing.domain.translation.port.TranslationGroupRepository;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.stream.Stream;
 
 public final class TranslationGroupAdminQueryService {
     private final ContentItemRepository contentItems;
     private final TranslationGroupRepository translationGroups;
+    private final TranslationCandidateContentReadModel candidateReadModel;
     private final ContentCommandAuthorizationPolicy authorization;
 
     public TranslationGroupAdminQueryService(
             ContentItemRepository contentItems,
             TranslationGroupRepository translationGroups,
+            TranslationCandidateContentReadModel candidateReadModel,
             ContentCommandAuthorizationPolicy authorization) {
         this.contentItems = Objects.requireNonNull(contentItems, "contentItems");
         this.translationGroups = Objects.requireNonNull(translationGroups, "translationGroups");
+        this.candidateReadModel = Objects.requireNonNull(candidateReadModel, "candidateReadModel");
         this.authorization = Objects.requireNonNull(authorization, "authorization");
     }
 
@@ -64,19 +64,6 @@ public final class TranslationGroupAdminQueryService {
     }
 
     private List<TranslationCandidateItem> candidatesFor(TranslationGroup group) {
-        ContentType type = group.contentType();
-        return manageableContent()
-                .filter(item -> item.type() == type)
-                .filter(item -> !group.containsLanguage(item.language()))
-                .filter(item -> !translationGroups.contentItemBelongsToAnyGroup(item.id()))
-                .sorted(Comparator.comparing(ContentItem::updatedAt).reversed())
-                .map(item -> new TranslationCandidateItem(
-                        item.id(), item.language(), item.title().map(Title::value)))
-                .toList();
-    }
-
-    private Stream<ContentItem> manageableContent() {
-        return Stream.of(ContentStatus.DRAFT, ContentStatus.UNPUBLISHED, ContentStatus.PUBLISHED)
-                .flatMap(status -> contentItems.findByStatus(status).stream());
+        return candidateReadModel.candidatesFor(group.id(), group.contentType());
     }
 }

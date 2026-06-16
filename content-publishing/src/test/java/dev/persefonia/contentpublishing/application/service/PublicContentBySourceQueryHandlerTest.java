@@ -85,6 +85,23 @@ class PublicContentBySourceQueryHandlerTest {
     }
 
     @Test
+    void canonicalPathUsesExpectedCurrentPublicPathWhenStoredMetadataIsStale() {
+        ContentItem item = content(
+                ContentStatus.PUBLISHED,
+                ContentVisibility.PUBLIC,
+                snapshot(),
+                SLUG,
+                CanonicalPath.of("/en/articles/old-route"));
+        items.add(item);
+
+        PublicContentLookupResult result = handler.lookup(query(item, "/en/articles/source-route"));
+
+        assertThat(result).isInstanceOfSatisfying(PublicContentLookupResult.Found.class,
+                found -> assertThat(found.page().canonicalPath())
+                        .isEqualTo(CanonicalPath.of("/en/articles/source-route")));
+    }
+
+    @Test
     void queryRejectsMissingOrNonPathOnlyExpectedPath() {
         assertThatNullPointerException()
                 .isThrownBy(() -> new PublicContentBySourceQuery(null, "/en/articles/source-route"));
@@ -124,6 +141,20 @@ class PublicContentBySourceQueryHandlerTest {
             ContentVisibility visibility,
             ContentRenderSnapshot renderSnapshot,
             Slug slug) {
+        return content(
+                status,
+                visibility,
+                renderSnapshot,
+                slug,
+                CanonicalPath.of("/en/articles/" + slug.value()));
+    }
+
+    private static ContentItem content(
+            ContentStatus status,
+            ContentVisibility visibility,
+            ContentRenderSnapshot renderSnapshot,
+            Slug slug,
+            CanonicalPath canonicalPath) {
         return ContentItem.rehydrate(
                 ContentId.newId(),
                 ContentType.ARTICLE,
@@ -134,7 +165,7 @@ class PublicContentBySourceQueryHandlerTest {
                 Title.of("Public content"),
                 Summary.of("Public-safe summary."),
                 MarkdownSource.of("# Draft source is not rendered here"),
-                ContentMetadata.withCanonicalPath(CanonicalPath.of("/en/articles/" + slug.value())),
+                ContentMetadata.withCanonicalPath(canonicalPath),
                 renderSnapshot,
                 Set.of(),
                 status == ContentStatus.PUBLISHED ? PUBLISHED_AT : null,

@@ -2,9 +2,11 @@ package dev.persefonia.contentpublishing.application.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import dev.persefonia.contentpublishing.application.discovery.ContentPublicRouteFactory;
 import dev.persefonia.contentpublishing.application.query.PublicTaggedContentQuery;
 import dev.persefonia.contentpublishing.application.support.InMemoryContentItemRepository;
+import dev.persefonia.contentpublishing.application.support.InMemoryContentReadModels;
+import dev.persefonia.contentpublishing.application.support.InMemorySeriesRepository;
+import dev.persefonia.contentpublishing.application.support.InMemoryTranslationGroupRepository;
 import dev.persefonia.contentpublishing.domain.content.CanonicalPath;
 import dev.persefonia.contentpublishing.domain.content.ContentId;
 import dev.persefonia.contentpublishing.domain.content.ContentItem;
@@ -33,7 +35,10 @@ class PublicTaggedContentQueryHandlerTest {
     private static final TagId TAG = TagId.newId();
     private final InMemoryContentItemRepository items = new InMemoryContentItemRepository();
     private final PublicTaggedContentQueryHandler handler =
-            new PublicTaggedContentQueryHandler(items, new ContentPublicRouteFactory());
+            new PublicTaggedContentQueryHandler(new InMemoryContentReadModels(
+                    items,
+                    new InMemorySeriesRepository(),
+                    new InMemoryTranslationGroupRepository()));
 
     @Test
     void listsOnlySameLanguagePublishedPublicCurrentPathContent() {

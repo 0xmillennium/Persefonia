@@ -3,6 +3,7 @@ package dev.persefonia.contentpublishing.application.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
+import dev.persefonia.contentpublishing.application.discovery.ContentPublicRouteFactory;
 import dev.persefonia.contentpublishing.application.query.PublicContentLookupResult;
 import dev.persefonia.contentpublishing.application.query.PublicContentPageResult;
 import dev.persefonia.contentpublishing.application.query.PublicContentRouteQuery;
@@ -45,7 +46,7 @@ class PublicContentQueryHandlerTest {
     private static final Slug SLUG = Slug.ofCanonical("public-content");
 
     private final InMemoryContentItemRepository items = new InMemoryContentItemRepository();
-    private final PublicContentQueryHandler handler = new PublicContentQueryHandler(items);
+    private final PublicContentQueryHandler handler = new PublicContentQueryHandler(items, new ContentPublicRouteFactory());
 
     @Test
     void publishedPublicContentReturnsPublicReadModel() {
@@ -133,32 +134,36 @@ class PublicContentQueryHandlerTest {
 
     @Test
     void handlerRejectsRepositoryReturnedDraft() {
-        var leaky = new PublicContentQueryHandler(leakyRepository(
-                content(ContentStatus.DRAFT, ContentVisibility.PUBLIC, snapshotWithUnsortedHeadings())));
+        var leaky = new PublicContentQueryHandler(
+                leakyRepository(content(ContentStatus.DRAFT, ContentVisibility.PUBLIC, snapshotWithUnsortedHeadings())),
+                new ContentPublicRouteFactory());
 
         assertNotFound(leaky.lookup(query()));
     }
 
     @Test
     void handlerRejectsRepositoryReturnedPrivatePublished() {
-        var leaky = new PublicContentQueryHandler(leakyRepository(
-                content(ContentStatus.PUBLISHED, ContentVisibility.PRIVATE, snapshotWithUnsortedHeadings())));
+        var leaky = new PublicContentQueryHandler(
+                leakyRepository(content(ContentStatus.PUBLISHED, ContentVisibility.PRIVATE, snapshotWithUnsortedHeadings())),
+                new ContentPublicRouteFactory());
 
         assertNotFound(leaky.lookup(query()));
     }
 
     @Test
     void handlerRejectsRepositoryReturnedArchived() {
-        var leaky = new PublicContentQueryHandler(leakyRepository(
-                content(ContentStatus.ARCHIVED, ContentVisibility.PUBLIC, snapshotWithUnsortedHeadings())));
+        var leaky = new PublicContentQueryHandler(
+                leakyRepository(content(ContentStatus.ARCHIVED, ContentVisibility.PUBLIC, snapshotWithUnsortedHeadings())),
+                new ContentPublicRouteFactory());
 
         assertNotFound(leaky.lookup(query()));
     }
 
     @Test
     void handlerRejectsRepositoryReturnedPublishedWithoutSnapshot() {
-        var leaky = new PublicContentQueryHandler(leakyRepository(
-                content(ContentStatus.PUBLISHED, ContentVisibility.PUBLIC, null)));
+        var leaky = new PublicContentQueryHandler(
+                leakyRepository(content(ContentStatus.PUBLISHED, ContentVisibility.PUBLIC, null)),
+                new ContentPublicRouteFactory());
 
         assertNotFound(leaky.lookup(query()));
     }

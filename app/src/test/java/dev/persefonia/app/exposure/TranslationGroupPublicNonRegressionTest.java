@@ -12,17 +12,22 @@ class TranslationGroupPublicNonRegressionTest {
     private static final Path CONTENT_TEMPLATE = Path.of("src/main/jte/site/content.jte");
     private static final Path TAG_TEMPLATE = Path.of("src/main/jte/site/tag.jte");
     private static final Path SERIES_TEMPLATE = Path.of("src/main/jte/site/series.jte");
+    private static final Path HREFLANG_COMPONENT = Path.of("src/main/jte/site/components/hreflangLinks.jte");
 
     @Test
     void contentDetailTemplateIsTheOnlyPublicTemplateThatRendersTranslationLinksOrHreflang() throws IOException {
         String contentTemplate = normalized(CONTENT_TEMPLATE);
         String tagTemplate = normalized(TAG_TEMPLATE);
         String seriesTemplate = normalized(SERIES_TEMPLATE);
+        String hreflangComponent = normalized(HREFLANG_COMPONENT);
 
         assertThat(contentTemplate)
                 .contains("hreflang")
-                .contains("rel=\"alternate\"")
+                .contains("hreflanglinks")
                 .contains("public-translations");
+        assertThat(hreflangComponent)
+                .contains("hreflang")
+                .contains("rel=\"alternate\"");
         assertThat(tagTemplate)
                 .doesNotContain("hreflang")
                 .doesNotContain("rel=\"alternate\"")
