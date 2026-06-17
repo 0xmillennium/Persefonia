@@ -10,6 +10,7 @@ public record PublicProjectDetailPage(
         String publicUrl,
         String canonicalUrl,
         boolean noindex,
+        PublicProjectPageCopy copy,
         List<String> stylesheetPaths,
         PublicProjectDetailView project) {
     public PublicProjectDetailPage {
@@ -17,6 +18,7 @@ public record PublicProjectDetailPage(
         Objects.requireNonNull(htmlLanguage, "htmlLanguage");
         Objects.requireNonNull(publicUrl, "publicUrl");
         Objects.requireNonNull(canonicalUrl, "canonicalUrl");
+        Objects.requireNonNull(copy, "copy");
         stylesheetPaths = List.copyOf(stylesheetPaths);
         Objects.requireNonNull(project, "project");
     }

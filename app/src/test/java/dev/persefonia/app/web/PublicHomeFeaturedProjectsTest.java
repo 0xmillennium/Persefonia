@@ -93,6 +93,21 @@ class PublicHomeFeaturedProjectsTest {
     }
 
     @Test
+    void homepageFeaturedTitleFollowsTurkishDefaultLanguage() throws Exception {
+        settings.configure(ContentLanguage.TR, true, 3);
+        projects.add(ProjectRecord.project("turkish-featured", Visibility.PUBLIC, Status.ACTIVE, ContentLanguage.TR).featured(true));
+        projects.add(ProjectRecord.project("english-featured", Visibility.PUBLIC, Status.ACTIVE, ContentLanguage.EN).featured(true));
+
+        mockMvc.perform(get("/"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("Öne çıkan projeler")))
+                .andExpect(content().string(containsString("/tr/projects/turkish-featured")))
+                .andExpect(content().string(not(containsString("Featured projects"))))
+                .andExpect(content().string(not(containsString("/en/projects/english-featured"))))
+                .andExpect(content().string(not(containsString("Fake project"))));
+    }
+
+    @Test
     void homepageFeaturedRespectsLimit() throws Exception {
         settings.configure(ContentLanguage.EN, true, 1);
         projects.add(ProjectRecord.project("first-featured", Visibility.PUBLIC, Status.ACTIVE, ContentLanguage.EN).featured(true));

@@ -17,7 +17,7 @@
             <h1>${page.title()}</h1>
         </header>
         @if(page.projects().isEmpty())
-            <p>No public projects are currently available.</p>
+            <p>${page.copy().projectsEmptyMessage()}</p>
         @else
             <ol>
                 @for(PublicProjectCardView project : page.projects())
@@ -26,6 +26,7 @@
                             <h2><a href="${project.publicUrl()}">${project.title()}</a></h2>
                             <p>${project.summary()}</p>
                             @if(!project.technologies().isEmpty())
+                                <h3>${page.copy().technologiesLabel()}</h3>
                                 <ul>
                                     @for(var technology : project.technologies())
                                         <li>${technology.name()}</li>
@@ -33,6 +34,7 @@
                                 </ul>
                             @endif
                             @if(!project.tags().isEmpty())
+                                <h3>${page.copy().tagsLabel()}</h3>
                                 <ul>
                                     @for(var tag : project.tags())
                                         <li>${tag.name()}</li>

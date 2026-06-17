@@ -5,6 +5,7 @@ import dev.persefonia.profileportfolio.application.query.PublicProfileSummaryVie
 import dev.persefonia.profileportfolio.application.service.PublicFeaturedProjectQueryService;
 import dev.persefonia.profileportfolio.application.service.PublicHomepageSettingsQueryService;
 import dev.persefonia.profileportfolio.application.service.PublicProfileSummaryQueryService;
+import dev.persefonia.webpublic.projects.PublicProjectPageCopy;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -58,6 +59,7 @@ public class PublicHomeController {
                 profile,
                 homepage.showFeaturedProjects(),
                 homepageFeaturedProjects,
+                PublicProjectPageCopy.forLanguage(homepage.defaultLanguage()).featuredProjectsTitle(),
                 homepage.showLatestWriting(),
                 homepage.showResearchHighlights(),
                 homepage.featuredProjectLimit(),

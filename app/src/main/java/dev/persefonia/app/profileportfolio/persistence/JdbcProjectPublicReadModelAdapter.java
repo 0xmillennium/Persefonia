@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -29,7 +30,7 @@ public class JdbcProjectPublicReadModelAdapter implements ProjectPublicReadModel
     @Override
     public List<ProjectSummaryRow> listListedProjects(ContentLanguage language) {
         Objects.requireNonNull(language, "language");
-        return jdbc().query("""
+        List<ProjectCardRow> cards = projectCards("""
                 SELECT projects.id,
                        localizations.slug,
                        localizations.title,
@@ -41,15 +42,8 @@ public class JdbcProjectPublicReadModelAdapter implements ProjectPublicReadModel
                 WHERE projects.visibility = 'PUBLIC'
                   AND projects.status <> 'ARCHIVED'
                 ORDER BY projects.sort_order NULLS LAST, projects.updated_at DESC, projects.id
-                """, Map.of("language", language.name()), (resultSet, rowNumber) -> {
-            UUID projectId = resultSet.getObject("id", UUID.class);
-            return new ProjectSummaryRow(
-                    resultSet.getString("title"),
-                    resultSet.getString("summary"),
-                    resultSet.getString("slug"),
-                    tagIds(projectId),
-                    technologies(projectId));
-        });
+                """, Map.of("language", language.name()));
+        return summaryRows(cards);
     }
 
     @Override
@@ -92,7 +86,7 @@ public class JdbcProjectPublicReadModelAdapter implements ProjectPublicReadModel
     @Override
     public List<ProjectSummaryRow> listFeaturedProjects(ContentLanguage language, int limit) {
         Objects.requireNonNull(language, "language");
-        return jdbc().query("""
+        List<ProjectCardRow> cards = projectCards("""
                 SELECT projects.id,
                        localizations.slug,
                        localizations.title,
@@ -106,15 +100,33 @@ public class JdbcProjectPublicReadModelAdapter implements ProjectPublicReadModel
                   AND projects.status <> 'ARCHIVED'
                 ORDER BY projects.sort_order NULLS LAST, projects.updated_at DESC, projects.id
                 LIMIT :limit
-                """, Map.of("language", language.name(), "limit", limit), (resultSet, rowNumber) -> {
-            UUID projectId = resultSet.getObject("id", UUID.class);
-            return new ProjectSummaryRow(
-                    resultSet.getString("title"),
-                    resultSet.getString("summary"),
-                    resultSet.getString("slug"),
-                    tagIds(projectId),
-                    technologies(projectId));
-        });
+                """, Map.of("language", language.name(), "limit", limit));
+        return summaryRows(cards);
+    }
+
+    private List<ProjectCardRow> projectCards(String sql, Map<String, ?> parameters) {
+        return jdbc().query(sql, parameters, (resultSet, rowNumber) -> new ProjectCardRow(
+                resultSet.getObject("id", UUID.class),
+                resultSet.getString("title"),
+                resultSet.getString("summary"),
+                resultSet.getString("slug")));
+    }
+
+    private List<ProjectSummaryRow> summaryRows(List<ProjectCardRow> cards) {
+        if (cards.isEmpty()) {
+            return List.of();
+        }
+        List<UUID> projectIds = cards.stream().map(ProjectCardRow::projectId).toList();
+        Map<UUID, Set<TagId>> tagIdsByProject = tagIds(projectIds);
+        Map<UUID, List<PublicProjectTechnologyView>> technologiesByProject = technologies(projectIds);
+        return cards.stream()
+                .map(card -> new ProjectSummaryRow(
+                        card.title(),
+                        card.summary(),
+                        card.slug(),
+                        tagIdsByProject.getOrDefault(card.projectId(), Set.of()),
+                        technologiesByProject.getOrDefault(card.projectId(), List.of())))
+                .toList();
     }
 
     private Set<TagId> tagIds(UUID projectId) {
@@ -127,6 +139,23 @@ public class JdbcProjectPublicReadModelAdapter implements ProjectPublicReadModel
                 TagId.from(resultSet.getObject("tag_id", UUID.class))));
     }
 
+    private Map<UUID, Set<TagId>> tagIds(List<UUID> projectIds) {
+        return jdbc().query("""
+                SELECT project_id, tag_id
+                FROM portfolio.project_tags
+                WHERE project_id IN (:projectIds)
+                ORDER BY project_id, assigned_at, tag_id
+                """, Map.of("projectIds", projectIds), (resultSet, rowNumber) -> new ProjectTagRow(
+                resultSet.getObject("project_id", UUID.class),
+                TagId.from(resultSet.getObject("tag_id", UUID.class))))
+                .stream()
+                .collect(Collectors.groupingBy(
+                        ProjectTagRow::projectId,
+                        Collectors.mapping(
+                                ProjectTagRow::tagId,
+                                Collectors.toCollection(LinkedHashSet::new))));
+    }
+
     private List<PublicProjectTechnologyView> technologies(UUID projectId) {
         return jdbc().query("""
                 SELECT name, category
@@ -137,6 +166,23 @@ public class JdbcProjectPublicReadModelAdapter implements ProjectPublicReadModel
                 new PublicProjectTechnologyView(
                         resultSet.getString("name"),
                         resultSet.getString("category")));
+    }
+
+    private Map<UUID, List<PublicProjectTechnologyView>> technologies(List<UUID> projectIds) {
+        return jdbc().query("""
+                SELECT project_id, name, category
+                FROM portfolio.project_technologies
+                WHERE project_id IN (:projectIds)
+                ORDER BY project_id, sort_order
+                """, Map.of("projectIds", projectIds), (resultSet, rowNumber) -> new ProjectTechnologyRow(
+                resultSet.getObject("project_id", UUID.class),
+                new PublicProjectTechnologyView(
+                        resultSet.getString("name"),
+                        resultSet.getString("category"))))
+                .stream()
+                .collect(Collectors.groupingBy(
+                        ProjectTechnologyRow::projectId,
+                        Collectors.mapping(ProjectTechnologyRow::technology, Collectors.toList())));
     }
 
     private List<PublicProjectLinkView> links(UUID projectId) {
@@ -170,5 +216,14 @@ public class JdbcProjectPublicReadModelAdapter implements ProjectPublicReadModel
             throw new PortfolioPersistenceException("JDBC project public read model is not available.");
         }
         return available;
+    }
+
+    private record ProjectCardRow(UUID projectId, String title, String summary, String slug) {
+    }
+
+    private record ProjectTagRow(UUID projectId, TagId tagId) {
+    }
+
+    private record ProjectTechnologyRow(UUID projectId, PublicProjectTechnologyView technology) {
     }
 }

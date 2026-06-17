@@ -67,7 +67,9 @@ class ProfilePortfolioArchitectureTest {
                         "dev.persefonia.discovery.application.redirect..",
                         "dev.persefonia.taxonomy.domain.port..",
                         "dev.persefonia.app.taxonomy.persistence..",
-                        "dev.persefonia.medialibrary..")
+                        "dev.persefonia.medialibrary.domain..",
+                        "dev.persefonia.medialibrary.infrastructure..",
+                        "dev.persefonia.app.medialibrary.persistence..")
                 .allowEmptyShould(true)
                 .check(ArchitectureTestSupport.PRODUCTION_CLASSES);
     }

@@ -17,6 +17,7 @@ public record PublicHomeViewModel(
         Optional<PublicProfileSummaryView> profile,
         boolean showFeaturedProjects,
         List<PublicFeaturedProjectView> featuredProjects,
+        String featuredProjectsTitle,
         boolean showLatestWriting,
         boolean showResearchHighlights,
         int featuredProjectLimit,
@@ -26,6 +27,7 @@ public record PublicHomeViewModel(
     public PublicHomeViewModel {
         profile = profile == null ? Optional.empty() : profile;
         featuredProjects = List.copyOf(featuredProjects);
+        java.util.Objects.requireNonNull(featuredProjectsTitle, "featuredProjectsTitle");
         stylesheetPaths = List.copyOf(stylesheetPaths);
     }
 }

@@ -45,12 +45,14 @@ public final class PublicProjectListingController {
         }
         String publicUrl = "/" + parsedLanguage.toLowerCase(Locale.ROOT) + "/projects";
         responseHeaders.applyPublicContentHeaders(response);
+        PublicProjectPageCopy copy = PublicProjectPageCopy.forLanguage(parsedLanguage);
         return new ModelAndView("site/projects/list", "page", new PublicProjectListingPage(
-                "Projects",
+                copy.projectsTitle(),
                 parsedLanguage.toLowerCase(Locale.ROOT),
                 publicUrl,
                 canonicalUrlFactory.canonicalUrl(publicUrl),
                 true,
+                copy,
                 assetResolver.stylesheetPaths(MAIN_FRONTEND_ENTRY),
                 projects.list(parsedLanguage)));
     }

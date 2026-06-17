@@ -63,8 +63,8 @@
             </section>
         @endif
         @if(page.showFeaturedProjects() && !page.featuredProjects().isEmpty())
-            <section aria-label="Featured projects">
-                <h2>Featured projects</h2>
+            <section aria-label="${page.featuredProjectsTitle()}">
+                <h2>${page.featuredProjectsTitle()}</h2>
                 <ol>
                     @for(var project : page.featuredProjects())
                         <li>

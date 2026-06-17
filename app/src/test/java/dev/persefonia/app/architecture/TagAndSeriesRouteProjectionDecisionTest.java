@@ -43,28 +43,23 @@ class TagAndSeriesRouteProjectionDecisionTest {
                 .contains("route_purpose = TAG_PAGE")
                 .contains("route_purpose = SERIES_PAGE")
                 .contains("language = TR or EN")
-                .contains("SourceContext.TAXONOMY")
-                .contains("SourceType.TAG")
-                .contains("SourceType.SERIES")
-                .contains("DiscoverableResourceType.TAG")
-                .contains("DiscoverableResourceType.SERIES")
-                .contains("RoutePurpose.TAG_PAGE")
-                .contains("RoutePurpose.SERIES_PAGE")
+                .contains("Series pages must use `RoutePurpose.SERIES_PAGE`")
                 .contains("NO_INDEX")
                 .contains("NOT_ELIGIBLE");
     }
 
     @Test
-    void decisionLocksCurrentOnlyPersistenceAndBoundariesWithoutWorkflowLanguage() throws Exception {
+    void decisionStaysFocusedOnDurableRouteReservationWithoutWorkflowLanguage() throws Exception {
         String decision = Files.readString(DECISION);
 
         assertThat(decision)
-                .contains("Discovery remains current-only")
-                .contains("No active flag is added to discoverable_resources")
-                .contains("No Discovery history table is introduced")
-                .contains("Source contexts must not construct DiscoverableResource directly")
-                .contains("Source contexts must not call Discovery repositories")
-                .contains("UNLISTED content remains direct URL only")
+                .contains("stable public route shapes")
+                .contains("requires a later explicit decision or implementation change")
+                .doesNotContain("No active flag is added")
+                .doesNotContain("No Discovery history table is introduced")
+                .doesNotContain("Source contexts must not construct DiscoverableResource directly")
+                .doesNotContain("Source contexts must not call Discovery repositories")
+                .doesNotContain("UNLISTED content remains direct URL only")
                 .doesNotContain("Spr" + "int")
                 .doesNotContain("S6" + "-P00")
                 .doesNotContain("Ste" + "p 0");

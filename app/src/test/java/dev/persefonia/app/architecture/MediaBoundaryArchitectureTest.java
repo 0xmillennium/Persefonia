@@ -1,0 +1,135 @@
+package dev.persefonia.app.architecture;
+
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.stream.Stream;
+import org.junit.jupiter.api.Test;
+
+class MediaBoundaryArchitectureTest {
+    @Test
+    void webLayersDoNotDependOnRepositoriesAdaptersOrMediaInternals() {
+        noClasses()
+                .that().resideInAnyPackage(
+                        "dev.persefonia.webpublic..",
+                        "dev.persefonia.webadmin..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "dev.persefonia..persistence..",
+                        "dev.persefonia..infrastructure..",
+                        "dev.persefonia.medialibrary.domain..",
+                        "dev.persefonia.app.medialibrary.persistence..",
+                        "org.springframework.data..",
+                        "org.springframework.jdbc..",
+                        "java.sql..",
+                        "javax.sql..")
+                .orShould().dependOnClassesThat().haveSimpleNameEndingWith("Repository")
+                .orShould().dependOnClassesThat().haveSimpleNameEndingWith("Adapter")
+                .allowEmptyShould(true)
+                .check(ArchitectureTestSupport.PRODUCTION_CLASSES);
+    }
+
+    @Test
+    void profilePortfolioDoesNotDependOnMediaRepositoriesOrInfrastructure() {
+        noClasses()
+                .that().resideInAnyPackage(
+                        "dev.persefonia.profileportfolio..",
+                        "dev.persefonia.app.profileportfolio..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "dev.persefonia.medialibrary.domain..",
+                        "dev.persefonia.medialibrary.infrastructure..",
+                        "dev.persefonia.app.medialibrary.persistence..")
+                .orShould().dependOnClassesThat().haveSimpleName("AssetRepository")
+                .allowEmptyShould(true)
+                .check(ArchitectureTestSupport.PRODUCTION_CLASSES);
+    }
+
+    @Test
+    void profilePortfolioDomainDoesNotDependOnMediaApplicationOrDomain() {
+        noClasses()
+                .that().resideInAPackage("dev.persefonia.profileportfolio.domain..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "dev.persefonia.medialibrary.application..",
+                        "dev.persefonia.medialibrary.domain..")
+                .allowEmptyShould(true)
+                .check(ArchitectureTestSupport.PRODUCTION_CLASSES);
+    }
+
+    @Test
+    void projectTemplatesDoNotExposeCoverAssetInternals() throws Exception {
+        for (Path root : List.of(
+                Path.of("src/main/jte/site/projects"),
+                Path.of("src/main/jte/admin/projects"))) {
+            assertThat(sourceText(root))
+                    .doesNotContain("coverAssetId")
+                    .doesNotContain("defaultOgImageAssetId")
+                    .doesNotContain("defaultOpenGraphImageAssetId");
+        }
+    }
+
+    @Test
+    void assetRepositoryUsageStaysInsideMediaCompositionBoundaries() throws Exception {
+        assertThat(javaSourcesContaining("AssetRepository").stream()
+                        .map(Path::toString)
+                        .filter(path -> !path.contains("/media-library/src/main/java/"))
+                        .filter(path -> !path.contains("/app/src/main/java/dev/persefonia/app/medialibrary/")))
+                .isEmpty();
+    }
+
+    @Test
+    void activeCvSurfaceIsNotIntroducedBeforeMilestone8() throws Exception {
+        String publicAndAdminSources = sourceText(Path.of("../web-public/src/main/java"))
+                + sourceText(Path.of("../web-admin/src/main/java"))
+                + sourceText(Path.of("src/main/jte/site"))
+                + sourceText(Path.of("src/main/jte/admin"));
+
+        assertThat(publicAndAdminSources)
+                .doesNotContain("ActiveCv")
+                .doesNotContain("ActiveCV")
+                .doesNotContain("active-cv")
+                .doesNotContain("cvDownload");
+    }
+
+    private static List<Path> javaSourcesContaining(String text) throws IOException {
+        List<Path> roots = List.of(
+                Path.of("../app/src/main/java"),
+                Path.of("../media-library/src/main/java"),
+                Path.of("../profile-portfolio/src/main/java"),
+                Path.of("../web-public/src/main/java"),
+                Path.of("../web-admin/src/main/java"));
+        java.util.ArrayList<Path> matches = new java.util.ArrayList<>();
+        for (Path root : roots) {
+            if (!Files.exists(root)) {
+                continue;
+            }
+            try (Stream<Path> paths = Files.walk(root)) {
+                paths.filter(path -> path.toString().endsWith(".java"))
+                        .filter(path -> {
+                            try {
+                                return Files.readString(path).contains(text);
+                            } catch (IOException exception) {
+                                throw new IllegalStateException(exception);
+                            }
+                        })
+                        .forEach(matches::add);
+            }
+        }
+        return matches;
+    }
+
+    private static String sourceText(Path root) throws IOException {
+        if (!Files.exists(root)) {
+            return "";
+        }
+        StringBuilder source = new StringBuilder();
+        try (Stream<Path> paths = Files.walk(root)) {
+            for (Path path : paths.filter(Files::isRegularFile).toList()) {
+                source.append(Files.readString(path)).append('\n');
+            }
+        }
+        return source.toString();
+    }
+}

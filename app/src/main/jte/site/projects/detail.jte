@@ -18,8 +18,8 @@
                 <p>${page.project().summary()}</p>
             </header>
             @if(!page.project().technologies().isEmpty())
-                <section aria-label="Technologies">
-                    <h2>Technologies</h2>
+                <section aria-label="${page.copy().technologiesLabel()}">
+                    <h2>${page.copy().technologiesLabel()}</h2>
                     <ul>
                         @for(var technology : page.project().technologies())
                             <li>
@@ -31,8 +31,8 @@
                 </section>
             @endif
             @if(!page.project().tags().isEmpty())
-                <section aria-label="Tags">
-                    <h2>Tags</h2>
+                <section aria-label="${page.copy().tagsLabel()}">
+                    <h2>${page.copy().tagsLabel()}</h2>
                     <ul>
                         @for(var tag : page.project().tags())
                             <li>${tag.name()}</li>
@@ -41,8 +41,8 @@
                 </section>
             @endif
             @if(!page.project().links().isEmpty())
-                <section aria-label="Links">
-                    <h2>Links</h2>
+                <section aria-label="${page.copy().linksLabel()}">
+                    <h2>${page.copy().linksLabel()}</h2>
                     <ul>
                         @for(var link : page.project().links())
                             <li><a href="${link.url()}" target="_blank" rel="noopener noreferrer">${link.label()}</a></li>
@@ -51,6 +51,7 @@
                 </section>
             @endif
             @if(!page.project().sections().isEmpty())
+                <h2>${page.copy().caseStudyLabel()}</h2>
                 @for(var section : page.project().sections())
                     <section>
                         <h2>${section.type()}</h2>

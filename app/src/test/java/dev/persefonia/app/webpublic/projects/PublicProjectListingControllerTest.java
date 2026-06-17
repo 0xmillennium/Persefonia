@@ -60,6 +60,28 @@ class PublicProjectListingControllerTest {
     }
 
     @Test
+    void turkishListingRendersTurkishCopy() throws Exception {
+        projects.add(ProjectRecord.project("turkish-copy", Visibility.PUBLIC, Status.ACTIVE, ContentLanguage.TR));
+
+        mockMvc.perform(get("/tr/projects"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("<h1>Projeler</h1>")))
+                .andExpect(content().string(containsString("Teknolojiler")))
+                .andExpect(content().string(not(containsString("No public projects are currently available."))));
+    }
+
+    @Test
+    void englishListingRendersEnglishCopy() throws Exception {
+        projects.add(ProjectRecord.project("english-copy", Visibility.PUBLIC, Status.ACTIVE, ContentLanguage.EN));
+
+        mockMvc.perform(get("/en/projects"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("<h1>Projects</h1>")))
+                .andExpect(content().string(containsString("Technologies")))
+                .andExpect(content().string(not(containsString("Henüz herkese açık proje bulunmuyor."))));
+    }
+
+    @Test
     void listingEmptyStateAndTemplateStayPublicSafe() throws Exception {
         mockMvc.perform(get("/en/projects"))
                 .andExpect(status().isOk())
@@ -69,5 +91,13 @@ class PublicProjectListingControllerTest {
                 .andExpect(content().string(not(containsString("Fake project"))))
                 .andExpect(content().string(not(containsString("@vite/client"))))
                 .andExpect(content().string(not(containsString("localhost"))));
+    }
+
+    @Test
+    void turkishListingEmptyStateUsesTurkishCopy() throws Exception {
+        mockMvc.perform(get("/tr/projects"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("Henüz herkese açık proje bulunmuyor.")))
+                .andExpect(content().string(not(containsString("No public projects are currently available."))));
     }
 }

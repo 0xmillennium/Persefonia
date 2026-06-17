@@ -11,6 +11,7 @@ import dev.persefonia.app.webpublic.content.InMemoryPublicRouteResolver;
 import dev.persefonia.app.webpublic.content.PublicContentTestConfiguration;
 import dev.persefonia.app.webpublic.projects.PublicProjectTestConfiguration.InMemoryProjectPublicReadModel;
 import dev.persefonia.app.webpublic.projects.PublicProjectTestConfiguration.ProjectRecord;
+import dev.persefonia.app.webpublic.projects.PublicProjectTestConfiguration.PublicProjectTagVocabulary;
 import dev.persefonia.app.webpublic.projects.PublicProjectTestConfiguration.Status;
 import dev.persefonia.app.webpublic.projects.PublicProjectTestConfiguration.Visibility;
 import dev.persefonia.discovery.application.contract.CanonicalUrl;
@@ -25,6 +26,7 @@ import dev.persefonia.discovery.application.contract.SourceType;
 import dev.persefonia.discovery.application.route.PublicRouteResolution;
 import dev.persefonia.profileportfolio.domain.common.ContentLanguage;
 import dev.persefonia.profileportfolio.domain.project.ProjectId;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,11 +47,13 @@ import org.springframework.test.web.servlet.MockMvc;
 class PublicProjectDetailControllerTest {
     @Autowired MockMvc mockMvc;
     @Autowired InMemoryProjectPublicReadModel projects;
+    @Autowired PublicProjectTagVocabulary tags;
     @Autowired InMemoryPublicRouteResolver routes;
 
     @BeforeEach
     void reset() {
         projects.reset();
+        tags.reset();
         routes.clear();
     }
 
@@ -72,6 +76,40 @@ class PublicProjectDetailControllerTest {
                 .andExpect(content().string(not(containsString("Fake project"))))
                 .andExpect(content().string(not(containsString("@vite/client"))))
                 .andExpect(content().string(not(containsString("localhost"))));
+    }
+
+    @Test
+    void turkishDetailRendersTurkishLabels() throws Exception {
+        var tagId = tags.active("Gözlem", "gozlem");
+        ProjectId projectId = projects.add(ProjectRecord
+                .project("turkish-detail", Visibility.PUBLIC, Status.ACTIVE, ContentLanguage.TR)
+                .tags(Set.of(tagId)));
+        routes.addProjectFound("/tr/projects/turkish-detail", projectId.value());
+
+        mockMvc.perform(get("/tr/projects/turkish-detail"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("Teknolojiler")))
+                .andExpect(content().string(containsString("Etiketler")))
+                .andExpect(content().string(containsString("Bağlantılar")))
+                .andExpect(content().string(containsString("Vaka çalışması")))
+                .andExpect(content().string(not(containsString("<h2>Technologies</h2>"))));
+    }
+
+    @Test
+    void englishDetailRendersEnglishLabels() throws Exception {
+        var tagId = tags.active("Delivery", "delivery");
+        ProjectId projectId = projects.add(ProjectRecord
+                .project("english-detail", Visibility.PUBLIC, Status.ACTIVE, ContentLanguage.EN)
+                .tags(Set.of(tagId)));
+        routes.addProjectFound("/en/projects/english-detail", projectId.value());
+
+        mockMvc.perform(get("/en/projects/english-detail"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("Technologies")))
+                .andExpect(content().string(containsString("Tags")))
+                .andExpect(content().string(containsString("Links")))
+                .andExpect(content().string(containsString("Case study")))
+                .andExpect(content().string(not(containsString("Teknolojiler"))));
     }
 
     @Test
