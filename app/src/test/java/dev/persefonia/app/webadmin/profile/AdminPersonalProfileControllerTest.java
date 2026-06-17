@@ -50,7 +50,7 @@ class AdminPersonalProfileControllerTest {
                 .andExpect(content().string(containsString("name=\"_csrf\"")))
                 .andExpect(content().string(containsString("href=\"/admin/profile\" aria-current=\"page\"")))
                 .andExpect(content().string(containsString("href=\"/admin/settings/site\"")))
-                .andExpect(content().string(containsString("aria-disabled=\"true\">Projects")));
+                .andExpect(content().string(containsString("href=\"/admin/projects\"")));
     }
 
     @Test

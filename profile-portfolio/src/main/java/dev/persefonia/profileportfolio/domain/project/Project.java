@@ -168,6 +168,37 @@ public final class Project {
         markUpdated(now);
     }
 
+    public void changeSortOrder(SortOrder sortOrder, ContentLanguage defaultLanguage, Instant now) {
+        this.sortOrder = sortOrder;
+        validateStructuralInvariants();
+        validateFeaturedEligibility(defaultLanguage);
+        markUpdated(now);
+    }
+
+    public void updateDetails(
+            ProjectStatus status,
+            ProjectVisibility visibility,
+            boolean featured,
+            SortOrder sortOrder,
+            Set<TagId> tagIds,
+            List<ProjectTechnology> technologies,
+            List<ProjectLink> links,
+            List<ProjectLocalization> localizations,
+            ContentLanguage defaultLanguage,
+            Instant now) {
+        this.status = Objects.requireNonNull(status, "status");
+        this.visibility = Objects.requireNonNull(visibility, "visibility");
+        this.featured = featured;
+        this.sortOrder = sortOrder;
+        this.tagIds = Set.copyOf(Objects.requireNonNull(tagIds, "tagIds"));
+        this.technologies = List.copyOf(Objects.requireNonNull(technologies, "technologies"));
+        this.links = List.copyOf(Objects.requireNonNull(links, "links"));
+        this.localizations = List.copyOf(Objects.requireNonNull(localizations, "localizations"));
+        validateStructuralInvariants();
+        validateFeaturedEligibility(defaultLanguage);
+        markUpdated(now);
+    }
+
     public void validateFeaturedEligibility(ContentLanguage defaultLanguage) {
         Objects.requireNonNull(defaultLanguage, "defaultLanguage");
         if (featured && localizations.stream().noneMatch(localization -> localization.language() == defaultLanguage)) {

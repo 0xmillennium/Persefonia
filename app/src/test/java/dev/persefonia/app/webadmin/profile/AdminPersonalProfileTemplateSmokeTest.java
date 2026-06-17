@@ -49,6 +49,6 @@ class AdminPersonalProfileTemplateSmokeTest {
                 .andExpect(content().string(not(containsString("cvDownload"))))
                 .andExpect(content().string(not(containsString("avatarAssetId"))))
                 .andExpect(content().string(not(containsString("projectIds"))))
-                .andExpect(content().string(not(containsString("/admin/projects"))));
+                .andExpect(content().string(containsString("/admin/projects")));
     }
 }

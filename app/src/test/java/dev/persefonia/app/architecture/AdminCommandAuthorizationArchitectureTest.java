@@ -39,16 +39,22 @@ class AdminCommandAuthorizationArchitectureTest {
     }
 
     @Test
-    void productionFeatureAdminControllersDoNotExist() {
+    void outOfScopeProductionFeatureAdminControllersDoNotExist() {
         assertThat(ArchitectureTestSupport.PRODUCTION_CLASSES.stream()
                         .map(javaClass -> javaClass.getSimpleName()))
                 .doesNotContain(
                         "AdminContentController",
-                        "AdminProjectController",
                         "AdminMediaController",
                         "AdminContactController",
                         "AdminAnalyticsController",
                         "AdminAuditController",
                         "AdminSettingsController");
+    }
+
+    @Test
+    void projectAdminControllerIsAllowedAfterProjectAdminImplementation() {
+        assertThat(ArchitectureTestSupport.PRODUCTION_CLASSES.stream()
+                        .map(javaClass -> javaClass.getSimpleName()))
+                .contains("AdminProjectController");
     }
 }

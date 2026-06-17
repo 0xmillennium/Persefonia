@@ -8,12 +8,11 @@ import org.junit.jupiter.api.Test;
 
 class AdminNavigationFactoryTest {
     @Test
-    void enablesSettingsAndProfileWhileProjectsRemainDisabled() {
-        var navigation = new AdminNavigationFactory().create(AdminNavigationSection.PROFILE);
+    void enablesSettingsProfileAndProjects() {
+        var navigation = new AdminNavigationFactory().create(AdminNavigationSection.PROJECTS);
 
         assertThat(navigation).anySatisfy(item -> {
             assertThat(item.label()).isEqualTo("Profile");
-            assertThat(item.active()).isTrue();
             assertThat(item.disabled()).isFalse();
             assertThat(item.href()).isEqualTo("/admin/profile");
         });
@@ -24,7 +23,9 @@ class AdminNavigationFactoryTest {
         });
         assertThat(navigation).anySatisfy(item -> {
             assertThat(item.label()).isEqualTo("Projects");
-            assertThat(item.disabled()).isTrue();
+            assertThat(item.active()).isTrue();
+            assertThat(item.disabled()).isFalse();
+            assertThat(item.href()).isEqualTo("/admin/projects");
         });
     }
 }

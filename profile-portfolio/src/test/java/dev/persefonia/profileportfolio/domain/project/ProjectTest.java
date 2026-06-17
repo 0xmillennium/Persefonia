@@ -174,6 +174,27 @@ class ProjectTest {
         assertThat(project.coverAssetId()).contains(assetId);
     }
 
+    @Test
+    void atomicUpdateDetailsIncrementsVersionOnce() {
+        Project project = project(ProjectStatus.ACTIVE, ProjectVisibility.PUBLIC, false, List.of(localization(ContentLanguage.TR)), List.of(), List.of(), Set.of(), null);
+
+        project.updateDetails(
+                ProjectStatus.COMPLETED,
+                ProjectVisibility.PRIVATE,
+                false,
+                SortOrder.of(2),
+                Set.of(TagId.newId()),
+                List.of(technology(1)),
+                List.of(link(1)),
+                List.of(localization(ContentLanguage.EN)),
+                ContentLanguage.TR,
+                NOW.plusSeconds(1));
+
+        assertThat(project.version().value()).isEqualTo(1);
+        assertThat(project.status()).isEqualTo(ProjectStatus.COMPLETED);
+        assertThat(project.visibility()).isEqualTo(ProjectVisibility.PRIVATE);
+    }
+
     private static Project project(
             ProjectStatus status,
             ProjectVisibility visibility,
@@ -239,6 +260,15 @@ class ProjectTest {
                 LinkLabel.of("Demo"),
                 ExternalUrl.of("https://example.test"),
                 ProjectLinkType.DEMO,
+                SortOrder.of(sortOrder));
+    }
+
+    private static ProjectTechnology technology(int sortOrder) {
+        return new ProjectTechnology(
+                ProjectTechnologyId.newId(),
+                TechnologyName.of("Java"),
+                NormalizedTechnologyName.of("java"),
+                TechnologyCategory.LANGUAGE,
                 SortOrder.of(sortOrder));
     }
 }

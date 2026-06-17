@@ -62,7 +62,8 @@ class ProfilePortfolioArchitectureTest {
                 .that().resideInAPackage("dev.persefonia.app.profileportfolio.application..")
                 .should().dependOnClassesThat().resideInAnyPackage(
                         "dev.persefonia.discovery..",
-                        "dev.persefonia.taxonomy..",
+                        "dev.persefonia.taxonomy.domain.port..",
+                        "dev.persefonia.app.taxonomy.persistence..",
                         "dev.persefonia.medialibrary..")
                 .allowEmptyShould(true)
                 .check(ArchitectureTestSupport.PRODUCTION_CLASSES);
@@ -76,6 +77,17 @@ class ProfilePortfolioArchitectureTest {
                         "dev.persefonia.profileportfolio.domain.profile..",
                         "dev.persefonia.profileportfolio.domain.project..",
                         "dev.persefonia.profileportfolio.domain.settings..",
+                        "dev.persefonia.app.profileportfolio.persistence..")
+                .allowEmptyShould(true)
+                .check(ArchitectureTestSupport.PRODUCTION_CLASSES);
+    }
+
+    @Test
+    void webAdminProjectsDoesNotDependOnRepositoriesOrAdapters() {
+        noClasses()
+                .that().resideInAPackage("dev.persefonia.webadmin.projects..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "dev.persefonia.profileportfolio.domain..",
                         "dev.persefonia.app.profileportfolio.persistence..")
                 .allowEmptyShould(true)
                 .check(ArchitectureTestSupport.PRODUCTION_CLASSES);

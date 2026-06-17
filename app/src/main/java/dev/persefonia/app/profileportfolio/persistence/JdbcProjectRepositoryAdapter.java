@@ -255,14 +255,19 @@ public class JdbcProjectRepositoryAdapter implements ProjectRepository {
     }
 
     private Optional<Project> loadProject(String whereClause, Map<String, Object> params) {
+        return loadProjects(whereClause, params).stream().findFirst();
+    }
+
+    private List<Project> loadProjects(String whereClause, Map<String, Object> params) {
         String sql = """
                 SELECT projects.id, projects.status, projects.visibility, projects.featured,
                        projects.sort_order, projects.cover_asset_id, projects.created_at,
                        projects.updated_at, projects.version
                 FROM portfolio.projects projects
                 WHERE %s
+                ORDER BY projects.updated_at DESC, projects.id
                 """.formatted(whereClause);
-        List<Project> rows = jdbc().query(sql, params, (resultSet, rowNumber) -> {
+        return jdbc().query(sql, params, (resultSet, rowNumber) -> {
             UUID projectId = resultSet.getObject("id", UUID.class);
             return mapper.toDomain(
                     resultSet,
@@ -271,7 +276,6 @@ public class JdbcProjectRepositoryAdapter implements ProjectRepository {
                     loadLinks(projectId),
                     loadLocalizations(projectId));
         });
-        return rows.stream().findFirst();
     }
 
     private Set<TagId> loadTagIds(UUID projectId) {

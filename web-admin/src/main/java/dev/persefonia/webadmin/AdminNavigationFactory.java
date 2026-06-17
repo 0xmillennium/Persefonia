@@ -15,7 +15,7 @@ public final class AdminNavigationFactory {
                 link(AdminNavigationSection.TAGS, activeSection, "Tags", "/admin/tags"),
                 link(AdminNavigationSection.REDIRECTS, activeSection, "Redirects", "/admin/discovery/redirects"),
                 link(AdminNavigationSection.PROFILE, activeSection, "Profile", "/admin/profile"),
-                AdminNavigationItem.disabled("Projects"),
+                link(AdminNavigationSection.PROJECTS, activeSection, "Projects", "/admin/projects"),
                 AdminNavigationItem.disabled("Media"),
                 AdminNavigationItem.disabled("Contact"),
                 AdminNavigationItem.disabled("Analytics"),
