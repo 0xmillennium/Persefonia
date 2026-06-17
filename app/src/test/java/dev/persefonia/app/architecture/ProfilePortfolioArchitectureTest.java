@@ -61,7 +61,10 @@ class ProfilePortfolioArchitectureTest {
         noClasses()
                 .that().resideInAPackage("dev.persefonia.app.profileportfolio.application..")
                 .should().dependOnClassesThat().resideInAnyPackage(
-                        "dev.persefonia.discovery..",
+                        "dev.persefonia.discovery.domain..",
+                        "dev.persefonia.discovery.infrastructure..",
+                        "dev.persefonia.discovery.application.service..",
+                        "dev.persefonia.discovery.application.redirect..",
                         "dev.persefonia.taxonomy.domain.port..",
                         "dev.persefonia.app.taxonomy.persistence..",
                         "dev.persefonia.medialibrary..")

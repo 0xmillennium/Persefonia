@@ -8,6 +8,7 @@ import dev.persefonia.profileportfolio.application.command.ProjectLocalizationIn
 import dev.persefonia.profileportfolio.application.command.ProjectMutationResult;
 import dev.persefonia.profileportfolio.application.command.ProjectTechnologyInput;
 import dev.persefonia.profileportfolio.application.command.UpdateProjectCommand;
+import dev.persefonia.profileportfolio.application.discovery.ProjectDiscoverabilityCoordinator;
 import dev.persefonia.profileportfolio.application.exception.ProjectApplicationException;
 import dev.persefonia.profileportfolio.application.exception.ProjectCommandRejectedException;
 import dev.persefonia.profileportfolio.application.exception.ProjectNotFoundException;
@@ -55,16 +56,19 @@ public final class ProjectCommandService {
     private final SitePresentationSettingsRepository settings;
     private final ProjectTagVocabularyPort tags;
     private final PortfolioCommandAuthorizationPolicy authorization;
+    private final ProjectDiscoverabilityCoordinator discoverability;
 
     public ProjectCommandService(
             ProjectRepository projects,
             SitePresentationSettingsRepository settings,
             ProjectTagVocabularyPort tags,
-            PortfolioCommandAuthorizationPolicy authorization) {
+            PortfolioCommandAuthorizationPolicy authorization,
+            ProjectDiscoverabilityCoordinator discoverability) {
         this.projects = Objects.requireNonNull(projects, "projects");
         this.settings = Objects.requireNonNull(settings, "settings");
         this.tags = Objects.requireNonNull(tags, "tags");
         this.authorization = Objects.requireNonNull(authorization, "authorization");
+        this.discoverability = Objects.requireNonNull(discoverability, "discoverability");
     }
 
     public ProjectMutationResult create(CreateProjectCommand command) {
@@ -91,6 +95,7 @@ public final class ProjectCommandService {
                     defaultLanguage,
                     command.requestedAt());
             Project saved = projects.save(project);
+            discoverability.sync(saved);
             return new ProjectMutationResult(saved.id().value(), true, saved.updatedAt(), saved.version().value());
         } catch (IllegalArgumentException | PortfolioValidationException exception) {
             throw new ProjectApplicationException("Project creation was rejected.", exception);
@@ -121,6 +126,7 @@ public final class ProjectCommandService {
                     defaultLanguage,
                     command.requestedAt());
             Project saved = projects.save(project);
+            discoverability.sync(saved);
             return new ProjectMutationResult(saved.id().value(), false, saved.updatedAt(), saved.version().value());
         } catch (IllegalArgumentException | PortfolioValidationException exception) {
             throw new ProjectApplicationException("Project update was rejected.", exception);

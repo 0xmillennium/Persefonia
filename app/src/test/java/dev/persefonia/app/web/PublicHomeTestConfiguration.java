@@ -1,6 +1,9 @@
 package dev.persefonia.app.web;
 
+import dev.persefonia.profileportfolio.application.port.ProjectPublicReadModel;
 import dev.persefonia.profileportfolio.domain.common.ContentLanguage;
+import dev.persefonia.profileportfolio.domain.project.ProjectId;
+import dev.persefonia.profileportfolio.domain.project.ProjectSlug;
 import dev.persefonia.profileportfolio.domain.profile.PersonalProfile;
 import dev.persefonia.profileportfolio.domain.profile.PersonalProfileRepository;
 import dev.persefonia.profileportfolio.domain.profile.ProfileId;
@@ -63,6 +66,30 @@ class PublicHomeTestConfiguration {
     @Primary
     PublicHomeProfileRepository publicHomeProfileRepository() {
         return profiles;
+    }
+
+    @Bean
+    @Primary
+    ProjectPublicReadModel publicHomeProjectPublicReadModel() {
+        return new ProjectPublicReadModel() {
+            @Override
+            public java.util.List<ProjectSummaryRow> listListedProjects(ContentLanguage language) {
+                return java.util.List.of();
+            }
+
+            @Override
+            public Optional<ProjectDetailRow> findDetail(
+                    ProjectId projectId,
+                    ContentLanguage language,
+                    ProjectSlug expectedSlug) {
+                return Optional.empty();
+            }
+
+            @Override
+            public java.util.List<ProjectSummaryRow> listFeaturedProjects(ContentLanguage language, int limit) {
+                return java.util.List.of();
+            }
+        };
     }
 
     static final class PublicHomeProfileRepository implements PersonalProfileRepository {

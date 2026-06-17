@@ -4,6 +4,7 @@ plugins {
 
 dependencies {
     implementation(project(":shared-kernel"))
+    implementation(project(":discovery"))
 
     testImplementation(platform(libs.spring.boot.dependencies))
     testImplementation(libs.junit.jupiter)

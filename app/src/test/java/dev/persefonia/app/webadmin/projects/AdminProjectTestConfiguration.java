@@ -1,5 +1,10 @@
 package dev.persefonia.app.webadmin.projects;
 
+import dev.persefonia.discovery.application.port.RemoveDiscoverableResourcePort;
+import dev.persefonia.discovery.application.port.UpdateDiscoverableResourcePort;
+import dev.persefonia.discovery.application.projection.DiscoverableResourceProjectionInput;
+import dev.persefonia.discovery.application.projection.DiscoverableResourceProjectionResult;
+import dev.persefonia.discovery.application.projection.RemoveDiscoverableResourceCommand;
 import dev.persefonia.profileportfolio.application.port.ProjectTagAssignmentValidation;
 import dev.persefonia.profileportfolio.application.port.ProjectTagDetails;
 import dev.persefonia.profileportfolio.application.port.ProjectTagOption;
@@ -54,6 +59,28 @@ class AdminProjectTestConfiguration {
     @Primary
     AdminProjectTagVocabulary adminProjectTagVocabulary() {
         return new AdminProjectTagVocabulary();
+    }
+
+    @Bean
+    @Primary
+    UpdateDiscoverableResourcePort adminProjectUpdateDiscoverableResourcePort() {
+        return new UpdateDiscoverableResourcePort() {
+            @Override
+            public DiscoverableResourceProjectionResult update(DiscoverableResourceProjectionInput input) {
+                return new DiscoverableResourceProjectionResult.Updated();
+            }
+        };
+    }
+
+    @Bean
+    @Primary
+    RemoveDiscoverableResourcePort adminProjectRemoveDiscoverableResourcePort() {
+        return new RemoveDiscoverableResourcePort() {
+            @Override
+            public DiscoverableResourceProjectionResult remove(RemoveDiscoverableResourceCommand command) {
+                return new DiscoverableResourceProjectionResult.Noop();
+            }
+        };
     }
 
     static final class AdminProjectTestRepository implements ProjectRepository, ProjectAdminReadModel {

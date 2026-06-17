@@ -62,6 +62,28 @@
                 @endif
             </section>
         @endif
+        @if(page.showFeaturedProjects() && !page.featuredProjects().isEmpty())
+            <section aria-label="Featured projects">
+                <h2>Featured projects</h2>
+                <ol>
+                    @for(var project : page.featuredProjects())
+                        <li>
+                            <article>
+                                <h3><a href="${project.publicUrl()}">${project.title()}</a></h3>
+                                <p>${project.summary()}</p>
+                                @if(!project.technologies().isEmpty())
+                                    <ul>
+                                        @for(var technology : project.technologies())
+                                            <li>${technology.name()}</li>
+                                        @endfor
+                                    </ul>
+                                @endif
+                            </article>
+                        </li>
+                    @endfor
+                </ol>
+            </section>
+        @endif
     </main>
     <script type="module" src="${page.scriptPath()}"></script>
 </body>

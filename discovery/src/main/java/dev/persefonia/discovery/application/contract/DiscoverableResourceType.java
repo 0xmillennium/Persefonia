@@ -6,5 +6,6 @@ public enum DiscoverableResourceType {
     RESEARCH,
     PAGE,
     TAG,
-    SERIES
+    SERIES,
+    PROJECT
 }

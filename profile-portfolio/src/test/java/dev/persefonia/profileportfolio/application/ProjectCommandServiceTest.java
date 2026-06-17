@@ -8,6 +8,10 @@ import dev.persefonia.profileportfolio.application.authorization.PortfolioComman
 import dev.persefonia.profileportfolio.application.command.CreateProjectCommand;
 import dev.persefonia.profileportfolio.application.command.ProjectLocalizationInput;
 import dev.persefonia.profileportfolio.application.command.UpdateProjectCommand;
+import dev.persefonia.profileportfolio.application.discovery.ConfiguredProjectCanonicalUrlFactory;
+import dev.persefonia.profileportfolio.application.discovery.ProjectDiscoverabilityCoordinator;
+import dev.persefonia.profileportfolio.application.discovery.ProjectDiscoveryProjectionFactory;
+import dev.persefonia.profileportfolio.application.discovery.ProjectPublicRouteFactory;
 import dev.persefonia.profileportfolio.application.exception.ProjectCommandRejectedException;
 import dev.persefonia.profileportfolio.application.port.ProjectTagAssignmentValidation;
 import dev.persefonia.profileportfolio.application.port.ProjectTagDetails;
@@ -35,6 +39,11 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import dev.persefonia.discovery.application.port.RemoveDiscoverableResourcePort;
+import dev.persefonia.discovery.application.port.UpdateDiscoverableResourcePort;
+import dev.persefonia.discovery.application.projection.DiscoverableResourceProjectionInput;
+import dev.persefonia.discovery.application.projection.DiscoverableResourceProjectionResult;
+import dev.persefonia.discovery.application.projection.RemoveDiscoverableResourceCommand;
 import org.junit.jupiter.api.Test;
 
 class ProjectCommandServiceTest {
@@ -44,6 +53,8 @@ class ProjectCommandServiceTest {
 
     private final Projects projects = new Projects();
     private final Vocabulary vocabulary = new Vocabulary();
+    private final RecordingUpdatePort updatePort = new RecordingUpdatePort();
+    private final RecordingRemovePort removePort = new RecordingRemovePort();
 
     @Test
     void ownerCreatesProjectUsingConfiguredDefaultLanguageForFeaturedValidation() {
@@ -57,6 +68,62 @@ class ProjectCommandServiceTest {
         assertThat(projects.values.get(resultId).localizations())
                 .extracting(localization -> localization.language())
                 .containsExactly(ContentLanguage.EN);
+    }
+
+    @Test
+    void createPublicProjectSyncsProjectDiscoveryProjection() {
+        var service = service(ContentLanguage.EN);
+
+        service.create(create(OWNER, true, "PUBLIC", Set.of(), "EN"));
+
+        assertThat(removePort.commands).hasSize(1);
+        assertThat(updatePort.inputs).hasSize(1);
+        assertThat(updatePort.inputs.getFirst().publicUrl().value()).isEqualTo("/en/projects/en-project");
+        assertThat(updatePort.inputs.getFirst().canonicalUrl().value())
+                .isEqualTo("https://example.test/en/projects/en-project");
+    }
+
+    @Test
+    void createUnlistedProjectSyncsDirectDetailProjection() {
+        var service = service(ContentLanguage.TR);
+
+        service.create(create(OWNER, false, "UNLISTED", Set.of(), "TR"));
+
+        assertThat(removePort.commands).hasSize(1);
+        assertThat(updatePort.inputs).hasSize(1);
+        assertThat(updatePort.inputs.getFirst().publicUrl().value()).isEqualTo("/tr/projects/tr-project");
+    }
+
+    @Test
+    void createPrivateProjectRemovesProjectDiscoveryProjectionWithoutUpdate() {
+        var service = service(ContentLanguage.TR);
+
+        service.create(create(OWNER, false, "PRIVATE", Set.of(), "TR"));
+
+        assertThat(removePort.commands).hasSize(1);
+        assertThat(updatePort.inputs).isEmpty();
+    }
+
+    @Test
+    void updatePublicProjectToPrivateRemovesProjectionWithoutRecreate() {
+        var service = service(ContentLanguage.TR);
+        ProjectId projectId = ProjectId.from(service.create(create(OWNER, false, "PUBLIC", Set.of(), "TR")).projectId());
+        updatePort.inputs.clear();
+        removePort.commands.clear();
+
+        service.update(update(projectId, Set.of()));
+
+        assertThat(removePort.commands).hasSize(1);
+        assertThat(updatePort.inputs).isEmpty();
+    }
+
+    @Test
+    void syncFailureFailsCommand() {
+        var service = service(ContentLanguage.TR);
+        updatePort.reject = true;
+
+        assertThatThrownBy(() -> service.create(create(OWNER, false, "PUBLIC", Set.of(), "TR")))
+                .isInstanceOf(dev.persefonia.profileportfolio.application.exception.ProjectDiscoverySynchronizationException.class);
     }
 
     @Test
@@ -106,7 +173,13 @@ class ProjectCommandServiceTest {
                 projects,
                 new Settings(settings(defaultLanguage)),
                 vocabulary,
-                new TestAuthorizationPolicy());
+                new TestAuthorizationPolicy(),
+                new ProjectDiscoverabilityCoordinator(
+                        updatePort,
+                        removePort,
+                        new ProjectDiscoveryProjectionFactory(
+                                new ProjectPublicRouteFactory(),
+                                new ConfiguredProjectCanonicalUrlFactory("https://example.test"))));
     }
 
     private static CreateProjectCommand create(
@@ -248,6 +321,30 @@ class ProjectCommandServiceTest {
                     .filter(id -> values.containsKey(id) && values.get(id).archived() && !current.contains(id))
                     .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
             return new ProjectTagAssignmentValidation(missing, newlyArchived);
+        }
+    }
+
+    private static final class RecordingUpdatePort implements UpdateDiscoverableResourcePort {
+        private final List<DiscoverableResourceProjectionInput> inputs = new java.util.ArrayList<>();
+        private boolean reject;
+
+        @Override
+        public DiscoverableResourceProjectionResult update(DiscoverableResourceProjectionInput input) {
+            inputs.add(input);
+            return reject
+                    ? new DiscoverableResourceProjectionResult.Rejected(
+                            DiscoverableResourceProjectionResult.Reason.CONFLICT)
+                    : new DiscoverableResourceProjectionResult.Updated();
+        }
+    }
+
+    private static final class RecordingRemovePort implements RemoveDiscoverableResourcePort {
+        private final List<RemoveDiscoverableResourceCommand> commands = new java.util.ArrayList<>();
+
+        @Override
+        public DiscoverableResourceProjectionResult remove(RemoveDiscoverableResourceCommand command) {
+            commands.add(command);
+            return new DiscoverableResourceProjectionResult.Removed();
         }
     }
 }

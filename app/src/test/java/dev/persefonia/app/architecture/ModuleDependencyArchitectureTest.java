@@ -49,7 +49,8 @@ class ModuleDependencyArchitectureTest {
     private static boolean allowedApplicationContractException(String contextPackage, String candidate) {
         boolean discoveryContractConsumer =
                 (contextPackage.equals("dev.persefonia.contentpublishing..")
-                                || contextPackage.equals("dev.persefonia.taxonomy.."))
+                                || contextPackage.equals("dev.persefonia.taxonomy..")
+                                || contextPackage.equals("dev.persefonia.profileportfolio.."))
                         && candidate.equals("dev.persefonia.discovery..");
         return !discoveryContractConsumer;
     }

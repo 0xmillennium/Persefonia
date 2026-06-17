@@ -43,6 +43,12 @@ public class SecurityConfiguration {
             "/tr/series/*",
             "/en/series/*"
     };
+    static final String[] PUBLIC_PROJECT_GET_PATTERNS = {
+            "/tr/projects",
+            "/en/projects",
+            "/tr/projects/*",
+            "/en/projects/*"
+    };
 
     @Bean
     SecurityFilterChain applicationSecurityFilterChain(
@@ -61,6 +67,7 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.GET, PUBLIC_CONTENT_GET_PATTERNS).permitAll()
                         .requestMatchers(HttpMethod.GET, PUBLIC_TAG_GET_PATTERNS).permitAll()
                         .requestMatchers(HttpMethod.GET, PUBLIC_SERIES_GET_PATTERNS).permitAll()
+                        .requestMatchers(HttpMethod.GET, PUBLIC_PROJECT_GET_PATTERNS).permitAll()
                         .anyRequest().denyAll())
                 .csrf(Customizer.withDefaults())
                 .formLogin(AbstractHttpConfigurer::disable)

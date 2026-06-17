@@ -89,6 +89,71 @@ class DiscoveryMigrationTest extends DiscoveryMigrationDatabase {
     }
 
     @Test
+    void discoveryAcceptsProjectDetailProjection() {
+        insertResource(java.util.Map.of(
+                "sourceContext", "PROFILE_PORTFOLIO",
+                "sourceType", "PROJECT",
+                "resourceType", "PROJECT",
+                "routePurpose", "DETAIL",
+                "publicUrl", "/en/projects/persefonia",
+                "canonicalUrl", "https://example.test/en/projects/persefonia",
+                "indexingPolicy", "NO_INDEX",
+                "searchEligibility", "NOT_ELIGIBLE",
+                "sitemapEligibility", "NOT_ELIGIBLE",
+                "feedEligibility", "NOT_ELIGIBLE"));
+
+        assertThat(jdbc().queryForObject("""
+                SELECT count(*) FROM discovery.discoverable_resources
+                WHERE source_context = 'PROFILE_PORTFOLIO' AND source_type = 'PROJECT'
+                """, Integer.class)).isEqualTo(1);
+    }
+
+    @Test
+    void discoveryRejectsProjectProjectionWithPublicDiscoveryEligibility() {
+        java.util.Map<String, Object> project = java.util.Map.of(
+                "sourceContext", "PROFILE_PORTFOLIO",
+                "sourceType", "PROJECT",
+                "resourceType", "PROJECT",
+                "routePurpose", "DETAIL",
+                "publicUrl", "/en/projects/public-discovery",
+                "canonicalUrl", "https://example.test/en/projects/public-discovery",
+                "indexingPolicy", "NO_INDEX",
+                "searchEligibility", "NOT_ELIGIBLE",
+                "sitemapEligibility", "NOT_ELIGIBLE",
+                "feedEligibility", "NOT_ELIGIBLE");
+
+        assertThatThrownBy(() -> insertResource(with(project, "searchEligibility", "ELIGIBLE")))
+                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> insertResource(with(project, "sitemapEligibility", "ELIGIBLE")))
+                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> insertResource(with(project, "feedEligibility", "ELIGIBLE")))
+                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void discoveryRejectsProjectProjectionWithWrongSourceTuple() {
+        assertThatThrownBy(() -> insertResource(java.util.Map.of(
+                "sourceContext", "PROFILE_PORTFOLIO",
+                "sourceType", "CONTENT_ITEM",
+                "resourceType", "PROJECT",
+                "routePurpose", "DETAIL",
+                "indexingPolicy", "NO_INDEX",
+                "searchEligibility", "NOT_ELIGIBLE",
+                "sitemapEligibility", "NOT_ELIGIBLE",
+                "feedEligibility", "NOT_ELIGIBLE")))
+                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void redirectRulesWereNotExpandedForProjectSourceReferences() {
+        assertThatThrownBy(() -> insertRedirect(java.util.Map.of(
+                "sourceContext", "PROFILE_PORTFOLIO",
+                "sourceType", "PROJECT",
+                "sourceEntityId", java.util.UUID.randomUUID())))
+                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+    }
+
+    @Test
     void publicUrlAndCanonicalUrlRemainUnique() {
         insertResource(java.util.Map.of(
                 "publicUrl", "/en/articles/unique",
@@ -199,5 +264,16 @@ class DiscoveryMigrationTest extends DiscoveryMigrationDatabase {
         assertThat(jdbc().queryForObject(
                 "SELECT to_regclass('discovery.discoverable_resource_history')",
                 String.class)).isNull();
+    }
+
+    private static java.util.Map<String, Object> with(
+            java.util.Map<String, Object> original,
+            String key,
+            Object value) {
+        java.util.Map<String, Object> copy = new java.util.HashMap<>(original);
+        copy.put(key, value);
+        copy.put("publicUrl", original.get("publicUrl") + "-" + key);
+        copy.put("canonicalUrl", original.get("canonicalUrl") + "-" + key);
+        return copy;
     }
 }
