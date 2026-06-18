@@ -85,10 +85,27 @@ public final class Asset {
             FileSize sizeBytes,
             Checksum checksum,
             Instant now) {
+        return pendingImage(
+                id, originalFilename, storedFilename, storagePath, publicUrl, contentType, fileExtension,
+                sizeBytes, checksum, List.of(), now);
+    }
+
+    public static Asset pendingImage(
+            AssetId id,
+            OriginalFilename originalFilename,
+            StoredFilename storedFilename,
+            StoragePath storagePath,
+            PublicAssetUrl publicUrl,
+            ContentTypeName contentType,
+            FileExtension fileExtension,
+            FileSize sizeBytes,
+            Checksum checksum,
+            List<AssetValidationResult> validationResults,
+            Instant now) {
         return new Asset(
                 id, originalFilename, storedFilename, storagePath, publicUrl, contentType, fileExtension,
                 sizeBytes, checksum, AssetKind.IMAGE, AssetVisibility.PRIVATE, null, null,
-                DecorativeImageFlag.informative(), ProcessingStatus.PENDING, List.of(), List.of(),
+                DecorativeImageFlag.informative(), ProcessingStatus.PENDING, List.of(), validationResults,
                 now, now, Version.initial());
     }
 
