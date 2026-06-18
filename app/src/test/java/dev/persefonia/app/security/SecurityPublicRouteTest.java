@@ -60,6 +60,14 @@ class SecurityPublicRouteTest {
         assertNotSuccessful(post(viteAssetResolver.scriptPath(FRONTEND_ENTRY)));
     }
 
+    @Test
+    void publicMediaVariantRouteAllowsAnonymousRequests() throws Exception {
+        HttpResponse<String> response =
+                get("/media/assets/00000000-0000-0000-0000-000000000000/variants/thumbnail");
+
+        assertEquals(404, response.statusCode());
+    }
+
     private HttpResponse<String> get(String path) throws Exception {
         HttpRequest request = HttpRequest.newBuilder(uri(path)).GET().build();
         return httpClient.send(request, HttpResponse.BodyHandlers.ofString());

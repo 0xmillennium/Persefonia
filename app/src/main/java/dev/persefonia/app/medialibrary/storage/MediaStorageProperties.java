@@ -8,6 +8,7 @@ public class MediaStorageProperties {
     private String storageRoot;
     private long maxImageBytes = UploadValidationPolicy.DEFAULT_MAX_IMAGE_BYTES;
     private long maxPdfBytes = UploadValidationPolicy.DEFAULT_MAX_PDF_BYTES;
+    private long maxImagePixels = 40_000_000L;
 
     public String getStorageRoot() {
         return storageRoot;
@@ -40,5 +41,16 @@ public class MediaStorageProperties {
             throw new IllegalArgumentException("maxPdfBytes must be positive");
         }
         this.maxPdfBytes = maxPdfBytes;
+    }
+
+    public long getMaxImagePixels() {
+        return maxImagePixels;
+    }
+
+    public void setMaxImagePixels(long maxImagePixels) {
+        if (maxImagePixels <= 0) {
+            throw new IllegalArgumentException("maxImagePixels must be positive");
+        }
+        this.maxImagePixels = maxImagePixels;
     }
 }

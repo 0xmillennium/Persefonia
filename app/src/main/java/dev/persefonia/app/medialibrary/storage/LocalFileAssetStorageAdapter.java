@@ -6,6 +6,8 @@ import dev.persefonia.medialibrary.application.storage.OriginalAssetStagingReque
 import dev.persefonia.medialibrary.application.storage.StagedAssetObject;
 import dev.persefonia.medialibrary.application.storage.StorageWriteException;
 import dev.persefonia.medialibrary.application.storage.StoredAssetObject;
+import dev.persefonia.medialibrary.application.storage.VariantStorageRequest;
+import dev.persefonia.medialibrary.domain.asset.StoragePath;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -110,6 +112,46 @@ public final class LocalFileAssetStorageAdapter implements AssetStoragePort {
     }
 
     @Override
+    public InputStream openStored(StoragePath storagePath) {
+        Objects.requireNonNull(storagePath, "storagePath");
+        try {
+            Path storedPath = resolveLogicalPath(storagePath.value()).toRealPath();
+            if (!storedPath.startsWith(realStorageRoot) || !Files.isRegularFile(storedPath)) {
+                throw new StorageWriteException("Stored media path escapes the storage root.");
+            }
+            return Files.newInputStream(storedPath, StandardOpenOption.READ);
+        } catch (IOException exception) {
+            throw new StorageWriteException("Unable to open stored media.", exception);
+        }
+    }
+
+    @Override
+    public StoredAssetObject storeVariant(VariantStorageRequest request) {
+        Objects.requireNonNull(request, "request");
+        String logicalPath = request.storagePath().value();
+        if (!logicalPath.startsWith("variants/")) {
+            throw new StorageWriteException("Generated variant path must be under variants/.");
+        }
+        Path variantPath = resolveLogicalPath(logicalPath);
+        boolean destinationReserved = false;
+        try {
+            Files.createDirectories(variantPath.getParent());
+            verifyExistingDirectoryWithinRoot(variantPath.getParent());
+            Files.createFile(variantPath);
+            destinationReserved = true;
+            Files.write(variantPath, request.content(), StandardOpenOption.WRITE);
+            return new StoredAssetObject(logicalPath);
+        } catch (FileAlreadyExistsException exception) {
+            throw new StorageWriteException("Stored media already exists.", exception);
+        } catch (IOException exception) {
+            if (destinationReserved) {
+                deleteBestEffort(variantPath);
+            }
+            throw new StorageWriteException("Unable to store generated media variant.", exception);
+        }
+    }
+
+    @Override
     public void deleteStagedIfExists(StagedAssetObject stagedObject) {
         if (stagedObject != null) {
             try {
@@ -125,6 +167,17 @@ public final class LocalFileAssetStorageAdapter implements AssetStoragePort {
         if (storedObject != null) {
             try {
                 deleteBestEffort(resolveLogicalPath(storedObject.logicalPath()));
+            } catch (RuntimeException ignored) {
+                // Compensating cleanup is deliberately best-effort.
+            }
+        }
+    }
+
+    @Override
+    public void deleteStoredByPathIfExists(StoragePath storagePath) {
+        if (storagePath != null) {
+            try {
+                deleteBestEffort(resolveLogicalPath(storagePath.value()));
             } catch (RuntimeException ignored) {
                 // Compensating cleanup is deliberately best-effort.
             }

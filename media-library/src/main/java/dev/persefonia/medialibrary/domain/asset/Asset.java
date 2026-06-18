@@ -250,12 +250,50 @@ public final class Asset {
     }
 
     public void markProcessed(ImageDimensions dimensions, Instant now) {
+        markProcessed(dimensions, variants, validationResults, now);
+    }
+
+    public void markProcessed(
+            ImageDimensions dimensions,
+            List<AssetVariant> processedVariants,
+            List<AssetValidationResult> processedValidationResults,
+            Instant now) {
         if (kind != AssetKind.IMAGE) {
             throw new AssetValidationException("only images may be marked processed");
         }
-        validateState(visibility, ProcessingStatus.PROCESSED, dimensions, altText, decorative, variants);
+        List<AssetVariant> replacementVariants =
+                List.copyOf(Objects.requireNonNull(processedVariants, "processedVariants"));
+        List<AssetValidationResult> replacementValidationResults =
+                List.copyOf(Objects.requireNonNull(processedValidationResults, "processedValidationResults"));
+        validateState(
+                visibility, ProcessingStatus.PROCESSED, dimensions, altText, decorative, replacementVariants);
+        rejectDuplicate(replacementValidationResults, result -> result.rule().value(), "validation rule name");
         imageDimensions = Objects.requireNonNull(dimensions, "dimensions");
+        variants = replacementVariants;
+        validationResults = replacementValidationResults;
         processingStatus = ProcessingStatus.PROCESSED;
+        markUpdated(now);
+    }
+
+    public void markFailed(List<AssetValidationResult> failedValidationResults, Instant now) {
+        if (kind != AssetKind.IMAGE) {
+            throw new AssetValidationException("only images may be marked failed");
+        }
+        List<AssetValidationResult> replacementValidationResults =
+                List.copyOf(Objects.requireNonNull(failedValidationResults, "failedValidationResults"));
+        rejectDuplicate(replacementValidationResults, result -> result.rule().value(), "validation rule name");
+        validateState(
+                AssetVisibility.PRIVATE,
+                ProcessingStatus.FAILED,
+                null,
+                altText,
+                decorative,
+                List.of());
+        visibility = AssetVisibility.PRIVATE;
+        imageDimensions = null;
+        variants = List.of();
+        validationResults = replacementValidationResults;
+        processingStatus = ProcessingStatus.FAILED;
         markUpdated(now);
     }
 
@@ -287,8 +325,8 @@ public final class Asset {
             if (candidateStatus == ProcessingStatus.NOT_REQUIRED) {
                 throw new AssetValidationException("image processing status must not be NOT_REQUIRED");
             }
-            if (candidateStatus != ProcessingStatus.PENDING && candidateDimensions == null) {
-                throw new AssetValidationException("non-pending image must have dimensions");
+            if (candidateStatus == ProcessingStatus.PROCESSED && candidateDimensions == null) {
+                throw new AssetValidationException("processed image must have dimensions");
             }
             if (candidateVisibility == AssetVisibility.PUBLIC && candidateStatus != ProcessingStatus.PROCESSED) {
                 throw new AssetValidationException("public image must be processed");

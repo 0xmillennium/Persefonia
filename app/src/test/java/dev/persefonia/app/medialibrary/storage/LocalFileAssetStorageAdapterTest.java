@@ -9,6 +9,8 @@ import dev.persefonia.medialibrary.application.storage.OriginalAssetStagingReque
 import dev.persefonia.medialibrary.application.storage.StagedAssetObject;
 import dev.persefonia.medialibrary.application.storage.StorageWriteException;
 import dev.persefonia.medialibrary.application.storage.StoredAssetObject;
+import dev.persefonia.medialibrary.application.storage.VariantStorageRequest;
+import dev.persefonia.medialibrary.domain.asset.StoragePath;
 import java.io.ByteArrayInputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -88,5 +90,45 @@ class LocalFileAssetStorageAdapterTest {
                 () -> new ByteArrayInputStream("1234567890".getBytes()), 4));
 
         assertThat(staged.sizeBytes()).isEqualTo(4);
+    }
+
+    @Test
+    void opensStoredOriginalAndStoresAndDeletesVariantByLogicalPath() throws Exception {
+        LocalFileAssetStorageAdapter adapter = new LocalFileAssetStorageAdapter(tempDirectory);
+        byte[] original = "original".getBytes();
+        StagedAssetObject staged = adapter.stageOriginal(new OriginalAssetStagingRequest(
+                () -> new ByteArrayInputStream(original), 100));
+        StoredAssetObject stored = adapter.commitStaged(
+                staged, new FinalAssetStorageKey("original/asset/checksum.png"));
+
+        try (var input = adapter.openStored(StoragePath.of(stored.logicalPath()))) {
+            assertThat(input.readAllBytes()).isEqualTo(original);
+        }
+
+        StoragePath variantPath = StoragePath.of("variants/asset/thumbnail-checksum.png");
+        StoredAssetObject variant = adapter.storeVariant(
+                new VariantStorageRequest(variantPath, "variant".getBytes()));
+        assertThat(variant.logicalPath()).isEqualTo(variantPath.value());
+        assertThat(tempDirectory.resolve(variantPath.value())).hasBinaryContent("variant".getBytes());
+
+        adapter.deleteStoredByPathIfExists(variantPath);
+        assertThat(tempDirectory.resolve(variantPath.value())).doesNotExist();
+    }
+
+    @Test
+    void variantStorageRejectsUnsafePathsAndMissingStoredObjectFailsSafely() {
+        LocalFileAssetStorageAdapter adapter = new LocalFileAssetStorageAdapter(tempDirectory);
+
+        for (String path : new String[] {"../escape.png", "/absolute.png", "variants/../../escape.png"}) {
+            assertThatThrownBy(() -> adapter.storeVariant(new VariantStorageRequest(
+                    new StoragePath(path), "variant".getBytes())))
+                    .isInstanceOf(RuntimeException.class);
+        }
+        assertThatThrownBy(() -> adapter.openStored(StoragePath.of("missing/file.png")))
+                .isInstanceOf(StorageWriteException.class)
+                .hasMessageNotContaining(tempDirectory.toString());
+        assertThatThrownBy(() -> adapter.storeVariant(new VariantStorageRequest(
+                StoragePath.of("original/asset/not-a-variant.png"), "variant".getBytes())))
+                .isInstanceOf(StorageWriteException.class);
     }
 }

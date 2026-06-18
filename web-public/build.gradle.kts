@@ -11,6 +11,7 @@ dependencies {
     implementation(project(":discovery"))
     implementation(project(":taxonomy"))
     implementation(project(":profile-portfolio"))
+    implementation(project(":media-library"))
     implementation(libs.spring.webmvc)
 
     compileOnly("jakarta.servlet:jakarta.servlet-api")

@@ -260,6 +260,17 @@ class UploadAssetCommandServiceTest {
         }
 
         @Override
+        public InputStream openStored(dev.persefonia.medialibrary.domain.asset.StoragePath storagePath) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public StoredAssetObject storeVariant(
+                dev.persefonia.medialibrary.application.storage.VariantStorageRequest request) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public void deleteStagedIfExists(StagedAssetObject stagedObject) {
             stagedDeleted = true;
             staged = null;
@@ -267,6 +278,12 @@ class UploadAssetCommandServiceTest {
 
         @Override
         public void deleteStoredIfExists(StoredAssetObject storedObject) {
+            storedDeleted = true;
+        }
+
+        @Override
+        public void deleteStoredByPathIfExists(
+                dev.persefonia.medialibrary.domain.asset.StoragePath storagePath) {
             storedDeleted = true;
         }
     }

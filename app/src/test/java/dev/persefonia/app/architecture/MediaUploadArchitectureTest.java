@@ -66,13 +66,12 @@ class MediaUploadArchitectureTest {
     }
 
     @Test
-    void noMediaOrCvRoutesAreIntroduced() throws Exception {
-        String webSources = sourceText(Path.of("../web-public/src/main/java"))
-                + sourceText(Path.of("../web-admin/src/main/java"));
-        assertThat(webSources)
+    void onlyPublicVariantMediaRouteAndNoCvRoutesAreIntroduced() throws Exception {
+        String publicSources = sourceText(Path.of("../web-public/src/main/java"));
+        String adminSources = sourceText(Path.of("../web-admin/src/main/java"));
+        assertThat(publicSources)
                 .doesNotContain("UploadAssetCommandService")
                 .doesNotContain("AssetStoragePort")
-                .doesNotContain("@GetMapping(\"/media")
                 .doesNotContain("@PostMapping(\"/media")
                 .doesNotContain("@GetMapping(\"/assets")
                 .doesNotContain("@PostMapping(\"/assets")
@@ -81,6 +80,16 @@ class MediaUploadArchitectureTest {
                 .doesNotContain("ActiveCv")
                 .doesNotContain("active_cv_profiles")
                 .doesNotContain("cv_entries");
+        assertThat(publicSources.split(
+                        java.util.regex.Pattern.quote(
+                                "@GetMapping(\"/media/assets/{assetId}/variants/{variantName}\")"),
+                        -1))
+                .hasSize(2);
+        assertThat(adminSources)
+                .doesNotContain("@GetMapping(\"/media")
+                .doesNotContain("@PostMapping(\"/media")
+                .doesNotContain("PublicImage")
+                .doesNotContain("ProcessImageAsset");
 
         assertThat(sourceText(Path.of("src/main/resources/db/migration")))
                 .doesNotContain("active_cv_profiles")

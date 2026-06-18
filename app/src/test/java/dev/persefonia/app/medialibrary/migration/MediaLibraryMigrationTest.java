@@ -42,9 +42,9 @@ class MediaLibraryMigrationTest {
     }
 
     @Test
-    void nonPendingImageRequiresDimensions() {
+    void processedImageRequiresDimensionsAndFailedImageMayOmitThem() throws SQLException {
         assertRejected(() -> insertAsset(UUID.randomUUID(), "a", "a", "PRIVATE", "PROCESSED", null, null, null, false));
-        assertRejected(() -> insertAsset(UUID.randomUUID(), "b", "b", "PRIVATE", "FAILED", null, null, null, false));
+        insertAsset(UUID.randomUUID(), "b", "b", "PRIVATE", "FAILED", null, null, null, false);
     }
 
     @Test

@@ -48,13 +48,21 @@ class AssetTest {
     }
 
     @Test
-    void processedOrFailedImageWithoutDimensionsIsRejected() {
+    void processedImageWithoutDimensionsIsRejectedButFailedImageWithoutDimensionsIsValid() {
         assertThatThrownBy(() -> rehydrateImage(
                 AssetVisibility.PRIVATE, ProcessingStatus.PROCESSED, null, null,
                 DecorativeImageFlag.informative(), List.of()))
                 .isInstanceOf(AssetValidationException.class);
-        assertThatThrownBy(() -> rehydrateImage(
+        Asset failed = rehydrateImage(
                 AssetVisibility.PRIVATE, ProcessingStatus.FAILED, null, null,
+                DecorativeImageFlag.informative(), List.of());
+        assertThat(failed.imageDimensions()).isEmpty();
+    }
+
+    @Test
+    void publicFailedImageIsRejected() {
+        assertThatThrownBy(() -> rehydrateImage(
+                AssetVisibility.PUBLIC, ProcessingStatus.FAILED, null, AltText.of("Portrait"),
                 DecorativeImageFlag.informative(), List.of()))
                 .isInstanceOf(AssetValidationException.class);
     }
