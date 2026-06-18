@@ -8,9 +8,12 @@ import dev.persefonia.profileportfolio.application.discovery.ProjectDiscoveryPro
 import dev.persefonia.profileportfolio.application.discovery.ProjectPublicRouteFactory;
 import dev.persefonia.identityaccess.application.admin.authorization.AdminCommandAuthorizationPolicy;
 import dev.persefonia.profileportfolio.application.authorization.PortfolioCommandAuthorizationPolicy;
+import dev.persefonia.profileportfolio.application.port.ActiveCvAssetEligibilityPort;
 import dev.persefonia.profileportfolio.application.port.ProjectAdminReadModel;
 import dev.persefonia.profileportfolio.application.port.ProjectPublicReadModel;
 import dev.persefonia.profileportfolio.application.port.ProjectTagVocabularyPort;
+import dev.persefonia.profileportfolio.application.service.ActiveCvAdminQueryService;
+import dev.persefonia.profileportfolio.application.service.ActiveCvCommandService;
 import dev.persefonia.profileportfolio.application.service.ProjectAdminQueryService;
 import dev.persefonia.profileportfolio.application.service.ProjectCommandService;
 import dev.persefonia.profileportfolio.application.service.PublicFeaturedProjectQueryService;
@@ -22,11 +25,13 @@ import dev.persefonia.profileportfolio.application.service.PersonalProfileAdminQ
 import dev.persefonia.profileportfolio.application.service.PersonalProfileCommandService;
 import dev.persefonia.profileportfolio.application.service.SitePresentationSettingsAdminQueryService;
 import dev.persefonia.profileportfolio.application.service.SitePresentationSettingsCommandService;
+import dev.persefonia.profileportfolio.domain.cv.ActiveCvProfileRepository;
 import dev.persefonia.profileportfolio.domain.profile.PersonalProfileRepository;
 import dev.persefonia.profileportfolio.domain.project.ProjectRepository;
 import dev.persefonia.profileportfolio.domain.settings.SitePresentationSettingsRepository;
 import dev.persefonia.taxonomy.application.service.TagVocabularyQueryService;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -69,6 +74,25 @@ class ProfilePortfolioApplicationConfiguration {
             PersonalProfileRepository profiles,
             SitePresentationSettingsRepository settings) {
         return new PersonalProfileAdminQueryService(profiles, settings);
+    }
+
+    @Bean
+    @ConditionalOnBean(ActiveCvAssetEligibilityPort.class)
+    ActiveCvCommandService activeCvCommandService(
+            ActiveCvProfileRepository activeCvProfiles,
+            SitePresentationSettingsRepository settings,
+            ActiveCvAssetEligibilityPort eligibility,
+            PortfolioCommandAuthorizationPolicy authorization) {
+        return new ActiveCvCommandService(activeCvProfiles, settings, eligibility, authorization);
+    }
+
+    @Bean
+    @ConditionalOnBean(ActiveCvAssetEligibilityPort.class)
+    ActiveCvAdminQueryService activeCvAdminQueryService(
+            ActiveCvProfileRepository activeCvProfiles,
+            SitePresentationSettingsRepository settings,
+            ActiveCvAssetEligibilityPort eligibility) {
+        return new ActiveCvAdminQueryService(activeCvProfiles, settings, eligibility);
     }
 
     @Bean

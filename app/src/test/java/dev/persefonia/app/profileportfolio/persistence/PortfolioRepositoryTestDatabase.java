@@ -2,6 +2,7 @@ package dev.persefonia.app.profileportfolio.persistence;
 
 import dev.persefonia.profileportfolio.domain.profile.PersonalProfileRepository;
 import dev.persefonia.profileportfolio.domain.project.ProjectRepository;
+import dev.persefonia.profileportfolio.domain.cv.ActiveCvProfileRepository;
 import dev.persefonia.profileportfolio.domain.settings.SitePresentationSettingsRepository;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,6 +29,7 @@ abstract class PortfolioRepositoryTestDatabase {
     private static boolean migrated;
 
     @Autowired SitePresentationSettingsRepository settings;
+    @Autowired ActiveCvProfileRepository activeCvProfiles;
     @Autowired PersonalProfileRepository profiles;
     @Autowired ProjectRepository projects;
     @Autowired JdbcTemplate jdbc;
@@ -44,6 +46,8 @@ abstract class PortfolioRepositoryTestDatabase {
         migrateOnce();
         jdbc.execute("""
                 TRUNCATE portfolio.project_tags,
+                    portfolio.active_cv_documents,
+                    portfolio.active_cv_profiles,
                     portfolio.project_links,
                     portfolio.project_technologies,
                     portfolio.project_case_study_sections,
@@ -58,6 +62,16 @@ abstract class PortfolioRepositoryTestDatabase {
                     portfolio.site_supported_languages,
                     portfolio.site_presentation_settings
                 CASCADE
+                """);
+        jdbc.execute("""
+                INSERT INTO portfolio.active_cv_profiles (id, singleton_key, created_at, updated_at, version)
+                VALUES (
+                    '00000000-0000-0000-0000-000000000801',
+                    true,
+                    timestamp with time zone '2026-06-16T10:00:00Z',
+                    timestamp with time zone '2026-06-16T10:00:00Z',
+                    0
+                )
                 """);
         jdbc.execute("""
                 INSERT INTO portfolio.site_presentation_settings (

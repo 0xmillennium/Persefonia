@@ -28,6 +28,8 @@ class PortfolioCrossContextBoundarySchemaTest {
         assertThat(PortfolioSchemaAssertions.foreignKeyCount(
                 "site_presentation_settings", "default_og_image_asset_id", "media", "assets"))
                 .isZero();
+        assertThat(PortfolioSchemaAssertions.foreignKeyCount("active_cv_documents", "asset_id", "media", "assets"))
+                .isZero();
     }
 
     @Test

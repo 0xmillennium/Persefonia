@@ -85,9 +85,8 @@ class MediaProcessingArchitectureTest {
                 .doesNotContain("defaultOgImageAssetId")
                 .doesNotContain("defaultOpenGraphImageAssetId");
 
-        String adminAndPublic = sourceText(Path.of("../web-admin/src/main/java"))
-                + sourceText(Path.of("../web-public/src/main/java"));
-        assertThat(adminAndPublic)
+        String publicSources = sourceText(Path.of("../web-public/src/main/java"));
+        assertThat(publicSources)
                 .doesNotContain("ActiveCv")
                 .doesNotContain("active_cv_profiles")
                 .doesNotContain("cv_entries");

@@ -58,7 +58,6 @@ class MediaBoundaryArchitectureTest {
         noClasses()
                 .that().resideInAnyPackage(
                         "dev.persefonia.profileportfolio..",
-                        "dev.persefonia.app.profileportfolio..",
                         "dev.persefonia.contentpublishing..",
                         "dev.persefonia.app.contentpublishing..")
                 .should().dependOnClassesThat().resideInAnyPackage(
@@ -69,6 +68,21 @@ class MediaBoundaryArchitectureTest {
                 .orShould().dependOnClassesThat().haveSimpleName("AssetRepository")
                 .allowEmptyShould(true)
                 .check(ArchitectureTestSupport.PRODUCTION_CLASSES);
+    }
+
+    @Test
+    void activeCvMediaBridgeDoesNotUseMediaRepositoriesStorageOrJdbcAdapters() throws Exception {
+        String bridge = Files.readString(Path.of(
+                "src/main/java/dev/persefonia/app/medialibrary/application/MediaLibraryActiveCvAssetEligibilityAdapter.java"));
+
+        assertThat(bridge)
+                .contains("PublicPdfAssetQueryService")
+                .doesNotContain("AssetRepository")
+                .doesNotContain("JdbcAssetRepositoryAdapter")
+                .doesNotContain("LocalFileAssetStorageAdapter")
+                .doesNotContain("ImageIO")
+                .doesNotContain("storagePath")
+                .doesNotContain("storage_path");
     }
 
     @Test
@@ -138,16 +152,16 @@ class MediaBoundaryArchitectureTest {
     }
 
     @Test
-    void activeCvRoutesAndSchemaAreAbsentFromMediaWorkflow() throws Exception {
-        String publicAndAdminSources = sourceText(Path.of("../web-public/src/main/java"))
-                + sourceText(Path.of("../web-admin/src/main/java"))
-                + sourceText(Path.of("src/main/jte/site"))
-                + sourceText(Path.of("src/main/jte/admin"));
+    void activeCvPublicDeliveryIsAbsentFromMediaWorkflow() throws Exception {
+        String publicSources = sourceText(Path.of("../web-public/src/main/java"))
+                + sourceText(Path.of("src/main/jte/site"));
 
-        assertThat(publicAndAdminSources)
+        assertThat(publicSources)
                 .doesNotContain("ActiveCv")
                 .doesNotContain("ActiveCV")
                 .doesNotContain("active-cv")
+                .doesNotContain("/cv")
+                .doesNotContain("/resume")
                 .doesNotContain("cvDownload");
     }
 

@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test;
 
 class AdminNavigationFactoryTest {
     @Test
-    void enablesSettingsProfileProjectsAndMedia() {
+    void enablesSettingsProfileProjectsCvAndMedia() {
         var navigation = new AdminNavigationFactory().create(AdminNavigationSection.PROJECTS);
 
         assertThat(navigation).anySatisfy(item -> {
@@ -28,6 +28,11 @@ class AdminNavigationFactoryTest {
             assertThat(item.href()).isEqualTo("/admin/projects");
         });
         assertThat(navigation).anySatisfy(item -> {
+            assertThat(item.label()).isEqualTo("CV");
+            assertThat(item.disabled()).isFalse();
+            assertThat(item.href()).isEqualTo("/admin/cv");
+        });
+        assertThat(navigation).anySatisfy(item -> {
             assertThat(item.label()).isEqualTo("Media");
             assertThat(item.disabled()).isFalse();
             assertThat(item.href()).isEqualTo("/admin/media");
@@ -42,6 +47,17 @@ class AdminNavigationFactoryTest {
             assertThat(item.label()).isEqualTo("Media");
             assertThat(item.active()).isTrue();
             assertThat(item.href()).isEqualTo("/admin/media");
+        });
+    }
+
+    @Test
+    void cvNavigationIsActiveForCvPages() {
+        var navigation = new AdminNavigationFactory().create(AdminNavigationSection.CV);
+
+        assertThat(navigation).anySatisfy(item -> {
+            assertThat(item.label()).isEqualTo("CV");
+            assertThat(item.active()).isTrue();
+            assertThat(item.href()).isEqualTo("/admin/cv");
         });
     }
 }

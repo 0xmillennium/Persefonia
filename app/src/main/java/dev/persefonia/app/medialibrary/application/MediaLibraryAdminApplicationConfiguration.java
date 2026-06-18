@@ -7,6 +7,8 @@ import dev.persefonia.medialibrary.application.admin.MediaAdminReadModel;
 import dev.persefonia.medialibrary.application.asset.AssetRepository;
 import dev.persefonia.medialibrary.application.authorization.MediaCommandAuthorizationPolicy;
 import dev.persefonia.medialibrary.application.processing.ProcessImageAssetCommandService;
+import dev.persefonia.medialibrary.application.publicview.PublicPdfAssetQueryService;
+import dev.persefonia.medialibrary.application.publicview.PublicPdfAssetReadModel;
 import dev.persefonia.medialibrary.application.upload.UploadAssetCommandService;
 import java.time.Clock;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -38,5 +40,11 @@ public class MediaLibraryAdminApplicationConfiguration {
     @Bean
     MediaAdminQueryService mediaAdminQueryService(MediaAdminReadModel readModel) {
         return new MediaAdminQueryService(readModel);
+    }
+
+    @Bean
+    @ConditionalOnBean(PublicPdfAssetReadModel.class)
+    PublicPdfAssetQueryService publicPdfAssetQueryService(PublicPdfAssetReadModel readModel) {
+        return new PublicPdfAssetQueryService(readModel);
     }
 }

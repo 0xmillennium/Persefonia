@@ -45,6 +45,7 @@ final class PortfolioMigrationDatabase {
     static void truncatePortfolioMutableTables() throws SQLException {
         PortfolioSql.execute("""
                 TRUNCATE portfolio.project_tags,
+                    portfolio.active_cv_documents,
                     portfolio.project_links,
                     portfolio.project_technologies,
                     portfolio.project_case_study_sections,

@@ -7,6 +7,7 @@ public enum AdminNavigationSection {
     TAGS,
     REDIRECTS,
     PROFILE,
+    CV,
     PROJECTS,
     MEDIA,
     CONTACT,

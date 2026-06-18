@@ -78,7 +78,6 @@ class MediaUploadArchitectureTest {
                 .doesNotContain("@GetMapping(\"/cv")
                 .doesNotContain("@PostMapping(\"/cv")
                 .doesNotContain("ActiveCv")
-                .doesNotContain("active_cv_profiles")
                 .doesNotContain("cv_entries");
         assertThat(publicSources.split(
                         java.util.regex.Pattern.quote(
@@ -91,9 +90,9 @@ class MediaUploadArchitectureTest {
                 .doesNotContain("PublicImage")
                 .doesNotContain("ProcessImageAsset");
 
-        assertThat(sourceText(Path.of("src/main/resources/db/migration")))
-                .doesNotContain("active_cv_profiles")
-                .doesNotContain("cv_entries");
+        assertThat(Files.readString(Path.of("src/main/resources/db/migration/V16__active_cv_profile.sql")))
+                .doesNotContain("cv_entries")
+                .doesNotContain("REFERENCES media.assets");
     }
 
     private static List<Path> productionJavaSourcesContaining(String text) throws IOException {
