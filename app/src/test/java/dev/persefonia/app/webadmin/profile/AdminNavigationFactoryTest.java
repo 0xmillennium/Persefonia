@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test;
 
 class AdminNavigationFactoryTest {
     @Test
-    void enablesSettingsProfileAndProjects() {
+    void enablesSettingsProfileProjectsAndMedia() {
         var navigation = new AdminNavigationFactory().create(AdminNavigationSection.PROJECTS);
 
         assertThat(navigation).anySatisfy(item -> {
@@ -26,6 +26,22 @@ class AdminNavigationFactoryTest {
             assertThat(item.active()).isTrue();
             assertThat(item.disabled()).isFalse();
             assertThat(item.href()).isEqualTo("/admin/projects");
+        });
+        assertThat(navigation).anySatisfy(item -> {
+            assertThat(item.label()).isEqualTo("Media");
+            assertThat(item.disabled()).isFalse();
+            assertThat(item.href()).isEqualTo("/admin/media");
+        });
+    }
+
+    @Test
+    void mediaNavigationIsActiveForMediaPages() {
+        var navigation = new AdminNavigationFactory().create(AdminNavigationSection.MEDIA);
+
+        assertThat(navigation).anySatisfy(item -> {
+            assertThat(item.label()).isEqualTo("Media");
+            assertThat(item.active()).isTrue();
+            assertThat(item.href()).isEqualTo("/admin/media");
         });
     }
 }

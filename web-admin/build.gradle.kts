@@ -8,6 +8,7 @@ dependencies {
     implementation(project(":taxonomy"))
     implementation(project(":content-publishing"))
     implementation(project(":profile-portfolio"))
+    implementation(project(":media-library"))
     implementation(libs.spring.webmvc)
     implementation(libs.spring.security.core)
     implementation(libs.spring.security.web)

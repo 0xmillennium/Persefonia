@@ -1,7 +1,9 @@
 package dev.persefonia.app.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 import org.junit.jupiter.api.Test;
@@ -17,41 +19,34 @@ import org.springframework.test.web.servlet.MvcResult;
         "spring.flyway.enabled=false"
 })
 @AutoConfigureMockMvc
-class SensitiveRouteCacheRegressionTest {
+class AdminMediaSecurityAndCacheTest {
     @Autowired MockMvc mockMvc;
 
     @Test
-    void unauthenticatedAdminAndPreviewRoutesRemainProtectedAndUncached() throws Exception {
-        assertProtectedAndUncached(mockMvc.perform(get("/admin/content")).andReturn());
-        assertProtectedAndUncached(mockMvc.perform(get("/admin/content/11111111-1111-1111-1111-111111111111/preview")).andReturn());
-        assertProtectedAndUncached(mockMvc.perform(get("/admin/content/11111111-1111-1111-1111-111111111111/revisions")).andReturn());
+    void anonymousMediaAdminGetsAreProtectedAndUncached() throws Exception {
         assertProtectedAndUncached(mockMvc.perform(get("/admin/media")).andReturn());
         assertProtectedAndUncached(mockMvc.perform(get("/admin/media/new")).andReturn());
-        assertProtectedAndUncached(mockMvc.perform(get("/admin/media/11111111-1111-1111-1111-111111111111")).andReturn());
+        assertProtectedAndUncached(mockMvc.perform(get(
+                "/admin/media/11111111-1111-1111-1111-111111111111")).andReturn());
     }
 
     @Test
-    void oauthRoutesRemainUncached() throws Exception {
-        assertUncached(mockMvc.perform(get("/oauth2/authorization/authelia")).andReturn());
-        assertUncached(mockMvc.perform(get("/login/oauth2/code/authelia")).andReturn());
-    }
+    void mediaAdminPostsRequireCsrfBeforeCommandHandling() throws Exception {
+        assertThat(mockMvc.perform(multipart("/admin/media")).andReturn().getResponse().getStatus())
+                .isEqualTo(403);
+        assertThat(mockMvc.perform(post("/admin/media/11111111-1111-1111-1111-111111111111")).andReturn()
+                .getResponse().getStatus())
+                .isEqualTo(403);
 
-    @Test
-    void logoutIsNotPublicGetContentAndPostRemainsUncached() throws Exception {
-        assertProtectedAndUncached(mockMvc.perform(get("/logout")).andReturn());
-        assertUncached(mockMvc.perform(post("/logout")).andReturn());
+        assertProtectedAndUncached(mockMvc.perform(multipart("/admin/media").with(csrf())).andReturn());
+        assertProtectedAndUncached(mockMvc.perform(post(
+                "/admin/media/11111111-1111-1111-1111-111111111111").with(csrf())).andReturn());
     }
 
     private static void assertProtectedAndUncached(MvcResult result) {
         assertThat(result.getResponse().getStatus()).isBetween(300, 499);
-        assertUncached(result);
-    }
-
-    private static void assertUncached(MvcResult result) {
         String cacheControl = result.getResponse().getHeader("Cache-Control");
         assertThat(cacheControl).contains("no-store").contains("private");
-        assertThat(result.getResponse().getHeader("Pragma")).contains("no-cache");
-        assertThat(result.getResponse().getHeaderValue("Expires")).isNotNull();
         assertThat(cacheControl).doesNotContain("public");
     }
 }

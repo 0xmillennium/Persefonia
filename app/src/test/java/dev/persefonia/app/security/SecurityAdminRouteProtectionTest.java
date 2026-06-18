@@ -23,7 +23,14 @@ import org.springframework.boot.test.web.server.LocalServerPort;
         })
 class SecurityAdminRouteProtectionTest {
     private static final List<String> ADMIN_PATHS =
-            List.of("/admin", "/admin/", "/admin/dashboard", "/admin/login", "/admin/assets");
+            List.of(
+                    "/admin",
+                    "/admin/",
+                    "/admin/dashboard",
+                    "/admin/login",
+                    "/admin/media",
+                    "/admin/media/new",
+                    "/admin/media/11111111-1111-1111-1111-111111111111");
 
     private final HttpClient httpClient = HttpClient.newHttpClient();
 

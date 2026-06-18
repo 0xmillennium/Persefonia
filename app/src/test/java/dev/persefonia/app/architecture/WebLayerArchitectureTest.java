@@ -50,6 +50,7 @@ class WebLayerArchitectureTest {
     void adminWebLayerDoesNotReachIntoCompositionContextsOrPersistence() {
         noClasses()
                 .that().resideInAPackage("dev.persefonia.webadmin..")
+                .and().resideOutsideOfPackage("dev.persefonia.webadmin.media..")
                 .should().dependOnClassesThat().resideInAnyPackage(
                         "dev.persefonia.app..",
                         "dev.persefonia.identityaccess..",

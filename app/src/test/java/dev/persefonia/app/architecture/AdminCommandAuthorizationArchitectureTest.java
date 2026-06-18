@@ -44,7 +44,6 @@ class AdminCommandAuthorizationArchitectureTest {
                         .map(javaClass -> javaClass.getSimpleName()))
                 .doesNotContain(
                         "AdminContentController",
-                        "AdminMediaController",
                         "AdminContactController",
                         "AdminAnalyticsController",
                         "AdminAuditController",
@@ -56,5 +55,12 @@ class AdminCommandAuthorizationArchitectureTest {
         assertThat(ArchitectureTestSupport.PRODUCTION_CLASSES.stream()
                         .map(javaClass -> javaClass.getSimpleName()))
                 .contains("AdminProjectController");
+    }
+
+    @Test
+    void mediaAdminControllerIsAllowedAfterMediaAdminImplementation() {
+        assertThat(ArchitectureTestSupport.PRODUCTION_CLASSES.stream()
+                        .map(javaClass -> javaClass.getSimpleName()))
+                .contains("AdminMediaController");
     }
 }

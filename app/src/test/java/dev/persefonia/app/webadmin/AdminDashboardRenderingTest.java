@@ -16,7 +16,6 @@ import gg.jte.output.StringOutput;
 
 class AdminDashboardRenderingTest {
     private static final List<String> UNIMPLEMENTED_ROUTES = List.of(
-            "/admin/media",
             "/admin/contact",
             "/admin/analytics",
             "/admin/audit");
@@ -50,6 +49,11 @@ class AdminDashboardRenderingTest {
     @Test
     void dashboardLinksToProjectAdmin() {
         assertThat(render()).contains("href=\"/admin/projects\"");
+    }
+
+    @Test
+    void dashboardLinksToMediaAdmin() {
+        assertThat(render()).contains("href=\"/admin/media\"");
     }
 
     @Test

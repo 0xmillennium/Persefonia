@@ -16,7 +16,7 @@ public final class AdminNavigationFactory {
                 link(AdminNavigationSection.REDIRECTS, activeSection, "Redirects", "/admin/discovery/redirects"),
                 link(AdminNavigationSection.PROFILE, activeSection, "Profile", "/admin/profile"),
                 link(AdminNavigationSection.PROJECTS, activeSection, "Projects", "/admin/projects"),
-                AdminNavigationItem.disabled("Media"),
+                link(AdminNavigationSection.MEDIA, activeSection, "Media", "/admin/media"),
                 AdminNavigationItem.disabled("Contact"),
                 AdminNavigationItem.disabled("Analytics"),
                 AdminNavigationItem.disabled("Audit"),

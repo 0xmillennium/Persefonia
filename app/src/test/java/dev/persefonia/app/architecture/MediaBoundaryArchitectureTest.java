@@ -17,6 +17,7 @@ class MediaBoundaryArchitectureTest {
                 .that().resideInAnyPackage(
                         "dev.persefonia.webpublic..",
                         "dev.persefonia.webadmin..")
+                .and().resideOutsideOfPackage("dev.persefonia.webadmin.media..")
                 .should().dependOnClassesThat().resideInAnyPackage(
                         "dev.persefonia..persistence..",
                         "dev.persefonia..infrastructure..",
@@ -26,6 +27,26 @@ class MediaBoundaryArchitectureTest {
                         "org.springframework.jdbc..",
                         "java.sql..",
                         "javax.sql..")
+                .orShould().dependOnClassesThat().haveSimpleNameEndingWith("Repository")
+                .orShould().dependOnClassesThat().haveSimpleNameEndingWith("Adapter")
+                .allowEmptyShould(true)
+                .check(ArchitectureTestSupport.PRODUCTION_CLASSES);
+    }
+
+    @Test
+    void webAdminMediaDoesNotDependOnMediaRepositoriesAdaptersOrFilesystemInternals() {
+        noClasses()
+                .that().resideInAPackage("dev.persefonia.webadmin.media..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "dev.persefonia..persistence..",
+                        "dev.persefonia..infrastructure..",
+                        "dev.persefonia.app.medialibrary..",
+                        "org.springframework.data..",
+                        "org.springframework.jdbc..",
+                        "java.sql..",
+                        "javax.sql..",
+                        "javax.imageio..",
+                        "java.nio.file..")
                 .orShould().dependOnClassesThat().haveSimpleNameEndingWith("Repository")
                 .orShould().dependOnClassesThat().haveSimpleNameEndingWith("Adapter")
                 .allowEmptyShould(true)
@@ -104,8 +125,8 @@ class MediaBoundaryArchitectureTest {
 
     @Test
     void aggregateChildrenHaveNoRepositories() throws Exception {
-        assertThat(javaSourcesContaining("AssetVariantRepository")).isEmpty();
-        assertThat(javaSourcesContaining("AssetValidationResultRepository")).isEmpty();
+        assertThat(javaSourcesContaining(childRepositorySymbol("AssetVariant"))).isEmpty();
+        assertThat(javaSourcesContaining(childRepositorySymbol("AssetValidationResult"))).isEmpty();
     }
 
     @Test
@@ -117,7 +138,7 @@ class MediaBoundaryArchitectureTest {
     }
 
     @Test
-    void activeCvSurfaceIsNotIntroducedBeforeMilestone8() throws Exception {
+    void activeCvRoutesAndSchemaAreAbsentFromMediaWorkflow() throws Exception {
         String publicAndAdminSources = sourceText(Path.of("../web-public/src/main/java"))
                 + sourceText(Path.of("../web-admin/src/main/java"))
                 + sourceText(Path.of("src/main/jte/site"))
@@ -128,6 +149,35 @@ class MediaBoundaryArchitectureTest {
                 .doesNotContain("ActiveCV")
                 .doesNotContain("active-cv")
                 .doesNotContain("cvDownload");
+    }
+
+    @Test
+    void mediaWorkflowDoesNotIntroduceForbiddenBinaryOrLifecycleRoutes() throws Exception {
+        String sources = sourceText(Path.of("../web-public/src/main/java"))
+                + sourceText(Path.of("../web-admin/src/main/java"))
+                + sourceText(Path.of("src/main/jte/admin"));
+
+        assertThat(sources)
+                .doesNotContain("/admin/media/{assetId}/" + "original")
+                .doesNotContain("/admin/media/{assetId}/" + "preview")
+                .doesNotContain("/admin/media/{assetId}/" + "variants")
+                .doesNotContain("/admin/media/{assetId}/" + "delete")
+                .doesNotContain("/admin/media/{assetId}/" + "reprocess")
+                .doesNotContain("/media/assets/{assetId}/" + "original");
+    }
+
+    @Test
+    void internalPlanningTermsAreAbsentFromMediaRelatedTests() throws Exception {
+        String testSources = sourceText(Path.of("src/test"))
+                + sourceText(Path.of("../media-library/src/test"))
+                + sourceText(Path.of("../web-public/src/test"))
+                + sourceText(Path.of("../web-admin/src/test"))
+                + sourceText(Path.of("../profile-portfolio/src/test"));
+
+        assertThat(testSources)
+                .doesNotContain("Before" + "Milestone" + "8")
+                .doesNotContain("Milestone" + "8")
+                .doesNotContain("Ste" + "p" + "8");
     }
 
     private static List<Path> javaSourcesContaining(String text) throws IOException {
@@ -156,6 +206,10 @@ class MediaBoundaryArchitectureTest {
             }
         }
         return matches;
+    }
+
+    private static String childRepositorySymbol(String aggregateChild) {
+        return aggregateChild + "Repository";
     }
 
     private static String sourceText(Path root) throws IOException {
