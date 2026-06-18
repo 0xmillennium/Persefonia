@@ -37,12 +37,35 @@ class MediaBoundaryArchitectureTest {
         noClasses()
                 .that().resideInAnyPackage(
                         "dev.persefonia.profileportfolio..",
-                        "dev.persefonia.app.profileportfolio..")
+                        "dev.persefonia.app.profileportfolio..",
+                        "dev.persefonia.contentpublishing..",
+                        "dev.persefonia.app.contentpublishing..")
                 .should().dependOnClassesThat().resideInAnyPackage(
+                        "dev.persefonia.medialibrary.application..",
                         "dev.persefonia.medialibrary.domain..",
                         "dev.persefonia.medialibrary.infrastructure..",
                         "dev.persefonia.app.medialibrary.persistence..")
                 .orShould().dependOnClassesThat().haveSimpleName("AssetRepository")
+                .allowEmptyShould(true)
+                .check(ArchitectureTestSupport.PRODUCTION_CLASSES);
+    }
+
+    @Test
+    void mediaDomainAndApplicationRemainFrameworkAndAppFree() {
+        noClasses()
+                .that().resideInAnyPackage(
+                        "dev.persefonia.medialibrary.domain..",
+                        "dev.persefonia.medialibrary.application..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "org.springframework..",
+                        "org.springframework.jdbc..",
+                        "java.sql..",
+                        "javax.sql..",
+                        "gg.jte..",
+                        "jakarta.servlet..",
+                        "dev.persefonia.app..",
+                        "dev.persefonia.webpublic..",
+                        "dev.persefonia.webadmin..")
                 .allowEmptyShould(true)
                 .check(ArchitectureTestSupport.PRODUCTION_CLASSES);
     }
@@ -80,6 +103,20 @@ class MediaBoundaryArchitectureTest {
     }
 
     @Test
+    void aggregateChildrenHaveNoRepositories() throws Exception {
+        assertThat(javaSourcesContaining("AssetVariantRepository")).isEmpty();
+        assertThat(javaSourcesContaining("AssetValidationResultRepository")).isEmpty();
+    }
+
+    @Test
+    void appOwnsTheIntentionalJdbcAssetRepositoryAdapter() throws Exception {
+        assertThat(javaSourcesContaining("class JdbcAssetRepositoryAdapter"))
+                .singleElement()
+                .satisfies(path -> assertThat(path.toString())
+                        .contains("/app/src/main/java/dev/persefonia/app/medialibrary/persistence/"));
+    }
+
+    @Test
     void activeCvSurfaceIsNotIntroducedBeforeMilestone8() throws Exception {
         String publicAndAdminSources = sourceText(Path.of("../web-public/src/main/java"))
                 + sourceText(Path.of("../web-admin/src/main/java"))
@@ -98,6 +135,7 @@ class MediaBoundaryArchitectureTest {
                 Path.of("../app/src/main/java"),
                 Path.of("../media-library/src/main/java"),
                 Path.of("../profile-portfolio/src/main/java"),
+                Path.of("../content-publishing/src/main/java"),
                 Path.of("../web-public/src/main/java"),
                 Path.of("../web-admin/src/main/java"));
         java.util.ArrayList<Path> matches = new java.util.ArrayList<>();
