@@ -66,8 +66,9 @@ class MediaUploadArchitectureTest {
     }
 
     @Test
-    void onlyPublicVariantMediaRouteAndNoCvRoutesAreIntroduced() throws Exception {
+    void onlyPublicVariantMediaRouteAndControlledCvRoutesAreIntroduced() throws Exception {
         String publicSources = sourceText(Path.of("../web-public/src/main/java"));
+        String publicMediaSources = sourceText(Path.of("../web-public/src/main/java/dev/persefonia/webpublic/media"));
         String adminSources = sourceText(Path.of("../web-admin/src/main/java"));
         assertThat(publicSources)
                 .doesNotContain("UploadAssetCommandService")
@@ -75,10 +76,17 @@ class MediaUploadArchitectureTest {
                 .doesNotContain("@PostMapping(\"/media")
                 .doesNotContain("@GetMapping(\"/assets")
                 .doesNotContain("@PostMapping(\"/assets")
-                .doesNotContain("@GetMapping(\"/cv")
                 .doesNotContain("@PostMapping(\"/cv")
-                .doesNotContain("ActiveCv")
+                .doesNotContain("@GetMapping(\"/resume")
                 .doesNotContain("cv_entries");
+        assertThat(publicSources)
+                .contains("@GetMapping(\"/cv\")")
+                .contains("@GetMapping(\"/cv/download\")")
+                .contains("@GetMapping(\"/cv/{language}\")")
+                .contains("@GetMapping(\"/cv/{language}/download\")");
+        assertThat(publicMediaSources)
+                .doesNotContain("ActiveCv")
+                .doesNotContain("/cv");
         assertThat(publicSources.split(
                         java.util.regex.Pattern.quote(
                                 "@GetMapping(\"/media/assets/{assetId}/variants/{variantName}\")"),

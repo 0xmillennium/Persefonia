@@ -73,15 +73,38 @@ class ActiveCvArchitectureTest {
     }
 
     @Test
-    void noPublicCvPdfOriginalOrDownloadRoutesExist() throws Exception {
+    void onlyControlledPublicCvRoutesExist() throws Exception {
         String publicSources = sourceText(Path.of("../web-public/src/main/java"))
                 + sourceText(Path.of("src/main/jte/site"));
 
         assertThat(publicSources)
-                .doesNotContain("@GetMapping(\"/cv")
+                .contains("@GetMapping(\"/cv\")")
+                .contains("@GetMapping(\"/cv/download\")")
+                .contains("@GetMapping(\"/cv/{language}\")")
+                .contains("@GetMapping(\"/cv/{language}/download\")")
                 .doesNotContain("@GetMapping(\"/resume")
                 .doesNotContain("/media/assets/{assetId}/download")
                 .doesNotContain("/media/assets/{assetId}/original");
+    }
+
+    @Test
+    void webPublicCvDoesNotDependOnMediaStorageImageIoOrProfileRepositories() {
+        noClasses()
+                .that().resideInAPackage("dev.persefonia.webpublic.cv..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "dev.persefonia.medialibrary.application.asset..",
+                        "dev.persefonia.medialibrary.domain..",
+                        "dev.persefonia.app.medialibrary..",
+                        "dev.persefonia.profileportfolio.domain..",
+                        "org.springframework.jdbc..",
+                        "java.sql..",
+                        "javax.sql..",
+                        "javax.imageio..",
+                        "java.nio.file..")
+                .orShould().dependOnClassesThat().haveSimpleNameEndingWith("Repository")
+                .orShould().dependOnClassesThat().haveSimpleName("LocalFileAssetStorageAdapter")
+                .allowEmptyShould(true)
+                .check(ArchitectureTestSupport.PRODUCTION_CLASSES);
     }
 
     private static String sourceText(Path root) throws IOException {

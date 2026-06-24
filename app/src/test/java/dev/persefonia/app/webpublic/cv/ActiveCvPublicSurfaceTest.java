@@ -1,38 +1,45 @@
 package dev.persefonia.app.webpublic.cv;
 
-import static org.mockito.Mockito.mock;
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import dev.persefonia.medialibrary.application.publicview.PublicImageVariantContentService;
-import dev.persefonia.webpublic.media.PublicMediaAssetController;
-import java.util.UUID;
+import dev.persefonia.profileportfolio.domain.common.ContentLanguage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 class ActiveCvPublicSurfaceTest {
+    private PublicCvMockMvcSupport support;
     private MockMvc mockMvc;
 
     @BeforeEach
-    void setUp() {
-        StaticListableBeanFactory beans = new StaticListableBeanFactory();
-        beans.addBean("publicImageVariantContentService", mock(PublicImageVariantContentService.class));
-        mockMvc = MockMvcBuilders.standaloneSetup(new PublicMediaAssetController(
-                beans.getBeanProvider(PublicImageVariantContentService.class))).build();
+    void reset() {
+        support = PublicCvMockMvcSupport.create();
+        support.reset();
+        mockMvc = support.mockMvc;
     }
 
     @Test
-    void cvAndResumeRoutesDoNotExist() throws Exception {
+    void cvRouteExistsOnlyThroughActiveSelectionAndResumeRemainsAbsent() throws Exception {
         mockMvc.perform(get("/cv")).andExpect(status().isNotFound());
+
+        support.profiles.profile().selectDocument(
+                ContentLanguage.EN,
+                PublicCvTestConfiguration.EN_PDF_ID,
+                null,
+                PublicCvTestConfiguration.NOW);
+
+        mockMvc.perform(get("/cv"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("cv-en.pdf")));
         mockMvc.perform(get("/resume")).andExpect(status().isNotFound());
     }
 
     @Test
     void publicPdfOriginalAndDownloadRoutesDoNotExist() throws Exception {
-        String assetId = UUID.randomUUID().toString();
+        String assetId = PublicCvTestConfiguration.EN_PDF_ID.value().toString();
 
         mockMvc.perform(get("/media/assets/{assetId}", assetId)).andExpect(status().isNotFound());
         mockMvc.perform(get("/media/assets/{assetId}/download", assetId)).andExpect(status().isNotFound());

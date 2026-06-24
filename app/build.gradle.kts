@@ -101,6 +101,7 @@ tasks.processResources {
 
 tasks.test {
     classpath += files(precompiledJteDirectory)
+    maxHeapSize = "1g"
 }
 
 tasks.named<BootJar>("bootJar") {

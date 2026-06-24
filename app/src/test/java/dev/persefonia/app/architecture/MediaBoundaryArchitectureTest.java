@@ -153,10 +153,9 @@ class MediaBoundaryArchitectureTest {
 
     @Test
     void activeCvPublicDeliveryIsAbsentFromMediaWorkflow() throws Exception {
-        String publicSources = sourceText(Path.of("../web-public/src/main/java"))
-                + sourceText(Path.of("src/main/jte/site"));
+        String mediaPublicSources = sourceText(Path.of("../web-public/src/main/java/dev/persefonia/webpublic/media"));
 
-        assertThat(publicSources)
+        assertThat(mediaPublicSources)
                 .doesNotContain("ActiveCv")
                 .doesNotContain("ActiveCV")
                 .doesNotContain("active-cv")
