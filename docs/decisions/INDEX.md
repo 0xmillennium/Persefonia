@@ -60,3 +60,6 @@ Use [TEMPLATE.md](TEMPLATE.md) for new decision records.
 - [ADR 0010: Use Spring Data JDBC Through Persistence Adapters](0010-use-spring-data-jdbc-through-persistence-adapters.md) — permits Spring Data JDBC in app-level adapters while keeping Content Publishing domain code framework-free.
 - [ADR 0011: Reserve Tag and Series Public Route Projections](0011-reserve-tag-and-series-public-route-projections.md) — reserves tag and series public route/projection shapes without implementing the feature surface.
 - [ADR 0012: Constrain Public Navigation and Hreflang to Listed Public Content](0012-constrain-public-navigation-and-hreflang-to-listed-public-content.md) — keeps public relationship navigation and hreflang limited to listed public content.
+- [ADR 0013: Use Discovery Eligibility for Public Index Surfaces](0013-use-discovery-eligibility-for-public-index-surfaces.md) — keeps dynamic search, sitemap, and feed inclusion driven by Discovery eligibility.
+- [ADR 0014: Use PostgreSQL Full Text Search for Public Search](0014-use-postgresql-full-text-search-for-public-search.md) — chooses PostgreSQL full text search over Discovery search text and keeps search terms private.
+- [ADR 0015: Publish Machine Readable Public Discovery Documents](0015-publish-machine-readable-public-discovery-documents.md) — defines sitemap, robots, and Atom feed publication rules.
