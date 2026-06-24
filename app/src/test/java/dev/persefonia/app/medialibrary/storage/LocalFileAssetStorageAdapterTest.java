@@ -14,6 +14,7 @@ import dev.persefonia.medialibrary.domain.asset.StoragePath;
 import java.io.ByteArrayInputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -79,7 +80,26 @@ class LocalFileAssetStorageAdapterTest {
         assertThatThrownBy(() -> adapter.commitStaged(staged, new FinalAssetStorageKey(logicalPath)))
                 .isInstanceOf(StorageWriteException.class);
         assertThat(finalPath).hasContent("existing");
+        assertThat(stagedPath(staged)).doesNotExist();
         assertThat(logicalPath).doesNotContain("my holiday photo.jpg");
+    }
+
+    @Test
+    void failedOriginalCommitCleansStagedFileAndLeavesNoEmptyFinalFile() throws Exception {
+        LocalFileAssetStorageAdapter adapter = new LocalFileAssetStorageAdapter(tempDirectory);
+        Path parentAsFile = tempDirectory.resolve("original/asset-id");
+        Files.createDirectories(parentAsFile.getParent());
+        Files.writeString(parentAsFile, "not a directory");
+        StagedAssetObject staged = adapter.stageOriginal(new OriginalAssetStagingRequest(
+                () -> new ByteArrayInputStream("new".getBytes()), 100));
+        Path finalPath = parentAsFile.resolve("checksum.jpg");
+
+        assertThatThrownBy(() -> adapter.commitStaged(
+                        staged, new FinalAssetStorageKey("original/asset-id/checksum.jpg")))
+                .isInstanceOf(StorageWriteException.class);
+
+        assertThat(stagedPath(staged)).doesNotExist();
+        assertThat(finalPath).doesNotExist();
     }
 
     @Test
@@ -116,6 +136,38 @@ class LocalFileAssetStorageAdapterTest {
     }
 
     @Test
+    void variantStorageDoesNotOverwriteExistingFinalFileAndCleansTemporaryFile() throws Exception {
+        LocalFileAssetStorageAdapter adapter = new LocalFileAssetStorageAdapter(tempDirectory);
+        StoragePath variantPath = StoragePath.of("variants/asset/thumbnail-checksum.png");
+        Path finalPath = tempDirectory.resolve(variantPath.value());
+        Files.createDirectories(finalPath.getParent());
+        Files.writeString(finalPath, "existing");
+
+        assertThatThrownBy(() -> adapter.storeVariant(new VariantStorageRequest(
+                        variantPath, "replacement".getBytes())))
+                .isInstanceOf(StorageWriteException.class);
+
+        assertThat(finalPath).hasContent("existing");
+        assertThat(stagingFiles()).isEmpty();
+    }
+
+    @Test
+    void failedVariantWriteCleansTemporaryFileAndLeavesNoEmptyFinalFile() throws Exception {
+        LocalFileAssetStorageAdapter adapter = new LocalFileAssetStorageAdapter(tempDirectory);
+        Path parentAsFile = tempDirectory.resolve("variants/asset");
+        Files.createDirectories(parentAsFile.getParent());
+        Files.writeString(parentAsFile, "not a directory");
+        Path finalPath = parentAsFile.resolve("thumbnail-checksum.png");
+
+        assertThatThrownBy(() -> adapter.storeVariant(new VariantStorageRequest(
+                        StoragePath.of("variants/asset/thumbnail-checksum.png"), "variant".getBytes())))
+                .isInstanceOf(StorageWriteException.class);
+
+        assertThat(finalPath).doesNotExist();
+        assertThat(stagingFiles()).isEmpty();
+    }
+
+    @Test
     void variantStorageRejectsUnsafePathsAndMissingStoredObjectFailsSafely() {
         LocalFileAssetStorageAdapter adapter = new LocalFileAssetStorageAdapter(tempDirectory);
 
@@ -130,5 +182,15 @@ class LocalFileAssetStorageAdapterTest {
         assertThatThrownBy(() -> adapter.storeVariant(new VariantStorageRequest(
                 StoragePath.of("original/asset/not-a-variant.png"), "variant".getBytes())))
                 .isInstanceOf(StorageWriteException.class);
+    }
+
+    private Path stagedPath(StagedAssetObject staged) {
+        return tempDirectory.resolve(".staging").resolve(staged.stagingKey() + ".tmp");
+    }
+
+    private List<Path> stagingFiles() throws Exception {
+        try (var files = Files.list(tempDirectory.resolve(".staging"))) {
+            return files.toList();
+        }
     }
 }

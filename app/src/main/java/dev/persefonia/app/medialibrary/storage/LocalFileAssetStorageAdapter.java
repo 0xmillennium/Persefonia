@@ -84,30 +84,19 @@ public final class LocalFileAssetStorageAdapter implements AssetStoragePort {
         Objects.requireNonNull(stagedObject, "stagedObject");
         Objects.requireNonNull(finalKey, "finalKey");
         Path stagedPath = stagedPath(stagedObject.stagingKey());
-        Path finalPath = resolveLogicalPath(finalKey.value());
-        boolean destinationReserved = false;
         try {
-            Files.createDirectories(finalPath.getParent());
-            verifyExistingDirectoryWithinRoot(finalPath.getParent());
-            Files.createFile(finalPath);
-            destinationReserved = true;
-            try {
-                Files.move(
-                        stagedPath,
-                        finalPath,
-                        StandardCopyOption.ATOMIC_MOVE,
-                        StandardCopyOption.REPLACE_EXISTING);
-            } catch (AtomicMoveNotSupportedException exception) {
-                Files.move(stagedPath, finalPath, StandardCopyOption.REPLACE_EXISTING);
-            }
+            Path finalPath = resolveLogicalPath(finalKey.value());
+            moveStagedToFinal(stagedPath, finalPath);
             return new StoredAssetObject(finalKey.value());
         } catch (FileAlreadyExistsException exception) {
+            deleteBestEffort(stagedPath);
             throw new StorageWriteException("Stored media already exists.", exception);
         } catch (IOException exception) {
-            if (destinationReserved) {
-                deleteBestEffort(finalPath);
-            }
+            deleteBestEffort(stagedPath);
             throw new StorageWriteException("Unable to commit staged media.", exception);
+        } catch (RuntimeException exception) {
+            deleteBestEffort(stagedPath);
+            throw exception;
         }
     }
 
@@ -133,21 +122,23 @@ public final class LocalFileAssetStorageAdapter implements AssetStoragePort {
             throw new StorageWriteException("Generated variant path must be under variants/.");
         }
         Path variantPath = resolveLogicalPath(logicalPath);
-        boolean destinationReserved = false;
+        Path stagedVariantPath = stagedPath(UUID.randomUUID().toString());
         try {
-            Files.createDirectories(variantPath.getParent());
-            verifyExistingDirectoryWithinRoot(variantPath.getParent());
-            Files.createFile(variantPath);
-            destinationReserved = true;
-            Files.write(variantPath, request.content(), StandardOpenOption.WRITE);
+            try (OutputStream output = Files.newOutputStream(
+                    stagedVariantPath, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE)) {
+                output.write(request.content());
+            }
+            moveStagedToFinal(stagedVariantPath, variantPath);
             return new StoredAssetObject(logicalPath);
         } catch (FileAlreadyExistsException exception) {
+            deleteBestEffort(stagedVariantPath);
             throw new StorageWriteException("Stored media already exists.", exception);
         } catch (IOException exception) {
-            if (destinationReserved) {
-                deleteBestEffort(variantPath);
-            }
+            deleteBestEffort(stagedVariantPath);
             throw new StorageWriteException("Unable to store generated media variant.", exception);
+        } catch (RuntimeException exception) {
+            deleteBestEffort(stagedVariantPath);
+            throw exception;
         }
     }
 
@@ -217,6 +208,19 @@ public final class LocalFileAssetStorageAdapter implements AssetStoragePort {
             throw new StorageWriteException("Logical media path escapes the storage root.");
         }
         return resolved;
+    }
+
+    private void moveStagedToFinal(Path stagedPath, Path finalPath) throws IOException {
+        Files.createDirectories(finalPath.getParent());
+        verifyExistingDirectoryWithinRoot(finalPath.getParent());
+        if (Files.exists(finalPath)) {
+            throw new FileAlreadyExistsException(finalPath.toString());
+        }
+        try {
+            Files.move(stagedPath, finalPath, StandardCopyOption.ATOMIC_MOVE);
+        } catch (AtomicMoveNotSupportedException exception) {
+            Files.move(stagedPath, finalPath);
+        }
     }
 
     private void verifyExistingDirectoryWithinRoot(Path directory) {

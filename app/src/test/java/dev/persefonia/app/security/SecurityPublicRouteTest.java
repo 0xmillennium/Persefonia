@@ -8,6 +8,9 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -66,6 +69,34 @@ class SecurityPublicRouteTest {
                 get("/media/assets/00000000-0000-0000-0000-000000000000/variants/thumbnail");
 
         assertEquals(404, response.statusCode());
+    }
+
+    @Test
+    void absentResumeAndGenericMediaRoutesDoNotServePublicContent() throws Exception {
+        for (String path : List.of(
+                "/resume",
+                "/resume/en",
+                "/media/assets/00000000-0000-0000-0000-000000000000",
+                "/media/assets/00000000-0000-0000-0000-000000000000/download",
+                "/media/assets/00000000-0000-0000-0000-000000000000/original")) {
+            HttpResponse<String> response = get(path);
+
+            assertNotSuccessful(response);
+            assertFalse(response.headers().firstValue("Content-Type").orElse("").startsWith("application/pdf"));
+        }
+    }
+
+    @Test
+    void securityConfigurationDoesNotPermitAbsentResumeOrGenericMediaRoutes() throws Exception {
+        String securityConfiguration = Files.readString(
+                Path.of("src/main/java/dev/persefonia/app/security/SecurityConfiguration.java"));
+
+        assertFalse(securityConfiguration.contains("\"/resume\""));
+        assertFalse(securityConfiguration.contains("\"/resume/*\""));
+        assertFalse(securityConfiguration.contains("\"/media/assets/*\""));
+        assertFalse(securityConfiguration.contains("\"/media/assets/*/download\""));
+        assertFalse(securityConfiguration.contains("\"/media/assets/*/original\""));
+        assertTrue(securityConfiguration.contains("\"/media/assets/*/variants/*\""));
     }
 
     private HttpResponse<String> get(String path) throws Exception {

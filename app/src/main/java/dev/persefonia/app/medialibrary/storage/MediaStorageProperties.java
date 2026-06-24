@@ -1,6 +1,7 @@
 package dev.persefonia.app.medialibrary.storage;
 
 import dev.persefonia.medialibrary.application.upload.UploadValidationPolicy;
+import java.nio.file.Path;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "persefonia.media")
@@ -14,10 +15,14 @@ public class MediaStorageProperties {
         return storageRoot;
     }
 
-    public void setStorageRoot(String storageRoot) {
+    Path requireStorageRootPath() {
         if (storageRoot == null || storageRoot.isBlank()) {
-            throw new IllegalArgumentException("storageRoot must not be blank");
+            throw new IllegalStateException("persefonia.media.storage-root must be configured.");
         }
+        return Path.of(storageRoot).toAbsolutePath().normalize();
+    }
+
+    public void setStorageRoot(String storageRoot) {
         this.storageRoot = storageRoot;
     }
 

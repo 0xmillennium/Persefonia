@@ -60,12 +60,7 @@ public class SecurityConfiguration {
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.GET, "/").permitAll()
                         .requestMatchers(HttpMethod.GET, "/cv", "/cv/download", "/cv/*", "/cv/*/download").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/resume", "/resume/*").permitAll()
                         .requestMatchers(HttpMethod.GET, "/assets/**").permitAll()
-                        .requestMatchers(HttpMethod.GET,
-                                "/media/assets/*",
-                                "/media/assets/*/download",
-                                "/media/assets/*/original").permitAll()
                         .requestMatchers(HttpMethod.GET, "/media/assets/*/variants/*").permitAll()
                         .requestMatchers(HttpMethod.GET, "/oauth2/authorization/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/login/oauth2/code/**").permitAll()

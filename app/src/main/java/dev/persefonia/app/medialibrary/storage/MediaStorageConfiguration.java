@@ -13,7 +13,6 @@ import dev.persefonia.medialibrary.application.processing.ImageVariantGenerator;
 import dev.persefonia.medialibrary.application.processing.ProcessImageAssetCommandService;
 import dev.persefonia.medialibrary.application.publicview.PublicImageAssetQueryService;
 import dev.persefonia.medialibrary.application.publicview.PublicImageVariantContentService;
-import java.nio.file.Path;
 import java.time.Clock;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -25,8 +24,16 @@ import org.springframework.context.annotation.Configuration;
 @ConditionalOnProperty(prefix = "persefonia.media", name = "storage-root")
 public class MediaStorageConfiguration {
     @Bean
-    AssetStoragePort assetStoragePort(MediaStorageProperties properties) {
-        return new LocalFileAssetStorageAdapter(Path.of(properties.getStorageRoot()));
+    MediaStorageReadinessService mediaStorageReadinessService(MediaStorageProperties properties) {
+        MediaStorageReadinessService readiness =
+                new MediaStorageReadinessService(properties.requireStorageRootPath());
+        readiness.verifyReady();
+        return readiness;
+    }
+
+    @Bean
+    AssetStoragePort assetStoragePort(MediaStorageReadinessService readiness) {
+        return new LocalFileAssetStorageAdapter(readiness.storageRoot());
     }
 
     @Bean
