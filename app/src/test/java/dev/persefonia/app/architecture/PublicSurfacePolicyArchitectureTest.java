@@ -13,7 +13,8 @@ import org.junit.jupiter.api.Test;
 
 class PublicSurfacePolicyArchitectureTest {
     private static final List<String> FORBIDDEN_PUBLIC_ROUTES = List.of(
-            "/search",
+            "/search/",
+            "/search/**",
             "/sitemap.xml",
             "/robots.txt",
             "/feed.xml",
@@ -24,11 +25,12 @@ class PublicSurfacePolicyArchitectureTest {
     private static final Pattern ROUTE_LITERAL = Pattern.compile("\"([^\"]+)\"");
 
     @Test
-    void doesNotIntroduceSearchSitemapRobotsOrFeedRoutes() throws Exception {
-        String webPublicRoutes = routeAnnotations(joinedJavaSources(Path.of("../web-public/src/main/java")));
+    void introducesOnlyExactSearchRouteAndNoMachineReadableRoutes() throws Exception {
+        List<String> routeLiterals = routeLiterals(joinedJavaSources(Path.of("../web-public/src/main/java")));
 
-        assertThat(webPublicRoutes)
+        assertThat(routeLiterals)
                 .doesNotContain(FORBIDDEN_PUBLIC_ROUTES.toArray(String[]::new));
+        assertThat(routeLiterals).contains("/search");
     }
 
     @Test

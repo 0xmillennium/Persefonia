@@ -55,12 +55,27 @@ class SecurityPublicRouteTest {
         for (String stylesheetPath : viteAssetResolver.stylesheetPaths(FRONTEND_ENTRY)) {
             assertEquals(200, get(stylesheetPath).statusCode());
         }
+        assertEquals(200, get("/search").statusCode());
     }
 
     @Test
     void unsafeRequestsAreNotPublic() throws Exception {
         assertNotSuccessful(post("/"));
+        assertNotSuccessful(post("/search"));
         assertNotSuccessful(post(viteAssetResolver.scriptPath(FRONTEND_ENTRY)));
+    }
+
+    @Test
+    void absentSearchWildcardAndMachineReadableRoutesDoNotServePublicContent() throws Exception {
+        for (String path : List.of(
+                "/search/anything",
+                "/sitemap.xml",
+                "/robots.txt",
+                "/feed.xml",
+                "/rss.xml",
+                "/atom.xml")) {
+            assertNotSuccessful(get(path));
+        }
     }
 
     @Test
@@ -97,6 +112,13 @@ class SecurityPublicRouteTest {
         assertFalse(securityConfiguration.contains("\"/media/assets/*/download\""));
         assertFalse(securityConfiguration.contains("\"/media/assets/*/original\""));
         assertTrue(securityConfiguration.contains("\"/media/assets/*/variants/*\""));
+        assertTrue(securityConfiguration.contains("\"/search\""));
+        assertFalse(securityConfiguration.contains("\"/search/**\""));
+        assertFalse(securityConfiguration.contains("\"/sitemap.xml\""));
+        assertFalse(securityConfiguration.contains("\"/robots.txt\""));
+        assertFalse(securityConfiguration.contains("\"/feed.xml\""));
+        assertFalse(securityConfiguration.contains("\"/rss.xml\""));
+        assertFalse(securityConfiguration.contains("\"/atom.xml\""));
     }
 
     private HttpResponse<String> get(String path) throws Exception {

@@ -20,7 +20,7 @@ class AdminLifecyclePublicExposureRegressionTest {
     @Autowired MockMvc mockMvc;
 
     @Test
-    void noPublicContentListingFeedSitemapOrSearchRouteExists() throws Exception {
+    void noPublicContentListingFeedSitemapOrSearchWildcardRouteExists() throws Exception {
         for (String path : List.of(
                 "/content/draft",
                 "/content/published",
@@ -31,8 +31,10 @@ class AdminLifecyclePublicExposureRegressionTest {
                 "/content",
                 "/sitemap.xml",
                 "/feed",
-                "/search")) {
+                "/search/anything")) {
             mockMvc.perform(get(path)).andExpect(status().is4xxClientError());
         }
+
+        mockMvc.perform(get("/search")).andExpect(status().isOk());
     }
 }

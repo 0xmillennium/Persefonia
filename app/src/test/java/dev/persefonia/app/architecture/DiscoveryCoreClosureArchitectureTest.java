@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 
 class DiscoveryCoreClosureArchitectureTest {
     private static final Pattern FORBIDDEN_PUBLIC_ROUTE = Pattern.compile(
-            "@(?:GetMapping|PostMapping|RequestMapping)\\s*\\([^\\n]*(search|feed|sitemap|robots|listing)",
+            "@(?:GetMapping|PostMapping|RequestMapping)\\s*\\([^\\n]*(feed|sitemap|robots|listing)",
             Pattern.CASE_INSENSITIVE);
 
     @Test

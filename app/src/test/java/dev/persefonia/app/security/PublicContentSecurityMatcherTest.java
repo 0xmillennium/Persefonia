@@ -73,6 +73,7 @@ class PublicContentSecurityMatcherTest {
 
     @Test
     void publicContentMatcherIsExplicitAndDoesNotUseBroadThreeSegmentPermit() throws Exception {
+        assertThat(getStatus("/search")).isEqualTo(200);
         assertThat(List.of(SecurityConfiguration.PUBLIC_CONTENT_GET_PATTERNS))
                 .containsExactly(
                         "/tr/articles/*",
@@ -98,6 +99,21 @@ class PublicContentSecurityMatcherTest {
         assertThat(securityConfiguration).doesNotContain("\"/series/**\"");
         assertThat(securityConfiguration).doesNotContain("\"/{language}/projects/**\"");
         assertThat(securityConfiguration).doesNotContain("\"/projects/**\"");
+        assertThat(securityConfiguration).contains("\"/search\"");
+        assertThat(securityConfiguration).doesNotContain("\"/search/**\"");
+    }
+
+    @Test
+    void futureMachineReadableRoutesRemainAbsent() throws Exception {
+        for (String path : List.of(
+                "/sitemap.xml",
+                "/robots.txt",
+                "/feed.xml",
+                "/rss.xml",
+                "/atom.xml",
+                "/search/anything")) {
+            assertNotPublicContent(getStatus(path));
+        }
     }
 
     @Test

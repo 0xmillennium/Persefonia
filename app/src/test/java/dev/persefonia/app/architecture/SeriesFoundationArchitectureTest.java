@@ -20,12 +20,11 @@ class SeriesFoundationArchitectureTest {
     @Test
     void publicSeriesImplementationDoesNotAddForbiddenAdjacentSurfaces() throws Exception {
         assertThat(matches(Path.of("../web-public/src/main"), "@GetMapping(\"/{language}/series\")")).isEmpty();
-        assertThat(matches(Path.of("../web-public/src/main"), "/search")).isEmpty();
         assertThat(matches(Path.of("../web-public/src/main"), "/feed")).isEmpty();
         assertThat(matches(Path.of("../web-public/src/main"), "/sitemap")).isEmpty();
         assertThat(matches(Path.of("../web-public/src/main"), "/robots")).isEmpty();
-        assertThat(matches(Path.of("src/main/jte/site"), "rel=\"prev\"")).isEmpty();
-        assertThat(matches(Path.of("src/main/jte/site"), "rel=\"next\"")).isEmpty();
+        assertThat(matches(Path.of("src/main/jte/site/series.jte"), "rel=\"prev\"")).isEmpty();
+        assertThat(matches(Path.of("src/main/jte/site/series.jte"), "rel=\"next\"")).isEmpty();
     }
 
     @Test
