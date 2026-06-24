@@ -61,9 +61,9 @@ public final class ProjectDiscoveryProjectionFactory {
                 canonicalUrlFactory.canonicalUrl(publicUrl),
                 title,
                 summary,
-                IndexingPolicy.NO_INDEX,
-                DiscoveryEligibility.NOT_ELIGIBLE,
-                DiscoveryEligibility.NOT_ELIGIBLE,
+                indexingPolicy(project),
+                searchEligibility(project),
+                sitemapEligibility(project),
                 DiscoveryEligibility.NOT_ELIGIBLE,
                 title,
                 summary,
@@ -71,5 +71,21 @@ public final class ProjectDiscoveryProjectionFactory {
                 null,
                 project.updatedAt(),
                 title + "\n" + summary);
+    }
+
+    private static IndexingPolicy indexingPolicy(Project project) {
+        return project.visibility() == ProjectVisibility.PUBLIC ? IndexingPolicy.INDEX : IndexingPolicy.NO_INDEX;
+    }
+
+    private static DiscoveryEligibility searchEligibility(Project project) {
+        return project.visibility() == ProjectVisibility.PUBLIC
+                ? DiscoveryEligibility.ELIGIBLE
+                : DiscoveryEligibility.NOT_ELIGIBLE;
+    }
+
+    private static DiscoveryEligibility sitemapEligibility(Project project) {
+        return project.visibility() == ProjectVisibility.PUBLIC
+                ? DiscoveryEligibility.ELIGIBLE
+                : DiscoveryEligibility.NOT_ELIGIBLE;
     }
 }

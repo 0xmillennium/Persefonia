@@ -109,7 +109,32 @@ class DiscoveryMigrationTest extends DiscoveryMigrationDatabase {
     }
 
     @Test
-    void discoveryRejectsProjectProjectionWithPublicDiscoveryEligibility() {
+    void discoveryAcceptsPublicProjectProjectionWithSearchAndSitemapEligibilityButNoFeedEligibility() {
+        insertResource(java.util.Map.of(
+                "sourceContext", "PROFILE_PORTFOLIO",
+                "sourceType", "PROJECT",
+                "resourceType", "PROJECT",
+                "routePurpose", "DETAIL",
+                "publicUrl", "/en/projects/public-discovery",
+                "canonicalUrl", "https://example.test/en/projects/public-discovery",
+                "indexingPolicy", "INDEX",
+                "searchEligibility", "ELIGIBLE",
+                "sitemapEligibility", "ELIGIBLE",
+                "feedEligibility", "NOT_ELIGIBLE"));
+
+        assertThat(jdbc().queryForObject("""
+                SELECT count(*) FROM discovery.discoverable_resources
+                WHERE source_context = 'PROFILE_PORTFOLIO'
+                  AND source_type = 'PROJECT'
+                  AND indexing_policy = 'INDEX'
+                  AND search_eligibility = 'ELIGIBLE'
+                  AND sitemap_eligibility = 'ELIGIBLE'
+                  AND feed_eligibility = 'NOT_ELIGIBLE'
+                """, Integer.class)).isEqualTo(1);
+    }
+
+    @Test
+    void discoveryRejectsProjectProjectionWithPublicFeedEligibility() {
         java.util.Map<String, Object> project = java.util.Map.of(
                 "sourceContext", "PROFILE_PORTFOLIO",
                 "sourceType", "PROJECT",
@@ -117,15 +142,11 @@ class DiscoveryMigrationTest extends DiscoveryMigrationDatabase {
                 "routePurpose", "DETAIL",
                 "publicUrl", "/en/projects/public-discovery",
                 "canonicalUrl", "https://example.test/en/projects/public-discovery",
-                "indexingPolicy", "NO_INDEX",
-                "searchEligibility", "NOT_ELIGIBLE",
-                "sitemapEligibility", "NOT_ELIGIBLE",
+                "indexingPolicy", "INDEX",
+                "searchEligibility", "ELIGIBLE",
+                "sitemapEligibility", "ELIGIBLE",
                 "feedEligibility", "NOT_ELIGIBLE");
 
-        assertThatThrownBy(() -> insertResource(with(project, "searchEligibility", "ELIGIBLE")))
-                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
-        assertThatThrownBy(() -> insertResource(with(project, "sitemapEligibility", "ELIGIBLE")))
-                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
         assertThatThrownBy(() -> insertResource(with(project, "feedEligibility", "ELIGIBLE")))
                 .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
     }
@@ -223,6 +244,9 @@ class DiscoveryMigrationTest extends DiscoveryMigrationDatabase {
                 "uq_discoverable_resources_public_url",
                 "uq_discoverable_resources_canonical_url",
                 "ix_discoverable_resources_source_ref",
+                "ix_discoverable_resources_search_fts",
+                "ix_discoverable_resources_public_sitemap",
+                "ix_discoverable_resources_public_feed",
                 "pk_redirect_rules",
                 "uq_redirect_rules_active_source_url",
                 "ck_redirect_rules_source_ref_all_or_none");
@@ -247,6 +271,38 @@ class DiscoveryMigrationTest extends DiscoveryMigrationDatabase {
         assertThat(jdbc().queryForObject(
                 "SELECT to_regclass('discovery.discoverable_resource_history')",
                 String.class)).isNull();
+        assertThat(jdbc().queryForObject(
+                "SELECT to_regclass('discovery.search_terms')",
+                String.class)).isNull();
+    }
+
+    @Test
+    void publicIndexMigrationCreatesExpectedPartialIndexesOnlyOnDiscoveryProjection() {
+        List<String> indexes = jdbc().queryForList("""
+                SELECT indexdef FROM pg_indexes
+                WHERE schemaname = 'discovery'
+                  AND tablename = 'discoverable_resources'
+                ORDER BY indexname
+                """, String.class);
+
+        assertThat(indexes).anySatisfy(index -> assertThat(index)
+                .contains("ix_discoverable_resources_search_fts")
+                .contains("USING gin")
+                .contains("to_tsvector('simple'::regconfig, COALESCE(search_text, ''::text))")
+                .contains("indexing_policy = 'INDEX'::text")
+                .contains("search_eligibility = 'ELIGIBLE'::text"));
+        assertThat(indexes).anySatisfy(index -> assertThat(index)
+                .contains("ix_discoverable_resources_public_sitemap")
+                .contains("language")
+                .contains("source_updated_at DESC")
+                .contains("public_url")
+                .contains("sitemap_eligibility = 'ELIGIBLE'::text"));
+        assertThat(indexes).anySatisfy(index -> assertThat(index)
+                .contains("ix_discoverable_resources_public_feed")
+                .contains("published_at DESC")
+                .contains("source_updated_at DESC")
+                .contains("public_url")
+                .contains("feed_eligibility = 'ELIGIBLE'::text"));
     }
 
     @Test

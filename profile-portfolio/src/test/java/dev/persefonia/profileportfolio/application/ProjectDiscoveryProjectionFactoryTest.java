@@ -35,7 +35,7 @@ class ProjectDiscoveryProjectionFactoryTest {
             new ConfiguredProjectCanonicalUrlFactory("https://example.test"));
 
     @Test
-    void publicProjectCreatesConservativeProjectionPerLocalization() {
+    void publicProjectCreatesSearchAndSitemapEligibleProjectionPerLocalization() {
         Project project = project(ProjectVisibility.PUBLIC, ProjectStatus.ACTIVE, localization(ContentLanguage.TR), localization(ContentLanguage.EN));
 
         var projections = factory.projectionsFor(project);
@@ -46,9 +46,9 @@ class ProjectDiscoveryProjectionFactoryTest {
             assertThat(input.sourceType()).isEqualTo(SourceType.PROJECT);
             assertThat(input.resourceType()).isEqualTo(DiscoverableResourceType.PROJECT);
             assertThat(input.routePurpose()).isEqualTo(RoutePurpose.DETAIL);
-            assertThat(input.indexingPolicy()).isEqualTo(IndexingPolicy.NO_INDEX);
-            assertThat(input.searchEligibility()).isEqualTo(DiscoveryEligibility.NOT_ELIGIBLE);
-            assertThat(input.sitemapEligibility()).isEqualTo(DiscoveryEligibility.NOT_ELIGIBLE);
+            assertThat(input.indexingPolicy()).isEqualTo(IndexingPolicy.INDEX);
+            assertThat(input.searchEligibility()).isEqualTo(DiscoveryEligibility.ELIGIBLE);
+            assertThat(input.sitemapEligibility()).isEqualTo(DiscoveryEligibility.ELIGIBLE);
             assertThat(input.feedEligibility()).isEqualTo(DiscoveryEligibility.NOT_ELIGIBLE);
             assertThat(input.openGraphImageAssetId()).isNull();
             assertThat(input.publishedAt()).isNull();
@@ -63,7 +63,33 @@ class ProjectDiscoveryProjectionFactoryTest {
 
         assertThat(factory.projectionsFor(project))
                 .singleElement()
-                .satisfies(input -> assertThat(input.publicUrl().value()).isEqualTo("/en/projects/en-project"));
+                .satisfies(input -> {
+                    assertThat(input.publicUrl().value()).isEqualTo("/en/projects/en-project");
+                    assertThat(input.indexingPolicy()).isEqualTo(IndexingPolicy.NO_INDEX);
+                    assertThat(input.searchEligibility()).isEqualTo(DiscoveryEligibility.NOT_ELIGIBLE);
+                    assertThat(input.sitemapEligibility()).isEqualTo(DiscoveryEligibility.NOT_ELIGIBLE);
+                    assertThat(input.feedEligibility()).isEqualTo(DiscoveryEligibility.NOT_ELIGIBLE);
+                });
+    }
+
+    @Test
+    void publicCompletedAndExperimentProjectsUseSamePublicIndexPolicy() {
+        assertThat(factory.projectionsFor(project(ProjectVisibility.PUBLIC, ProjectStatus.COMPLETED, localization(ContentLanguage.EN))))
+                .singleElement()
+                .satisfies(input -> {
+                    assertThat(input.indexingPolicy()).isEqualTo(IndexingPolicy.INDEX);
+                    assertThat(input.searchEligibility()).isEqualTo(DiscoveryEligibility.ELIGIBLE);
+                    assertThat(input.sitemapEligibility()).isEqualTo(DiscoveryEligibility.ELIGIBLE);
+                    assertThat(input.feedEligibility()).isEqualTo(DiscoveryEligibility.NOT_ELIGIBLE);
+                });
+        assertThat(factory.projectionsFor(project(ProjectVisibility.PUBLIC, ProjectStatus.EXPERIMENT, localization(ContentLanguage.EN))))
+                .singleElement()
+                .satisfies(input -> {
+                    assertThat(input.indexingPolicy()).isEqualTo(IndexingPolicy.INDEX);
+                    assertThat(input.searchEligibility()).isEqualTo(DiscoveryEligibility.ELIGIBLE);
+                    assertThat(input.sitemapEligibility()).isEqualTo(DiscoveryEligibility.ELIGIBLE);
+                    assertThat(input.feedEligibility()).isEqualTo(DiscoveryEligibility.NOT_ELIGIBLE);
+                });
     }
 
     @Test

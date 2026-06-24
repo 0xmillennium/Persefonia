@@ -32,8 +32,12 @@ class PublicSurfaceAbsenceRegressionTest {
                 "/series",
                 "/en/series",
                 "/tr/series",
+                "/robots.txt",
                 "/sitemap.xml",
                 "/feed",
+                "/feed.xml",
+                "/rss.xml",
+                "/atom.xml",
                 "/search")) {
             mockMvc.perform(get(path)).andExpect(status().is4xxClientError());
         }

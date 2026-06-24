@@ -54,7 +54,7 @@ class PublicSurfacePolicyArchitectureTest {
         assertThat(productionAndMigrationText)
                 .doesNotContain("search_vector")
                 .doesNotContain("SearchVector")
-                .doesNotContain("tsvector")
+                .doesNotContain("GENERATED ALWAYS")
                 .doesNotContain("SearchTerm")
                 .doesNotContain("search_terms")
                 .doesNotContain("Elasticsearch")
