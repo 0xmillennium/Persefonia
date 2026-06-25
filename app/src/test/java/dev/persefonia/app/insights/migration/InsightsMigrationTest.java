@@ -31,7 +31,11 @@ class InsightsMigrationTest {
             "session_id",
             "visitor_id",
             "tracking_cookie_id",
-            "country_code");
+            "country_code",
+            "public_path",
+            "search_term",
+            "cv_asset_id",
+            "not_found_path");
     private static final List<String> FORBIDDEN_RAW_EVENT_TABLES = List.of(
             "analytics_events",
             "raw_events",
@@ -80,26 +84,26 @@ class InsightsMigrationTest {
                 .isInstanceOf(DataIntegrityViolationException.class);
 
         UUID dimensionId = UUID.randomUUID();
-        insertDimension(dimensionId, "PAGE_VIEW");
-        assertThatThrownBy(() -> insertCounter(UUID.randomUUID(), "PAGE_VIEW", "HOUR", dimensionId))
+        insertDimension(dimensionId, "PUBLIC_PAGE_VIEW");
+        assertThatThrownBy(() -> insertCounter(UUID.randomUUID(), "PUBLIC_PAGE_VIEW", "HOUR", dimensionId))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
     @Test
     void duplicateDimensionUniquenessTreatsNullsAsNotDistinct() {
-        insertDimension(UUID.randomUUID(), "PAGE_VIEW");
+        insertDimension(UUID.randomUUID(), "PUBLIC_PAGE_VIEW");
 
-        assertThatThrownBy(() -> insertDimension(UUID.randomUUID(), "PAGE_VIEW"))
+        assertThatThrownBy(() -> insertDimension(UUID.randomUUID(), "PUBLIC_PAGE_VIEW"))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
     @Test
     void duplicateCounterUniquenessSupportsFutureAtomicUpsert() {
         UUID dimensionId = UUID.randomUUID();
-        insertDimension(dimensionId, "SEARCH_PERFORMED");
-        insertCounter(UUID.randomUUID(), "SEARCH_PERFORMED", "DAY", dimensionId);
+        insertDimension(dimensionId, "PUBLIC_SEARCH_SUBMITTED");
+        insertCounter(UUID.randomUUID(), "PUBLIC_SEARCH_SUBMITTED", "DAY", dimensionId);
 
-        assertThatThrownBy(() -> insertCounter(UUID.randomUUID(), "SEARCH_PERFORMED", "DAY", dimensionId))
+        assertThatThrownBy(() -> insertCounter(UUID.randomUUID(), "PUBLIC_SEARCH_SUBMITTED", "DAY", dimensionId))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
@@ -114,6 +118,11 @@ class InsightsMigrationTest {
     void aggregateInsightsTablesHaveNoForbiddenIdentityColumnsOrCountryCode() {
         assertThat(columns("analytics_dimensions")).doesNotContainAnyElementsOf(FORBIDDEN_INSIGHTS_COLUMNS);
         assertThat(columns("analytics_counters")).doesNotContainAnyElementsOf(FORBIDDEN_INSIGHTS_COLUMNS);
+    }
+
+    @Test
+    void insightsDimensionsAreBoundedByMetricAndSurfaceOnly() {
+        assertThat(columns("analytics_dimensions")).containsExactlyInAnyOrder("id", "metric", "surface", "created_at");
     }
 
     private static List<String> insightsTables() {
@@ -133,8 +142,8 @@ class InsightsMigrationTest {
     private static void insertDimension(UUID id, String eventType) {
         jdbc.update("""
                 INSERT INTO insights.analytics_dimensions (
-                    id, event_type, public_path, search_term, cv_asset_id, not_found_path, created_at
-                ) VALUES (?, ?, NULL, NULL, NULL, NULL, ?)
+                    id, metric, surface, created_at
+                ) VALUES (?, ?, 'HOME', ?)
                 """, id, eventType, Timestamp.from(Instant.parse("2026-06-25T10:00:00Z")));
     }
 
@@ -142,7 +151,7 @@ class InsightsMigrationTest {
         Instant now = Instant.parse("2026-06-25T10:01:00Z");
         jdbc.update("""
                 INSERT INTO insights.analytics_counters (
-                    id, event_type, period_start, period_granularity, dimension_id, count,
+                    id, metric, period_start, period_granularity, dimension_id, count,
                     first_seen_at, last_seen_at, version
                 ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, 0)
                 """,

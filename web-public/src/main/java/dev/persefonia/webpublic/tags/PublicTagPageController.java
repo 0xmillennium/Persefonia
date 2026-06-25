@@ -8,6 +8,8 @@ import dev.persefonia.taxonomy.application.query.PublicTagLookupResult;
 import dev.persefonia.taxonomy.application.service.PublicTagBySourceQueryHandler;
 import dev.persefonia.webpublic.content.PublicContentResponseHeaders;
 import dev.persefonia.webpublic.content.PublicContentViewModelFactory;
+import dev.persefonia.webpublic.insights.PublicInsightSurface;
+import dev.persefonia.webpublic.insights.PublicInsightsObservationGateway;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
@@ -26,6 +28,7 @@ public final class PublicTagPageController {
     private final PublicTagPageViewModelFactory viewModelFactory;
     private final PublicContentViewModelFactory publicContentViewModelFactory;
     private final PublicContentResponseHeaders responseHeaders;
+    private final PublicInsightsObservationGateway insights;
 
     public PublicTagPageController(
             PublicTagRouteParser routeParser,
@@ -34,7 +37,8 @@ public final class PublicTagPageController {
             PublicTaggedContentQueryHandler contentQueryHandler,
             PublicTagPageViewModelFactory viewModelFactory,
             PublicContentViewModelFactory publicContentViewModelFactory,
-            PublicContentResponseHeaders responseHeaders) {
+            PublicContentResponseHeaders responseHeaders,
+            PublicInsightsObservationGateway insights) {
         this.routeParser = routeParser;
         this.routeResolver = routeResolver;
         this.tagQueryHandler = tagQueryHandler;
@@ -42,6 +46,7 @@ public final class PublicTagPageController {
         this.viewModelFactory = viewModelFactory;
         this.publicContentViewModelFactory = publicContentViewModelFactory;
         this.responseHeaders = responseHeaders;
+        this.insights = insights;
     }
 
     @GetMapping("/{language}/tags/{tagSlug}")
@@ -68,6 +73,7 @@ public final class PublicTagPageController {
                 ContentLanguage.valueOf(tagRoute.language().name()),
                 CONTENT_LIMIT));
         responseHeaders.applyPublicContentHeaders(response);
+        insights.recordPageView(PublicInsightSurface.TAG_INDEX);
         return new ModelAndView(
                 "site/tag",
                 "page",
@@ -81,6 +87,7 @@ public final class PublicTagPageController {
 
     private ModelAndView notFound(HttpServletResponse response) {
         responseHeaders.applyPublicNotFoundHeaders(response);
+        insights.recordNotFound();
         ModelAndView modelAndView =
                 new ModelAndView("site/not-found", "page", publicContentViewModelFactory.notFoundPage());
         modelAndView.setStatus(HttpStatus.NOT_FOUND);

@@ -12,6 +12,7 @@ import dev.persefonia.platformoperations.application.port.RateLimitPort;
 import dev.persefonia.platformoperations.application.port.RateLimitRejectionReason;
 import dev.persefonia.platformoperations.application.port.RateLimitRequest;
 import dev.persefonia.platformoperations.application.port.RateLimitScope;
+import dev.persefonia.webpublic.insights.PublicInsightsObservationGateway;
 import dev.persefonia.webpublic.contact.PublicContactSubmissionGateway;
 import dev.persefonia.webpublic.contact.PublicContactSubmissionRequest;
 import dev.persefonia.webpublic.contact.PublicContactSubmissionResult;
@@ -27,6 +28,7 @@ public class PublicContactSubmissionService implements PublicContactSubmissionGa
     private final PostCommitTaskExecutor postCommitTasks;
     private final MailNotificationPort mailNotifications;
     private final ContactMailNotificationAttemptRecorder mailAttempts;
+    private final PublicInsightsObservationGateway insights;
     private final Clock clock;
 
     public PublicContactSubmissionService(
@@ -37,6 +39,7 @@ public class PublicContactSubmissionService implements PublicContactSubmissionGa
             PostCommitTaskExecutor postCommitTasks,
             MailNotificationPort mailNotifications,
             ContactMailNotificationAttemptRecorder mailAttempts,
+            PublicInsightsObservationGateway insights,
             Clock clock) {
         this.rateLimits = Objects.requireNonNull(rateLimits, "rateLimits must not be null");
         this.keyFactory = Objects.requireNonNull(keyFactory, "keyFactory must not be null");
@@ -45,6 +48,7 @@ public class PublicContactSubmissionService implements PublicContactSubmissionGa
         this.postCommitTasks = Objects.requireNonNull(postCommitTasks, "postCommitTasks must not be null");
         this.mailNotifications = Objects.requireNonNull(mailNotifications, "mailNotifications must not be null");
         this.mailAttempts = Objects.requireNonNull(mailAttempts, "mailAttempts must not be null");
+        this.insights = Objects.requireNonNull(insights, "insights must not be null");
         this.clock = Objects.requireNonNull(clock, "clock must not be null");
     }
 
@@ -78,6 +82,7 @@ public class PublicContactSubmissionService implements PublicContactSubmissionGa
                 result.notification(),
                 mailNotifications,
                 mailAttempts));
+        postCommitTasks.afterCommit(insights::recordContactSubmitted);
         return PublicContactSubmissionResult.success();
     }
 }

@@ -6,6 +6,7 @@ import dev.persefonia.profileportfolio.application.service.ActiveCvPublicQuerySe
 import dev.persefonia.webpublic.content.PublicCanonicalUrlFactory;
 import dev.persefonia.webpublic.content.PublicContentResponseHeaders;
 import dev.persefonia.webpublic.content.PublicContentViewModelFactory;
+import dev.persefonia.webpublic.insights.PublicInsightsObservationGateway;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.Locale;
 import java.util.Objects;
@@ -29,18 +30,21 @@ public final class PublicCvController {
     private final PublicContentResponseHeaders responseHeaders;
     private final PublicContentViewModelFactory viewModelFactory;
     private final PublicCanonicalUrlFactory canonicalUrlFactory;
+    private final PublicInsightsObservationGateway insights;
 
     public PublicCvController(
             ObjectProvider<ActiveCvPublicQueryService> queries,
             ObjectProvider<ActiveCvPublicDownloadService> downloads,
             PublicContentResponseHeaders responseHeaders,
             PublicContentViewModelFactory viewModelFactory,
-            PublicCanonicalUrlFactory canonicalUrlFactory) {
+            PublicCanonicalUrlFactory canonicalUrlFactory,
+            PublicInsightsObservationGateway insights) {
         this.queries = Objects.requireNonNull(queries, "queries");
         this.downloads = Objects.requireNonNull(downloads, "downloads");
         this.responseHeaders = Objects.requireNonNull(responseHeaders, "responseHeaders");
         this.viewModelFactory = Objects.requireNonNull(viewModelFactory, "viewModelFactory");
         this.canonicalUrlFactory = Objects.requireNonNull(canonicalUrlFactory, "canonicalUrlFactory");
+        this.insights = Objects.requireNonNull(insights, "insights");
     }
 
     @GetMapping("/cv")
@@ -61,7 +65,7 @@ public final class PublicCvController {
             return ResponseEntity.notFound().build();
         }
         return downloadService.defaultLanguageDownload()
-                .map(PublicCvController::downloadResponse)
+                .map(this::observedDownloadResponse)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
@@ -85,7 +89,7 @@ public final class PublicCvController {
             return ResponseEntity.notFound().build();
         }
         return downloadService.explicitLanguageDownload(language)
-                .map(PublicCvController::downloadResponse)
+                .map(this::observedDownloadResponse)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
@@ -94,12 +98,14 @@ public final class PublicCvController {
             String canonicalPath,
             HttpServletResponse response) {
         responseHeaders.applyPublicContentHeaders(response);
+        insights.recordCvViewed();
         return new ModelAndView("site/cv/index", "page",
                 PublicCvPage.from(view, canonicalUrlFactory.canonicalUrl(canonicalPath)));
     }
 
     private ModelAndView notFound(HttpServletResponse response) {
         responseHeaders.applyPublicNotFoundHeaders(response);
+        insights.recordNotFound();
         ModelAndView modelAndView = new ModelAndView("site/not-found", "page", viewModelFactory.notFoundPage());
         modelAndView.setStatus(HttpStatus.NOT_FOUND);
         return modelAndView;
@@ -113,5 +119,10 @@ public final class PublicCvController {
                 .header("X-Content-Type-Options", "nosniff")
                 .header(HttpHeaders.CACHE_CONTROL, DOWNLOAD_CACHE_CONTROL)
                 .body(new InputStreamResource(download.inputStream()));
+    }
+
+    private ResponseEntity<InputStreamResource> observedDownloadResponse(ActiveCvDownload download) {
+        insights.recordCvDownloaded();
+        return downloadResponse(download);
     }
 }

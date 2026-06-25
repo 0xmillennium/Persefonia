@@ -3,6 +3,8 @@ package dev.persefonia.webpublic.contact;
 import dev.persefonia.webpublic.FrontendAssetResolver;
 import dev.persefonia.webpublic.content.PublicCanonicalUrlFactory;
 import dev.persefonia.webpublic.content.PublicContentResponseHeaders;
+import dev.persefonia.webpublic.insights.PublicInsightSurface;
+import dev.persefonia.webpublic.insights.PublicInsightsObservationGateway;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.LinkedHashMap;
@@ -29,16 +31,19 @@ public final class PublicContactController {
     private final FrontendAssetResolver assetResolver;
     private final PublicCanonicalUrlFactory canonicalUrlFactory;
     private final PublicContentResponseHeaders responseHeaders;
+    private final PublicInsightsObservationGateway insights;
 
     public PublicContactController(
             PublicContactSubmissionGateway submissions,
             FrontendAssetResolver assetResolver,
             PublicCanonicalUrlFactory canonicalUrlFactory,
-            PublicContentResponseHeaders responseHeaders) {
+            PublicContentResponseHeaders responseHeaders,
+            PublicInsightsObservationGateway insights) {
         this.submissions = Objects.requireNonNull(submissions, "submissions must not be null");
         this.assetResolver = Objects.requireNonNull(assetResolver, "assetResolver must not be null");
         this.canonicalUrlFactory = Objects.requireNonNull(canonicalUrlFactory, "canonicalUrlFactory must not be null");
         this.responseHeaders = Objects.requireNonNull(responseHeaders, "responseHeaders must not be null");
+        this.insights = Objects.requireNonNull(insights, "insights must not be null");
     }
 
     @GetMapping("/contact")
@@ -47,6 +52,7 @@ public final class PublicContactController {
             HttpServletRequest request,
             HttpServletResponse response) {
         responseHeaders.applyPublicContactHeaders(response);
+        insights.recordPageView(PublicInsightSurface.CONTACT);
         return page(new ContactForm(), Map.of(), successMessage(submitted), "1".equals(submitted), request);
     }
 

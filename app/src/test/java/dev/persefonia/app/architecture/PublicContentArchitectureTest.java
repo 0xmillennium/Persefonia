@@ -14,6 +14,7 @@ import dev.persefonia.webpublic.content.PublicContentController;
 import dev.persefonia.webpublic.content.PublicContentResponseHeaders;
 import dev.persefonia.webpublic.content.PublicContentRouteParser;
 import dev.persefonia.webpublic.content.PublicContentViewModelFactory;
+import dev.persefonia.webpublic.insights.PublicInsightsObservationGateway;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -34,7 +35,8 @@ class PublicContentArchitectureTest {
                                 PublicContentBySourceQueryHandler.class,
                                 PublicTranslationLinkQueryService.class,
                                 PublicContentViewModelFactory.class,
-                                PublicContentResponseHeaders.class));
+                                PublicContentResponseHeaders.class,
+                                PublicInsightsObservationGateway.class));
     }
 
     @Test

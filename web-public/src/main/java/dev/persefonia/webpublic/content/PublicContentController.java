@@ -3,6 +3,8 @@ package dev.persefonia.webpublic.content;
 import dev.persefonia.contentpublishing.application.query.PublicContentLookupResult;
 import dev.persefonia.contentpublishing.application.service.PublicContentBySourceQueryHandler;
 import dev.persefonia.contentpublishing.application.service.PublicTranslationLinkQueryService;
+import dev.persefonia.webpublic.insights.PublicInsightSurface;
+import dev.persefonia.webpublic.insights.PublicInsightsObservationGateway;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
@@ -18,6 +20,7 @@ public final class PublicContentController {
     private final PublicTranslationLinkQueryService translationLinkQueryService;
     private final PublicContentViewModelFactory viewModelFactory;
     private final PublicContentResponseHeaders responseHeaders;
+    private final PublicInsightsObservationGateway insights;
 
     public PublicContentController(
             PublicContentRouteParser routeParser,
@@ -25,13 +28,15 @@ public final class PublicContentController {
             PublicContentBySourceQueryHandler queryHandler,
             PublicTranslationLinkQueryService translationLinkQueryService,
             PublicContentViewModelFactory viewModelFactory,
-            PublicContentResponseHeaders responseHeaders) {
+            PublicContentResponseHeaders responseHeaders,
+            PublicInsightsObservationGateway insights) {
         this.routeParser = routeParser;
         this.routeResolver = routeResolver;
         this.queryHandler = queryHandler;
         this.translationLinkQueryService = translationLinkQueryService;
         this.viewModelFactory = viewModelFactory;
         this.responseHeaders = responseHeaders;
+        this.insights = insights;
     }
 
     @GetMapping("/{language}/{collection}/{slug}")
@@ -65,6 +70,7 @@ public final class PublicContentController {
     private ModelAndView render(PublicContentLookupResult result, HttpServletResponse response) {
         if (result instanceof PublicContentLookupResult.Found found) {
             responseHeaders.applyPublicContentHeaders(response);
+            insights.recordPageView(PublicInsightSurface.CONTENT_DETAIL);
             return new ModelAndView(
                     "site/content",
                     "page",
@@ -75,6 +81,7 @@ public final class PublicContentController {
 
     private ModelAndView notFound(HttpServletResponse response) {
         responseHeaders.applyPublicNotFoundHeaders(response);
+        insights.recordNotFound();
         ModelAndView modelAndView = new ModelAndView("site/not-found", "page", viewModelFactory.notFoundPage());
         modelAndView.setStatus(HttpStatus.NOT_FOUND);
         return modelAndView;

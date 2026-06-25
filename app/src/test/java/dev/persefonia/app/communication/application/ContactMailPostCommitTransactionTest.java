@@ -17,6 +17,8 @@ import dev.persefonia.communication.domain.contact.MailDeliveryStatus;
 import dev.persefonia.communication.domain.contact.MailNotificationAttemptResult;
 import dev.persefonia.platformoperations.application.port.RateLimitDecision;
 import dev.persefonia.webpublic.contact.PublicContactSubmissionRequest;
+import dev.persefonia.webpublic.insights.PublicInsightSurface;
+import dev.persefonia.webpublic.insights.PublicInsightsObservationGateway;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -44,6 +46,7 @@ class ContactMailPostCommitTransactionTest {
 
     private InMemoryContactMessages messages;
     private RecordingMailNotificationPort mailNotifications;
+    private RecordingPublicInsightsObservationGateway insights;
     private PublicContactSubmissionService service;
     private TransactionTemplate transactions;
 
@@ -51,6 +54,7 @@ class ContactMailPostCommitTransactionTest {
     void setUp() {
         messages = new InMemoryContactMessages();
         mailNotifications = new RecordingMailNotificationPort(MailNotificationResult.sent());
+        insights = new RecordingPublicInsightsObservationGateway();
         service = new PublicContactSubmissionService(
                 request -> RateLimitDecision.allowed(4),
                 new ContactRateLimitKeyFactory("secret-value"),
@@ -59,6 +63,7 @@ class ContactMailPostCommitTransactionTest {
                 new SpringTransactionSynchronizationPostCommitTaskExecutor(),
                 mailNotifications,
                 new ContactMailNotificationAttemptRecorder(messages, Clock.fixed(NOW.plusSeconds(1), ZoneOffset.UTC)),
+                insights,
                 Clock.fixed(NOW, ZoneOffset.UTC));
         transactions = new TransactionTemplate(new InMemoryTransactionManager());
     }
@@ -74,6 +79,7 @@ class ContactMailPostCommitTransactionTest {
 
         ContactMessage message = messages.onlyMessage();
         assertThat(mailNotifications.notifications()).hasSize(1);
+        assertThat(insights.contactSubmittedCalls()).isEqualTo(1);
         assertThat(message.mailDeliveryStatus()).isEqualTo(MailDeliveryStatus.SENT);
         assertThat(message.mailNotificationAttempts())
                 .extracting(attempt -> attempt.result())
@@ -88,6 +94,7 @@ class ContactMailPostCommitTransactionTest {
         });
 
         assertThat(mailNotifications.notifications()).isEmpty();
+        assertThat(insights.contactSubmittedCalls()).isZero();
         assertThat(messages.onlyMessage().mailNotificationAttempts()).isEmpty();
         assertThat(messages.onlyMessage().mailDeliveryStatus()).isEqualTo(MailDeliveryStatus.NOT_ATTEMPTED);
     }
@@ -100,9 +107,43 @@ class ContactMailPostCommitTransactionTest {
 
         ContactMessage message = messages.onlyMessage();
         assertThat(message.mailDeliveryStatus()).isEqualTo(MailDeliveryStatus.FAILED);
+        assertThat(insights.contactSubmittedCalls()).isEqualTo(1);
         assertThat(message.mailNotificationAttempts())
                 .extracting(attempt -> attempt.result())
                 .containsExactly(MailNotificationAttemptResult.FAILED);
+    }
+
+    private static final class RecordingPublicInsightsObservationGateway implements PublicInsightsObservationGateway {
+        private int contactSubmittedCalls;
+
+        @Override
+        public void recordPageView(PublicInsightSurface surface) {
+        }
+
+        @Override
+        public void recordSearchSubmitted() {
+        }
+
+        @Override
+        public void recordCvViewed() {
+        }
+
+        @Override
+        public void recordCvDownloaded() {
+        }
+
+        @Override
+        public void recordContactSubmitted() {
+            contactSubmittedCalls++;
+        }
+
+        @Override
+        public void recordNotFound() {
+        }
+
+        int contactSubmittedCalls() {
+            return contactSubmittedCalls;
+        }
     }
 
     private static final class RecordingMailNotificationPort implements MailNotificationPort {

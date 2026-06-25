@@ -8,6 +8,7 @@ import dev.persefonia.communication.application.command.SubmitContactMessageComm
 import dev.persefonia.communication.application.port.MailNotificationPort;
 import dev.persefonia.platformoperations.application.port.RateLimitPort;
 import dev.persefonia.webpublic.contact.PublicContactSubmissionGateway;
+import dev.persefonia.webpublic.insights.PublicInsightsObservationGateway;
 import java.time.Clock;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -23,6 +24,7 @@ class ContactSubmissionGatewayAdapter {
             PostCommitTaskExecutor postCommitTasks,
             MailNotificationPort mailNotifications,
             ContactMailNotificationAttemptRecorder mailAttempts,
+            PublicInsightsObservationGateway insights,
             Clock clock) {
         return new PublicContactSubmissionService(
                 rateLimits,
@@ -32,6 +34,7 @@ class ContactSubmissionGatewayAdapter {
                 postCommitTasks,
                 mailNotifications,
                 mailAttempts,
+                insights,
                 clock);
     }
 }

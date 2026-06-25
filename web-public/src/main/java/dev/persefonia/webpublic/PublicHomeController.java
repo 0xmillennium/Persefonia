@@ -6,6 +6,8 @@ import dev.persefonia.profileportfolio.application.service.PublicFeaturedProject
 import dev.persefonia.profileportfolio.application.service.PublicHomepageSettingsQueryService;
 import dev.persefonia.profileportfolio.application.service.PublicProfileSummaryQueryService;
 import dev.persefonia.webpublic.content.PublicCanonicalUrlFactory;
+import dev.persefonia.webpublic.insights.PublicInsightSurface;
+import dev.persefonia.webpublic.insights.PublicInsightsObservationGateway;
 import dev.persefonia.webpublic.projects.PublicProjectPageCopy;
 import java.util.List;
 import java.util.Objects;
@@ -24,6 +26,7 @@ public class PublicHomeController {
     private final PublicProfileSummaryQueryService profiles;
     private final PublicFeaturedProjectQueryService featuredProjects;
     private final PublicCanonicalUrlFactory canonicalUrlFactory;
+    private final PublicInsightsObservationGateway insights;
     private final String publicBaseUrl;
     private final String ownerAlias;
 
@@ -33,6 +36,7 @@ public class PublicHomeController {
             PublicProfileSummaryQueryService profiles,
             PublicFeaturedProjectQueryService featuredProjects,
             PublicCanonicalUrlFactory canonicalUrlFactory,
+            PublicInsightsObservationGateway insights,
             @Value("${site.public-base-url}") String publicBaseUrl,
             @Value("${site.owner-alias}") String ownerAlias) {
         this.assetResolver = Objects.requireNonNull(assetResolver, "assetResolver");
@@ -40,12 +44,14 @@ public class PublicHomeController {
         this.profiles = Objects.requireNonNull(profiles, "profiles");
         this.featuredProjects = Objects.requireNonNull(featuredProjects, "featuredProjects");
         this.canonicalUrlFactory = Objects.requireNonNull(canonicalUrlFactory, "canonicalUrlFactory");
+        this.insights = Objects.requireNonNull(insights, "insights");
         this.publicBaseUrl = publicBaseUrl;
         this.ownerAlias = ownerAlias;
     }
 
     @GetMapping("/")
     public String home(Model model) {
+        insights.recordPageView(PublicInsightSurface.HOME);
         PublicHomepageSettingsView homepage = settings.current();
         Optional<PublicProfileSummaryView> profile = profiles.currentSummary(homepage.defaultLanguage());
         var homepageFeaturedProjects = homepage.showFeaturedProjects()

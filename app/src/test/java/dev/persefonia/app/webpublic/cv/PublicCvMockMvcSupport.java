@@ -10,6 +10,8 @@ import dev.persefonia.webpublic.content.PublicCanonicalUrlFactory;
 import dev.persefonia.webpublic.content.PublicContentResponseHeaders;
 import dev.persefonia.webpublic.content.PublicContentViewModelFactory;
 import dev.persefonia.webpublic.cv.PublicCvController;
+import dev.persefonia.webpublic.insights.PublicInsightSurface;
+import dev.persefonia.webpublic.insights.PublicInsightsObservationGateway;
 import gg.jte.ContentType;
 import gg.jte.TemplateEngine;
 import gg.jte.output.StringOutput;
@@ -51,12 +53,39 @@ final class PublicCvMockMvcSupport {
                 beans.getBeanProvider(ActiveCvPublicDownloadService.class),
                 new PublicContentResponseHeaders(),
                 new PublicContentViewModelFactory(new TestAssetResolver(), canonicalUrlFactory),
-                canonicalUrlFactory);
+                canonicalUrlFactory,
+                new NoOpPublicInsightsObservationGateway());
 
         MockMvc mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setViewResolvers(new JteViewResolver())
                 .build();
         return new PublicCvMockMvcSupport(mockMvc, profiles, assets);
+    }
+
+    private static final class NoOpPublicInsightsObservationGateway implements PublicInsightsObservationGateway {
+        @Override
+        public void recordPageView(PublicInsightSurface surface) {
+        }
+
+        @Override
+        public void recordSearchSubmitted() {
+        }
+
+        @Override
+        public void recordCvViewed() {
+        }
+
+        @Override
+        public void recordCvDownloaded() {
+        }
+
+        @Override
+        public void recordContactSubmitted() {
+        }
+
+        @Override
+        public void recordNotFound() {
+        }
     }
 
     void reset() {

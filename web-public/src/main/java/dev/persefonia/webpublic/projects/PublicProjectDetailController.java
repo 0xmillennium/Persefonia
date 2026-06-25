@@ -5,6 +5,8 @@ import dev.persefonia.profileportfolio.application.service.PublicProjectDetailQu
 import dev.persefonia.webpublic.FrontendAssetResolver;
 import dev.persefonia.webpublic.content.PublicContentResponseHeaders;
 import dev.persefonia.webpublic.content.PublicContentViewModelFactory;
+import dev.persefonia.webpublic.insights.PublicInsightSurface;
+import dev.persefonia.webpublic.insights.PublicInsightsObservationGateway;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.Locale;
 import java.util.Objects;
@@ -24,6 +26,7 @@ public final class PublicProjectDetailController {
     private final FrontendAssetResolver assetResolver;
     private final PublicContentResponseHeaders responseHeaders;
     private final PublicContentViewModelFactory contentViewModelFactory;
+    private final PublicInsightsObservationGateway insights;
 
     public PublicProjectDetailController(
             PublicProjectRouteParser routeParser,
@@ -31,13 +34,15 @@ public final class PublicProjectDetailController {
             PublicProjectDetailQueryService projects,
             FrontendAssetResolver assetResolver,
             PublicContentResponseHeaders responseHeaders,
-            PublicContentViewModelFactory contentViewModelFactory) {
+            PublicContentViewModelFactory contentViewModelFactory,
+            PublicInsightsObservationGateway insights) {
         this.routeParser = Objects.requireNonNull(routeParser, "routeParser");
         this.routeResolver = Objects.requireNonNull(routeResolver, "routeResolver");
         this.projects = Objects.requireNonNull(projects, "projects");
         this.assetResolver = Objects.requireNonNull(assetResolver, "assetResolver");
         this.responseHeaders = Objects.requireNonNull(responseHeaders, "responseHeaders");
         this.contentViewModelFactory = Objects.requireNonNull(contentViewModelFactory, "contentViewModelFactory");
+        this.insights = Objects.requireNonNull(insights, "insights");
     }
 
     @GetMapping("/{language}/projects/{slug}")
@@ -78,6 +83,7 @@ public final class PublicProjectDetailController {
             DiscoveryPublicProjectRouteOutcome.Project route,
             HttpServletResponse response) {
         responseHeaders.applyPublicContentHeaders(response);
+        insights.recordPageView(PublicInsightSurface.PROJECT_DETAIL);
         return new ModelAndView("site/projects/detail", "page", new PublicProjectDetailPage(
                 project.title(),
                 route.language().toLowerCase(Locale.ROOT),
@@ -91,6 +97,7 @@ public final class PublicProjectDetailController {
 
     private ModelAndView notFound(HttpServletResponse response) {
         responseHeaders.applyPublicNotFoundHeaders(response);
+        insights.recordNotFound();
         ModelAndView modelAndView =
                 new ModelAndView("site/not-found", "page", contentViewModelFactory.notFoundPage());
         modelAndView.setStatus(HttpStatus.NOT_FOUND);

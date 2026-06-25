@@ -4,6 +4,8 @@ import dev.persefonia.contentpublishing.application.query.PublicSeriesLookupResu
 import dev.persefonia.contentpublishing.application.service.PublicSeriesPageQueryService;
 import dev.persefonia.webpublic.content.PublicContentResponseHeaders;
 import dev.persefonia.webpublic.content.PublicContentViewModelFactory;
+import dev.persefonia.webpublic.insights.PublicInsightSurface;
+import dev.persefonia.webpublic.insights.PublicInsightsObservationGateway;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
@@ -19,6 +21,7 @@ public final class PublicSeriesPageController {
     private final PublicSeriesPageViewModelFactory viewModelFactory;
     private final PublicContentViewModelFactory publicContentViewModelFactory;
     private final PublicContentResponseHeaders responseHeaders;
+    private final PublicInsightsObservationGateway insights;
 
     public PublicSeriesPageController(
             PublicSeriesRouteParser routeParser,
@@ -26,13 +29,15 @@ public final class PublicSeriesPageController {
             PublicSeriesPageQueryService queryService,
             PublicSeriesPageViewModelFactory viewModelFactory,
             PublicContentViewModelFactory publicContentViewModelFactory,
-            PublicContentResponseHeaders responseHeaders) {
+            PublicContentResponseHeaders responseHeaders,
+            PublicInsightsObservationGateway insights) {
         this.routeParser = routeParser;
         this.routeResolver = routeResolver;
         this.queryService = queryService;
         this.viewModelFactory = viewModelFactory;
         this.publicContentViewModelFactory = publicContentViewModelFactory;
         this.responseHeaders = responseHeaders;
+        this.insights = insights;
     }
 
     @GetMapping("/{language}/series/{seriesSlug}")
@@ -55,6 +60,7 @@ public final class PublicSeriesPageController {
             return notFound(response);
         }
         responseHeaders.applyPublicContentHeaders(response);
+        insights.recordPageView(PublicInsightSurface.SERIES_INDEX);
         return new ModelAndView(
                 "site/series",
                 "page",
@@ -67,6 +73,7 @@ public final class PublicSeriesPageController {
 
     private ModelAndView notFound(HttpServletResponse response) {
         responseHeaders.applyPublicNotFoundHeaders(response);
+        insights.recordNotFound();
         ModelAndView modelAndView =
                 new ModelAndView("site/not-found", "page", publicContentViewModelFactory.notFoundPage());
         modelAndView.setStatus(HttpStatus.NOT_FOUND);

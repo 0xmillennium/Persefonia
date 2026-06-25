@@ -20,6 +20,8 @@ import dev.persefonia.platformoperations.application.port.RateLimitRejectionReas
 import dev.persefonia.platformoperations.application.port.RateLimitRequest;
 import dev.persefonia.webpublic.contact.PublicContactSubmissionRequest;
 import dev.persefonia.webpublic.contact.PublicContactSubmissionResult;
+import dev.persefonia.webpublic.insights.PublicInsightSurface;
+import dev.persefonia.webpublic.insights.PublicInsightsObservationGateway;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -42,6 +44,7 @@ class SubmitContactMessageGatewayTest {
     private final StubRateLimitPort rateLimits = new StubRateLimitPort();
     private final RecordingPostCommitTaskExecutor postCommitTasks = new RecordingPostCommitTaskExecutor();
     private final StubMailNotificationPort mailNotifications = new StubMailNotificationPort();
+    private final RecordingPublicInsightsObservationGateway insights = new RecordingPublicInsightsObservationGateway();
     private final ContactMailNotificationAttemptRecorder mailAttempts = new ContactMailNotificationAttemptRecorder(
             messages,
             Clock.fixed(NOW.plusSeconds(1), ZoneOffset.UTC));
@@ -53,6 +56,7 @@ class SubmitContactMessageGatewayTest {
             postCommitTasks,
             mailNotifications,
             mailAttempts,
+            insights,
             Clock.fixed(NOW, ZoneOffset.UTC));
 
     @Test
@@ -65,8 +69,9 @@ class SubmitContactMessageGatewayTest {
         assertThat(rateLimits.requests().getFirst().window()).isEqualTo(Duration.ofMinutes(15));
         assertThat(rateLimits.requests().getFirst().key().value()).doesNotContain("203.0.113.10");
         assertThat(messages.saved()).hasSize(1);
-        assertThat(postCommitTasks.tasks()).hasSize(1);
+        assertThat(postCommitTasks.tasks()).hasSize(2);
         assertThat(mailNotifications.notifications()).isEmpty();
+        assertThat(insights.contactSubmittedCalls()).isZero();
     }
 
     @Test
@@ -81,6 +86,7 @@ class SubmitContactMessageGatewayTest {
 
         assertThat(mailNotifications.notifications()).hasSize(1);
         assertThat(messages.findById(message.id()).orElseThrow().mailDeliveryStatus()).isEqualTo(MailDeliveryStatus.SENT);
+        assertThat(insights.contactSubmittedCalls()).isEqualTo(1);
     }
 
     @Test
@@ -156,6 +162,39 @@ class SubmitContactMessageGatewayTest {
 
         List<Runnable> tasks() {
             return tasks;
+        }
+    }
+
+    private static final class RecordingPublicInsightsObservationGateway implements PublicInsightsObservationGateway {
+        private int contactSubmittedCalls;
+
+        @Override
+        public void recordPageView(PublicInsightSurface surface) {
+        }
+
+        @Override
+        public void recordSearchSubmitted() {
+        }
+
+        @Override
+        public void recordCvViewed() {
+        }
+
+        @Override
+        public void recordCvDownloaded() {
+        }
+
+        @Override
+        public void recordContactSubmitted() {
+            contactSubmittedCalls++;
+        }
+
+        @Override
+        public void recordNotFound() {
+        }
+
+        int contactSubmittedCalls() {
+            return contactSubmittedCalls;
         }
     }
 
