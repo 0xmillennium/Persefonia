@@ -103,6 +103,10 @@ class RedirectManagementArchitectureTest {
         if (path.toString().contains("/app/src/main/java/dev/persefonia/app/transaction/")) {
             return false;
         }
+        if (path.toString().endsWith(
+                "/app/src/main/java/dev/persefonia/app/communication/application/PublicContactSubmissionService.java")) {
+            return false;
+        }
         return source.contains("TransactionSynchronization") || source.contains("afterCommit");
     }
 }

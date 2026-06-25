@@ -34,7 +34,6 @@ class PublicContactWorkflowArchitectureTest {
     void publicContactDoesNotUseMailPostCommitOrInsights() throws Exception {
         String sources = joinedSources(List.of(
                 Path.of("../web-public/src/main/java/dev/persefonia/webpublic/contact"),
-                Path.of("src/main/java/dev/persefonia/app/communication/application"),
                 Path.of("../communication/src/main/java/dev/persefonia/communication/application/command")));
 
         assertThat(sources)

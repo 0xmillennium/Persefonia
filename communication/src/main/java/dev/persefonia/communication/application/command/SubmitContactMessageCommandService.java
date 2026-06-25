@@ -1,5 +1,6 @@
 package dev.persefonia.communication.application.command;
 
+import dev.persefonia.communication.application.port.ContactMessageNotification;
 import dev.persefonia.communication.application.port.ContactMessageRepository;
 import dev.persefonia.communication.domain.contact.ContactBody;
 import dev.persefonia.communication.domain.contact.ContactMessage;
@@ -41,7 +42,13 @@ public final class SubmitContactMessageCommandService {
                 body,
                 command.submittedAt());
         messages.save(message);
-        return SubmitContactMessageResult.success(message.id());
+        return SubmitContactMessageResult.success(message.id(), new ContactMessageNotification(
+                message.id().value(),
+                message.submittedAt(),
+                message.senderName().value(),
+                message.senderEmail().value(),
+                message.subject().value(),
+                message.body().value()));
     }
 
     private static <T> T validate(String field, Supplier<T> factory, Map<String, String> fieldErrors) {

@@ -70,6 +70,11 @@ class ContactMessageArchitectureTest {
                 + joinedSources(Path.of("src/main/java/dev/persefonia/app/communication"))
                 + joinedSources(Path.of("../web-public/src/main/java"))
                 + joinedSources(Path.of("../web-admin/src/main/java"));
+        String contactProductionSourcesOutsideMailAdapter = joinedSources(Path.of("../communication/src/main/java"))
+                + joinedSources(Path.of("src/main/java/dev/persefonia/app/communication/application"))
+                + joinedSources(Path.of("src/main/java/dev/persefonia/app/communication/persistence"))
+                + joinedSources(Path.of("../web-public/src/main/java"))
+                + joinedSources(Path.of("../web-admin/src/main/java"));
 
         assertThat(contactRelatedProductionSources)
                 .doesNotContain("analytics_counters")
@@ -77,7 +82,8 @@ class ContactMessageArchitectureTest {
                 .doesNotContain("RecordAnalytics")
                 .doesNotContain("AnalyticsCounter")
                 .doesNotContain("StringRedisTemplate")
-                .doesNotContain("RedisTemplate")
+                .doesNotContain("RedisTemplate");
+        assertThat(contactProductionSourcesOutsideMailAdapter)
                 .doesNotContain("JavaMailSender");
     }
 

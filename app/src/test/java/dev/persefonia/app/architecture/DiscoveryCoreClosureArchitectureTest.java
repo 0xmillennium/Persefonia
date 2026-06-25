@@ -65,6 +65,8 @@ class DiscoveryCoreClosureArchitectureTest {
             assertThat(paths
                             .filter(path -> path.toString().endsWith(".java"))
                             .filter(path -> !path.toString().contains("/dev/persefonia/app/transaction/"))
+                            .filter(path -> !path.toString().endsWith(
+                                    "/dev/persefonia/app/communication/application/PublicContactSubmissionService.java"))
                             .filter(path -> containsAny(path, forbiddenText))
                             .map(Path::toString))
                     .isEmpty();

@@ -38,6 +38,7 @@ dependencies {
     implementation(libs.spring.boot.starter.data.jdbc)
     implementation(libs.spring.boot.starter.data.redis)
     implementation(libs.spring.boot.starter.jdbc)
+    implementation(libs.spring.boot.starter.mail)
     implementation(libs.spring.boot.starter.oauth2.client)
     implementation(libs.spring.boot.starter.security)
     implementation(libs.spring.boot.starter.web)

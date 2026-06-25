@@ -2,12 +2,18 @@ package dev.persefonia.app.communication.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.persefonia.app.communication.mail.ContactMailNotificationAttemptRecorder;
 import dev.persefonia.app.platformoperations.ratelimit.ContactRateLimitKeyFactory;
 import dev.persefonia.app.platformoperations.ratelimit.ContactRateLimitProperties;
+import dev.persefonia.app.transaction.PostCommitTaskExecutor;
 import dev.persefonia.communication.application.command.SubmitContactMessageCommandService;
 import dev.persefonia.communication.application.port.ContactMessageRepository;
+import dev.persefonia.communication.application.port.ContactMessageNotification;
+import dev.persefonia.communication.application.port.MailNotificationPort;
+import dev.persefonia.communication.application.port.MailNotificationResult;
 import dev.persefonia.communication.domain.contact.ContactMessage;
 import dev.persefonia.communication.domain.contact.ContactMessageId;
+import dev.persefonia.communication.domain.contact.MailDeliveryStatus;
 import dev.persefonia.platformoperations.application.port.RateLimitDecision;
 import dev.persefonia.platformoperations.application.port.RateLimitPort;
 import dev.persefonia.platformoperations.application.port.RateLimitRejectionReason;
@@ -30,15 +36,24 @@ class SubmitContactMessageGatewayTest {
             "Hello",
             "Body",
             "203.0.113.10");
+    private static final Instant NOW = Instant.parse("2026-06-25T10:00:00Z");
 
     private final InMemoryContactMessages messages = new InMemoryContactMessages();
     private final StubRateLimitPort rateLimits = new StubRateLimitPort();
+    private final RecordingPostCommitTaskExecutor postCommitTasks = new RecordingPostCommitTaskExecutor();
+    private final StubMailNotificationPort mailNotifications = new StubMailNotificationPort();
+    private final ContactMailNotificationAttemptRecorder mailAttempts = new ContactMailNotificationAttemptRecorder(
+            messages,
+            Clock.fixed(NOW.plusSeconds(1), ZoneOffset.UTC));
     private final PublicContactSubmissionService service = new PublicContactSubmissionService(
             rateLimits,
             new ContactRateLimitKeyFactory("secret-value"),
             new ContactRateLimitProperties("secret-value", 5, Duration.ofMinutes(15), "persefonia:rate-limit"),
             new SubmitContactMessageCommandService(messages),
-            Clock.fixed(Instant.parse("2026-06-25T10:00:00Z"), ZoneOffset.UTC));
+            postCommitTasks,
+            mailNotifications,
+            mailAttempts,
+            Clock.fixed(NOW, ZoneOffset.UTC));
 
     @Test
     void validSubmissionChecksRateLimitBeforePersisting() {
@@ -50,6 +65,22 @@ class SubmitContactMessageGatewayTest {
         assertThat(rateLimits.requests().getFirst().window()).isEqualTo(Duration.ofMinutes(15));
         assertThat(rateLimits.requests().getFirst().key().value()).doesNotContain("203.0.113.10");
         assertThat(messages.saved()).hasSize(1);
+        assertThat(postCommitTasks.tasks()).hasSize(1);
+        assertThat(mailNotifications.notifications()).isEmpty();
+    }
+
+    @Test
+    void validSubmissionSendsMailOnlyWhenAfterCommitTaskRuns() {
+        service.submit(VALID_REQUEST);
+        ContactMessage message = messages.saved().getFirst();
+
+        assertThat(mailNotifications.notifications()).isEmpty();
+        assertThat(message.mailDeliveryStatus()).isEqualTo(MailDeliveryStatus.NOT_ATTEMPTED);
+
+        postCommitTasks.runAll();
+
+        assertThat(mailNotifications.notifications()).hasSize(1);
+        assertThat(messages.findById(message.id()).orElseThrow().mailDeliveryStatus()).isEqualTo(MailDeliveryStatus.SENT);
     }
 
     @Test
@@ -64,6 +95,8 @@ class SubmitContactMessageGatewayTest {
         assertThat(result.status()).isEqualTo(PublicContactSubmissionResult.Status.VALIDATION_FAILED);
         assertThat(rateLimits.requests()).hasSize(1);
         assertThat(messages.saved()).isEmpty();
+        assertThat(postCommitTasks.tasks()).isEmpty();
+        assertThat(mailNotifications.notifications()).isEmpty();
     }
 
     @Test
@@ -76,6 +109,8 @@ class SubmitContactMessageGatewayTest {
 
         assertThat(result.status()).isEqualTo(PublicContactSubmissionResult.Status.RATE_LIMITED);
         assertThat(messages.saved()).isEmpty();
+        assertThat(postCommitTasks.tasks()).isEmpty();
+        assertThat(mailNotifications.notifications()).isEmpty();
     }
 
     @Test
@@ -88,6 +123,8 @@ class SubmitContactMessageGatewayTest {
 
         assertThat(result.status()).isEqualTo(PublicContactSubmissionResult.Status.TEMPORARILY_UNAVAILABLE);
         assertThat(messages.saved()).isEmpty();
+        assertThat(postCommitTasks.tasks()).isEmpty();
+        assertThat(mailNotifications.notifications()).isEmpty();
     }
 
     private static final class StubRateLimitPort implements RateLimitPort {
@@ -105,11 +142,43 @@ class SubmitContactMessageGatewayTest {
         }
     }
 
+    private static final class RecordingPostCommitTaskExecutor implements PostCommitTaskExecutor {
+        private final List<Runnable> tasks = new ArrayList<>();
+
+        @Override
+        public void afterCommit(Runnable task) {
+            tasks.add(task);
+        }
+
+        void runAll() {
+            tasks.forEach(Runnable::run);
+        }
+
+        List<Runnable> tasks() {
+            return tasks;
+        }
+    }
+
+    private static final class StubMailNotificationPort implements MailNotificationPort {
+        private final List<ContactMessageNotification> notifications = new ArrayList<>();
+
+        @Override
+        public MailNotificationResult notifyOwner(ContactMessageNotification notification) {
+            notifications.add(notification);
+            return MailNotificationResult.sent();
+        }
+
+        List<ContactMessageNotification> notifications() {
+            return notifications;
+        }
+    }
+
     private static final class InMemoryContactMessages implements ContactMessageRepository {
         private final List<ContactMessage> saved = new ArrayList<>();
 
         @Override
         public void save(ContactMessage message) {
+            saved.removeIf(existing -> existing.id().equals(message.id()));
             saved.add(message);
         }
 

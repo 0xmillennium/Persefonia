@@ -47,6 +47,12 @@ persefonia:
       automatic-provisioning-enabled: false
       initial-owner-bootstrap-enabled: true
   contact:
+    mail:
+      enabled: ${PERSEFONIA_CONTACT_MAIL_ENABLED:false}
+      owner-recipient: ${PERSEFONIA_CONTACT_MAIL_OWNER_RECIPIENT:}
+      from: ${PERSEFONIA_CONTACT_MAIL_FROM:}
+      subject-prefix: ${PERSEFONIA_CONTACT_MAIL_SUBJECT_PREFIX:[Persefonia Contact]}
+      reply-to-sender: ${PERSEFONIA_CONTACT_MAIL_REPLY_TO_SENDER:true}
     rate-limit:
       secret: ${PERSEFONIA_CONTACT_RATE_LIMIT_SECRET:local-development-contact-rate-limit-secret-change-me}
       max-attempts: ${PERSEFONIA_CONTACT_RATE_LIMIT_MAX_ATTEMPTS:5}

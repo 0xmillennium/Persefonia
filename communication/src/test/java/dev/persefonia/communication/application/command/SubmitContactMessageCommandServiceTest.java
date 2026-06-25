@@ -28,6 +28,12 @@ class SubmitContactMessageCommandServiceTest {
         assertThat(messages.saved()).hasSize(1);
         ContactMessage saved = messages.saved().getFirst();
         assertThat(saved.id()).isEqualTo(result.messageId());
+        assertThat(result.notification().contactMessageId()).isEqualTo(saved.id().value());
+        assertThat(result.notification().submittedAt()).isEqualTo(SUBMITTED_AT);
+        assertThat(result.notification().senderName()).isEqualTo("Ada Lovelace");
+        assertThat(result.notification().senderEmail()).isEqualTo("ada@example.test");
+        assertThat(result.notification().subject()).isEqualTo("Hello");
+        assertThat(result.notification().body()).isEqualTo("First line\nSecond line");
         assertThat(saved.senderName().value()).isEqualTo("Ada Lovelace");
         assertThat(saved.senderEmail().value()).isEqualTo("ada@example.test");
         assertThat(saved.subject().value()).isEqualTo("Hello");

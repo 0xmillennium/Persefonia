@@ -32,6 +32,35 @@ class ContactMailNotificationArchitectureTest {
         assertThat(webSources).doesNotContain("JavaMailSender");
     }
 
+    @Test
+    void webModulesDoNotUseMailNotificationOrPostCommitShortcuts() throws Exception {
+        String webSources = joinedSources(List.of(
+                Path.of("../web-public/src/main/java"),
+                Path.of("../web-admin/src/main/java")));
+
+        assertThat(webSources)
+                .doesNotContain("MailNotificationPort")
+                .doesNotContain("PostCommitTaskExecutor")
+                .doesNotContain("ContactMessageRepository");
+    }
+
+    @Test
+    void springMailAdapterExistsOnlyInAppCommunicationMail() throws Exception {
+        String outsideAppMailSources = joinedSources(List.of(
+                Path.of("../communication/src/main/java"),
+                Path.of("../web-public/src/main/java"),
+                Path.of("../web-admin/src/main/java")));
+        String appMailSources = joinedSources(List.of(Path.of("src/main/java/dev/persefonia/app/communication/mail")));
+
+        assertThat(outsideAppMailSources)
+                .doesNotContain("JavaMailSender")
+                .doesNotContain("SimpleMailMessage")
+                .doesNotContain("MimeMessageHelper");
+        assertThat(appMailSources)
+                .contains("JavaMailSender")
+                .contains("SimpleMailMessage");
+    }
+
     private static String joinedSources(List<Path> roots) throws IOException {
         StringBuilder joined = new StringBuilder();
         for (Path root : roots) {
