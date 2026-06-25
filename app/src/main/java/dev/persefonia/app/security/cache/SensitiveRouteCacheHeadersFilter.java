@@ -41,6 +41,7 @@ public final class SensitiveRouteCacheHeadersFilter extends OncePerRequestFilter
     private static boolean isSensitivePath(String path) {
         return path.equals("/admin")
                 || path.startsWith("/admin/")
+                || path.equals("/contact")
                 || path.startsWith("/login/oauth2/code/")
                 || path.startsWith("/oauth2/authorization/")
                 || path.equals("/logout");

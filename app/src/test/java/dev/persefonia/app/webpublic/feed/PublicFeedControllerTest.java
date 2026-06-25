@@ -91,6 +91,7 @@ class PublicFeedControllerTest {
     void feedExcludesUnsafeRouteFamiliesEvenFromSource() throws Exception {
         feedIndex.entries(List.of(
                 stub("/search", "Search"),
+                stub("/contact", "Contact"),
                 stub("/sitemap.xml", "Sitemap"),
                 stub("/robots.txt", "Robots"),
                 stub("/feed.xml", "Feed"),
@@ -104,6 +105,7 @@ class PublicFeedControllerTest {
         mockMvc.perform(get("/feed.xml"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(not(containsString("/search"))))
+                .andExpect(content().string(not(containsString("/contact"))))
                 .andExpect(content().string(not(containsString("/sitemap.xml"))))
                 .andExpect(content().string(not(containsString("/robots.txt"))))
                 .andExpect(content().string(not(containsString("/cv"))))

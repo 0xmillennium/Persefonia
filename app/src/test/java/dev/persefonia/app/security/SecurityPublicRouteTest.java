@@ -56,12 +56,14 @@ class SecurityPublicRouteTest {
             assertEquals(200, get(stylesheetPath).statusCode());
         }
         assertEquals(200, get("/search").statusCode());
+        assertEquals(200, get("/contact").statusCode());
     }
 
     @Test
     void unsafeRequestsAreNotPublic() throws Exception {
         assertNotSuccessful(post("/"));
         assertNotSuccessful(post("/search"));
+        assertEquals(403, post("/contact").statusCode());
         assertNotSuccessful(post(viteAssetResolver.scriptPath(FRONTEND_ENTRY)));
     }
 
@@ -72,6 +74,8 @@ class SecurityPublicRouteTest {
                 "/sitemap.xml/anything",
                 "/robots.txt/anything",
                 "/feed.xml/anything",
+                "/contact/anything",
+                "/api/contact",
                 "/rss.xml",
                 "/atom.xml")) {
             assertNotSuccessful(get(path));
@@ -116,6 +120,9 @@ class SecurityPublicRouteTest {
         assertTrue(securityConfiguration.contains("\"/media/assets/*/variants/*\""));
         assertTrue(securityConfiguration.contains("\"/search\""));
         assertFalse(securityConfiguration.contains("\"/search/**\""));
+        assertTrue(securityConfiguration.contains("\"/contact\""));
+        assertFalse(securityConfiguration.contains("\"/contact/**\""));
+        assertFalse(securityConfiguration.contains("\"/api/contact\""));
         assertTrue(securityConfiguration.contains("\"/sitemap.xml\""));
         assertTrue(securityConfiguration.contains("\"/robots.txt\""));
         assertFalse(securityConfiguration.contains("\"/sitemap.xml/**\""));

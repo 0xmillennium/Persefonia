@@ -13,6 +13,7 @@ dependencies {
     implementation(project(":profile-portfolio"))
     implementation(project(":media-library"))
     implementation(libs.spring.webmvc)
+    implementation(libs.spring.security.web)
 
     compileOnly("jakarta.servlet:jakarta.servlet-api")
 

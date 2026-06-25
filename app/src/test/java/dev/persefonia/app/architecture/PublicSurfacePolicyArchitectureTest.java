@@ -20,7 +20,9 @@ class PublicSurfacePolicyArchitectureTest {
             "/sitemap_index.xml",
             "/feed.xml/**",
             "/rss.xml",
-            "/atom.xml");
+            "/atom.xml",
+            "/contact/**",
+            "/api/contact");
     private static final Pattern ROUTE_ANNOTATION = Pattern.compile(
             "@(?:GetMapping|PostMapping|RequestMapping)\\s*\\(([^)]*)\\)", Pattern.DOTALL);
     private static final Pattern ROUTE_LITERAL = Pattern.compile("\"([^\"]+)\"");
@@ -31,7 +33,7 @@ class PublicSurfacePolicyArchitectureTest {
 
         assertThat(routeLiterals)
                 .doesNotContain(FORBIDDEN_PUBLIC_ROUTES.toArray(String[]::new));
-        assertThat(routeLiterals).contains("/search", "/sitemap.xml", "/robots.txt", "/feed.xml");
+        assertThat(routeLiterals).contains("/search", "/contact", "/sitemap.xml", "/robots.txt", "/feed.xml");
     }
 
     @Test

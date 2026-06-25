@@ -121,7 +121,7 @@ class PublicContentArchitectureTest {
 
     @Test
     void publicContentRoutesDoNotExposePostHandlers() throws Exception {
-        try (var paths = Files.walk(Path.of("../web-public/src/main/java/dev/persefonia/webpublic"))) {
+        try (var paths = Files.walk(Path.of("../web-public/src/main/java/dev/persefonia/webpublic/content"))) {
             String routeAnnotations = paths
                     .filter(path -> path.toString().endsWith(".java"))
                     .map(path -> {

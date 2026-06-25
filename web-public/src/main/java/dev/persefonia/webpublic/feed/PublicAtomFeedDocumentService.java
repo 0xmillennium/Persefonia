@@ -42,6 +42,7 @@ public final class PublicAtomFeedDocumentService {
      */
     private static final List<String> FORBIDDEN_PATH_PREFIXES = List.of(
             "/search",
+            "/contact",
             "/sitemap.xml",
             "/robots.txt",
             "/feed.xml",

@@ -61,12 +61,15 @@ class CommunicationInsightsPrivacyArchitectureTest {
     }
 
     @Test
-    void noContactOrInsightsRoutesAreIntroduced() throws Exception {
+    void onlyExactPublicContactRouteIsIntroducedAndAdminInsightsRemainClosed() throws Exception {
         String routeAnnotations = routeAnnotations(joinedSources(Path.of("../web-public/src/main/java"))
                 + joinedSources(Path.of("../web-admin/src/main/java")));
 
         assertThat(routeAnnotations)
-                .doesNotContain("/contact")
+                .contains("/contact")
+                .doesNotContain("/contact/")
+                .doesNotContain("/contact/**")
+                .doesNotContain("/api/contact")
                 .doesNotContain("/admin/contact")
                 .doesNotContain("/admin/insights")
                 .doesNotContain("/admin/analytics");
