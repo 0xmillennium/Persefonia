@@ -40,7 +40,7 @@ class PublicRouteDiscoveryCacheTest extends PublicContentMvcTestSupport {
     }
 
     private static void assertPublicCache(MvcResult result) {
-        assertThat(cacheControlTokens(result)).contains("public", "max-age=60");
+        assertThat(cacheControlTokens(result)).contains("public", "max-age=300");
     }
 
     private static void assertNoStorePrivate(MvcResult result) {

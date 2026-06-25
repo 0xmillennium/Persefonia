@@ -4,7 +4,6 @@ import dev.persefonia.profileportfolio.domain.cv.ActiveCvDocument;
 import dev.persefonia.profileportfolio.domain.cv.ActiveCvProfile;
 import dev.persefonia.profileportfolio.domain.cv.ActiveCvProfileId;
 import dev.persefonia.profileportfolio.domain.cv.ActiveCvProfileRepository;
-import dev.persefonia.profileportfolio.domain.cv.CvDisplayLabel;
 import java.sql.Timestamp;
 import java.util.List;
 import java.util.Map;

@@ -3,8 +3,6 @@ package dev.persefonia.app.profileportfolio.persistence;
 import dev.persefonia.profileportfolio.domain.profile.CurrentFocusItem;
 import dev.persefonia.profileportfolio.domain.profile.EducationSummary;
 import dev.persefonia.profileportfolio.domain.profile.ExternalProfileLink;
-import dev.persefonia.profileportfolio.domain.profile.FocusAreaDescription;
-import dev.persefonia.profileportfolio.domain.profile.LocationText;
 import dev.persefonia.profileportfolio.domain.profile.PersonalProfile;
 import dev.persefonia.profileportfolio.domain.profile.PersonalProfileRepository;
 import dev.persefonia.profileportfolio.domain.profile.ProfileId;

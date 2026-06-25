@@ -7,13 +7,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${page.title()}</title>
+    <meta name="description" content="${page.description().isBlank() ? page.title() : page.description()}">
     @template.site.components.canonicalLink(page.canonicalUrl())
     @template.site.components.robotsMeta(page.noindex())
     @template.site.components.stylesheetLinks(page.stylesheetPaths())
     @template.site.components.feedDiscoveryLink()
 </head>
 <body>
-    <main class="public-page">
+    <a class="skip-link" href="#main-content">Skip to main content</a>
+    <main id="main-content" class="public-page">
         <header>
             <h1>${page.title()}</h1>
             @if(!page.description().isBlank())

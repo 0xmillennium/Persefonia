@@ -42,7 +42,6 @@ import dev.persefonia.medialibrary.domain.asset.ImageDimensions;
 import dev.persefonia.medialibrary.domain.asset.OriginalFilename;
 import dev.persefonia.medialibrary.domain.asset.PixelHeight;
 import dev.persefonia.medialibrary.domain.asset.PixelWidth;
-import dev.persefonia.medialibrary.domain.asset.ProcessingStatus;
 import dev.persefonia.medialibrary.domain.asset.StoragePath;
 import dev.persefonia.medialibrary.domain.asset.StoredFilename;
 import dev.persefonia.medialibrary.domain.asset.ValidationMessage;

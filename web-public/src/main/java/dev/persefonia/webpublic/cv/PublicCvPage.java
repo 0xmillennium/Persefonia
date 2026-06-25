@@ -9,6 +9,7 @@ public record PublicCvPage(
         String title,
         String language,
         String displayLabel,
+        String canonicalUrl,
         String downloadPath,
         String displayFilename,
         String contentType,
@@ -22,6 +23,7 @@ public record PublicCvPage(
         Objects.requireNonNull(title, "title");
         Objects.requireNonNull(language, "language");
         Objects.requireNonNull(displayLabel, "displayLabel");
+        Objects.requireNonNull(canonicalUrl, "canonicalUrl");
         Objects.requireNonNull(downloadPath, "downloadPath");
         Objects.requireNonNull(displayFilename, "displayFilename");
         Objects.requireNonNull(contentType, "contentType");
@@ -30,11 +32,12 @@ public record PublicCvPage(
         Objects.requireNonNull(assetUpdatedAt, "assetUpdatedAt");
     }
 
-    static PublicCvPage from(ActiveCvPublicView view) {
+    static PublicCvPage from(ActiveCvPublicView view, String canonicalUrl) {
         return new PublicCvPage(
                 "CV",
                 view.language(),
                 view.displayLabel(),
+                canonicalUrl,
                 view.downloadPath(),
                 view.displayFilename(),
                 view.contentType(),

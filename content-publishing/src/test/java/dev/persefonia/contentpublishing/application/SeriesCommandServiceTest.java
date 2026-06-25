@@ -28,7 +28,6 @@ import dev.persefonia.contentpublishing.domain.content.ContentVisibility;
 import dev.persefonia.contentpublishing.domain.model.series.Series;
 import dev.persefonia.contentpublishing.domain.model.series.SeriesEntryId;
 import dev.persefonia.contentpublishing.domain.model.series.SeriesId;
-import dev.persefonia.contentpublishing.domain.model.series.SeriesSlug;
 import dev.persefonia.discovery.application.contract.RoutePurpose;
 import dev.persefonia.discovery.application.contract.SourceType;
 import dev.persefonia.discovery.application.projection.DiscoverableResourceProjectionInput;

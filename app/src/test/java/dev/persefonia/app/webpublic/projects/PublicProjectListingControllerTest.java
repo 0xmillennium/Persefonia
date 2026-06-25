@@ -60,6 +60,22 @@ class PublicProjectListingControllerTest {
     }
 
     @Test
+    void listingExposesSafeOpenGraphAndDescriptionWithoutImageOrWideningIndexing() throws Exception {
+        mockMvc.perform(get("/en/projects"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString(
+                        "<meta name=\"description\" content=\"Public projects and case studies.\">")))
+                .andExpect(content().string(containsString("<meta property=\"og:type\" content=\"website\">")))
+                .andExpect(content().string(containsString("<meta property=\"og:title\" content=\"Projects\">")))
+                .andExpect(content().string(containsString(
+                        "<meta property=\"og:url\" content=\"https://0xmillennium.dev/en/projects\">")))
+                .andExpect(content().string(containsString("<meta name=\"robots\" content=\"noindex\">")))
+                .andExpect(content().string(containsString("id=\"main-content\"")))
+                .andExpect(content().string(not(containsString("og:image"))))
+                .andExpect(content().string(not(containsString("twitter:image"))));
+    }
+
+    @Test
     void turkishListingRendersTurkishCopy() throws Exception {
         projects.add(ProjectRecord.project("turkish-copy", Visibility.PUBLIC, Status.ACTIVE, ContentLanguage.TR));
 

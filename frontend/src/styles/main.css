@@ -38,6 +38,22 @@ a:focus-visible {
   outline-offset: 3px;
 }
 
+.skip-link {
+  position: absolute;
+  left: 0.5rem;
+  top: -3rem;
+  z-index: 100;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  background: var(--accent-strong);
+  color: var(--code-text);
+  transition: top 0.15s ease-in-out;
+}
+
+.skip-link:focus {
+  top: 0.5rem;
+}
+
 .public-page {
   width: min(100% - 2rem, 70rem);
   padding: 3rem 0 4rem;

@@ -3,7 +3,6 @@ package dev.persefonia.app.profileportfolio.persistence;
 import dev.persefonia.profileportfolio.domain.common.ContentLanguage;
 import dev.persefonia.profileportfolio.domain.settings.HomepageSettings;
 import dev.persefonia.profileportfolio.domain.settings.SeoDescription;
-import dev.persefonia.profileportfolio.domain.settings.SiteName;
 import dev.persefonia.profileportfolio.domain.settings.SitePresentationSettings;
 import dev.persefonia.profileportfolio.domain.settings.SitePresentationSettingsId;
 import dev.persefonia.profileportfolio.domain.settings.SitePresentationSettingsRepository;

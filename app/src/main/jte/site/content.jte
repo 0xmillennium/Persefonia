@@ -11,10 +11,7 @@
     <meta name="description" content="${page.seoDescription()}">
     @template.site.components.canonicalLink(page.canonicalUrl())
     @template.site.components.hreflangLinks(page.hreflangLinks())
-    <meta property="og:title" content="${page.openGraphTitle()}">
-    <meta property="og:description" content="${page.openGraphDescription()}">
-    <meta property="og:url" content="${page.openGraphUrl()}">
-    <meta property="og:type" content="${page.openGraphType()}">
+    @template.site.components.openGraphTags(page.openGraphType(), page.openGraphTitle(), page.openGraphDescription(), page.openGraphUrl())
     <meta property="article:published_time" content="${page.publishedAtIso()}">
     <meta property="article:modified_time" content="${page.updatedAtIso()}">
     @template.site.components.robotsMeta(page.noindex())
@@ -22,7 +19,8 @@
     @template.site.components.feedDiscoveryLink()
 </head>
 <body>
-    <main class="public-page">
+    <a class="skip-link" href="#main-content">Skip to main content</a>
+    <main id="main-content" class="public-page">
         <article class="public-article">
             <header class="public-article__header">
                 <p class="public-article__kicker">${page.typeLabel()}</p>

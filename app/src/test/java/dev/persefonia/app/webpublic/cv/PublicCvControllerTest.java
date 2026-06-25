@@ -48,6 +48,46 @@ class PublicCvControllerTest {
     }
 
     @Test
+    void cvPageRendersIndexableMetadataWithAbsoluteCanonicalAndNoFakeImage() throws Exception {
+        support.profiles.profile().selectDocument(
+                ContentLanguage.EN,
+                PublicCvTestConfiguration.EN_PDF_ID,
+                CvDisplayLabel.of("Public CV"),
+                PublicCvTestConfiguration.NOW);
+
+        mockMvc.perform(get("/cv").header("Host", "evil.example"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString(
+                        "<link rel=\"canonical\" href=\"https://example.test/cv\">")))
+                .andExpect(content().string(containsString("<meta name=\"robots\" content=\"index, follow\">")))
+                .andExpect(content().string(containsString("<meta name=\"description\" content=\"Public CV\">")))
+                .andExpect(content().string(containsString("<meta property=\"og:type\" content=\"website\">")))
+                .andExpect(content().string(containsString(
+                        "<meta property=\"og:url\" content=\"https://example.test/cv\">")))
+                .andExpect(content().string(containsString(
+                        "<link rel=\"alternate\" type=\"application/atom+xml\"")))
+                .andExpect(content().string(containsString("id=\"main-content\"")))
+                .andExpect(content().string(not(containsString("og:image"))))
+                .andExpect(content().string(not(containsString("twitter:image"))))
+                .andExpect(content().string(not(containsString("evil.example"))));
+    }
+
+    @Test
+    void explicitLanguageCvPageUsesLanguageScopedCanonical() throws Exception {
+        support.profiles.profile().selectDocument(
+                ContentLanguage.TR,
+                PublicCvTestConfiguration.TR_PDF_ID,
+                null,
+                PublicCvTestConfiguration.NOW);
+
+        mockMvc.perform(get("/cv/tr"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString(
+                        "<link rel=\"canonical\" href=\"https://example.test/cv/tr\">")))
+                .andExpect(content().string(containsString("<meta name=\"robots\" content=\"index, follow\">")));
+    }
+
+    @Test
     void explicitLanguagePageRendersActiveCv() throws Exception {
         support.profiles.profile().selectDocument(
                 ContentLanguage.TR,

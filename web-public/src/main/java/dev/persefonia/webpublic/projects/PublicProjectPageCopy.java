@@ -5,6 +5,7 @@ import java.util.Objects;
 
 public record PublicProjectPageCopy(
         String projectsTitle,
+        String projectsMetaDescription,
         String projectsEmptyMessage,
         String technologiesLabel,
         String tagsLabel,
@@ -14,6 +15,7 @@ public record PublicProjectPageCopy(
         String featuredProjectsTitle) {
     public PublicProjectPageCopy {
         Objects.requireNonNull(projectsTitle, "projectsTitle");
+        Objects.requireNonNull(projectsMetaDescription, "projectsMetaDescription");
         Objects.requireNonNull(projectsEmptyMessage, "projectsEmptyMessage");
         Objects.requireNonNull(technologiesLabel, "technologiesLabel");
         Objects.requireNonNull(tagsLabel, "tagsLabel");
@@ -27,6 +29,7 @@ public record PublicProjectPageCopy(
         return switch (Objects.requireNonNull(language, "language").toUpperCase(Locale.ROOT)) {
             case "TR" -> new PublicProjectPageCopy(
                     "Projeler",
+                    "Herkese açık projeler ve vaka çalışmaları.",
                     "Henüz herkese açık proje bulunmuyor.",
                     "Teknolojiler",
                     "Etiketler",
@@ -36,6 +39,7 @@ public record PublicProjectPageCopy(
                     "Öne çıkan projeler");
             case "EN" -> new PublicProjectPageCopy(
                     "Projects",
+                    "Public projects and case studies.",
                     "No public projects are currently available.",
                     "Technologies",
                     "Tags",

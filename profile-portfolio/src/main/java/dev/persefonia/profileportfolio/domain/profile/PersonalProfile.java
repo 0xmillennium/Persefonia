@@ -2,7 +2,6 @@ package dev.persefonia.profileportfolio.domain.profile;
 
 import dev.persefonia.profileportfolio.domain.common.ContentLanguage;
 import dev.persefonia.profileportfolio.domain.common.PortfolioValidationException;
-import dev.persefonia.profileportfolio.domain.common.SortOrder;
 import dev.persefonia.profileportfolio.domain.common.Version;
 import java.time.Instant;
 import java.util.HashSet;

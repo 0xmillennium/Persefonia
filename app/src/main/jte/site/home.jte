@@ -8,11 +8,15 @@
     <meta name="description" content="${page.defaultMetaDescription()}">
     <meta name="color-scheme" content="${"SYSTEM".equals(page.defaultTheme()) ? "light dark" : page.defaultTheme().toLowerCase(java.util.Locale.ROOT)}">
     <title>${page.pageTitle()}</title>
+    @template.site.components.canonicalLink(page.canonicalUrl())
+    @template.site.components.robotsMeta(false)
+    @template.site.components.openGraphTags("website", page.pageTitle(), page.defaultMetaDescription(), page.canonicalUrl())
     @template.site.components.stylesheetLinks(page.stylesheetPaths())
     @template.site.components.feedDiscoveryLink()
 </head>
 <body>
-    <main>
+    <a class="skip-link" href="#main-content">Skip to main content</a>
+    <main id="main-content">
         <h1>${page.siteName()}</h1>
         <p>${page.ownerAlias()}</p>
         @if(page.profile().isPresent())

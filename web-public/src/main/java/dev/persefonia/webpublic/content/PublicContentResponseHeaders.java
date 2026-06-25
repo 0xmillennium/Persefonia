@@ -5,8 +5,8 @@ import org.springframework.stereotype.Component;
 
 @Component
 public final class PublicContentResponseHeaders {
-    static final String PUBLIC_CONTENT_CACHE_CONTROL = "public, max-age=60";
-    static final String PUBLIC_REDIRECT_CACHE_CONTROL = "public, max-age=60";
+    static final String PUBLIC_CONTENT_CACHE_CONTROL = "public, max-age=300, must-revalidate";
+    static final String PUBLIC_REDIRECT_CACHE_CONTROL = "public, max-age=300, must-revalidate";
     static final String PUBLIC_NOT_FOUND_CACHE_CONTROL = "no-store, private";
     static final String PUBLIC_SEARCH_CACHE_CONTROL = "no-store, private";
 

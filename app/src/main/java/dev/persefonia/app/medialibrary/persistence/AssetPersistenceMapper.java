@@ -39,7 +39,7 @@ public final class AssetPersistenceMapper {
             List<AssetValidationResult> validationResults) throws SQLException {
         Integer width = nullableInteger(resultSet, "image_width");
         Integer height = nullableInteger(resultSet, "image_height");
-        ImageDimensions dimensions = width == null && height == null ? null : ImageDimensions.of(width, height);
+        ImageDimensions dimensions = imageDimensions(width, height);
         return Asset.rehydrate(
                 AssetId.from(resultSet.getObject("id", UUID.class)),
                 OriginalFilename.of(resultSet.getString("original_filename")),
@@ -89,6 +89,16 @@ public final class AssetPersistenceMapper {
     private Integer nullableInteger(ResultSet resultSet, String column) throws SQLException {
         int value = resultSet.getInt(column);
         return resultSet.wasNull() ? null : value;
+    }
+
+    private ImageDimensions imageDimensions(Integer width, Integer height) {
+        if (width == null && height == null) {
+            return null;
+        }
+        if (width == null || height == null) {
+            throw new MediaLibraryPersistenceException("Asset image dimensions must have both width and height");
+        }
+        return ImageDimensions.of(width, height);
     }
 
     private <T> T nullableString(ResultSet resultSet, String column, java.util.function.Function<String, T> mapper)

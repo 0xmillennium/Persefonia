@@ -6,7 +6,6 @@ import dev.persefonia.profileportfolio.application.query.PublicProfileExternalLi
 import dev.persefonia.profileportfolio.application.query.PublicProfileSummaryView;
 import dev.persefonia.profileportfolio.application.query.PublicTechnicalFocusAreaView;
 import dev.persefonia.profileportfolio.domain.common.ContentLanguage;
-import dev.persefonia.profileportfolio.domain.profile.ExternalProfileLink;
 import dev.persefonia.profileportfolio.domain.profile.PersonalProfile;
 import dev.persefonia.profileportfolio.domain.profile.PersonalProfileRepository;
 import dev.persefonia.profileportfolio.domain.profile.ProfileLocalization;

@@ -10,7 +10,8 @@
     @template.site.components.stylesheetLinks(page.stylesheetPaths())
 </head>
 <body>
-    <main class="public-page public-page--not-found">
+    <a class="skip-link" href="#main-content">Skip to main content</a>
+    <main id="main-content" class="public-page public-page--not-found">
         <section class="public-not-found" aria-labelledby="not-found-title">
             <h1 id="not-found-title">${page.title()}</h1>
             <p>${page.message()}</p>

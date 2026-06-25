@@ -7,7 +7,6 @@ import dev.persefonia.profileportfolio.application.query.AdminExternalProfileLin
 import dev.persefonia.profileportfolio.application.query.AdminPersonalProfileView;
 import dev.persefonia.profileportfolio.application.query.AdminProfileLocalizationView;
 import dev.persefonia.profileportfolio.application.query.AdminTechnicalFocusAreaView;
-import dev.persefonia.profileportfolio.domain.profile.ExternalProfileLink;
 import dev.persefonia.profileportfolio.domain.profile.PersonalProfile;
 import dev.persefonia.profileportfolio.domain.profile.PersonalProfileRepository;
 import dev.persefonia.profileportfolio.domain.profile.ProfileLocalization;

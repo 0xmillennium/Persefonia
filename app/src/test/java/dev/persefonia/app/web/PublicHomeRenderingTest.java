@@ -46,4 +46,30 @@ class PublicHomeRenderingTest {
         org.junit.jupiter.api.Assertions.assertFalse(response.contains("Fake profile"));
         org.junit.jupiter.api.Assertions.assertFalse(response.contains("Fake content"));
     }
+
+    @Test
+    void homeExposesIndexableMetadataWithAbsoluteCanonicalAndFeedLink() throws Exception {
+        String response = mockMvc.perform(get("/").header("Host", "evil.example"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "<link rel=\"canonical\" href=\"https://0xmillennium.dev/\">")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "<meta name=\"robots\" content=\"index, follow\">")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "<meta property=\"og:type\" content=\"website\">")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "<meta property=\"og:url\" content=\"https://0xmillennium.dev/\">")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "<link rel=\"alternate\" type=\"application/atom+xml\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("id=\"main-content\"")))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        org.junit.jupiter.api.Assertions.assertFalse(response.contains("og:image"));
+        org.junit.jupiter.api.Assertions.assertFalse(response.contains("twitter:image"));
+        org.junit.jupiter.api.Assertions.assertFalse(response.contains("evil.example"));
+        org.junit.jupiter.api.Assertions.assertFalse(response.contains("/rss.xml"));
+        org.junit.jupiter.api.Assertions.assertFalse(response.contains("/atom.xml"));
+    }
 }

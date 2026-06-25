@@ -45,11 +45,13 @@ final class PublicCvMockMvcSupport {
         beans.addBean("activeCvPublicQueryService", queryService);
         beans.addBean("activeCvPublicDownloadService", downloadService);
 
+        PublicCanonicalUrlFactory canonicalUrlFactory = new PublicCanonicalUrlFactory("https://example.test");
         PublicCvController controller = new PublicCvController(
                 beans.getBeanProvider(ActiveCvPublicQueryService.class),
                 beans.getBeanProvider(ActiveCvPublicDownloadService.class),
                 new PublicContentResponseHeaders(),
-                new PublicContentViewModelFactory(new TestAssetResolver(), new PublicCanonicalUrlFactory("https://example.test")));
+                new PublicContentViewModelFactory(new TestAssetResolver(), canonicalUrlFactory),
+                canonicalUrlFactory);
 
         MockMvc mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setViewResolvers(new JteViewResolver())

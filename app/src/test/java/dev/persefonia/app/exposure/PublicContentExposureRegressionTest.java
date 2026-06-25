@@ -55,7 +55,7 @@ class PublicContentExposureRegressionTest {
                 .andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", Matchers.allOf(
                         Matchers.containsString("public"),
-                        Matchers.containsString("max-age=60"))))
+                        Matchers.containsString("max-age=300"))))
                 .andExpect(content().string(Matchers.containsString("Persisted HTML")))
                 .andExpect(content().string(Matchers.containsString("<link rel=\"canonical\" href=\"https://0xmillennium.dev/tr/articles/public\">")))
                 .andExpect(content().string(Matchers.not(Matchers.containsString("noindex"))));
@@ -63,7 +63,7 @@ class PublicContentExposureRegressionTest {
                 .andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", Matchers.allOf(
                         Matchers.containsString("public"),
-                        Matchers.containsString("max-age=60"))))
+                        Matchers.containsString("max-age=300"))))
                 .andExpect(content().string(Matchers.containsString("Persisted HTML")))
                 .andExpect(content().string(Matchers.containsString("<link rel=\"canonical\" href=\"https://0xmillennium.dev/tr/articles/unlisted\">")))
                 .andExpect(content().string(Matchers.containsString("<meta name=\"robots\" content=\"noindex\">")));

@@ -13,6 +13,7 @@ public record PublicHomeViewModel(
         String defaultTheme,
         String ownerAlias,
         String publicBaseUrl,
+        String canonicalUrl,
         boolean profileAvailable,
         Optional<PublicProfileSummaryView> profile,
         boolean showFeaturedProjects,
@@ -27,6 +28,7 @@ public record PublicHomeViewModel(
     public PublicHomeViewModel {
         profile = profile == null ? Optional.empty() : profile;
         featuredProjects = List.copyOf(featuredProjects);
+        java.util.Objects.requireNonNull(canonicalUrl, "canonicalUrl");
         java.util.Objects.requireNonNull(featuredProjectsTitle, "featuredProjectsTitle");
         stylesheetPaths = List.copyOf(stylesheetPaths);
     }

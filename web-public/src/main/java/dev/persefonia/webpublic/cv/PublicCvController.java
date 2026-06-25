@@ -3,9 +3,11 @@ package dev.persefonia.webpublic.cv;
 import dev.persefonia.profileportfolio.application.query.ActiveCvDownload;
 import dev.persefonia.profileportfolio.application.service.ActiveCvPublicDownloadService;
 import dev.persefonia.profileportfolio.application.service.ActiveCvPublicQueryService;
+import dev.persefonia.webpublic.content.PublicCanonicalUrlFactory;
 import dev.persefonia.webpublic.content.PublicContentResponseHeaders;
 import dev.persefonia.webpublic.content.PublicContentViewModelFactory;
 import jakarta.servlet.http.HttpServletResponse;
+import java.util.Locale;
 import java.util.Objects;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.core.io.InputStreamResource;
@@ -26,16 +28,19 @@ public final class PublicCvController {
     private final ObjectProvider<ActiveCvPublicDownloadService> downloads;
     private final PublicContentResponseHeaders responseHeaders;
     private final PublicContentViewModelFactory viewModelFactory;
+    private final PublicCanonicalUrlFactory canonicalUrlFactory;
 
     public PublicCvController(
             ObjectProvider<ActiveCvPublicQueryService> queries,
             ObjectProvider<ActiveCvPublicDownloadService> downloads,
             PublicContentResponseHeaders responseHeaders,
-            PublicContentViewModelFactory viewModelFactory) {
+            PublicContentViewModelFactory viewModelFactory,
+            PublicCanonicalUrlFactory canonicalUrlFactory) {
         this.queries = Objects.requireNonNull(queries, "queries");
         this.downloads = Objects.requireNonNull(downloads, "downloads");
         this.responseHeaders = Objects.requireNonNull(responseHeaders, "responseHeaders");
         this.viewModelFactory = Objects.requireNonNull(viewModelFactory, "viewModelFactory");
+        this.canonicalUrlFactory = Objects.requireNonNull(canonicalUrlFactory, "canonicalUrlFactory");
     }
 
     @GetMapping("/cv")
@@ -45,7 +50,7 @@ public final class PublicCvController {
             return notFound(response);
         }
         return queryService.defaultLanguageView()
-                .map(view -> render(view, response))
+                .map(view -> render(view, "/cv", response))
                 .orElseGet(() -> notFound(response));
     }
 
@@ -69,7 +74,7 @@ public final class PublicCvController {
             return notFound(response);
         }
         return queryService.explicitLanguageView(language)
-                .map(view -> render(view, response))
+                .map(view -> render(view, "/cv/" + language.toLowerCase(Locale.ROOT), response))
                 .orElseGet(() -> notFound(response));
     }
 
@@ -86,9 +91,11 @@ public final class PublicCvController {
 
     private ModelAndView render(
             dev.persefonia.profileportfolio.application.query.ActiveCvPublicView view,
+            String canonicalPath,
             HttpServletResponse response) {
         responseHeaders.applyPublicContentHeaders(response);
-        return new ModelAndView("site/cv/index", "page", PublicCvPage.from(view));
+        return new ModelAndView("site/cv/index", "page",
+                PublicCvPage.from(view, canonicalUrlFactory.canonicalUrl(canonicalPath)));
     }
 
     private ModelAndView notFound(HttpServletResponse response) {

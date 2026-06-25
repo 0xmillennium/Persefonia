@@ -6,7 +6,6 @@ import dev.persefonia.contentpublishing.application.query.PublicContentHeadingRe
 import dev.persefonia.contentpublishing.application.query.PublicContentLookupResult;
 import dev.persefonia.contentpublishing.application.query.PublicContentPageResult;
 import dev.persefonia.contentpublishing.application.query.PublicContentRouteQuery;
-import dev.persefonia.contentpublishing.application.service.PublicContentQueryHandler;
 import java.io.IOException;
 import java.lang.reflect.RecordComponent;
 import java.nio.file.Files;

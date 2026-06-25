@@ -62,6 +62,13 @@ class AdminDashboardRenderingTest {
     }
 
     @Test
+    void dashboardShellDoesNotExposePublicFeedDiscoveryLink() {
+        assertThat(render())
+                .doesNotContain("application/atom+xml")
+                .doesNotContain("/feed.xml");
+    }
+
+    @Test
     void dashboardShellContainsCsrfLogoutForm() {
         assertThat(render())
                 .contains("<form method=\"post\" action=\"/logout\">")

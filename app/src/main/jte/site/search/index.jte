@@ -10,25 +10,24 @@
     <meta name="description" content="Search public content and projects.">
     @template.site.components.canonicalLink(page.canonicalUrl())
     <meta name="robots" content="noindex, follow">
-    <meta property="og:title" content="Search">
-    <meta property="og:description" content="Search public content and projects.">
-    <meta property="og:url" content="${page.canonicalUrl()}">
-    <meta property="og:type" content="website">
+    @template.site.components.openGraphTags("website", "Search", "Search public content and projects.", page.canonicalUrl())
     @template.site.components.stylesheetLinks(page.stylesheetPaths())
     @template.site.components.feedDiscoveryLink()
 </head>
 <body>
-    <main class="public-page">
+    <a class="skip-link" href="#main-content">Skip to main content</a>
+    <main id="main-content" class="public-page">
         <header>
             <h1>Search</h1>
         </header>
         <form action="/search" method="get" role="search">
             <label for="q">Search query</label>
-            <input id="q" name="q" type="search" value="${page.query()}" autocomplete="off">
+            <input id="q" name="q" type="search" value="${page.query()}" autocomplete="off"
+                   aria-describedby="${page.hasValidationError() ? "q-error" : null}">
             <button type="submit">Search</button>
         </form>
         @if(page.hasValidationError())
-            <p role="alert">${page.validationError()}</p>
+            <p id="q-error" role="alert">${page.validationError()}</p>
         @endif
         @if(page.hasSearched())
             @if(page.totalCount() == 1)

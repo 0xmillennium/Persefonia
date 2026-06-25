@@ -47,6 +47,9 @@ class PublicSearchControllerTest {
                 .andExpect(header().string("Cache-Control", "no-store, private"))
                 .andExpect(content().string(containsString("<form action=\"/search\" method=\"get\" role=\"search\">")))
                 .andExpect(content().string(containsString("<label for=\"q\">Search query</label>")))
+                .andExpect(content().string(containsString("id=\"main-content\"")))
+                .andExpect(content().string(containsString("href=\"#main-content\"")))
+                .andExpect(content().string(not(containsString("aria-describedby"))))
                 .andExpect(content().string(containsString("<meta name=\"robots\" content=\"noindex, follow\">")))
                 .andExpect(content().string(containsString("<link rel=\"canonical\" href=\"https://0xmillennium.dev/search\">")))
                 .andExpect(content().string(not(containsString("og:image"))))
@@ -94,7 +97,9 @@ class PublicSearchControllerTest {
 
         mockMvc.perform(get("/search").param("q", "a"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("Enter at least 2 characters to search.")));
+                .andExpect(content().string(containsString("Enter at least 2 characters to search.")))
+                .andExpect(content().string(containsString("aria-describedby=\"q-error\"")))
+                .andExpect(content().string(containsString("<p id=\"q-error\" role=\"alert\">")));
 
         mockMvc.perform(get("/search").param("q", "x".repeat(121)))
                 .andExpect(status().isOk())

@@ -9,9 +9,7 @@ import dev.persefonia.profileportfolio.application.command.ProjectTechnologyInpu
 import dev.persefonia.profileportfolio.application.command.UpdateProjectCommand;
 import dev.persefonia.profileportfolio.application.query.AdminProjectCaseStudySectionView;
 import dev.persefonia.profileportfolio.application.query.AdminProjectEditView;
-import dev.persefonia.profileportfolio.application.query.AdminProjectLinkView;
 import dev.persefonia.profileportfolio.application.query.AdminProjectLocalizationView;
-import dev.persefonia.profileportfolio.application.query.AdminProjectTechnologyView;
 import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.List;
