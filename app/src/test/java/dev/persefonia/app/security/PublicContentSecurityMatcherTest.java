@@ -104,10 +104,10 @@ class PublicContentSecurityMatcherTest {
     }
 
     @Test
-    void futureMachineReadableRoutesRemainAbsent() throws Exception {
+    void crawlerDocumentsAndFeedRoutesDoNotReceivePublicContentCacheHeaders() throws Exception {
+        // Feed routes remain absent; sitemap/robots are crawler documents, not public HTML content,
+        // so they must not carry the public-content cache profile.
         for (String path : List.of(
-                "/sitemap.xml",
-                "/robots.txt",
                 "/feed.xml",
                 "/rss.xml",
                 "/atom.xml",

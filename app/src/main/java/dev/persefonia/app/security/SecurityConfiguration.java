@@ -59,6 +59,7 @@ public class SecurityConfiguration {
                 .securityMatcher(new NegatedRequestMatcher(EndpointRequest.toAnyEndpoint()))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.GET, "/").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/sitemap.xml", "/robots.txt").permitAll()
                         .requestMatchers(HttpMethod.GET, "/search").permitAll()
                         .requestMatchers(HttpMethod.GET, "/cv", "/cv/download", "/cv/*", "/cv/*/download").permitAll()
                         .requestMatchers(HttpMethod.GET, "/assets/**").permitAll()

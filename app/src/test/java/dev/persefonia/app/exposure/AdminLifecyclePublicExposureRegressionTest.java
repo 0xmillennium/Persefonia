@@ -29,12 +29,17 @@ class AdminLifecyclePublicExposureRegressionTest {
                 "/content/private",
                 "/articles/published",
                 "/content",
-                "/sitemap.xml",
                 "/feed",
+                "/feed.xml",
+                "/rss.xml",
+                "/atom.xml",
+                "/sitemap.xml/anything",
+                "/robots.txt/anything",
                 "/search/anything")) {
             mockMvc.perform(get(path)).andExpect(status().is4xxClientError());
         }
 
         mockMvc.perform(get("/search")).andExpect(status().isOk());
+        mockMvc.perform(get("/robots.txt")).andExpect(status().isOk());
     }
 }

@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 
 class RedirectManagementArchitectureTest {
     private static final Pattern FORBIDDEN_PUBLIC_ROUTE =
-            Pattern.compile("@(?:GetMapping|PostMapping|RequestMapping)\\s*\\([^\\n]*(feed|sitemap|robots|listing)",
+            Pattern.compile("@(?:GetMapping|PostMapping|RequestMapping)\\s*\\([^\\n]*(feed|rss|atom|listing)",
                     Pattern.CASE_INSENSITIVE);
     private static final Pattern REDIRECT_RULE_CONSTRUCTION =
             Pattern.compile("\\b(?:new\\s+RedirectRule\\s*\\(|RedirectRule\\.(?:create|createManual|createSlugChanged)\\s*\\()");

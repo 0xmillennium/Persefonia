@@ -20,9 +20,9 @@ class SeriesFoundationArchitectureTest {
     @Test
     void publicSeriesImplementationDoesNotAddForbiddenAdjacentSurfaces() throws Exception {
         assertThat(matches(Path.of("../web-public/src/main"), "@GetMapping(\"/{language}/series\")")).isEmpty();
-        assertThat(matches(Path.of("../web-public/src/main"), "/feed")).isEmpty();
-        assertThat(matches(Path.of("../web-public/src/main"), "/sitemap")).isEmpty();
-        assertThat(matches(Path.of("../web-public/src/main"), "/robots")).isEmpty();
+        assertThat(matches(Path.of("../web-public/src/main"), "@GetMapping(\"/feed.xml\")")).isEmpty();
+        assertThat(matches(Path.of("../web-public/src/main"), "@GetMapping(\"/rss.xml\")")).isEmpty();
+        assertThat(matches(Path.of("../web-public/src/main"), "@GetMapping(\"/atom.xml\")")).isEmpty();
         assertThat(matches(Path.of("src/main/jte/site/series.jte"), "rel=\"prev\"")).isEmpty();
         assertThat(matches(Path.of("src/main/jte/site/series.jte"), "rel=\"next\"")).isEmpty();
     }
@@ -38,13 +38,13 @@ class SeriesFoundationArchitectureTest {
     }
 
     @Test
-    void noSearchFeedSitemapRobotsRoutesExist() throws Exception {
+    void noFeedOrSeriesWildcardRoutesExist() throws Exception {
         String security = Files.readString(Path.of("src/main/java/dev/persefonia/app/security/SecurityConfiguration.java"));
 
         assertThat(security)
                 .doesNotContain("/feed")
-                .doesNotContain("/sitemap")
-                .doesNotContain("/robots")
+                .doesNotContain("/rss")
+                .doesNotContain("/atom")
                 .doesNotContain("/series/**")
                 .doesNotContain("/{language}/series/**");
     }

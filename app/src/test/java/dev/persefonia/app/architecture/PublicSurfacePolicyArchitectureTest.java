@@ -15,8 +15,9 @@ class PublicSurfacePolicyArchitectureTest {
     private static final List<String> FORBIDDEN_PUBLIC_ROUTES = List.of(
             "/search/",
             "/search/**",
-            "/sitemap.xml",
-            "/robots.txt",
+            "/sitemap.xml/**",
+            "/robots.txt/**",
+            "/sitemap_index.xml",
             "/feed.xml",
             "/rss.xml",
             "/atom.xml");
@@ -25,12 +26,12 @@ class PublicSurfacePolicyArchitectureTest {
     private static final Pattern ROUTE_LITERAL = Pattern.compile("\"([^\"]+)\"");
 
     @Test
-    void introducesOnlyExactSearchRouteAndNoMachineReadableRoutes() throws Exception {
+    void exposesExactCrawlerRoutesAndNoFeedOrWildcardRoutes() throws Exception {
         List<String> routeLiterals = routeLiterals(joinedJavaSources(Path.of("../web-public/src/main/java")));
 
         assertThat(routeLiterals)
                 .doesNotContain(FORBIDDEN_PUBLIC_ROUTES.toArray(String[]::new));
-        assertThat(routeLiterals).contains("/search");
+        assertThat(routeLiterals).contains("/search", "/sitemap.xml", "/robots.txt");
     }
 
     @Test
