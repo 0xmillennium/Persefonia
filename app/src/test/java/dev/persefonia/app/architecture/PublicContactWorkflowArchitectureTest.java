@@ -16,16 +16,16 @@ class PublicContactWorkflowArchitectureTest {
 
     @Test
     void onlyExactPublicContactRoutesExist() throws Exception {
-        String routes = routeAnnotations(joinedSources(List.of(
-                Path.of("../web-public/src/main/java"),
-                Path.of("../web-admin/src/main/java"))));
+        String publicRoutes = routeAnnotations(joinedSources(List.of(Path.of("../web-public/src/main/java"))));
+        String adminRoutes = routeAnnotations(joinedSources(List.of(Path.of("../web-admin/src/main/java"))));
 
-        assertThat(routes)
+        assertThat(publicRoutes)
                 .contains("/contact")
                 .doesNotContain("/contact/")
                 .doesNotContain("/contact/**")
-                .doesNotContain("/api/contact")
-                .doesNotContain("/admin/contact")
+                .doesNotContain("/api/contact");
+        assertThat(adminRoutes)
+                .contains("/admin/contact")
                 .doesNotContain("/admin/insights")
                 .doesNotContain("/admin/analytics");
     }

@@ -18,7 +18,7 @@ public final class AdminNavigationFactory {
                 link(AdminNavigationSection.CV, activeSection, "CV", "/admin/cv"),
                 link(AdminNavigationSection.PROJECTS, activeSection, "Projects", "/admin/projects"),
                 link(AdminNavigationSection.MEDIA, activeSection, "Media", "/admin/media"),
-                AdminNavigationItem.disabled("Contact"),
+                link(AdminNavigationSection.CONTACT, activeSection, "Contact", "/admin/contact"),
                 AdminNavigationItem.disabled("Analytics"),
                 AdminNavigationItem.disabled("Audit"),
                 link(AdminNavigationSection.SETTINGS, activeSection, "Settings", "/admin/settings/site"));

@@ -28,6 +28,8 @@ class SensitiveRouteCacheRegressionTest {
         assertProtectedAndUncached(mockMvc.perform(get("/admin/media")).andReturn());
         assertProtectedAndUncached(mockMvc.perform(get("/admin/media/new")).andReturn());
         assertProtectedAndUncached(mockMvc.perform(get("/admin/media/11111111-1111-1111-1111-111111111111")).andReturn());
+        assertProtectedAndUncached(mockMvc.perform(get("/admin/contact")).andReturn());
+        assertProtectedAndUncached(mockMvc.perform(get("/admin/contact/11111111-1111-1111-1111-111111111111")).andReturn());
     }
 
     @Test

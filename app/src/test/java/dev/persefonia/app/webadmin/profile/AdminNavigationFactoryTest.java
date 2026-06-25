@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test;
 
 class AdminNavigationFactoryTest {
     @Test
-    void enablesSettingsProfileProjectsCvAndMedia() {
+    void enablesSettingsProfileProjectsCvMediaAndContact() {
         var navigation = new AdminNavigationFactory().create(AdminNavigationSection.PROJECTS);
 
         assertThat(navigation).anySatisfy(item -> {
@@ -37,6 +37,11 @@ class AdminNavigationFactoryTest {
             assertThat(item.disabled()).isFalse();
             assertThat(item.href()).isEqualTo("/admin/media");
         });
+        assertThat(navigation).anySatisfy(item -> {
+            assertThat(item.label()).isEqualTo("Contact");
+            assertThat(item.disabled()).isFalse();
+            assertThat(item.href()).isEqualTo("/admin/contact");
+        });
     }
 
     @Test
@@ -58,6 +63,17 @@ class AdminNavigationFactoryTest {
             assertThat(item.label()).isEqualTo("CV");
             assertThat(item.active()).isTrue();
             assertThat(item.href()).isEqualTo("/admin/cv");
+        });
+    }
+
+    @Test
+    void contactNavigationIsActiveForContactPages() {
+        var navigation = new AdminNavigationFactory().create(AdminNavigationSection.CONTACT);
+
+        assertThat(navigation).anySatisfy(item -> {
+            assertThat(item.label()).isEqualTo("Contact");
+            assertThat(item.active()).isTrue();
+            assertThat(item.href()).isEqualTo("/admin/contact");
         });
     }
 }
