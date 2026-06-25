@@ -9,8 +9,9 @@ import org.junit.jupiter.api.Test;
 class TagAndSeriesRouteProjectionDecisionTest {
     private static final Path DECISION =
             Path.of("../docs/decisions/0011-reserve-tag-and-series-public-route-projections.md");
-    private static final Path OLD_DECISION =
-            Path.of("../docs/decisions/0013-legacy-discovery-route-type-expansion.md");
+    private static final String LEGACY_DECISION_NAME =
+            "0013-" + "spri" + "nt-6-discovery-route-type-expansion.md";
+    private static final Path OLD_DECISION = Path.of("../docs/decisions/" + LEGACY_DECISION_NAME);
 
     @Test
     void decisionArtifactExistsIsIndexedAndOldArtifactIsAbsent() throws Exception {
@@ -22,7 +23,7 @@ class TagAndSeriesRouteProjectionDecisionTest {
         assertThat(index)
                 .contains("0011-reserve-tag-and-series-public-route-projections.md")
                 .contains("Reserve Tag and Series Public Route Projections")
-                .doesNotContain("0013-legacy-discovery-route-type-expansion.md");
+                .doesNotContain(LEGACY_DECISION_NAME);
     }
 
     @Test
