@@ -20,7 +20,6 @@ class SeriesFoundationArchitectureTest {
     @Test
     void publicSeriesImplementationDoesNotAddForbiddenAdjacentSurfaces() throws Exception {
         assertThat(matches(Path.of("../web-public/src/main"), "@GetMapping(\"/{language}/series\")")).isEmpty();
-        assertThat(matches(Path.of("../web-public/src/main"), "@GetMapping(\"/feed.xml\")")).isEmpty();
         assertThat(matches(Path.of("../web-public/src/main"), "@GetMapping(\"/rss.xml\")")).isEmpty();
         assertThat(matches(Path.of("../web-public/src/main"), "@GetMapping(\"/atom.xml\")")).isEmpty();
         assertThat(matches(Path.of("src/main/jte/site/series.jte"), "rel=\"prev\"")).isEmpty();
@@ -42,7 +41,9 @@ class SeriesFoundationArchitectureTest {
         String security = Files.readString(Path.of("src/main/java/dev/persefonia/app/security/SecurityConfiguration.java"));
 
         assertThat(security)
-                .doesNotContain("/feed")
+                .doesNotContain("/feed.xml/**")
+                .doesNotContain("\"/feed\"")
+                .doesNotContain("/feeds")
                 .doesNotContain("/rss")
                 .doesNotContain("/atom")
                 .doesNotContain("/series/**")

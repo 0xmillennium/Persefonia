@@ -33,7 +33,7 @@ class PublicSurfaceAbsenceRegressionTest {
                 "/en/series",
                 "/tr/series",
                 "/feed",
-                "/feed.xml",
+                "/feed.xml/anything",
                 "/rss.xml",
                 "/atom.xml",
                 "/sitemap.xml/anything",

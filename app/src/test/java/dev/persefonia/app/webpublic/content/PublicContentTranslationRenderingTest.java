@@ -89,7 +89,7 @@ class PublicContentTranslationRenderingTest extends PublicContentMvcTestSupport 
         mockMvc.perform(get("/tr/articles/merhaba"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(not(containsString("public-translations"))))
-                .andExpect(content().string(not(containsString("rel=\"alternate\""))));
+                .andExpect(content().string(not(containsString("hreflang"))));
     }
 
     @Test
@@ -105,7 +105,7 @@ class PublicContentTranslationRenderingTest extends PublicContentMvcTestSupport 
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("<meta name=\"robots\" content=\"noindex\">")))
                 .andExpect(content().string(not(containsString("public-translations"))))
-                .andExpect(content().string(not(containsString("rel=\"alternate\""))));
+                .andExpect(content().string(not(containsString("hreflang"))));
     }
 
     @Test
@@ -155,7 +155,7 @@ class PublicContentTranslationRenderingTest extends PublicContentMvcTestSupport 
         mockMvc.perform(get("/en/articles/current"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(not(containsString("public-translations"))))
-                .andExpect(content().string(not(containsString("rel=\"alternate\""))))
+                .andExpect(content().string(not(containsString("hreflang"))))
                 .andExpect(content().string(not(containsString(target.slug().orElseThrow().value()))));
     }
 

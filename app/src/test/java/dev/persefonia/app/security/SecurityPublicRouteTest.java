@@ -66,12 +66,12 @@ class SecurityPublicRouteTest {
     }
 
     @Test
-    void absentSearchWildcardAndFeedRoutesDoNotServePublicContent() throws Exception {
+    void absentSearchWildcardAndAliasFeedRoutesDoNotServePublicContent() throws Exception {
         for (String path : List.of(
                 "/search/anything",
                 "/sitemap.xml/anything",
                 "/robots.txt/anything",
-                "/feed.xml",
+                "/feed.xml/anything",
                 "/rss.xml",
                 "/atom.xml")) {
             assertNotSuccessful(get(path));
@@ -120,7 +120,8 @@ class SecurityPublicRouteTest {
         assertTrue(securityConfiguration.contains("\"/robots.txt\""));
         assertFalse(securityConfiguration.contains("\"/sitemap.xml/**\""));
         assertFalse(securityConfiguration.contains("\"/robots.txt/**\""));
-        assertFalse(securityConfiguration.contains("\"/feed.xml\""));
+        assertTrue(securityConfiguration.contains("\"/feed.xml\""));
+        assertFalse(securityConfiguration.contains("\"/feed.xml/**\""));
         assertFalse(securityConfiguration.contains("\"/rss.xml\""));
         assertFalse(securityConfiguration.contains("\"/atom.xml\""));
     }

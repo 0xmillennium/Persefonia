@@ -6,6 +6,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${page.title()}</title>
+    @template.site.components.feedDiscoveryLink()
 </head>
 <body>
     <main class="public-page public-page--cv">

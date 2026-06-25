@@ -8,8 +8,10 @@ import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
 class DiscoveryCoreClosureArchitectureTest {
+    // The exact Atom feed route (@GetMapping("/feed.xml")) is an accepted public surface; RSS/Atom
+    // aliases, feed wildcards/collections, and listing routes remain forbidden.
     private static final Pattern FORBIDDEN_PUBLIC_ROUTE = Pattern.compile(
-            "@(?:GetMapping|PostMapping|RequestMapping)\\s*\\([^\\n]*(feed|rss|atom|listing)",
+            "@(?:GetMapping|PostMapping|RequestMapping)\\s*\\([^\\n]*(rss|atom|listing|/feeds|/feed\\.xml/|\"/feed\")",
             Pattern.CASE_INSENSITIVE);
 
     @Test

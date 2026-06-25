@@ -9,6 +9,7 @@
     <meta name="color-scheme" content="${"SYSTEM".equals(page.defaultTheme()) ? "light dark" : page.defaultTheme().toLowerCase(java.util.Locale.ROOT)}">
     <title>${page.pageTitle()}</title>
     @template.site.components.stylesheetLinks(page.stylesheetPaths())
+    @template.site.components.feedDiscoveryLink()
 </head>
 <body>
     <main>

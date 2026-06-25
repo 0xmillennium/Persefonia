@@ -15,6 +15,7 @@
     <meta property="og:url" content="${page.canonicalUrl()}">
     <meta property="og:type" content="website">
     @template.site.components.stylesheetLinks(page.stylesheetPaths())
+    @template.site.components.feedDiscoveryLink()
 </head>
 <body>
     <main class="public-page">

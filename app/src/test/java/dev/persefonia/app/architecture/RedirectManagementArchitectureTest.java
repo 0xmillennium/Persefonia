@@ -12,8 +12,11 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 class RedirectManagementArchitectureTest {
+    // The exact Atom feed route (@GetMapping("/feed.xml")) is an accepted public surface; RSS/Atom
+    // aliases, feed wildcards/collections, and listing routes remain forbidden.
     private static final Pattern FORBIDDEN_PUBLIC_ROUTE =
-            Pattern.compile("@(?:GetMapping|PostMapping|RequestMapping)\\s*\\([^\\n]*(feed|rss|atom|listing)",
+            Pattern.compile(
+                    "@(?:GetMapping|PostMapping|RequestMapping)\\s*\\([^\\n]*(rss|atom|listing|/feeds|/feed\\.xml/|\"/feed\")",
                     Pattern.CASE_INSENSITIVE);
     private static final Pattern REDIRECT_RULE_CONSTRUCTION =
             Pattern.compile("\\b(?:new\\s+RedirectRule\\s*\\(|RedirectRule\\.(?:create|createManual|createSlugChanged)\\s*\\()");

@@ -18,7 +18,7 @@ class PublicSurfacePolicyArchitectureTest {
             "/sitemap.xml/**",
             "/robots.txt/**",
             "/sitemap_index.xml",
-            "/feed.xml",
+            "/feed.xml/**",
             "/rss.xml",
             "/atom.xml");
     private static final Pattern ROUTE_ANNOTATION = Pattern.compile(
@@ -26,12 +26,12 @@ class PublicSurfacePolicyArchitectureTest {
     private static final Pattern ROUTE_LITERAL = Pattern.compile("\"([^\"]+)\"");
 
     @Test
-    void exposesExactCrawlerRoutesAndNoFeedOrWildcardRoutes() throws Exception {
+    void exposesExactCrawlerRoutesAndNoRssAtomOrWildcardRoutes() throws Exception {
         List<String> routeLiterals = routeLiterals(joinedJavaSources(Path.of("../web-public/src/main/java")));
 
         assertThat(routeLiterals)
                 .doesNotContain(FORBIDDEN_PUBLIC_ROUTES.toArray(String[]::new));
-        assertThat(routeLiterals).contains("/search", "/sitemap.xml", "/robots.txt");
+        assertThat(routeLiterals).contains("/search", "/sitemap.xml", "/robots.txt", "/feed.xml");
     }
 
     @Test

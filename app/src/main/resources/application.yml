@@ -55,6 +55,9 @@ logging:
 site:
   public-base-url: ${PERSEFONIA_PUBLIC_BASE_URL:https://0xmillennium.dev}
   owner-alias: ${PERSEFONIA_OWNER_ALIAS:0xmillennium}
+  feed:
+    title: ${PERSEFONIA_FEED_TITLE:0xmillennium}
+    subtitle: ${PERSEFONIA_FEED_SUBTITLE:Latest articles, notes, and research.}
 
 gg:
   jte:

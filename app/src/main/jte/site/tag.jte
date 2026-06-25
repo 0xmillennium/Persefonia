@@ -10,6 +10,7 @@
     @template.site.components.canonicalLink(page.canonicalUrl())
     @template.site.components.robotsMeta(page.noindex())
     @template.site.components.stylesheetLinks(page.stylesheetPaths())
+    @template.site.components.feedDiscoveryLink()
 </head>
 <body>
     <main class="public-page">

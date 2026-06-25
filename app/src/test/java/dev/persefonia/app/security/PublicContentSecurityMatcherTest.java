@@ -104,11 +104,11 @@ class PublicContentSecurityMatcherTest {
     }
 
     @Test
-    void crawlerDocumentsAndFeedRoutesDoNotReceivePublicContentCacheHeaders() throws Exception {
-        // Feed routes remain absent; sitemap/robots are crawler documents, not public HTML content,
-        // so they must not carry the public-content cache profile.
+    void crawlerDocumentsAndAliasFeedRoutesDoNotReceivePublicContentCacheHeaders() throws Exception {
+        // The Atom feed (/feed.xml) carries its own explicit feed cache profile and is covered
+        // separately. RSS/Atom alias routes remain absent; sitemap/robots are crawler documents, not
+        // public HTML content, so they must not carry the public-content cache profile.
         for (String path : List.of(
-                "/feed.xml",
                 "/rss.xml",
                 "/atom.xml",
                 "/search/anything")) {

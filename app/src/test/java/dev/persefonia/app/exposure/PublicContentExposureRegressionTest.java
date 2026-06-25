@@ -87,7 +87,7 @@ class PublicContentExposureRegressionTest {
         mockMvc.perform(get("/admin/content/" + id + "/revisions")).andExpect(status().is4xxClientError());
         mockMvc.perform(get("/sitemap.xml/anything")).andExpect(status().is4xxClientError());
         mockMvc.perform(get("/feed")).andExpect(status().is4xxClientError());
-        mockMvc.perform(get("/feed.xml")).andExpect(status().is4xxClientError());
+        mockMvc.perform(get("/feed.xml/anything")).andExpect(status().is4xxClientError());
         mockMvc.perform(get("/search"))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", Matchers.containsString("no-store")))

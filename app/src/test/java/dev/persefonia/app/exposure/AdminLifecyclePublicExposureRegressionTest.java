@@ -30,7 +30,7 @@ class AdminLifecyclePublicExposureRegressionTest {
                 "/articles/published",
                 "/content",
                 "/feed",
-                "/feed.xml",
+                "/feed.xml/anything",
                 "/rss.xml",
                 "/atom.xml",
                 "/sitemap.xml/anything",
