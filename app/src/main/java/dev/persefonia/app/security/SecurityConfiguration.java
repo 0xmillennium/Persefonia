@@ -70,6 +70,7 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.GET, "/oauth2/authorization/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/login/oauth2/code/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/logout").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/admin/analytics").hasRole("OWNER")
                         .requestMatchers("/admin", "/admin/**").authenticated()
                         .requestMatchers(HttpMethod.GET, PUBLIC_CONTENT_GET_PATTERNS).permitAll()
                         .requestMatchers(HttpMethod.GET, PUBLIC_TAG_GET_PATTERNS).permitAll()

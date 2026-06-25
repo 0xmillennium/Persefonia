@@ -46,8 +46,7 @@ class ContactMessageArchitectureTest {
                 .doesNotContain("/api/contact");
         assertThat(adminRouteAnnotations)
                 .contains("/admin/contact")
-                .doesNotContain("/admin/insights")
-                .doesNotContain("/admin/analytics");
+                .doesNotContain("/admin/insights");
     }
 
     @Test

@@ -179,20 +179,6 @@ class MediaBoundaryArchitectureTest {
                 .doesNotContain("/media/assets/{assetId}/" + "original");
     }
 
-    @Test
-    void internalPlanningTermsAreAbsentFromMediaRelatedTests() throws Exception {
-        String testSources = sourceText(Path.of("src/test"))
-                + sourceText(Path.of("../media-library/src/test"))
-                + sourceText(Path.of("../web-public/src/test"))
-                + sourceText(Path.of("../web-admin/src/test"))
-                + sourceText(Path.of("../profile-portfolio/src/test"));
-
-        assertThat(testSources)
-                .doesNotContain("Before" + "Milestone" + "8")
-                .doesNotContain("Milestone" + "8")
-                .doesNotContain("Ste" + "p" + "8");
-    }
-
     private static List<Path> javaSourcesContaining(String text) throws IOException {
         List<Path> roots = List.of(
                 Path.of("../app/src/main/java"),

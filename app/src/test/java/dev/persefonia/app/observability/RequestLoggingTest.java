@@ -41,11 +41,13 @@ class RequestLoggingTest {
         assertEquals(1, logs.split("http_request_completed", -1).length - 1);
         assertTrue(logs.contains("\"request_id\""));
         assertTrue(logs.contains("\"method\""));
-        assertTrue(logs.contains("\"path\""));
+        assertTrue(logs.contains("\"route_category\""));
+        assertTrue(logs.contains("PUBLIC_HOME"));
         assertTrue(logs.contains("\"status\""));
         assertTrue(logs.contains("\"duration_ms\""));
         assertTrue(logs.contains("GET"));
 
+        assertFalse(logs.contains("\"path\""));
         assertFalse(logs.contains("super-secret-value"));
         assertFalse(logs.contains("super-secret-token"));
         assertFalse(logs.contains("should-not-appear"));

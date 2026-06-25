@@ -26,8 +26,7 @@ class PublicContactWorkflowArchitectureTest {
                 .doesNotContain("/api/contact");
         assertThat(adminRoutes)
                 .contains("/admin/contact")
-                .doesNotContain("/admin/insights")
-                .doesNotContain("/admin/analytics");
+                .doesNotContain("/admin/insights");
     }
 
     @Test

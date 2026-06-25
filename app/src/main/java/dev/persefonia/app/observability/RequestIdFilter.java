@@ -41,9 +41,11 @@ public final class RequestIdFilter extends OncePerRequestFilter {
             filterChain.doFilter(request, response);
         } finally {
             long durationMs = (System.nanoTime() - startedAt) / 1_000_000;
+            RequestRouteCategory routeCategory =
+                    RequestRouteCategory.classify(request.getRequestURI(), response.getStatus());
             LOGGER.atInfo()
                     .addKeyValue("method", request.getMethod())
-                    .addKeyValue("path", request.getRequestURI())
+                    .addKeyValue("route_category", routeCategory.name())
                     .addKeyValue("status", response.getStatus())
                     .addKeyValue("duration_ms", durationMs)
                     .log("http_request_completed");

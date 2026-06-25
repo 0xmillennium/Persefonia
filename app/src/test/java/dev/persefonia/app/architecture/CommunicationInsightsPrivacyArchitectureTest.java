@@ -72,8 +72,7 @@ class CommunicationInsightsPrivacyArchitectureTest {
                 .doesNotContain("/api/contact");
         assertThat(adminRouteAnnotations)
                 .contains("/admin/contact")
-                .doesNotContain("/admin/insights")
-                .doesNotContain("/admin/analytics");
+                .doesNotContain("/admin/insights");
     }
 
     private static String routeAnnotations(String source) {

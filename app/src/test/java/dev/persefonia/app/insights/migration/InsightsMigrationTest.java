@@ -90,7 +90,17 @@ class InsightsMigrationTest {
     }
 
     @Test
-    void duplicateDimensionUniquenessTreatsNullsAsNotDistinct() {
+    void invalidSurfaceIsRejected() {
+        assertThatThrownBy(() -> jdbc.update("""
+                INSERT INTO insights.analytics_dimensions (
+                    id, metric, surface, created_at
+                ) VALUES (?, 'PUBLIC_PAGE_VIEW', 'UNKNOWN_SURFACE', ?)
+                """, UUID.randomUUID(), Timestamp.from(Instant.parse("2026-06-25T10:00:00Z"))))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void duplicateMetricSurfacePairIsRejected() {
         insertDimension(UUID.randomUUID(), "PUBLIC_PAGE_VIEW");
 
         assertThatThrownBy(() -> insertDimension(UUID.randomUUID(), "PUBLIC_PAGE_VIEW"))

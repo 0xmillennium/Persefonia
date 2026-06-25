@@ -27,7 +27,6 @@ class AdminContactArchitectureTest {
                 .contains("/admin/contact/{messageId}/archive")
                 .doesNotContain("/api/admin/contact")
                 .doesNotContain("/admin/insights")
-                .doesNotContain("/admin/analytics")
                 .doesNotContain("/admin/contact/{messageId}/" + "delete")
                 .doesNotContain("/admin/contact/{messageId}/" + "reply")
                 .doesNotContain("/admin/contact/{messageId}/" + "resend")
