@@ -50,7 +50,7 @@ class PublicProjectListingControllerTest {
         mockMvc.perform(get("/tr/projects"))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", containsString("public")))
-                .andExpect(content().string(containsString("<meta name=\"robots\" content=\"noindex\">")))
+                .andExpect(content().string(containsString("<meta name=\"robots\" content=\"index, follow\">")))
                 .andExpect(content().string(containsString("/tr/projects/listed")))
                 .andExpect(content().string(containsString("Project listed")))
                 .andExpect(content().string(not(containsString("/tr/projects/unlisted"))))
@@ -60,7 +60,7 @@ class PublicProjectListingControllerTest {
     }
 
     @Test
-    void listingExposesSafeOpenGraphAndDescriptionWithoutImageOrWideningIndexing() throws Exception {
+    void listingExposesSafeOpenGraphAndDescriptionWithoutImage() throws Exception {
         mockMvc.perform(get("/en/projects"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString(
@@ -69,7 +69,7 @@ class PublicProjectListingControllerTest {
                 .andExpect(content().string(containsString("<meta property=\"og:title\" content=\"Projects\">")))
                 .andExpect(content().string(containsString(
                         "<meta property=\"og:url\" content=\"https://0xmillennium.dev/en/projects\">")))
-                .andExpect(content().string(containsString("<meta name=\"robots\" content=\"noindex\">")))
+                .andExpect(content().string(containsString("<meta name=\"robots\" content=\"index, follow\">")))
                 .andExpect(content().string(containsString("id=\"main-content\"")))
                 .andExpect(content().string(not(containsString("og:image"))))
                 .andExpect(content().string(not(containsString("twitter:image"))));

@@ -141,6 +141,7 @@ class PublicAtomFeedDocumentServiceTest {
                 entry("/series/x", "Series", "s", now(), now()),
                 entry("/tr/tags/topic", "TrTags", "s", now(), now()),
                 entry("/en/series/x", "EnSeries", "s", now(), now()),
+                entry("PROJECT", "/en/projects/portfolio", "Project", "s", now(), now()),
                 entry("/en/articles/keep", "Keep", "kept", now(), now()));
 
         String xml = service.renderXml();
@@ -158,6 +159,7 @@ class PublicAtomFeedDocumentServiceTest {
         assertThat(xml).doesNotContain("/preview");
         assertThat(xml).doesNotContain("/tags/");
         assertThat(xml).doesNotContain("/series/");
+        assertThat(xml).doesNotContain("/projects/");
         // The feed self route never appears as an entry id.
         assertThat(xml).doesNotContain("<id>https://example.test/feed.xml</id>\n    <title>Feed</title>");
         // Only the eligible article survives.
@@ -198,8 +200,13 @@ class PublicAtomFeedDocumentServiceTest {
 
     private static PublicFeedEntry entry(
             String publicUrl, String title, String summary, Instant publishedAt, Instant updatedAt) {
+        return entry("ARTICLE", publicUrl, title, summary, publishedAt, updatedAt);
+    }
+
+    private static PublicFeedEntry entry(
+            String sourceType, String publicUrl, String title, String summary, Instant publishedAt, Instant updatedAt) {
         return new PublicFeedEntry(
-                "ARTICLE",
+                sourceType,
                 "id-" + Math.abs(publicUrl.hashCode()),
                 DiscoveryLanguage.EN,
                 publicUrl,

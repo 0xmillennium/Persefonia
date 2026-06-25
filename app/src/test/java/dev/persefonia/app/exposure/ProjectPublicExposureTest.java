@@ -90,13 +90,14 @@ class ProjectPublicExposureTest {
     @Test
     void unlistedProjectIsNotListedButRendersThroughDirectProjection() throws Exception {
         ProjectId id = projects.add(ProjectRecord.project("unlisted-project", Visibility.UNLISTED, Status.ACTIVE, ContentLanguage.TR));
-        routes.addProjectFound("/tr/projects/unlisted-project", id.value());
+        routes.addUnlistedProjectFound("/tr/projects/unlisted-project", id.value());
 
         mockMvc.perform(get("/tr/projects"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(not(containsString("unlisted-project"))));
         mockMvc.perform(get("/tr/projects/unlisted-project"))
                 .andExpect(status().isOk())
+                .andExpect(content().string(containsString("<meta name=\"robots\" content=\"noindex, follow\">")))
                 .andExpect(content().string(containsString("Project unlisted-project")));
     }
 

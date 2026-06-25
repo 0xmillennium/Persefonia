@@ -29,7 +29,8 @@ class DiscoveryPublicProjectRouteResolverTest {
     void resolvesProjectProjection() {
         UUID projectId = UUID.randomUUID();
         resolverPort.resolution = found(projectId, SourceContext.PROFILE_PORTFOLIO, SourceType.PROJECT,
-                DiscoverableResourceType.PROJECT, RoutePurpose.DETAIL, DiscoveryLanguage.EN, "/en/projects/demo");
+                DiscoverableResourceType.PROJECT, RoutePurpose.DETAIL, DiscoveryLanguage.EN, "/en/projects/demo",
+                IndexingPolicy.INDEX);
 
         var outcome = resolver.resolve(new PublicProjectRoute(DiscoveryLanguage.EN, "demo"));
 
@@ -37,33 +38,52 @@ class DiscoveryPublicProjectRouteResolverTest {
             assertThat(project.projectId()).isEqualTo(projectId);
             assertThat(project.publicUrl()).isEqualTo("/en/projects/demo");
             assertThat(project.canonicalUrl()).isEqualTo("https://example.test/en/projects/demo");
+            assertThat(project.noindex()).isFalse();
         });
+    }
+
+    @Test
+    void resolvesUnlistedNoIndexProjectProjectionForDirectRoutes() {
+        UUID projectId = UUID.randomUUID();
+        resolverPort.resolution = found(projectId, SourceContext.PROFILE_PORTFOLIO, SourceType.PROJECT,
+                DiscoverableResourceType.PROJECT, RoutePurpose.DETAIL, DiscoveryLanguage.EN, "/en/projects/direct",
+                IndexingPolicy.NO_INDEX);
+
+        var outcome = resolver.resolve(new PublicProjectRoute(DiscoveryLanguage.EN, "direct"));
+
+        assertThat(outcome).isInstanceOfSatisfying(DiscoveryPublicProjectRouteOutcome.Project.class, project ->
+                assertThat(project.noindex()).isTrue());
     }
 
     @Test
     void rejectsWrongProjectionMetadata() {
         resolverPort.resolution = found(UUID.randomUUID(), SourceContext.CONTENT_PUBLISHING, SourceType.PROJECT,
-                DiscoverableResourceType.PROJECT, RoutePurpose.DETAIL, DiscoveryLanguage.EN, "/en/projects/demo");
+                DiscoverableResourceType.PROJECT, RoutePurpose.DETAIL, DiscoveryLanguage.EN, "/en/projects/demo",
+                IndexingPolicy.INDEX);
         assertThat(resolver.resolve(new PublicProjectRoute(DiscoveryLanguage.EN, "demo")))
                 .isInstanceOf(DiscoveryPublicProjectRouteOutcome.NotFound.class);
 
         resolverPort.resolution = found(UUID.randomUUID(), SourceContext.PROFILE_PORTFOLIO, SourceType.CONTENT_ITEM,
-                DiscoverableResourceType.PROJECT, RoutePurpose.DETAIL, DiscoveryLanguage.EN, "/en/projects/demo");
+                DiscoverableResourceType.PROJECT, RoutePurpose.DETAIL, DiscoveryLanguage.EN, "/en/projects/demo",
+                IndexingPolicy.INDEX);
         assertThat(resolver.resolve(new PublicProjectRoute(DiscoveryLanguage.EN, "demo")))
                 .isInstanceOf(DiscoveryPublicProjectRouteOutcome.NotFound.class);
 
         resolverPort.resolution = found(UUID.randomUUID(), SourceContext.PROFILE_PORTFOLIO, SourceType.PROJECT,
-                DiscoverableResourceType.TAG, RoutePurpose.DETAIL, DiscoveryLanguage.EN, "/en/projects/demo");
+                DiscoverableResourceType.TAG, RoutePurpose.DETAIL, DiscoveryLanguage.EN, "/en/projects/demo",
+                IndexingPolicy.INDEX);
         assertThat(resolver.resolve(new PublicProjectRoute(DiscoveryLanguage.EN, "demo")))
                 .isInstanceOf(DiscoveryPublicProjectRouteOutcome.NotFound.class);
 
         resolverPort.resolution = found(UUID.randomUUID(), SourceContext.PROFILE_PORTFOLIO, SourceType.PROJECT,
-                DiscoverableResourceType.PROJECT, RoutePurpose.DETAIL, DiscoveryLanguage.TR, "/en/projects/demo");
+                DiscoverableResourceType.PROJECT, RoutePurpose.DETAIL, DiscoveryLanguage.TR, "/en/projects/demo",
+                IndexingPolicy.INDEX);
         assertThat(resolver.resolve(new PublicProjectRoute(DiscoveryLanguage.EN, "demo")))
                 .isInstanceOf(DiscoveryPublicProjectRouteOutcome.NotFound.class);
 
         resolverPort.resolution = found(UUID.randomUUID(), SourceContext.PROFILE_PORTFOLIO, SourceType.PROJECT,
-                DiscoverableResourceType.PROJECT, RoutePurpose.DETAIL, DiscoveryLanguage.EN, "/en/projects/other");
+                DiscoverableResourceType.PROJECT, RoutePurpose.DETAIL, DiscoveryLanguage.EN, "/en/projects/other",
+                IndexingPolicy.INDEX);
         assertThat(resolver.resolve(new PublicProjectRoute(DiscoveryLanguage.EN, "demo")))
                 .isInstanceOf(DiscoveryPublicProjectRouteOutcome.NotFound.class);
     }
@@ -88,7 +108,8 @@ class DiscoveryPublicProjectRouteResolverTest {
             DiscoverableResourceType resourceType,
             RoutePurpose routePurpose,
             DiscoveryLanguage language,
-            String publicUrl) {
+            String publicUrl,
+            IndexingPolicy indexingPolicy) {
         return new PublicRouteResolution.Found(
                 sourceContext,
                 sourceType,
@@ -98,7 +119,7 @@ class DiscoveryPublicProjectRouteResolverTest {
                 language,
                 new PublicUrl(publicUrl),
                 new CanonicalUrl("https://example.test" + publicUrl),
-                IndexingPolicy.NO_INDEX);
+                indexingPolicy);
     }
 
     private static final class Resolver implements ResolvePublicRoutePort {

@@ -12,7 +12,8 @@ public sealed interface DiscoveryPublicProjectRouteOutcome
             String language,
             String slug,
             String publicUrl,
-            String canonicalUrl) implements DiscoveryPublicProjectRouteOutcome {
+            String canonicalUrl,
+            boolean noindex) implements DiscoveryPublicProjectRouteOutcome {
         public Project {
             Objects.requireNonNull(projectId, "projectId");
             Objects.requireNonNull(language, "language");

@@ -13,7 +13,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
-class PublicSearchPublicSitemapPublicFeedSeriesDiscoveryIndexAdapterTest extends DiscoveryRepositoryTestDatabase {
+class PublicIndexAdapterTest extends DiscoveryRepositoryTestDatabase {
     private static final Instant PUBLISHED_NEW = Instant.parse("2026-06-21T10:00:00Z");
     private static final Instant PUBLISHED_OLD = Instant.parse("2026-06-20T10:00:00Z");
     private static final Instant UPDATED = Instant.parse("2026-06-22T10:00:00Z");

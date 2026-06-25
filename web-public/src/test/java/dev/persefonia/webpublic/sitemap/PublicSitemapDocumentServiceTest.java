@@ -29,6 +29,19 @@ class PublicSitemapDocumentServiceTest {
     }
 
     @Test
+    void includesProjectListingsAsStaticEntriesAndProjectDetailsAsDynamicEntries() {
+        PublicSitemapDocumentService service = service(
+                staticRoutes(false),
+                entry("/en/projects/portfolio", Instant.parse("2026-06-24T10:15:00Z")));
+
+        String xml = service.renderXml();
+
+        assertThat(xml).contains("<loc>https://example.test/tr/projects</loc>");
+        assertThat(xml).contains("<loc>https://example.test/en/projects</loc>");
+        assertThat(xml).contains("<loc>https://example.test/en/projects/portfolio</loc>");
+    }
+
+    @Test
     void escapesSpecialCharactersInLoc() {
         PublicSitemapDocumentService service = service(
                 staticRoutes(false),

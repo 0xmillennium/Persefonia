@@ -8,7 +8,11 @@
     <title>${page.title()}</title>
     <meta name="description" content="${page.project().summary()}">
     @template.site.components.canonicalLink(page.canonicalUrl())
-    @template.site.components.robotsMeta(page.noindex())
+    @if(page.noindex())
+        <meta name="robots" content="noindex, follow">
+    @else
+        @template.site.components.robotsMeta(false)
+    @endif
     @template.site.components.openGraphTags("website", page.project().title(), page.project().summary(), page.canonicalUrl())
     @template.site.components.stylesheetLinks(page.stylesheetPaths())
     @template.site.components.feedDiscoveryLink()

@@ -51,7 +51,7 @@ public final class PublicProjectListingController {
                 parsedLanguage.toLowerCase(Locale.ROOT),
                 publicUrl,
                 canonicalUrlFactory.canonicalUrl(publicUrl),
-                true,
+                false,
                 copy,
                 assetResolver.stylesheetPaths(MAIN_FRONTEND_ENTRY),
                 projects.list(parsedLanguage)));

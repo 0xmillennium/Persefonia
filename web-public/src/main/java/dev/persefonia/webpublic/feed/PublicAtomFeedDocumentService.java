@@ -80,7 +80,7 @@ public final class PublicAtomFeedDocumentService {
 
         for (PublicFeedEntry entry : feedIndex.findLatestFeedEntries(DEFAULT_FEED_LIMIT)) {
             String path = entry.publicUrl();
-            if (!isSafePublicPath(path)) {
+            if (!isSafePublicPath(path) || isProjectEntry(entry)) {
                 continue;
             }
             String absoluteUrl = canonicalUrlFactory.canonicalUrl(path);
@@ -94,6 +94,10 @@ public final class PublicAtomFeedDocumentService {
 
         Instant feedUpdated = newestUpdated == null ? EMPTY_FEED_UPDATED : newestUpdated;
         return render(byAbsoluteUrl, feedUpdated);
+    }
+
+    private static boolean isProjectEntry(PublicFeedEntry entry) {
+        return "PROJECT".equalsIgnoreCase(entry.sourceType());
     }
 
     private String render(Map<String, PublicFeedEntry> entries, Instant feedUpdated) {

@@ -83,7 +83,7 @@ public final class PublicProjectDetailController {
                 route.language().toLowerCase(Locale.ROOT),
                 route.publicUrl(),
                 route.canonicalUrl(),
-                true,
+                route.noindex(),
                 PublicProjectPageCopy.forLanguage(route.language()),
                 assetResolver.stylesheetPaths(MAIN_FRONTEND_ENTRY),
                 project));

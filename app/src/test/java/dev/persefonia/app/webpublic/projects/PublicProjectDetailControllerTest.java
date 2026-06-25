@@ -65,14 +65,19 @@ class PublicProjectDetailControllerTest {
         mockMvc.perform(get("/tr/projects/public-detail"))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", containsString("public")))
+                .andExpect(content().string(containsString("<meta name=\"robots\" content=\"index, follow\">")))
                 .andExpect(content().string(containsString("Project public-detail")))
                 .andExpect(content().string(containsString("Summary public-detail")))
                 .andExpect(content().string(containsString("Java")))
                 .andExpect(content().string(containsString("href=\"https://example.test/public-detail\"")))
                 .andExpect(content().string(containsString("rel=\"noopener noreferrer\"")))
+                .andExpect(content().string(containsString(
+                        "<meta property=\"og:url\" content=\"https://0xmillennium.dev/tr/projects/public-detail\">")))
                 .andExpect(content().string(containsString("Problem body")))
                 .andExpect(content().string(not(containsString("coverAssetId"))))
                 .andExpect(content().string(not(containsString("Media"))))
+                .andExpect(content().string(not(containsString("og:image"))))
+                .andExpect(content().string(not(containsString("twitter:image"))))
                 .andExpect(content().string(not(containsString("Fake project"))))
                 .andExpect(content().string(not(containsString("@vite/client"))))
                 .andExpect(content().string(not(containsString("localhost"))));
@@ -119,9 +124,10 @@ class PublicProjectDetailControllerTest {
         mockMvc.perform(get("/en/projects/direct-only"))
                 .andExpect(status().isNotFound());
 
-        routes.addProjectFound("/en/projects/direct-only", projectId.value());
+        routes.addUnlistedProjectFound("/en/projects/direct-only", projectId.value());
         mockMvc.perform(get("/en/projects/direct-only"))
                 .andExpect(status().isOk())
+                .andExpect(content().string(containsString("<meta name=\"robots\" content=\"noindex, follow\">")))
                 .andExpect(content().string(containsString("Project direct-only")));
     }
 

@@ -35,7 +35,8 @@ public final class DiscoveryPublicProjectRouteResolver {
                             route.language().name(),
                             route.slug(),
                             found.publicUrl().value(),
-                            found.canonicalUrl().value());
+                            found.canonicalUrl().value(),
+                            found.indexingPolicy() == IndexingPolicy.NO_INDEX);
             case PublicRouteResolution.Found ignored -> new DiscoveryPublicProjectRouteOutcome.NotFound();
             case PublicRouteResolution.NotFound ignored -> new DiscoveryPublicProjectRouteOutcome.NotFound();
         };
@@ -47,7 +48,11 @@ public final class DiscoveryPublicProjectRouteResolver {
                 && found.resourceType() == DiscoverableResourceType.PROJECT
                 && found.routePurpose() == RoutePurpose.DETAIL
                 && found.language() == route.language()
-                && found.indexingPolicy() == IndexingPolicy.NO_INDEX
+                && isSupportedIndexingPolicy(found.indexingPolicy())
                 && found.publicUrl().value().equals(route.publicPath());
+    }
+
+    private static boolean isSupportedIndexingPolicy(IndexingPolicy indexingPolicy) {
+        return indexingPolicy == IndexingPolicy.INDEX || indexingPolicy == IndexingPolicy.NO_INDEX;
     }
 }
