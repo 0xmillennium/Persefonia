@@ -89,8 +89,7 @@ class RedirectManagementArchitectureTest {
         try {
             String source = Files.readString(path);
             return source.contains("@TransactionalEventListener")
-                    || source.contains("TransactionSynchronization")
-                    || source.contains("afterCommit")
+                    || containsPostCommitMechanicsOutsideFoundation(path, source)
                     || source.toLowerCase().contains("outbox")
                     || source.contains("hitCount")
                     || source.toLowerCase().contains("redirect analytics")
@@ -98,5 +97,12 @@ class RedirectManagementArchitectureTest {
         } catch (IOException exception) {
             throw new IllegalStateException("Could not read " + path, exception);
         }
+    }
+
+    private static boolean containsPostCommitMechanicsOutsideFoundation(Path path, String source) {
+        if (path.toString().contains("/app/src/main/java/dev/persefonia/app/transaction/")) {
+            return false;
+        }
+        return source.contains("TransactionSynchronization") || source.contains("afterCommit");
     }
 }

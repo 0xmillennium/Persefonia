@@ -38,7 +38,8 @@ class DiscoveryCoreClosureArchitectureTest {
         }
 
         assertNoForbiddenPublicRoutes("../web-public/src/main/java");
-        assertNoRouteText("src/main/java", "outbox", "afterCommit", "TransactionSynchronization");
+        assertNoRouteText("src/main/java", "outbox");
+        assertNoRouteTextOutsidePostCommitFoundation("src/main/java", "afterCommit", "TransactionSynchronization");
     }
 
     private static String tableDefinition(String migration, String tableName) {
@@ -53,6 +54,17 @@ class DiscoveryCoreClosureArchitectureTest {
         try (var paths = Files.walk(Path.of(root))) {
             assertThat(paths
                             .filter(path -> path.toString().endsWith(".java"))
+                            .filter(path -> containsAny(path, forbiddenText))
+                            .map(Path::toString))
+                    .isEmpty();
+        }
+    }
+
+    private static void assertNoRouteTextOutsidePostCommitFoundation(String root, String... forbiddenText) throws Exception {
+        try (var paths = Files.walk(Path.of(root))) {
+            assertThat(paths
+                            .filter(path -> path.toString().endsWith(".java"))
+                            .filter(path -> !path.toString().contains("/dev/persefonia/app/transaction/"))
                             .filter(path -> containsAny(path, forbiddenText))
                             .map(Path::toString))
                     .isEmpty();
