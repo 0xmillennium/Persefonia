@@ -63,3 +63,4 @@ Use [TEMPLATE.md](TEMPLATE.md) for new decision records.
 - [ADR 0013: Use Discovery Eligibility for Public Index Surfaces](0013-use-discovery-eligibility-for-public-index-surfaces.md) — keeps dynamic search, sitemap, and feed inclusion driven by Discovery eligibility.
 - [ADR 0014: Use PostgreSQL Full Text Search for Public Search](0014-use-postgresql-full-text-search-for-public-search.md) — chooses PostgreSQL full text search over Discovery search text and keeps search terms private.
 - [ADR 0015: Publish Machine Readable Public Discovery Documents](0015-publish-machine-readable-public-discovery-documents.md) — defines sitemap, robots, and Atom feed publication rules.
+- [ADR 0016: Use Post-Commit Operational Side Effects and Same-Transaction Audit Appends](0016-use-post-commit-operational-side-effects.md) — appends mandatory audit records in-transaction and runs failure-prone side effects like cache purge after commit, deferring a transactional outbox.
