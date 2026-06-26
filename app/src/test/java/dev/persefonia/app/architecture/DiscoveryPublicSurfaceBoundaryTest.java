@@ -89,7 +89,7 @@ class DiscoveryPublicSurfaceBoundaryTest {
                     .filter(Files::isRegularFile)
                     .filter(path -> path.toString().endsWith(".java"))
                     .map(DiscoveryPublicSurfaceBoundaryTest::read)
-                    .reduce("", String::concat);
+                    .reduce("", (left, right) -> left.concat(right));
         }
     }
 

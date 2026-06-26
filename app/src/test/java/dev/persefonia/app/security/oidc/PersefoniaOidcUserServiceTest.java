@@ -12,7 +12,6 @@ import java.util.Optional;
 import java.util.Set;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 
 import dev.persefonia.app.identityaccess.bootstrap.TransactionalAdminBootstrapGateway;
@@ -129,7 +128,7 @@ class PersefoniaOidcUserServiceTest {
         var principal = ((PersefoniaOidcUser) ownerService(OidcTestFixtures.validUser()).loadUser(null)).adminPrincipal();
 
         assertThat(principal.getClass().getDeclaredFields())
-                .extracting(java.lang.reflect.Field::getName)
+                .extracting(field -> field.getName())
                 .noneMatch(name -> name.toLowerCase().contains("token"));
     }
 
@@ -169,7 +168,7 @@ class PersefoniaOidcUserServiceTest {
 
     private static Set<String> authorities(org.springframework.security.oauth2.core.oidc.user.OidcUser user) {
         return user.getAuthorities().stream()
-                .map(GrantedAuthority::getAuthority)
+                .map(authority -> authority.getAuthority())
                 .collect(java.util.stream.Collectors.toCollection(java.util.LinkedHashSet::new));
     }
 

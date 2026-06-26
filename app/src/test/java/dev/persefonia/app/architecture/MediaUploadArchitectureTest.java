@@ -58,7 +58,7 @@ class MediaUploadArchitectureTest {
     void uploadAndStorageServicesAreNotUsedByWebOrOtherContexts() throws Exception {
         for (String symbol : List.of("AssetStoragePort", "UploadAssetCommandService")) {
             assertThat(productionJavaSourcesContaining(symbol).stream()
-                            .map(Path::toString)
+                            .map(path -> path.toString())
                             .filter(path -> !path.contains("/media-library/src/main/java/"))
                             .filter(path -> !path.contains("/app/src/main/java/dev/persefonia/app/medialibrary/")))
                     .isEmpty();

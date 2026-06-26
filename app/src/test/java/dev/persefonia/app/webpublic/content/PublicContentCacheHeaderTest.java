@@ -114,7 +114,7 @@ class PublicContentCacheHeaderTest {
         String cacheControl = result.getResponse().getHeader("Cache-Control");
         assertThat(cacheControl).isNotBlank();
         return java.util.Arrays.stream(cacheControl.split(","))
-                .map(String::trim)
+                .map(value -> value.trim())
                 .toArray(String[]::new);
     }
 }

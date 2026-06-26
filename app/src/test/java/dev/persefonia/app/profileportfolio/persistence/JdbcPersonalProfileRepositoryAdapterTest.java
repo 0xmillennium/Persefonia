@@ -46,7 +46,7 @@ class JdbcPersonalProfileRepositoryAdapterTest extends PortfolioRepositoryTestDa
         assertThat(reloaded.localizations().getFirst().educationSummaries()).hasSize(1);
         assertThat(reloaded.localizations().getFirst().currentFocusItems()).hasSize(1);
         assertThat(reloaded.externalLinks()).hasSize(1);
-        assertThat(profiles.findActiveProfile()).map(PersonalProfile::id).contains(saved.id());
+        assertThat(profiles.findActiveProfile()).map(profile -> profile.id()).contains(saved.id());
     }
 
     @Test
@@ -62,7 +62,7 @@ class JdbcPersonalProfileRepositoryAdapterTest extends PortfolioRepositoryTestDa
 
         assertThat(updated.displayName().value()).isEqualTo("Updated");
         assertThat(updated.externalLinks()).extracting(link -> link.sortOrder().value()).containsExactly(2);
-        assertThat(updated.localizations()).extracting(ProfileLocalization::language).containsExactly(ContentLanguage.EN);
+        assertThat(updated.localizations()).extracting(localization -> localization.language()).containsExactly(ContentLanguage.EN);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM portfolio.external_profile_links", Long.class)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM portfolio.profile_localizations", Long.class)).isEqualTo(1);
     }

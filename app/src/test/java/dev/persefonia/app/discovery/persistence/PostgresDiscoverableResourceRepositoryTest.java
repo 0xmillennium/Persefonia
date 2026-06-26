@@ -30,7 +30,7 @@ class PostgresDiscoverableResourceRepositoryTest extends DiscoveryRepositoryTest
         assertThat(resources.findByPublicUrl(saved.publicUrl())).hasValueSatisfying(
                 actual -> assertThat(actual).usingRecursiveComparison().isEqualTo(saved));
         assertThat(resources.findBySourceRef(saved.sourceRef()))
-                .extracting(DiscoverableResource::id)
+                .extracting(found -> found.id())
                 .containsExactly(saved.id());
     }
 
@@ -41,7 +41,7 @@ class PostgresDiscoverableResourceRepositoryTest extends DiscoveryRepositoryTest
                 DiscoverableResourceId.random(), "page", DiscoverableResourceType.PAGE));
 
         assertThat(resources.findBySourceRef(DiscoveryRepositoryFixtures.SOURCE_REF))
-                .extracting(DiscoverableResource::id)
+                .extracting(found -> found.id())
                 .containsExactlyInAnyOrder(article.id(), page.id());
     }
 

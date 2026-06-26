@@ -138,7 +138,7 @@ class DiscoveryBoundaryArchitectureTest {
     private static Stream<String> discoveryImports(Path source) {
         try {
             return Files.readAllLines(source).stream()
-                    .map(String::trim)
+                    .map(value -> value.trim())
                     .filter(line -> line.startsWith("import dev.persefonia.discovery."))
                     .map(line -> line.substring("import ".length(), line.length() - 1));
         } catch (IOException exception) {

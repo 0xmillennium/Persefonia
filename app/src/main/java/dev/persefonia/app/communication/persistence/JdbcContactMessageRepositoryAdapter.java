@@ -162,7 +162,7 @@ public class JdbcContactMessageRepositoryAdapter implements ContactMessageReposi
                         .addValue("result", attempt.result().name())
                         .addValue("attemptedAt", Timestamp.from(attempt.attemptedAt()))
                         .addValue("failureReason", attempt.failureReasonOptional()
-                                .map(SafeFailureReason::value)
+                                .map(reason -> reason.value())
                                 .orElse(null)))
                 .toArray(MapSqlParameterSource[]::new);
         jdbc().batchUpdate("""

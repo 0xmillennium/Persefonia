@@ -20,12 +20,12 @@ public class AdminAccessConfiguration {
     @Bean
     AdminAccessPolicy adminAccessPolicy(AdminAccessProperties properties) {
         Set<OidcSubject> subjects = properties.getAllowlistedSubjects().stream()
-                .map(String::trim)
+                .map(value -> value.trim())
                 .filter(value -> !value.isBlank())
                 .map(OidcSubject::of)
                 .collect(Collectors.toUnmodifiableSet());
         Set<NormalizedEmailAddress> emails = properties.getAllowlistedEmails().stream()
-                .map(String::trim)
+                .map(value -> value.trim())
                 .filter(value -> !value.isBlank())
                 .map(EmailAddress::of)
                 .map(NormalizedEmailAddress::from)

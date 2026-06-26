@@ -87,7 +87,7 @@ class PublicSurfacePolicyArchitectureTest {
         return ROUTE_ANNOTATION.matcher(source)
                 .results()
                 .map(match -> match.group(1))
-                .reduce("", String::concat);
+                .reduce("", (left, right) -> left.concat(right));
     }
 
     private static List<String> routeLiterals(String source) {
@@ -114,7 +114,7 @@ class PublicSurfacePolicyArchitectureTest {
                     .filter(path -> path.toString().endsWith(".java")
                             || path.toString().endsWith(".sql"))
                     .map(PublicSurfacePolicyArchitectureTest::read)
-                    .reduce("", String::concat);
+                    .reduce("", (left, right) -> left.concat(right));
         }
     }
 

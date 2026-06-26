@@ -62,7 +62,7 @@ class AdminMediaTestConfiguration {
 
         @Override
         public List<MediaAdminAssetListItem> listAssets() {
-            return assets.values().stream().map(MediaAdminAssetDetails::summary).toList();
+            return assets.values().stream().map(details -> details.summary()).toList();
         }
 
         @Override

@@ -73,7 +73,7 @@ public class PublicProjectTestConfiguration {
         @Override
         public List<ProjectSummaryRow> listFeaturedProjects(ContentLanguage language, int limit) {
             return projects.values().stream()
-                    .filter(ProjectRecord::featured)
+                    .filter(record -> record.featured())
                     .filter(project -> project.visibility() == Visibility.PUBLIC)
                     .filter(project -> project.status() != Status.ARCHIVED)
                     .map(project -> project.summaryRow(language))

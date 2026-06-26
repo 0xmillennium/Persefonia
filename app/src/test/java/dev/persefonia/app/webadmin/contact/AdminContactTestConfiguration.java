@@ -11,7 +11,6 @@ import dev.persefonia.communication.application.query.ContactMessageAdminStatusC
 import dev.persefonia.communication.domain.contact.ContactBody;
 import dev.persefonia.communication.domain.contact.ContactMessage;
 import dev.persefonia.communication.domain.contact.ContactMessageId;
-import dev.persefonia.communication.domain.contact.ContactMessageStatus;
 import dev.persefonia.communication.domain.contact.ContactSubject;
 import dev.persefonia.communication.domain.contact.MailNotificationAttempt;
 import dev.persefonia.communication.domain.contact.MailNotificationAttemptId;
@@ -96,7 +95,7 @@ class AdminContactTestConfiguration {
                     .filter(message -> request.statusFilterOptional()
                             .map(status -> message.status() == status)
                             .orElse(true))
-                    .sorted(Comparator.comparing(ContactMessage::submittedAt).reversed())
+                    .sorted(Comparator.comparing((ContactMessage message) -> message.submittedAt()).reversed())
                     .map(AdminContactTestConfiguration::listItem)
                     .toList();
             List<ContactMessageAdminListItem> page = all.stream()
@@ -144,7 +143,7 @@ class AdminContactTestConfiguration {
                         .map(attempt -> new ContactMessageAdminMailAttemptItem(
                                 attempt.id(),
                                 attempt.result(),
-                                attempt.failureReasonOptional().map(SafeFailureReason::value).orElse(null),
+                                attempt.failureReasonOptional().map(reason -> reason.value()).orElse(null),
                                 attempt.attemptedAt()))
                         .toList(),
                 message.statusChanges().stream()

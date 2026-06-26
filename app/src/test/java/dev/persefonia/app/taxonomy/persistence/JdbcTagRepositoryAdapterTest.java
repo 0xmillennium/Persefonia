@@ -26,7 +26,7 @@ class JdbcTagRepositoryAdapterTest extends TaxonomyRepositoryTestDatabase {
         assertThat(tags.findByNormalizedName(NormalizedTagName.ofCanonical("java"))).isPresent();
         assertThat(tags.existsBySlug(TagSlug.ofCanonical("java"))).isTrue();
         assertThat(tags.existsByNormalizedName(NormalizedTagName.ofCanonical("java"))).isTrue();
-        assertThat(tags.findAllForAdmin()).extracting(Tag::id).containsExactly(saved.id());
+        assertThat(tags.findAllForAdmin()).extracting(tag -> tag.id()).containsExactly(saved.id());
 
         saved.update(
                 TagName.of("Java Platform"), NormalizedTagName.ofCanonical("java platform"),

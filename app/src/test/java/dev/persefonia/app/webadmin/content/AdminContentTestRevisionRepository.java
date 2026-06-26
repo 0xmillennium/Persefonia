@@ -35,8 +35,8 @@ final class AdminContentTestRevisionRepository implements ContentRevisionReposit
     @Override
     public Optional<RevisionNumber> findLatestRevisionNumber(ContentId contentId) {
         return findByContentId(contentId).stream()
-                .map(ContentRevision::revisionNumber)
-                .max(Comparator.comparingInt(RevisionNumber::value));
+                .map(revision -> revision.revisionNumber())
+                .max(Comparator.comparingInt(revisionNumber -> revisionNumber.value()));
     }
 
     void reset() {

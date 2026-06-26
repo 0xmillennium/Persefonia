@@ -95,7 +95,7 @@ class AdminAnalyticsBoundaryArchitectureTest {
                 .matcher(source)
                 .results()
                 .map(match -> match.group(1))
-                .reduce("", String::concat);
+                .reduce("", (left, right) -> left.concat(right));
     }
 
     private static String mutationRouteAnnotations(String source) {
@@ -104,7 +104,7 @@ class AdminAnalyticsBoundaryArchitectureTest {
                 .matcher(source)
                 .results()
                 .map(match -> match.group(1))
-                .reduce("", String::concat);
+                .reduce("", (left, right) -> left.concat(right));
     }
 
     private static String joinedSources(List<Path> roots) throws IOException {
@@ -118,7 +118,7 @@ class AdminAnalyticsBoundaryArchitectureTest {
                         .filter(Files::isRegularFile)
                         .filter(path -> path.toString().endsWith(".java") || path.toString().endsWith(".jte"))
                         .map(AdminAnalyticsBoundaryArchitectureTest::read)
-                        .reduce("", String::concat));
+                        .reduce("", (left, right) -> left.concat(right)));
             }
         }
         return joined.toString();

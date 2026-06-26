@@ -131,7 +131,7 @@ class MediaBoundaryArchitectureTest {
     @Test
     void assetRepositoryUsageStaysInsideMediaCompositionBoundaries() throws Exception {
         assertThat(javaSourcesContaining("AssetRepository").stream()
-                        .map(Path::toString)
+                        .map(path -> path.toString())
                         .filter(path -> !path.contains("/media-library/src/main/java/"))
                         .filter(path -> !path.contains("/app/src/main/java/dev/persefonia/app/medialibrary/")))
                 .isEmpty();

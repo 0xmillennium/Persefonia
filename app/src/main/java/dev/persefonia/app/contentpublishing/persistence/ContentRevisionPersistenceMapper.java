@@ -32,16 +32,16 @@ final class ContentRevisionPersistenceMapper {
                 revision.slug().value(),
                 revision.summary().value(),
                 revision.markdownSource().value(),
-                revision.renderedHtml().map(RenderedHtml::value).orElse(null),
-                revision.metadata().seoTitle().map(SeoTitle::value).orElse(null),
-                revision.metadata().seoDescription().map(SeoDescription::value).orElse(null),
-                revision.metadata().canonicalPath().map(CanonicalPath::value).orElse(null),
-                revision.metadata().openGraphTitle().map(OpenGraphTitle::value).orElse(null),
-                revision.metadata().openGraphDescription().map(OpenGraphDescription::value).orElse(null),
-                revision.metadata().ogImageAssetId().map(AssetId::value).orElse(null),
+                revision.renderedHtml().map(renderedHtml -> renderedHtml.value()).orElse(null),
+                revision.metadata().seoTitle().map(seoTitle -> seoTitle.value()).orElse(null),
+                revision.metadata().seoDescription().map(seoDescription -> seoDescription.value()).orElse(null),
+                revision.metadata().canonicalPath().map(canonicalPath -> canonicalPath.value()).orElse(null),
+                revision.metadata().openGraphTitle().map(openGraphTitle -> openGraphTitle.value()).orElse(null),
+                revision.metadata().openGraphDescription().map(openGraphDescription -> openGraphDescription.value()).orElse(null),
+                revision.metadata().ogImageAssetId().map(assetId -> assetId.value()).orElse(null),
                 revision.createdBy().value(),
                 revision.createdAt(),
-                revision.changeNote().map(ChangeNote::value).orElse(null));
+                revision.changeNote().map(changeNote -> changeNote.value()).orElse(null));
     }
 
     ContentRevision toDomain(ContentRevisionPersistenceEntity entity) {

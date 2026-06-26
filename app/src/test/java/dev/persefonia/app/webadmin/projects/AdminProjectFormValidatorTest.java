@@ -95,10 +95,10 @@ class AdminProjectFormValidatorTest {
     }
 
     private static List<String> fields(List<AdminProjectFieldError> errors) {
-        return errors.stream().map(AdminProjectFieldError::field).toList();
+        return errors.stream().map(error -> error.field()).toList();
     }
 
     private static List<String> messages(List<AdminProjectFieldError> errors) {
-        return errors.stream().map(AdminProjectFieldError::message).toList();
+        return errors.stream().map(error -> error.message()).toList();
     }
 }

@@ -69,7 +69,7 @@ class ContactMailNotificationArchitectureTest {
                         .filter(Files::isRegularFile)
                         .filter(path -> path.toString().endsWith(".java"))
                         .map(ContactMailNotificationArchitectureTest::read)
-                        .reduce("", String::concat));
+                        .reduce("", (left, right) -> left.concat(right)));
             }
         }
         return joined.toString();

@@ -75,7 +75,7 @@ class JdbcAssetRepositoryAdapterTest extends MediaLibraryRepositoryTestDatabase 
                 List.of(variant(VariantName.THUMBNAIL, "thumb"), variant(VariantName.MEDIUM, "medium")),
                 List.of(validation("mime"), validation("dimensions")));
         Asset saved = assets.save(asset);
-        assertThat(saved.variants()).extracting(AssetVariant::name)
+        assertThat(saved.variants()).extracting(variant -> variant.name())
                 .containsExactly(VariantName.THUMBNAIL, VariantName.MEDIUM);
         assertThat(saved.validationResults()).extracting(result -> result.rule().value())
                 .containsExactly("dimensions", "mime");
@@ -84,7 +84,7 @@ class JdbcAssetRepositoryAdapterTest extends MediaLibraryRepositoryTestDatabase 
         saved.replaceValidationResults(List.of(validation("checksum")), NOW.plusSeconds(2));
         Asset replaced = assets.save(saved);
 
-        assertThat(replaced.variants()).extracting(AssetVariant::name).containsExactly(VariantName.LARGE);
+        assertThat(replaced.variants()).extracting(variant -> variant.name()).containsExactly(VariantName.LARGE);
         assertThat(replaced.validationResults()).extracting(result -> result.rule().value())
                 .containsExactly("checksum");
         assertThat(jdbc.queryForObject("SELECT count(*) FROM media.asset_variants", Long.class)).isEqualTo(1);
@@ -96,7 +96,7 @@ class JdbcAssetRepositoryAdapterTest extends MediaLibraryRepositoryTestDatabase 
     void findsByChecksumAndReturnsEmptyForMissingValues() {
         Asset saved = assets.save(pendingImage("lookup"));
 
-        assertThat(assets.findByChecksum(saved.checksum())).map(Asset::id).contains(saved.id());
+        assertThat(assets.findByChecksum(saved.checksum())).map(asset -> asset.id()).contains(saved.id());
         assertThat(assets.findByChecksum(Checksum.of("missing"))).isEmpty();
     }
 

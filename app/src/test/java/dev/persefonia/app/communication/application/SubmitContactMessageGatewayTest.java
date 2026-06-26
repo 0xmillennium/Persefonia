@@ -157,7 +157,7 @@ class SubmitContactMessageGatewayTest {
         }
 
         void runAll() {
-            tasks.forEach(Runnable::run);
+            tasks.forEach(task -> task.run());
         }
 
         List<Runnable> tasks() {

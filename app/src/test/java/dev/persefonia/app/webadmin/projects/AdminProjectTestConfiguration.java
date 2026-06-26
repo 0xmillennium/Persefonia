@@ -230,7 +230,7 @@ class AdminProjectTestConfiguration {
         TagId activeTagId() {
             return tags.entrySet().stream()
                     .filter(entry -> !entry.getValue().archived())
-                    .map(Map.Entry::getKey)
+                    .map(entry -> entry.getKey())
                     .findFirst()
                     .orElseThrow();
         }

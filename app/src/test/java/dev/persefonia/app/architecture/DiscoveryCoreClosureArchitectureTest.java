@@ -55,7 +55,7 @@ class DiscoveryCoreClosureArchitectureTest {
             assertThat(paths
                             .filter(path -> path.toString().endsWith(".java"))
                             .filter(path -> containsAny(path, forbiddenText))
-                            .map(Path::toString))
+                            .map(path -> path.toString()))
                     .isEmpty();
         }
     }
@@ -68,7 +68,7 @@ class DiscoveryCoreClosureArchitectureTest {
                             .filter(path -> !path.toString().endsWith(
                                     "/dev/persefonia/app/communication/application/PublicContactSubmissionService.java"))
                             .filter(path -> containsAny(path, forbiddenText))
-                            .map(Path::toString))
+                            .map(path -> path.toString()))
                     .isEmpty();
         }
     }
@@ -78,7 +78,7 @@ class DiscoveryCoreClosureArchitectureTest {
             assertThat(paths
                             .filter(path -> path.toString().endsWith(".java"))
                             .filter(DiscoveryCoreClosureArchitectureTest::containsForbiddenPublicRoute)
-                            .map(Path::toString))
+                            .map(path -> path.toString()))
                     .isEmpty();
         }
     }

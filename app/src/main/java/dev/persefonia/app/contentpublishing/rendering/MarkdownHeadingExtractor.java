@@ -29,7 +29,7 @@ final class MarkdownHeadingExtractor {
             }
         });
 
-        List<String> texts = headings.stream().map(HeadingData::text).toList();
+        List<String> texts = headings.stream().map(heading -> heading.text()).toList();
         List<HeadingAnchor> anchors = anchorGenerator.generateUniqueAnchors(texts);
         List<RenderedHeading> renderedHeadings = new ArrayList<>(headings.size());
         for (int index = 0; index < headings.size(); index++) {

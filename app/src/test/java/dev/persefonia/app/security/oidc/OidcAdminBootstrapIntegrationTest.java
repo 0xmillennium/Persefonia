@@ -14,7 +14,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -99,13 +98,13 @@ class OidcAdminBootstrapIntegrationTest {
         PersefoniaOidcUser user = loadUser("owner-subject", "owner@example.com");
 
         assertThat(user.adminPrincipal().status().name()).isEqualTo("ACTIVE");
-        assertThat(user.adminPrincipal().roles()).extracting(Enum::name).containsExactly("OWNER");
+        assertThat(user.adminPrincipal().roles()).extracting(value -> value.name()).containsExactly("OWNER");
     }
 
     @Test
     void returnedPersefoniaOidcUserHasRoleAdminAndRoleOwner() {
         assertThat(loadUser("owner-subject", "owner@example.com").getAuthorities())
-                .extracting(GrantedAuthority::getAuthority)
+                .extracting(authority -> authority.getAuthority())
                 .containsExactlyInAnyOrder("ROLE_ADMIN", "ROLE_OWNER");
     }
 

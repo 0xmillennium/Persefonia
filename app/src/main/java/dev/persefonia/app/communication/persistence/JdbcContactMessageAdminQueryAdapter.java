@@ -40,7 +40,7 @@ public class JdbcContactMessageAdminQueryAdapter implements ContactMessageAdminQ
     public ContactMessageAdminListPage list(ContactMessageAdminListRequest request) {
         Objects.requireNonNull(request, "request");
         MapSqlParameterSource parameters = new MapSqlParameterSource()
-                .addValue("status", request.statusFilterOptional().map(Enum::name).orElse(null))
+                .addValue("status", request.statusFilterOptional().map(status -> status.name()).orElse(null))
                 .addValue("limit", request.pageSize())
                 .addValue("offset", request.offset());
 

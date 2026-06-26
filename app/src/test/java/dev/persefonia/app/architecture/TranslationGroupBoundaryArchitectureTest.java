@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.persefonia.contentpublishing.domain.content.ContentItem;
 import dev.persefonia.contentpublishing.domain.translation.port.TranslationGroupRepository;
-import java.lang.reflect.Field;
 import java.util.Arrays;
 import org.junit.jupiter.api.Test;
 
@@ -13,8 +12,8 @@ class TranslationGroupBoundaryArchitectureTest {
     @Test
     void contentItemDoesNotOwnTranslationGroupForeignKey() {
         boolean ownsTranslationState = Arrays.stream(ContentItem.class.getDeclaredFields())
-                .map(Field::getType)
-                .map(Class::getName)
+                .map(field -> field.getType())
+                .map(type -> type.getName())
                 .anyMatch(name -> name.contains("translation") || name.contains("Translation"));
 
         assertThat(ownsTranslationState)

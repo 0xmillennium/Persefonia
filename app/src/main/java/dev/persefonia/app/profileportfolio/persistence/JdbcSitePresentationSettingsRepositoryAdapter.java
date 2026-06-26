@@ -2,11 +2,9 @@ package dev.persefonia.app.profileportfolio.persistence;
 
 import dev.persefonia.profileportfolio.domain.common.ContentLanguage;
 import dev.persefonia.profileportfolio.domain.settings.HomepageSettings;
-import dev.persefonia.profileportfolio.domain.settings.SeoDescription;
 import dev.persefonia.profileportfolio.domain.settings.SitePresentationSettings;
 import dev.persefonia.profileportfolio.domain.settings.SitePresentationSettingsId;
 import dev.persefonia.profileportfolio.domain.settings.SitePresentationSettingsRepository;
-import dev.persefonia.profileportfolio.domain.settings.TitleSuffix;
 import java.sql.Timestamp;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -120,8 +118,8 @@ public class JdbcSitePresentationSettingsRepositoryAdapter implements SitePresen
                 .addValue("id", settings.id().value())
                 .addValue("siteName", settings.siteName().value())
                 .addValue("defaultLanguage", settings.defaultLanguage().name())
-                .addValue("titleSuffix", settings.titleSuffix().map(TitleSuffix::value).orElse(null))
-                .addValue("defaultMetaDescription", settings.defaultMetaDescription().map(SeoDescription::value).orElse(null))
+                .addValue("titleSuffix", settings.titleSuffix().map(titleSuffix -> titleSuffix.value()).orElse(null))
+                .addValue("defaultMetaDescription", settings.defaultMetaDescription().map(seoDescription -> seoDescription.value()).orElse(null))
                 .addValue("defaultOpenGraphImageAssetId", settings.defaultOpenGraphImageAssetId().map(asset -> asset.value()).orElse(null))
                 .addValue("defaultTheme", settings.defaultTheme().name())
                 .addValue("showFeaturedProjects", homepage.showFeaturedProjects())

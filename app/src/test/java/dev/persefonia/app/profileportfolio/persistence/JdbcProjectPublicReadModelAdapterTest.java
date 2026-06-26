@@ -61,7 +61,7 @@ class JdbcProjectPublicReadModelAdapterTest extends PortfolioRepositoryTestDatab
 
         var rows = publicReadModel.listListedProjects(ContentLanguage.TR);
 
-        assertThat(rows).extracting(ProjectPublicReadModel.ProjectSummaryRow::slug).containsExactly("listed");
+        assertThat(rows).extracting(row -> row.slug()).containsExactly("listed");
         assertThat(rows.getFirst().title()).isEqualTo("Project listed");
         assertThat(rows.getFirst().tagIds()).containsExactlyElementsOf(listed.tagIds());
     }
@@ -293,7 +293,7 @@ class JdbcProjectPublicReadModelAdapterTest extends PortfolioRepositoryTestDatab
     private static Map<String, ProjectPublicReadModel.ProjectSummaryRow> summaryRowsBySlug(
             List<ProjectPublicReadModel.ProjectSummaryRow> rows) {
         return rows.stream().collect(java.util.stream.Collectors.toMap(
-                ProjectPublicReadModel.ProjectSummaryRow::slug,
+                row -> row.slug(),
                 java.util.function.Function.identity(),
                 (first, second) -> first,
                 LinkedHashMap::new));
@@ -301,7 +301,7 @@ class JdbcProjectPublicReadModelAdapterTest extends PortfolioRepositoryTestDatab
 
     private static Map<String, PublicProjectCardView> listedCardsBySlug(List<PublicProjectCardView> cards) {
         return cards.stream().collect(java.util.stream.Collectors.toMap(
-                PublicProjectCardView::slug,
+                card -> card.slug(),
                 java.util.function.Function.identity(),
                 (first, second) -> first,
                 LinkedHashMap::new));
@@ -309,7 +309,7 @@ class JdbcProjectPublicReadModelAdapterTest extends PortfolioRepositoryTestDatab
 
     private static Map<String, PublicFeaturedProjectView> featuredCardsBySlug(List<PublicFeaturedProjectView> cards) {
         return cards.stream().collect(java.util.stream.Collectors.toMap(
-                PublicFeaturedProjectView::slug,
+                featured -> featured.slug(),
                 java.util.function.Function.identity(),
                 (first, second) -> first,
                 LinkedHashMap::new));

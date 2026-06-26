@@ -3,7 +3,6 @@ package dev.persefonia.app.architecture;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import dev.persefonia.contentpublishing.application.service.PublicContentBySourceQueryHandler;
 import dev.persefonia.contentpublishing.application.service.PublicTranslationLinkQueryService;
@@ -133,7 +132,7 @@ class PublicContentArchitectureTest {
                             throw new IllegalStateException(exception);
                         }
                     })
-                    .reduce("", String::concat);
+                    .reduce("", (left, right) -> left.concat(right));
 
             assertThat(routeAnnotations).doesNotContain("@PostMapping");
             assertThat(routeAnnotations).doesNotContain("method = RequestMethod.POST");
@@ -153,13 +152,13 @@ class PublicContentArchitectureTest {
     @Test
     void testSupportDoesNotConflateContentRepositoryAndDiscoveryRoutePorts() {
         var classes = new ClassFileImporter().importPackages("dev.persefonia");
-        assertThat(classes.stream().map(JavaClass::getName))
+        assertThat(classes.stream().map(javaClass -> javaClass.getName()))
                 .contains("dev.persefonia.app.webpublic.content.PublicContentTestRepository");
 
         assertThat(classes.stream()
                         .filter(javaClass -> javaClass.isAssignableTo(ContentItemRepository.class))
                         .filter(javaClass -> javaClass.isAssignableTo(ResolvePublicRoutePort.class))
-                        .map(JavaClass::getName))
+                        .map(javaClass -> javaClass.getName()))
                 .isEmpty();
     }
 
@@ -167,7 +166,7 @@ class PublicContentArchitectureTest {
     void testSupportDoesNotUseOmnibusPublicRouteFakesAcrossBoundedContextPorts() {
         assertThat(testJavaSources().stream()
                         .filter(path -> implementedForbiddenPortCount(path) > 1)
-                        .map(Path::toString))
+                        .map(path -> path.toString()))
                 .isEmpty();
     }
 

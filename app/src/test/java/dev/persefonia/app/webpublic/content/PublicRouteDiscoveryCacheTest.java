@@ -49,7 +49,7 @@ class PublicRouteDiscoveryCacheTest extends PublicContentMvcTestSupport {
 
     private static String[] cacheControlTokens(MvcResult result) {
         return Arrays.stream(result.getResponse().getHeader("Cache-Control").split(","))
-                .map(String::trim)
+                .map(value -> value.trim())
                 .toArray(String[]::new);
     }
 }

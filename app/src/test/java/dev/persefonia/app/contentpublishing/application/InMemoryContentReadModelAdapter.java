@@ -21,7 +21,6 @@ import dev.persefonia.contentpublishing.domain.content.ContentItem;
 import dev.persefonia.contentpublishing.domain.content.ContentLanguage;
 import dev.persefonia.contentpublishing.domain.content.ContentStatus;
 import dev.persefonia.contentpublishing.domain.content.ContentType;
-import dev.persefonia.contentpublishing.domain.content.Title;
 import dev.persefonia.contentpublishing.domain.content.port.ContentItemRepository;
 import dev.persefonia.contentpublishing.domain.model.series.Series;
 import dev.persefonia.contentpublishing.domain.model.series.SeriesId;
@@ -85,7 +84,7 @@ public final class InMemoryContentReadModelAdapter implements
     @Override
     public List<PublicTaggedContentItem> list(PublicTaggedContentQuery query) {
         return contentItems.findByAssignedTagId(query.tagId()).stream()
-                .filter(ContentItem::isListedPublicly)
+                .filter(item -> item.isListedPublicly())
                 .filter(item -> item.language() == query.language())
                 .filter(item -> item.renderSnapshot().isPresent())
                 .filter(this::currentPublicPathIsValid)
@@ -109,7 +108,7 @@ public final class InMemoryContentReadModelAdapter implements
         return seriesRepository.findById(seriesId).stream()
                 .flatMap(series -> series.entries().stream()
                         .map(entry -> contentItems.findById(entry.contentItemId())
-                                .filter(ContentItem::isListedPublicly)
+                                .filter(item -> item.isListedPublicly())
                                 .filter(item -> item.language() == language)
                                 .filter(item -> item.renderSnapshot().isPresent())
                                 .filter(this::currentPublicPathIsValid)
@@ -122,7 +121,7 @@ public final class InMemoryContentReadModelAdapter implements
                                         item.type().name(),
                                         item.publishedAt().orElseThrow(),
                                         item.language().name())))
-                        .flatMap(Optional::stream))
+                        .flatMap(optional -> optional.stream()))
                 .toList();
     }
 
@@ -146,9 +145,9 @@ public final class InMemoryContentReadModelAdapter implements
                 .filter(item -> seriesRepository.findById(seriesId)
                         .map(series -> !series.containsContentItem(item.id()))
                         .orElse(true))
-                .sorted(Comparator.comparing(ContentItem::updatedAt).reversed())
+                .sorted(Comparator.comparing((ContentItem item) -> item.updatedAt()).reversed())
                 .map(item -> new SeriesCandidateContentItem(
-                        item.id(), item.type(), item.status(), item.title().map(Title::value)))
+                        item.id(), item.type(), item.status(), item.title().map(title -> title.value())))
                 .toList();
     }
 
@@ -159,8 +158,8 @@ public final class InMemoryContentReadModelAdapter implements
                 .filter(item -> item.type() == contentType)
                 .filter(item -> !group.containsLanguage(item.language()))
                 .filter(item -> !translationGroups.contentItemBelongsToAnyGroup(item.id()))
-                .sorted(Comparator.comparing(ContentItem::updatedAt).reversed())
-                .map(item -> new TranslationCandidateItem(item.id(), item.language(), item.title().map(Title::value)))
+                .sorted(Comparator.comparing((ContentItem item) -> item.updatedAt()).reversed())
+                .map(item -> new TranslationCandidateItem(item.id(), item.language(), item.title().map(title -> title.value())))
                 .toList();
     }
 
@@ -168,7 +167,7 @@ public final class InMemoryContentReadModelAdapter implements
         List<PublicTranslationLink> visibleLinks = entries.stream()
                 .filter(entry -> !entry.contentItemId().equals(current.contentId()))
                 .map(entry -> contentItems.findById(entry.contentItemId()).flatMap(this::renderableContent))
-                .flatMap(Optional::stream)
+                .flatMap(optional -> optional.stream())
                 .map(content -> new PublicTranslationLink(
                         languageCode(content.language()),
                         languageLabel(content.language()),

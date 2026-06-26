@@ -3,7 +3,6 @@ package dev.persefonia.app.security.admin;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.lang.reflect.Field;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -97,7 +96,7 @@ class AdminPrincipalTest {
     @Test
     void storesNoTokenPasswordSessionCredentialFields() {
         assertThat(AdminPrincipal.class.getDeclaredFields())
-                .extracting(Field::getName)
+                .extracting(field -> field.getName())
                 .noneMatch(name -> name.toLowerCase().matches(".*(token|password|credential|session|securitycontext).*"));
     }
 

@@ -38,7 +38,7 @@ public final class PublicContentTestRepository implements ContentItemRepository 
 
     @Override
     public Optional<ContentItem> findPublishedByRoute(ContentType type, Slug slug, ContentLanguage language) {
-        return findBySlugAndTypeAndLanguage(slug, type, language).filter(ContentItem::isPublished);
+        return findBySlugAndTypeAndLanguage(slug, type, language).filter(item -> item.isPublished());
     }
 
     @Override

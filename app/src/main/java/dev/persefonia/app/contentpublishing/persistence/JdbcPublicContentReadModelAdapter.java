@@ -79,7 +79,7 @@ public class JdbcPublicContentReadModelAdapter implements
                 "tagId", query.tagId().value(),
                 "language", query.language().name(),
                 "limit", query.limit()), (resultSet, rowNumber) -> contentRow(resultSet)).stream()
-                .filter(ContentRow::hasCurrentCanonicalPath)
+                .filter(row -> row.hasCurrentCanonicalPath())
                 .map(row -> new PublicTaggedContentItem(
                         row.title(),
                         row.summary(),
@@ -174,7 +174,7 @@ public class JdbcPublicContentReadModelAdapter implements
                 """, Map.of(
                 "groupId", groupIds.getFirst(),
                 "contentItemId", currentPage.contentId().value()), (resultSet, rowNumber) -> contentRow(resultSet)).stream()
-                .filter(ContentRow::hasCurrentCanonicalPath)
+                .filter(row -> row.hasCurrentCanonicalPath())
                 .map(row -> new PublicTranslationLink(
                         languageCode(row.language()),
                         languageLabel(row.language()),

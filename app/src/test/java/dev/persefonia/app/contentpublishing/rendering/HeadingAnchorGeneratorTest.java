@@ -40,6 +40,6 @@ class HeadingAnchorGeneratorTest {
     }
 
     private static List<String> values(List<HeadingAnchor> anchors) {
-        return anchors.stream().map(HeadingAnchor::value).toList();
+        return anchors.stream().map(anchor -> anchor.value()).toList();
     }
 }

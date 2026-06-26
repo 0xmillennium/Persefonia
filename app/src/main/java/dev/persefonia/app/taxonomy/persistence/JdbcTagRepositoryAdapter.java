@@ -61,7 +61,7 @@ public class JdbcTagRepositoryAdapter implements TagRepository {
     public List<Tag> findAllForAdmin() {
         return java.util.stream.StreamSupport.stream(rows().findAll().spliterator(), false)
                 .map(mapper::toDomain)
-                .sorted(Comparator.comparing(Tag::updatedAt).reversed())
+                .sorted(Comparator.comparing((Tag tag) -> tag.updatedAt()).reversed())
                 .toList();
     }
 

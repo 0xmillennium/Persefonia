@@ -13,7 +13,6 @@ import dev.persefonia.communication.domain.contact.ContactMessageStatusChangeId;
 import dev.persefonia.communication.domain.contact.MailNotificationAttemptId;
 import dev.persefonia.communication.domain.contact.MailNotificationAttemptResult;
 import dev.persefonia.communication.domain.contact.SafeFailureReason;
-import java.lang.reflect.RecordComponent;
 import java.time.Instant;
 import java.util.Arrays;
 import org.junit.jupiter.api.Test;
@@ -47,7 +46,7 @@ class JdbcContactMessageAdminQueryAdapterTest extends CommunicationPersistenceTe
 
         var page = adminQuery.list(new ContactMessageAdminListRequest(ContactMessageStatus.SPAM, 1, 20));
 
-        assertThat(page.items()).extracting(ContactMessageAdminListItem::id).containsExactly(spam.id());
+        assertThat(page.items()).extracting(item -> item.id()).containsExactly(spam.id());
         assertThat(page.totalItems()).isEqualTo(1);
     }
 
@@ -83,7 +82,7 @@ class JdbcContactMessageAdminQueryAdapterTest extends CommunicationPersistenceTe
         var item = adminQuery.list(ContactMessageAdminListRequest.firstPage()).items().getFirst();
 
         assertThat(Arrays.stream(ContactMessageAdminListItem.class.getRecordComponents())
-                .map(RecordComponent::getName))
+                .map(component -> component.getName()))
                 .doesNotContain("body");
         assertThat(item.mailAttemptCount()).isEqualTo(2);
         assertThat(item.latestMailAttemptResultOptional()).contains(MailNotificationAttemptResult.FAILED);

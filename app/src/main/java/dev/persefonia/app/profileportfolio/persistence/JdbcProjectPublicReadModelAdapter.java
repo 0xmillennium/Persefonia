@@ -116,7 +116,7 @@ public class JdbcProjectPublicReadModelAdapter implements ProjectPublicReadModel
         if (cards.isEmpty()) {
             return List.of();
         }
-        List<UUID> projectIds = cards.stream().map(ProjectCardRow::projectId).toList();
+        List<UUID> projectIds = cards.stream().map(card -> card.projectId()).toList();
         Map<UUID, Set<TagId>> tagIdsByProject = tagIds(projectIds);
         Map<UUID, List<PublicProjectTechnologyView>> technologiesByProject = technologies(projectIds);
         return cards.stream()
@@ -150,9 +150,9 @@ public class JdbcProjectPublicReadModelAdapter implements ProjectPublicReadModel
                 TagId.from(resultSet.getObject("tag_id", UUID.class))))
                 .stream()
                 .collect(Collectors.groupingBy(
-                        ProjectTagRow::projectId,
+                        row -> row.projectId(),
                         Collectors.mapping(
-                                ProjectTagRow::tagId,
+                                row -> row.tagId(),
                                 Collectors.toCollection(LinkedHashSet::new))));
     }
 
@@ -181,8 +181,8 @@ public class JdbcProjectPublicReadModelAdapter implements ProjectPublicReadModel
                         resultSet.getString("category"))))
                 .stream()
                 .collect(Collectors.groupingBy(
-                        ProjectTechnologyRow::projectId,
-                        Collectors.mapping(ProjectTechnologyRow::technology, Collectors.toList())));
+                        row -> row.projectId(),
+                        Collectors.mapping(row -> row.technology(), Collectors.toList())));
     }
 
     private List<PublicProjectLinkView> links(UUID projectId) {

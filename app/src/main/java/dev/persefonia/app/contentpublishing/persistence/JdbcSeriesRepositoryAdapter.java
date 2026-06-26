@@ -154,7 +154,7 @@ public class JdbcSeriesRepositoryAdapter implements SeriesRepository {
                 .addValue("language", series.language().name())
                 .addValue("slug", series.slug().value())
                 .addValue("title", series.title().value())
-                .addValue("description", series.description().map(SeriesDescription::value).orElse(null))
+                .addValue("description", series.description().map(description -> description.value()).orElse(null))
                 .addValue("status", series.status().name())
                 .addValue("createdAt", Timestamp.from(series.createdAt()))
                 .addValue("updatedAt", Timestamp.from(series.updatedAt()))

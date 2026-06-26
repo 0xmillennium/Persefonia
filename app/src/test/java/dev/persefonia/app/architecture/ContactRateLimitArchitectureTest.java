@@ -59,7 +59,7 @@ class ContactRateLimitArchitectureTest {
                         .filter(Files::isRegularFile)
                         .filter(path -> path.toString().endsWith(".java"))
                         .map(ContactRateLimitArchitectureTest::read)
-                        .reduce("", String::concat));
+                        .reduce("", (left, right) -> left.concat(right)));
             }
         }
         return joined.toString();

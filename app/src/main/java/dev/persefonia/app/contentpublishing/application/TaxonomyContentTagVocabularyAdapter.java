@@ -50,7 +50,7 @@ final class TaxonomyContentTagVocabularyAdapter implements ContentTagVocabularyP
 
         Set<ReferencedTagId> newlyArchived = found.entrySet().stream()
                 .filter(entry -> entry.getValue().status() == TagStatus.ARCHIVED)
-                .map(Map.Entry::getKey)
+                .map(entry -> entry.getKey())
                 .filter(id -> !currentlyAssigned.contains(id))
                 .collect(Collectors.toCollection(LinkedHashSet::new));
         return new TagAssignmentValidation(missing, newlyArchived);

@@ -27,7 +27,7 @@ class PostgresRedirectRuleRepositoryTest extends DiscoveryRepositoryTestDatabase
         assertThat(redirects.findActiveBySourceUrl(manual.sourceUrl())).hasValueSatisfying(
                 actual -> assertThat(actual).usingRecursiveComparison().isEqualTo(manual));
         assertThat(redirects.findBySourceRef(DiscoveryRepositoryFixtures.SOURCE_REF))
-                .extracting(RedirectRule::id)
+                .extracting(rule -> rule.id())
                 .containsExactlyInAnyOrder(manual.id(), slugChanged.id());
     }
 
@@ -59,13 +59,13 @@ class PostgresRedirectRuleRepositoryTest extends DiscoveryRepositoryTestDatabase
                 "same-a", true, DiscoveryRepositoryFixtures.NOW.plusSeconds(20)));
 
         assertThat(redirects.list(RedirectRuleStatusFilter.ACTIVE, 100))
-                .extracting(RedirectRule::id)
+                .extracting(rule -> rule.id())
                 .containsExactly(sameTimeA.id(), sameTimeB.id(), olderActive.id());
         assertThat(redirects.list(RedirectRuleStatusFilter.INACTIVE, 100))
-                .extracting(RedirectRule::id)
+                .extracting(rule -> rule.id())
                 .containsExactly(newestInactive.id());
         assertThat(redirects.list(RedirectRuleStatusFilter.ALL, 2))
-                .extracting(RedirectRule::id)
+                .extracting(rule -> rule.id())
                 .containsExactly(sameTimeA.id(), sameTimeB.id());
     }
 

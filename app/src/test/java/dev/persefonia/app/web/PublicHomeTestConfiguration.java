@@ -116,7 +116,7 @@ class PublicHomeTestConfiguration {
 
         @Override
         public Optional<PersonalProfile> findActiveProfile() {
-            return Optional.ofNullable(current).filter(PersonalProfile::active);
+            return Optional.ofNullable(current).filter(profile -> profile.active());
         }
     }
 }

@@ -91,7 +91,7 @@ class ContactMessageArchitectureTest {
                 .matcher(source)
                 .results()
                 .map(match -> match.group(1))
-                .reduce("", String::concat);
+                .reduce("", (left, right) -> left.concat(right));
     }
 
     private static String joinedSources(Path root) throws IOException {
@@ -103,7 +103,7 @@ class ContactMessageArchitectureTest {
                     .filter(Files::isRegularFile)
                     .filter(path -> path.toString().endsWith(".java") || path.toString().endsWith(".sql"))
                     .map(ContactMessageArchitectureTest::read)
-                    .reduce("", String::concat);
+                    .reduce("", (left, right) -> left.concat(right));
         }
     }
 

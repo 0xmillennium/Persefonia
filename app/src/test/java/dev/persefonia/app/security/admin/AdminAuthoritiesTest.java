@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.Set;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.security.core.GrantedAuthority;
 
 import dev.persefonia.identityaccess.domain.admin.AdminAccountStatus;
 import dev.persefonia.identityaccess.domain.admin.AdminRole;
@@ -38,7 +37,7 @@ class AdminAuthoritiesTest {
         return AdminAuthorities.from(AdminPrincipalTest.principal(
                         AdminPrincipalTest.id(), roles, AdminAccountStatus.ACTIVE))
                 .stream()
-                .map(GrantedAuthority::getAuthority)
+                .map(authority -> authority.getAuthority())
                 .collect(java.util.stream.Collectors.toCollection(java.util.LinkedHashSet::new));
     }
 }

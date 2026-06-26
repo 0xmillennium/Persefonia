@@ -53,7 +53,7 @@ class JdbcProjectRepositoryAdapterTest extends PortfolioRepositoryTestDatabase {
         assertThat(reloaded.links()).hasSize(1);
         assertThat(reloaded.tagIds()).containsExactly(tagId);
         assertThat(reloaded.coverAssetId()).contains(assetId);
-        assertThat(projects.findBySlug(ProjectSlug.of("sample-project"), ContentLanguage.TR)).map(Project::id).contains(saved.id());
+        assertThat(projects.findBySlug(ProjectSlug.of("sample-project"), ContentLanguage.TR)).map(project -> project.id()).contains(saved.id());
         assertThat(projects.existsSlug(ProjectSlug.of("sample-project"), ContentLanguage.TR)).isTrue();
         assertThat(projects.existsSlug(ProjectSlug.of("missing-project"), ContentLanguage.TR)).isFalse();
     }
@@ -81,9 +81,9 @@ class JdbcProjectRepositoryAdapterTest extends PortfolioRepositoryTestDatabase {
         Project reloaded = projects.findById(projectId).orElseThrow();
 
         assertThat(reloaded.featured()).isTrue();
-        assertThat(reloaded.localizations()).extracting(ProjectLocalization::language).containsExactly(ContentLanguage.EN);
+        assertThat(reloaded.localizations()).extracting(localization -> localization.language()).containsExactly(ContentLanguage.EN);
         assertThat(projects.findBySlug(ProjectSlug.of("english-featured"), ContentLanguage.EN))
-                .map(Project::id)
+                .map(project -> project.id())
                 .contains(projectId);
     }
 

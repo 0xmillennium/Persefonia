@@ -3,7 +3,6 @@ package dev.persefonia.app.security.admin;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.lang.reflect.Constructor;
 import java.util.Set;
 
 import org.junit.jupiter.api.Test;
@@ -73,7 +72,7 @@ class PersefoniaAdminCommandActorResolverTest {
     void doesNotCallRepositoryOrBootstrapService() {
         assertThat(PersefoniaAdminCommandActorResolver.class.getDeclaredFields()).isEmpty();
         assertThat(Set.of(PersefoniaAdminCommandActorResolver.class.getDeclaredConstructors()))
-                .extracting(Constructor::getParameterCount)
+                .extracting(constructor -> constructor.getParameterCount())
                 .containsExactly(0);
     }
 }
