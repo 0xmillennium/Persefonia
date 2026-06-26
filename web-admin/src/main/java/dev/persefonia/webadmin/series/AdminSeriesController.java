@@ -306,7 +306,7 @@ public final class AdminSeriesController {
         }
         return java.util.stream.IntStream.range(0, entryIds.size())
                 .mapToObj(index -> new EntryOrder(entryIds.get(index), positions.get(index)))
-                .sorted(Comparator.comparingInt(EntryOrder::position))
+                .sorted(Comparator.comparingInt((EntryOrder entry) -> entry.position()))
                 .map(entry -> parseEntryId(entry.entryId()))
                 .toList();
     }

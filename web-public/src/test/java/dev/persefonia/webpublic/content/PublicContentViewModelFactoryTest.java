@@ -175,7 +175,7 @@ class PublicContentViewModelFactoryTest {
             assertThat(link.publicUrl()).isEqualTo("/en/articles/public-title");
         });
         assertThat(page.hreflangLinks())
-                .extracting(PublicContentHreflangLinkView::languageCode)
+                .extracting(link -> link.languageCode())
                 .containsExactly("tr", "en");
     }
 

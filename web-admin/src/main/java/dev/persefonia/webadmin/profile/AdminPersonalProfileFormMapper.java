@@ -147,14 +147,14 @@ public final class AdminPersonalProfileFormMapper {
 
     private static String joinExternalLinks(List<AdminExternalProfileLinkView> links) {
         return links.stream()
-                .sorted(Comparator.comparing(AdminExternalProfileLinkView::sortOrder))
+                .sorted(Comparator.comparing((AdminExternalProfileLinkView link) -> link.sortOrder()))
                 .map(link -> link.label() + " | " + link.url())
                 .collect(java.util.stream.Collectors.joining("\n"));
     }
 
     private static String joinFocusAreas(List<AdminTechnicalFocusAreaView> areas) {
         return areas.stream()
-                .sorted(Comparator.comparing(AdminTechnicalFocusAreaView::sortOrder))
+                .sorted(Comparator.comparing((AdminTechnicalFocusAreaView area) -> area.sortOrder()))
                 .map(area -> area.description() == null || area.description().isBlank()
                         ? area.name()
                         : area.name() + " | " + area.description())
@@ -163,7 +163,7 @@ public final class AdminPersonalProfileFormMapper {
 
     private static String joinEducationSummaries(List<AdminEducationSummaryView> summaries) {
         return summaries.stream()
-                .sorted(Comparator.comparing(AdminEducationSummaryView::sortOrder))
+                .sorted(Comparator.comparing((AdminEducationSummaryView summary) -> summary.sortOrder()))
                 .map(summary -> summary.description() == null || summary.description().isBlank()
                         ? summary.institution() + " | " + summary.program()
                         : summary.institution() + " | " + summary.program() + " | " + summary.description())
@@ -172,8 +172,8 @@ public final class AdminPersonalProfileFormMapper {
 
     private static String joinFocusItems(List<AdminCurrentFocusItemView> items) {
         return items.stream()
-                .sorted(Comparator.comparing(AdminCurrentFocusItemView::sortOrder))
-                .map(AdminCurrentFocusItemView::text)
+                .sorted(Comparator.comparing((AdminCurrentFocusItemView item) -> item.sortOrder()))
+                .map(item -> item.text())
                 .collect(java.util.stream.Collectors.joining("\n"));
     }
 

@@ -134,7 +134,7 @@ public final class AdminPersonalProfileFormValidator {
             return List.of();
         }
         return value.lines()
-                .map(String::trim)
+                .map(line -> line.trim())
                 .filter(line -> !line.isBlank())
                 .toList();
     }

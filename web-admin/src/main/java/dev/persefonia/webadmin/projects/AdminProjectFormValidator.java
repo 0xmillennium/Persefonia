@@ -139,7 +139,7 @@ public final class AdminProjectFormValidator {
     private static List<String> nonBlankLines(String value) {
         return value == null || value.isBlank()
                 ? List.of()
-                : value.lines().map(String::trim).filter(line -> !line.isBlank()).toList();
+                : value.lines().map(line -> line.trim()).filter(line -> !line.isBlank()).toList();
     }
 
     private static String[] split(String line, int expectedParts) {
