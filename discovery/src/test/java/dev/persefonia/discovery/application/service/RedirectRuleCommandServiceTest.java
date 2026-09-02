@@ -11,6 +11,7 @@ import dev.persefonia.discovery.application.contract.SourceEntityId;
 import dev.persefonia.discovery.application.contract.SourceType;
 import dev.persefonia.discovery.application.redirect.CreateRedirectRuleCommand;
 import dev.persefonia.discovery.application.redirect.RedirectRuleCreationResult;
+import dev.persefonia.discovery.application.redirect.RedirectRuleChangeSummary;
 import dev.persefonia.discovery.application.redirect.RedirectRuleStatusFilter;
 import dev.persefonia.discovery.domain.RedirectRule;
 import dev.persefonia.discovery.domain.RedirectRuleId;
@@ -41,6 +42,8 @@ class RedirectRuleCommandServiceTest {
             assertThat(rule.sourceRef()).isEmpty();
             assertThat(rule.createdAt()).isEqualTo(NOW);
             assertThat(rule.version()).isEqualTo(Version.initial());
+            assertThat(((RedirectRuleCreationResult.Created) result).redirect())
+                    .isEqualTo(summary(rule));
         });
     }
 
@@ -66,6 +69,8 @@ class RedirectRuleCommandServiceTest {
         RedirectRuleCreationResult result = service(repository).create(manual("/old", "/new"));
 
         assertThat(result).isInstanceOf(RedirectRuleCreationResult.Noop.class);
+        assertThat(((RedirectRuleCreationResult.Noop) result).existingRedirect())
+                .isEqualTo(summary(repository.active.getFirst()));
         assertThat(repository.saved).isEmpty();
     }
 
@@ -160,6 +165,11 @@ class RedirectRuleCommandServiceTest {
                 SourceContext.CONTENT_PUBLISHING,
                 SourceType.CONTENT_ITEM,
                 new SourceEntityId(UUID.fromString("5b91a38c-bddc-439b-b89a-5c42231b62ad")));
+    }
+
+    private static RedirectRuleChangeSummary summary(RedirectRule rule) {
+        return new RedirectRuleChangeSummary(
+                rule.id(), rule.sourceUrl(), rule.targetUrl(), rule.statusCode(), rule.reason());
     }
 
     private static final class InMemoryRedirectRuleRepository implements RedirectRuleRepository {

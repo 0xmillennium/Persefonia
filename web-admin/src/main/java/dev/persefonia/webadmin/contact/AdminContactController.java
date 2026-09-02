@@ -1,7 +1,7 @@
 package dev.persefonia.webadmin.contact;
 
+import dev.persefonia.communication.application.command.ContactMessageStatusCommandGateway;
 import dev.persefonia.communication.application.command.UpdateContactMessageStatusCommand;
-import dev.persefonia.communication.application.command.UpdateContactMessageStatusCommandService;
 import dev.persefonia.communication.application.command.UpdateContactMessageStatusResult;
 import dev.persefonia.communication.application.query.ContactMessageAdminDetail;
 import dev.persefonia.communication.application.query.ContactMessageAdminListRequest;
@@ -36,14 +36,14 @@ public final class AdminContactController {
             ContactMessageStatus.ARCHIVED.name());
 
     private final ContactMessageAdminQueryService queries;
-    private final UpdateContactMessageStatusCommandService commands;
+    private final ContactMessageStatusCommandGateway commands;
     private final ContactMessageAdminActorResolver actors;
     private final AdminContactPageChromeFactory chrome;
     private final Clock clock;
 
     public AdminContactController(
             ContactMessageAdminQueryService queries,
-            UpdateContactMessageStatusCommandService commands,
+            ContactMessageStatusCommandGateway commands,
             ContactMessageAdminActorResolver actors,
             AdminContactPageChromeFactory chrome,
             Clock clock) {
@@ -111,11 +111,11 @@ public final class AdminContactController {
     private String update(Authentication authentication, String rawMessageId, ContactMessageStatus status) {
         ContactMessageId messageId = parse(rawMessageId);
         Instant changedAt = clock.instant();
+        var actor = actors.resolve(authentication);
         var result = commands.update(new UpdateContactMessageStatusCommand(
-                actors.resolve(authentication),
+                actor,
                 messageId,
                 status,
-                actors.changedBy(authentication),
                 changedAt));
         if (result instanceof UpdateContactMessageStatusResult.Updated) {
             return "redirect:/admin/contact/" + messageId.value() + "?updated";

@@ -40,7 +40,8 @@ class UpdateContactMessageStatusCommandServiceTest {
 
         UpdateContactMessageStatusResult result = service.update(command(message.id(), ContactMessageStatus.READ));
 
-        assertThat(result).isEqualTo(new UpdateContactMessageStatusResult.Updated(message.id(), ContactMessageStatus.READ));
+        assertThat(result).isEqualTo(new UpdateContactMessageStatusResult.Updated(
+                message.id(), ContactMessageStatus.NEW, ContactMessageStatus.READ));
         assertThat(messages.required(message.id()).status()).isEqualTo(ContactMessageStatus.READ);
     }
 
@@ -135,7 +136,6 @@ class UpdateContactMessageStatusCommandServiceTest {
                 new ContactMessageCommandActor(ADMIN_ID, true, false),
                 message.id(),
                 ContactMessageStatus.READ,
-                AdminAccountId.from(ADMIN_ID),
                 CHANGED_AT)))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("OWNER required");
@@ -163,8 +163,17 @@ class UpdateContactMessageStatusCommandServiceTest {
                 new ContactMessageCommandActor(ADMIN_ID, true, true),
                 id,
                 status,
-                AdminAccountId.from(ADMIN_ID),
                 CHANGED_AT);
+    }
+
+    @Test
+    void unexpectedRepositoryFailurePropagates() {
+        ContactMessage message = savedMessage();
+        messages.failOnFind = true;
+
+        assertThatThrownBy(() -> service.update(command(message.id(), ContactMessageStatus.READ)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("repository unavailable");
     }
 
     private static final class OwnerOnlyPolicy implements ContactMessageCommandAuthorizationPolicy {
@@ -180,6 +189,7 @@ class UpdateContactMessageStatusCommandServiceTest {
         private final Map<ContactMessageId, ContactMessage> messages = new LinkedHashMap<>();
         private int saves;
         private int finds;
+        private boolean failOnFind;
 
         @Override
         public void save(ContactMessage message) {
@@ -190,6 +200,9 @@ class UpdateContactMessageStatusCommandServiceTest {
         @Override
         public Optional<ContactMessage> findById(ContactMessageId id) {
             finds++;
+            if (failOnFind) {
+                throw new IllegalStateException("repository unavailable");
+            }
             return Optional.ofNullable(messages.get(id));
         }
 

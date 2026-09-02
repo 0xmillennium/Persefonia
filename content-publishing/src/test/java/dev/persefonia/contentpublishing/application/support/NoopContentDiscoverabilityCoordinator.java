@@ -7,6 +7,8 @@ import dev.persefonia.contentpublishing.application.discovery.ContentDiscoveryRe
 import dev.persefonia.contentpublishing.application.discovery.ContentPublicRouteFactory;
 import dev.persefonia.discovery.application.projection.DiscoverableResourceProjectionResult;
 import dev.persefonia.discovery.application.redirect.RedirectRuleCreationResult;
+import dev.persefonia.discovery.application.redirect.RedirectRuleChangeSummary;
+import dev.persefonia.discovery.domain.RedirectRuleId;
 
 public final class NoopContentDiscoverabilityCoordinator {
     private NoopContentDiscoverabilityCoordinator() {
@@ -17,7 +19,12 @@ public final class NoopContentDiscoverabilityCoordinator {
         return new ContentDiscoverabilityCoordinator(
                 input -> new DiscoverableResourceProjectionResult.Updated(),
                 command -> new DiscoverableResourceProjectionResult.Noop(),
-                command -> new RedirectRuleCreationResult.Noop(),
+                command -> new RedirectRuleCreationResult.Noop(new RedirectRuleChangeSummary(
+                        RedirectRuleId.random(),
+                        command.sourceUrl(),
+                        command.targetUrl(),
+                        command.statusCode(),
+                        command.reason())),
                 new ContentDiscoveryProjectionFactory(
                         routeFactory,
                         new ConfiguredContentCanonicalUrlFactory("https://example.test")),

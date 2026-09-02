@@ -24,7 +24,7 @@ export default defineConfig({
         "mermaid-loader": "src/mermaid-loader.ts"
       },
       output: {
-        advancedChunks: {
+        codeSplitting: {
           groups: [
             {
               name(id: string) {

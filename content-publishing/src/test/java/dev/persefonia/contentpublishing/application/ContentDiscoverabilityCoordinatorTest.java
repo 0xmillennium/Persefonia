@@ -26,6 +26,8 @@ import dev.persefonia.discovery.application.projection.DiscoverableResourceProje
 import dev.persefonia.discovery.application.projection.RemoveDiscoverableResourceCommand;
 import dev.persefonia.discovery.application.redirect.CreateRedirectRuleCommand;
 import dev.persefonia.discovery.application.redirect.RedirectRuleCreationResult;
+import dev.persefonia.discovery.application.redirect.RedirectRuleChangeSummary;
+import dev.persefonia.discovery.domain.RedirectRuleId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -189,7 +191,13 @@ class ContentDiscoverabilityCoordinatorTest {
         private final List<RemoveDiscoverableResourceCommand> removals = new ArrayList<>();
         private final List<CreateRedirectRuleCommand> redirects = new ArrayList<>();
         private DiscoverableResourceProjectionResult projectionResult = new DiscoverableResourceProjectionResult.Updated();
-        private RedirectRuleCreationResult redirectResult = new RedirectRuleCreationResult.Created();
+        private RedirectRuleCreationResult redirectResult = new RedirectRuleCreationResult.Created(
+                new RedirectRuleChangeSummary(
+                        RedirectRuleId.random(),
+                        new dev.persefonia.discovery.application.contract.PublicUrl("/old"),
+                        new dev.persefonia.discovery.application.contract.PublicUrl("/new"),
+                        dev.persefonia.discovery.application.contract.RedirectStatusCode.MOVED_PERMANENTLY_301,
+                        dev.persefonia.discovery.application.contract.RedirectReason.SLUG_CHANGED));
 
         private DiscoverableResourceProjectionResult update(DiscoverableResourceProjectionInput input) {
             updates.add(input);

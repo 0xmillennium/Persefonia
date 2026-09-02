@@ -53,6 +53,7 @@ class WebLayerArchitectureTest {
                 .and().resideOutsideOfPackage("dev.persefonia.webadmin.media..")
                 .and().resideOutsideOfPackage("dev.persefonia.webadmin.contact..")
                 .and().resideOutsideOfPackage("dev.persefonia.webadmin.analytics..")
+                .and().resideOutsideOfPackage("dev.persefonia.webadmin.discovery..")
                 .should().dependOnClassesThat().resideInAnyPackage(
                         "dev.persefonia.app..",
                         "dev.persefonia.identityaccess..",

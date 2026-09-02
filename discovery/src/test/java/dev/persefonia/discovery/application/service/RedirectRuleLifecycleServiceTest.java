@@ -9,6 +9,7 @@ import dev.persefonia.discovery.application.contract.RedirectStatusCode;
 import dev.persefonia.discovery.application.redirect.DeactivateRedirectRuleCommand;
 import dev.persefonia.discovery.application.redirect.DeactivateRedirectRuleResult;
 import dev.persefonia.discovery.application.redirect.RedirectRuleStatusFilter;
+import dev.persefonia.discovery.application.redirect.RedirectRuleChangeSummary;
 import dev.persefonia.discovery.domain.RedirectRule;
 import dev.persefonia.discovery.domain.RedirectRuleId;
 import dev.persefonia.discovery.domain.RedirectRuleRepository;
@@ -35,6 +36,8 @@ class RedirectRuleLifecycleServiceTest {
         var result = service(repository).deactivate(new DeactivateRedirectRuleCommand(active.id()));
 
         assertThat(result).isInstanceOf(DeactivateRedirectRuleResult.Deactivated.class);
+        assertThat(((DeactivateRedirectRuleResult.Deactivated) result).redirect())
+                .isEqualTo(summary(repository.findById(active.id()).orElseThrow()));
         assertThat(repository.findById(active.id())).hasValueSatisfying(deactivated -> {
             assertThat(deactivated.active()).isFalse();
             assertThat(deactivated.updatedAt()).isEqualTo(UPDATED_AT);
@@ -44,10 +47,11 @@ class RedirectRuleLifecycleServiceTest {
 
     @Test
     void missingRuleReturnsNotFound() {
+        RedirectRuleId missingId = RedirectRuleId.random();
         var result = service(new InMemoryRedirectRuleRepository())
-                .deactivate(new DeactivateRedirectRuleCommand(RedirectRuleId.random()));
+                .deactivate(new DeactivateRedirectRuleCommand(missingId));
 
-        assertThat(result).isInstanceOf(DeactivateRedirectRuleResult.NotFound.class);
+        assertThat(result).isEqualTo(new DeactivateRedirectRuleResult.NotFound(missingId));
     }
 
     @Test
@@ -59,6 +63,8 @@ class RedirectRuleLifecycleServiceTest {
         var result = service(repository).deactivate(new DeactivateRedirectRuleCommand(inactive.id()));
 
         assertThat(result).isInstanceOf(DeactivateRedirectRuleResult.AlreadyInactive.class);
+        assertThat(((DeactivateRedirectRuleResult.AlreadyInactive) result).redirect())
+                .isEqualTo(summary(inactive));
         assertThat(repository.deactivateCalls).isZero();
     }
 
@@ -84,6 +90,11 @@ class RedirectRuleLifecycleServiceTest {
                 NOW,
                 NOW,
                 Version.initial());
+    }
+
+    private static RedirectRuleChangeSummary summary(RedirectRule rule) {
+        return new RedirectRuleChangeSummary(
+                rule.id(), rule.sourceUrl(), rule.targetUrl(), rule.statusCode(), rule.reason());
     }
 
     private static final class InMemoryRedirectRuleRepository implements RedirectRuleRepository {

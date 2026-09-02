@@ -7,10 +7,16 @@ public sealed interface RedirectRuleCreationResult
                 RedirectRuleCreationResult.Noop,
                 RedirectRuleCreationResult.Rejected {
 
-    record Created() implements RedirectRuleCreationResult {
+    record Created(RedirectRuleChangeSummary redirect) implements RedirectRuleCreationResult {
+        public Created {
+            Objects.requireNonNull(redirect, "redirect");
+        }
     }
 
-    record Noop() implements RedirectRuleCreationResult {
+    record Noop(RedirectRuleChangeSummary existingRedirect) implements RedirectRuleCreationResult {
+        public Noop {
+            Objects.requireNonNull(existingRedirect, "existingRedirect");
+        }
     }
 
     record Rejected(Reason reason) implements RedirectRuleCreationResult {

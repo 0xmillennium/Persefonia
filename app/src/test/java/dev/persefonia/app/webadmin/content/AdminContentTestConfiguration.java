@@ -8,6 +8,8 @@ import dev.persefonia.discovery.application.port.RemoveDiscoverableResourcePort;
 import dev.persefonia.discovery.application.port.UpdateDiscoverableResourcePort;
 import dev.persefonia.discovery.application.projection.DiscoverableResourceProjectionResult;
 import dev.persefonia.discovery.application.redirect.RedirectRuleCreationResult;
+import dev.persefonia.discovery.application.redirect.RedirectRuleChangeSummary;
+import dev.persefonia.discovery.domain.RedirectRuleId;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
@@ -68,6 +70,11 @@ class AdminContentTestConfiguration {
     @Bean
     @Primary
     CreateRedirectRulePort adminContentTestCreateRedirectRulePort() {
-        return command -> new RedirectRuleCreationResult.Created();
+        return command -> new RedirectRuleCreationResult.Created(new RedirectRuleChangeSummary(
+                RedirectRuleId.random(),
+                command.sourceUrl(),
+                command.targetUrl(),
+                command.statusCode(),
+                command.reason()));
     }
 }

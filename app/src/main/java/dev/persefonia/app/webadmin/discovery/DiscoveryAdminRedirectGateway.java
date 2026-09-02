@@ -1,17 +1,16 @@
 package dev.persefonia.app.webadmin.discovery;
 
+import dev.persefonia.discovery.application.authorization.AdminRedirectCommandActor;
 import dev.persefonia.discovery.application.contract.PublicUrl;
-import dev.persefonia.discovery.application.contract.RedirectReason;
 import dev.persefonia.discovery.application.contract.RedirectStatusCode;
-import dev.persefonia.discovery.application.port.CreateRedirectRulePort;
-import dev.persefonia.discovery.application.port.DeactivateRedirectRulePort;
 import dev.persefonia.discovery.application.port.ListRedirectRulesPort;
-import dev.persefonia.discovery.application.redirect.CreateRedirectRuleCommand;
-import dev.persefonia.discovery.application.redirect.DeactivateRedirectRuleCommand;
+import dev.persefonia.discovery.application.redirect.CreateManualRedirectCommand;
+import dev.persefonia.discovery.application.redirect.DeactivateManualRedirectCommand;
 import dev.persefonia.discovery.application.redirect.DeactivateRedirectRuleResult;
 import dev.persefonia.discovery.application.redirect.RedirectRuleCreationResult;
 import dev.persefonia.discovery.application.redirect.RedirectRuleListQuery;
 import dev.persefonia.discovery.application.redirect.RedirectRuleSummary;
+import dev.persefonia.discovery.application.service.AdminRedirectCommandGateway;
 import dev.persefonia.discovery.domain.RedirectRuleId;
 import dev.persefonia.webadmin.discovery.AdminRedirectCreateResult;
 import dev.persefonia.webadmin.discovery.AdminRedirectDeactivateResult;
@@ -28,19 +27,14 @@ import org.springframework.stereotype.Component;
 
 @Component
 public final class DiscoveryAdminRedirectGateway implements AdminRedirectGateway {
-    private static final String SAFE_CREATE_ERROR = "The redirect could not be created.";
-
     private final ListRedirectRulesPort lists;
-    private final CreateRedirectRulePort creates;
-    private final DeactivateRedirectRulePort deactivates;
+    private final AdminRedirectCommandGateway commands;
 
     public DiscoveryAdminRedirectGateway(
             ListRedirectRulesPort lists,
-            CreateRedirectRulePort creates,
-            DeactivateRedirectRulePort deactivates) {
+            AdminRedirectCommandGateway commands) {
         this.lists = Objects.requireNonNull(lists, "lists");
-        this.creates = Objects.requireNonNull(creates, "creates");
-        this.deactivates = Objects.requireNonNull(deactivates, "deactivates");
+        this.commands = Objects.requireNonNull(commands, "commands");
     }
 
     @Override
@@ -51,41 +45,33 @@ public final class DiscoveryAdminRedirectGateway implements AdminRedirectGateway
     }
 
     @Override
-    public AdminRedirectCreateResult create(AdminRedirectForm form) {
+    public AdminRedirectCreateResult create(AdminRedirectCommandActor actor, AdminRedirectForm form) {
         AdminRedirectCreateMapping mapping = map(form);
         if (mapping instanceof AdminRedirectCreateMapping.Rejected rejected) {
             return new AdminRedirectCreateResult.Rejected(rejected.fieldErrors(), List.of());
         }
 
-        try {
-            var result = creates.create(((AdminRedirectCreateMapping.Mapped) mapping).command());
-            return switch (result) {
-                case RedirectRuleCreationResult.Created ignored -> new AdminRedirectCreateResult.Created();
-                case RedirectRuleCreationResult.Noop ignored -> new AdminRedirectCreateResult.Noop();
-                case RedirectRuleCreationResult.Rejected rejected -> new AdminRedirectCreateResult.Rejected(
-                        List.of(rejectedCreateError(rejected.reason())),
-                        List.of());
-            };
-        } catch (RuntimeException exception) {
-            return new AdminRedirectCreateResult.Rejected(List.of(), List.of(SAFE_CREATE_ERROR));
-        }
+        var result = commands.create(((AdminRedirectCreateMapping.Mapped) mapping).command(actor));
+        return switch (result) {
+            case RedirectRuleCreationResult.Created ignored -> new AdminRedirectCreateResult.Created();
+            case RedirectRuleCreationResult.Noop ignored -> new AdminRedirectCreateResult.Noop();
+            case RedirectRuleCreationResult.Rejected rejected -> new AdminRedirectCreateResult.Rejected(
+                    List.of(rejectedCreateError(rejected.reason())),
+                    List.of());
+        };
     }
 
     @Override
-    public AdminRedirectDeactivateResult deactivate(String redirectRuleId) {
+    public AdminRedirectDeactivateResult deactivate(AdminRedirectCommandActor actor, String redirectRuleId) {
         RedirectRuleId id = parseRedirectRuleId(redirectRuleId);
         if (id == null) {
             return AdminRedirectDeactivateResult.NOT_FOUND;
         }
-        try {
-            return switch (deactivates.deactivate(new DeactivateRedirectRuleCommand(id))) {
-                case DeactivateRedirectRuleResult.Deactivated ignored -> AdminRedirectDeactivateResult.DEACTIVATED;
-                case DeactivateRedirectRuleResult.AlreadyInactive ignored -> AdminRedirectDeactivateResult.ALREADY_INACTIVE;
-                case DeactivateRedirectRuleResult.NotFound ignored -> AdminRedirectDeactivateResult.NOT_FOUND;
-            };
-        } catch (RuntimeException exception) {
-            return AdminRedirectDeactivateResult.FAILED;
-        }
+        return switch (commands.deactivate(new DeactivateManualRedirectCommand(actor, id))) {
+            case DeactivateRedirectRuleResult.Deactivated ignored -> AdminRedirectDeactivateResult.DEACTIVATED;
+            case DeactivateRedirectRuleResult.AlreadyInactive ignored -> AdminRedirectDeactivateResult.ALREADY_INACTIVE;
+            case DeactivateRedirectRuleResult.NotFound ignored -> AdminRedirectDeactivateResult.NOT_FOUND;
+        };
     }
 
     private static AdminRedirectCreateMapping map(AdminRedirectForm form) {
@@ -101,14 +87,7 @@ public final class DiscoveryAdminRedirectGateway implements AdminRedirectGateway
             return new AdminRedirectCreateMapping.Rejected(errors);
         }
 
-        return new AdminRedirectCreateMapping.Mapped(new CreateRedirectRuleCommand(
-                sourceUrl,
-                targetUrl,
-                statusCode,
-                RedirectReason.MANUAL,
-                null,
-                null,
-                null));
+        return new AdminRedirectCreateMapping.Mapped(sourceUrl, targetUrl, statusCode);
     }
 
     private static PublicUrl publicUrl(
@@ -184,7 +163,13 @@ public final class DiscoveryAdminRedirectGateway implements AdminRedirectGateway
             permits AdminRedirectCreateMapping.Mapped,
                     AdminRedirectCreateMapping.Rejected {
 
-        record Mapped(CreateRedirectRuleCommand command) implements AdminRedirectCreateMapping {
+        record Mapped(
+                PublicUrl sourceUrl,
+                PublicUrl targetUrl,
+                RedirectStatusCode statusCode) implements AdminRedirectCreateMapping {
+            private CreateManualRedirectCommand command(AdminRedirectCommandActor actor) {
+                return new CreateManualRedirectCommand(actor, sourceUrl, targetUrl, statusCode);
+            }
         }
 
         record Rejected(List<AdminRedirectFieldError> fieldErrors) implements AdminRedirectCreateMapping {

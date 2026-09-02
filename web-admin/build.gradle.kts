@@ -10,6 +10,7 @@ dependencies {
     implementation(project(":profile-portfolio"))
     implementation(project(":media-library"))
     implementation(project(":communication"))
+    implementation(project(":discovery"))
     implementation(project(":insights"))
     implementation(libs.spring.webmvc)
     implementation(libs.spring.security.core)

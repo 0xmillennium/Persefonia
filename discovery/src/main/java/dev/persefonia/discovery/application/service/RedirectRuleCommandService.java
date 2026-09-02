@@ -2,6 +2,7 @@ package dev.persefonia.discovery.application.service;
 
 import dev.persefonia.discovery.application.port.CreateRedirectRulePort;
 import dev.persefonia.discovery.application.redirect.CreateRedirectRuleCommand;
+import dev.persefonia.discovery.application.redirect.RedirectRuleChangeSummary;
 import dev.persefonia.discovery.application.redirect.RedirectRuleCreationResult;
 import dev.persefonia.discovery.domain.RedirectRule;
 import dev.persefonia.discovery.domain.RedirectRuleId;
@@ -44,7 +45,7 @@ public final class RedirectRuleCommandService implements CreateRedirectRulePort 
         var existing = repository.findActiveBySourceUrl(command.sourceUrl());
         if (existing.isPresent()) {
             return identical(existing.get(), rule)
-                    ? new RedirectRuleCreationResult.Noop()
+                    ? new RedirectRuleCreationResult.Noop(summary(existing.get()))
                     : new RedirectRuleCreationResult.Rejected(
                             RedirectRuleCreationResult.Reason.DUPLICATE_ACTIVE_SOURCE);
         }
@@ -56,8 +57,8 @@ public final class RedirectRuleCommandService implements CreateRedirectRulePort 
             return new RedirectRuleCreationResult.Rejected(RedirectRuleCreationResult.Reason.LOOP_DETECTED);
         }
 
-        repository.save(rule);
-        return new RedirectRuleCreationResult.Created();
+        RedirectRule saved = repository.save(rule);
+        return new RedirectRuleCreationResult.Created(summary(saved));
     }
 
     private static SourceEntityRef sourceRef(CreateRedirectRuleCommand command) {
@@ -72,5 +73,10 @@ public final class RedirectRuleCommandService implements CreateRedirectRulePort 
                 && existing.statusCode() == candidate.statusCode()
                 && existing.reason() == candidate.reason()
                 && existing.sourceRef().equals(candidate.sourceRef());
+    }
+
+    private static RedirectRuleChangeSummary summary(RedirectRule rule) {
+        return new RedirectRuleChangeSummary(
+                rule.id(), rule.sourceUrl(), rule.targetUrl(), rule.statusCode(), rule.reason());
     }
 }

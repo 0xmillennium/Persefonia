@@ -1,5 +1,7 @@
 package dev.persefonia.app.webadmin.contact;
 
+import dev.persefonia.communication.application.command.ContactMessageStatusCommandGateway;
+import dev.persefonia.communication.application.command.UpdateContactMessageStatusCommandService;
 import dev.persefonia.communication.application.port.ContactMessageRepository;
 import dev.persefonia.communication.application.query.ContactMessageAdminDetail;
 import dev.persefonia.communication.application.query.ContactMessageAdminListItem;
@@ -50,6 +52,13 @@ class AdminContactTestConfiguration {
     @Primary
     Clock adminContactClock() {
         return Clock.fixed(NOW.plusSeconds(300), ZoneOffset.UTC);
+    }
+
+    @Bean
+    @Primary
+    ContactMessageStatusCommandGateway adminContactStatusCommandGateway(
+            UpdateContactMessageStatusCommandService service) {
+        return service::update;
     }
 
     static ContactMessage message() {

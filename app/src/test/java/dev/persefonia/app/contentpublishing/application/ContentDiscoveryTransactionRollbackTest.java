@@ -31,6 +31,8 @@ import dev.persefonia.discovery.application.port.CreateRedirectRulePort;
 import dev.persefonia.discovery.application.port.UpdateDiscoverableResourcePort;
 import dev.persefonia.discovery.application.projection.DiscoverableResourceProjectionResult;
 import dev.persefonia.discovery.application.redirect.RedirectRuleCreationResult;
+import dev.persefonia.discovery.application.redirect.RedirectRuleChangeSummary;
+import dev.persefonia.discovery.domain.RedirectRuleId;
 import java.time.Instant;
 import java.util.List;
 import org.flywaydb.core.Flyway;
@@ -179,7 +181,12 @@ class ContentDiscoveryTransactionRollbackTest {
             return command -> scenario.rejectRedirect
                     ? new RedirectRuleCreationResult.Rejected(
                             RedirectRuleCreationResult.Reason.DUPLICATE_ACTIVE_SOURCE)
-                    : new RedirectRuleCreationResult.Created();
+                    : new RedirectRuleCreationResult.Created(new RedirectRuleChangeSummary(
+                            RedirectRuleId.random(),
+                            command.sourceUrl(),
+                            command.targetUrl(),
+                            command.statusCode(),
+                            command.reason()));
         }
     }
 

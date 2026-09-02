@@ -20,14 +20,17 @@ public final class AdminRedirectController {
 
     private final AdminRedirectGateway redirects;
     private final AdminRedirectAccessPolicy access;
+    private final AdminRedirectActorResolver actors;
     private final AdminRedirectPageChromeFactory chrome;
 
     public AdminRedirectController(
             AdminRedirectGateway redirects,
             AdminRedirectAccessPolicy access,
+            AdminRedirectActorResolver actors,
             AdminRedirectPageChromeFactory chrome) {
         this.redirects = Objects.requireNonNull(redirects, "redirects");
         this.access = Objects.requireNonNull(access, "access");
+        this.actors = Objects.requireNonNull(actors, "actors");
         this.chrome = Objects.requireNonNull(chrome, "chrome");
     }
 
@@ -40,7 +43,6 @@ public final class AdminRedirectController {
             @RequestParam(name = "deactivated", required = false) String deactivated,
             @RequestParam(name = "alreadyInactive", required = false) String alreadyInactive,
             @RequestParam(name = "notFound", required = false) String notFound,
-            @RequestParam(name = "failed", required = false) String failed,
             Model model) {
         access.requireOwner(authentication, LIST_COMMAND);
         model.addAttribute("page", page(
@@ -49,7 +51,7 @@ public final class AdminRedirectController {
                 new AdminRedirectForm(),
                 List.of(),
                 List.of(),
-                successMessage(created, noop, deactivated, alreadyInactive, notFound, failed)));
+                successMessage(created, noop, deactivated, alreadyInactive, notFound)));
         return "admin/discovery/redirects";
     }
 
@@ -60,7 +62,8 @@ public final class AdminRedirectController {
             @ModelAttribute AdminRedirectForm form,
             Model model) {
         access.requireOwner(authentication, CREATE_COMMAND);
-        return switch (redirects.create(form)) {
+        var actor = actors.resolve(authentication);
+        return switch (redirects.create(actor, form)) {
             case AdminRedirectCreateResult.Created ignored -> redirect("created");
             case AdminRedirectCreateResult.Noop ignored -> redirect("noop");
             case AdminRedirectCreateResult.Rejected rejected -> {
@@ -79,11 +82,11 @@ public final class AdminRedirectController {
     @PostMapping("/admin/discovery/redirects/{redirectRuleId}/deactivate")
     public String deactivate(Authentication authentication, @PathVariable("redirectRuleId") String redirectRuleId) {
         access.requireOwner(authentication, DEACTIVATE_COMMAND);
-        return switch (redirects.deactivate(redirectRuleId)) {
+        var actor = actors.resolve(authentication);
+        return switch (redirects.deactivate(actor, redirectRuleId)) {
             case DEACTIVATED -> redirect("deactivated");
             case ALREADY_INACTIVE -> redirect("alreadyInactive");
             case NOT_FOUND -> redirect("notFound");
-            case FAILED -> redirect("failed");
         };
     }
 
@@ -108,8 +111,7 @@ public final class AdminRedirectController {
             String noop,
             String deactivated,
             String alreadyInactive,
-            String notFound,
-            String failed) {
+            String notFound) {
         if (created != null) {
             return "Redirect created.";
         }
@@ -124,9 +126,6 @@ public final class AdminRedirectController {
         }
         if (notFound != null) {
             return "Redirect was not found.";
-        }
-        if (failed != null) {
-            return "Redirect action failed.";
         }
         return null;
     }

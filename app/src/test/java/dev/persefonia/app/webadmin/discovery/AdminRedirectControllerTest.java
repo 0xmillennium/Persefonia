@@ -1,6 +1,7 @@
 package dev.persefonia.app.webadmin.discovery;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -74,10 +75,8 @@ class AdminRedirectControllerTest {
             assertThat(command.sourceUrl().value()).isEqualTo("/tr/articles/old");
             assertThat(command.targetUrl().value()).isEqualTo("/tr/articles/new");
             assertThat(command.statusCode()).isEqualTo(RedirectStatusCode.TEMPORARY_REDIRECT_307);
-            assertThat(command.reason()).isEqualTo(RedirectReason.MANUAL);
-            assertThat(command.sourceContext()).isNull();
-            assertThat(command.sourceType()).isNull();
-            assertThat(command.sourceEntityId()).isNull();
+            assertThat(command.actor().active()).isTrue();
+            assertThat(command.actor().owner()).isTrue();
         });
     }
 
@@ -92,6 +91,8 @@ class AdminRedirectControllerTest {
                 .andExpect(redirectedUrl("/admin/discovery/redirects?deactivated=true"));
 
         assertThat(ports.lastDeactivateCommand().redirectRuleId().value()).isEqualTo(redirectId);
+        assertThat(ports.lastDeactivateCommand().actor().active()).isTrue();
+        assertThat(ports.lastDeactivateCommand().actor().owner()).isTrue();
     }
 
     @Test
@@ -154,6 +155,33 @@ class AdminRedirectControllerTest {
         postValidCreate()
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("direct loop")));
+    }
+
+    @Test
+    void unexpectedGatewayFailuresPropagateWithoutFailedRedirectOrBusinessResult() {
+        IllegalStateException createFailure = new IllegalStateException("private create failure");
+        ports.failCreate(createFailure);
+
+        assertThatThrownBy(this::postValidCreate)
+                .hasCause(createFailure);
+
+        IllegalStateException deactivateFailure = new IllegalStateException("private deactivate failure");
+        ports.failDeactivate(deactivateFailure);
+        assertThatThrownBy(() -> mockMvc.perform(post(
+                                "/admin/discovery/redirects/22222222-2222-2222-2222-222222222222/deactivate")
+                        .with(authentication(AdminAuthenticationTestSupport.authentication(AdminRole.OWNER)))
+                        .with(csrf())))
+                .hasCause(deactivateFailure);
+    }
+
+    @Test
+    void obsoleteFailedQueryFlagDoesNotRenderMessageOrRawFailure() throws Exception {
+        mockMvc.perform(get("/admin/discovery/redirects")
+                        .param("failed", "true")
+                        .with(authentication(AdminAuthenticationTestSupport.authentication(AdminRole.OWNER))))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.not(containsString("Redirect action failed."))))
+                .andExpect(content().string(org.hamcrest.Matchers.not(containsString("private failure"))));
     }
 
     private void expectFormError(

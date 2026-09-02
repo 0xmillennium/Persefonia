@@ -35,12 +35,13 @@ class AdminContactArchitectureTest {
     }
 
     @Test
-    void webAdminContactUsesQueryAndCommandServicesWithoutInfrastructureShortcuts() throws Exception {
+    void webAdminContactUsesQueryServiceAndCommandGatewayWithoutInfrastructureShortcuts() throws Exception {
         String sources = joinedSources(List.of(Path.of("../web-admin/src/main/java/dev/persefonia/webadmin/contact")));
 
         assertThat(sources)
                 .contains("ContactMessageAdminQueryService")
-                .contains("UpdateContactMessageStatusCommandService")
+                .contains("ContactMessageStatusCommandGateway")
+                .doesNotContain("UpdateContactMessageStatusCommandService")
                 .doesNotContain("ContactMessageRepository")
                 .doesNotContain("JdbcTemplate")
                 .doesNotContain("NamedParameterJdbcTemplate")
@@ -51,7 +52,8 @@ class AdminContactArchitectureTest {
                 .doesNotContain("PostCommitTaskExecutor")
                 .doesNotContain("RecordAnalytics")
                 .doesNotContain("AnalyticsCounter")
-                .doesNotContain("Audit");
+                .doesNotContain("Audit")
+                .doesNotContain("@Transactional");
     }
 
     @Test

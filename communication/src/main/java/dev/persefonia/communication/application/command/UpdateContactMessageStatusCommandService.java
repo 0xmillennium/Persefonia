@@ -2,6 +2,7 @@ package dev.persefonia.communication.application.command;
 
 import dev.persefonia.communication.application.authorization.ContactMessageCommandAuthorizationPolicy;
 import dev.persefonia.communication.application.port.ContactMessageRepository;
+import dev.persefonia.communication.domain.contact.AdminAccountId;
 import dev.persefonia.communication.domain.contact.ContactMessageStatus;
 import dev.persefonia.communication.domain.contact.ContactMessageStatusChangeId;
 import dev.persefonia.communication.domain.contact.ContactMessageValidationException;
@@ -37,17 +38,19 @@ public final class UpdateContactMessageStatusCommandService {
 
         return messages.findById(command.messageId())
                 .<UpdateContactMessageStatusResult>map(message -> {
+                    ContactMessageStatus previousStatus = message.status();
                     try {
                         message.changeStatus(
                                 ContactMessageStatusChangeId.newId(),
                                 command.newStatus(),
-                                command.changedBy(),
+                                AdminAccountId.from(command.actor().identityRef()),
                                 command.changedAt());
                     } catch (ContactMessageValidationException exception) {
                         return new UpdateContactMessageStatusResult.Rejected(safeMessage(exception));
                     }
                     messages.save(message);
-                    return new UpdateContactMessageStatusResult.Updated(message.id(), message.status());
+                    return new UpdateContactMessageStatusResult.Updated(
+                            message.id(), previousStatus, message.status());
                 })
                 .orElseGet(() -> new UpdateContactMessageStatusResult.NotFound(command.messageId()));
     }

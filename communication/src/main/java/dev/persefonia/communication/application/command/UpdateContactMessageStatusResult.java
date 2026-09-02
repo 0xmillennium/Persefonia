@@ -8,10 +8,14 @@ public sealed interface UpdateContactMessageStatusResult
         permits UpdateContactMessageStatusResult.Updated,
                 UpdateContactMessageStatusResult.NotFound,
                 UpdateContactMessageStatusResult.Rejected {
-    record Updated(ContactMessageId messageId, ContactMessageStatus status) implements UpdateContactMessageStatusResult {
+    record Updated(
+            ContactMessageId messageId,
+            ContactMessageStatus previousStatus,
+            ContactMessageStatus currentStatus) implements UpdateContactMessageStatusResult {
         public Updated {
             Objects.requireNonNull(messageId, "messageId");
-            Objects.requireNonNull(status, "status");
+            Objects.requireNonNull(previousStatus, "previousStatus");
+            Objects.requireNonNull(currentStatus, "currentStatus");
         }
     }
 

@@ -73,6 +73,43 @@ class RedirectManagementArchitectureTest {
     }
 
     @Test
+    void discoveryApplicationDoesNotImportFrameworkTransactionSecurityOrJdbc() {
+        noClasses()
+                .that().resideInAPackage("dev.persefonia.discovery.application..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "org.springframework.transaction..",
+                        "org.springframework.security..",
+                        "org.springframework.jdbc..",
+                        "java.sql..",
+                        "javax.sql..")
+                .allowEmptyShould(false)
+                .check(ArchitectureTestSupport.PRODUCTION_CLASSES);
+    }
+
+    @Test
+    void redirectWebAdapterUsesAuthorizedGatewayWithoutLowLevelMutationPortsOrBroadCatch() throws IOException {
+        Path source = Path.of(
+                "src/main/java/dev/persefonia/app/webadmin/discovery/DiscoveryAdminRedirectGateway.java");
+        String text = Files.readString(source);
+
+        assertThat(text)
+                .contains("AdminRedirectCommandGateway")
+                .doesNotContain("CreateRedirectRulePort")
+                .doesNotContain("DeactivateRedirectRulePort")
+                .doesNotContain("catch (RuntimeException");
+    }
+
+    @Test
+    void webAdminDoesNotAccessRedirectRepositoriesOrPersistenceAdapters() {
+        noClasses()
+                .that().resideInAPackage("dev.persefonia.webadmin.discovery..")
+                .should().dependOnClassesThat().haveSimpleNameEndingWith("Repository")
+                .orShould().dependOnClassesThat().resideInAPackage("dev.persefonia.app.discovery.persistence..")
+                .allowEmptyShould(false)
+                .check(ArchitectureTestSupport.PRODUCTION_CLASSES);
+    }
+
+    @Test
     void noEventOutboxAnalyticsOrForbiddenPublicRoutesIntroduced() throws IOException {
         try (Stream<Path> sources = Files.walk(Path.of(".."))) {
             List<Path> forbidden = sources

@@ -3,6 +3,8 @@ package dev.persefonia.discovery.application.service;
 import dev.persefonia.discovery.application.port.DeactivateRedirectRulePort;
 import dev.persefonia.discovery.application.redirect.DeactivateRedirectRuleCommand;
 import dev.persefonia.discovery.application.redirect.DeactivateRedirectRuleResult;
+import dev.persefonia.discovery.application.redirect.RedirectRuleChangeSummary;
+import dev.persefonia.discovery.domain.RedirectRule;
 import dev.persefonia.discovery.domain.RedirectRuleRepository;
 import java.time.Clock;
 import java.time.Instant;
@@ -25,13 +27,21 @@ public final class RedirectRuleLifecycleService implements DeactivateRedirectRul
 
         var existing = repository.findById(command.redirectRuleId());
         if (existing.isEmpty()) {
-            return new DeactivateRedirectRuleResult.NotFound();
+            return new DeactivateRedirectRuleResult.NotFound(command.redirectRuleId());
         }
         if (!existing.get().active()) {
-            return new DeactivateRedirectRuleResult.AlreadyInactive();
+            return new DeactivateRedirectRuleResult.AlreadyInactive(summary(existing.get()));
         }
 
-        repository.deactivate(command.redirectRuleId(), Instant.now(clock));
-        return new DeactivateRedirectRuleResult.Deactivated();
+        RedirectRule deactivated = repository.deactivate(command.redirectRuleId(), Instant.now(clock))
+                .filter(rule -> !rule.active())
+                .orElseThrow(() -> new IllegalStateException(
+                        "Redirect rule was not deactivated after a successful pre-read"));
+        return new DeactivateRedirectRuleResult.Deactivated(summary(deactivated));
+    }
+
+    private static RedirectRuleChangeSummary summary(RedirectRule rule) {
+        return new RedirectRuleChangeSummary(
+                rule.id(), rule.sourceUrl(), rule.targetUrl(), rule.statusCode(), rule.reason());
     }
 }

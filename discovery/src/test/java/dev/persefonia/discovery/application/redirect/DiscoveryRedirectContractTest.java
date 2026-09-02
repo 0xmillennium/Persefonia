@@ -93,18 +93,47 @@ class DiscoveryRedirectContractTest {
     }
 
     @Test
-    void redirectResultExposesNoEntityOrAggregate() {
+    void redirectResultExposesOnlySafeChangeSummary() {
         assertThat(RedirectRuleCreationResult.class.getPermittedSubclasses())
                 .containsExactlyInAnyOrder(
                         RedirectRuleCreationResult.Created.class,
                         RedirectRuleCreationResult.Noop.class,
                         RedirectRuleCreationResult.Rejected.class);
-        assertThat(RedirectRuleCreationResult.Created.class.getRecordComponents()).isEmpty();
-        assertThat(RedirectRuleCreationResult.Noop.class.getRecordComponents()).isEmpty();
+        assertThat(RedirectRuleCreationResult.Created.class.getRecordComponents())
+                .singleElement()
+                .extracting(component -> component.getType())
+                .isEqualTo(RedirectRuleChangeSummary.class);
+        assertThat(RedirectRuleCreationResult.Noop.class.getRecordComponents())
+                .singleElement()
+                .extracting(component -> component.getType())
+                .isEqualTo(RedirectRuleChangeSummary.class);
         assertThat(RedirectRuleCreationResult.Rejected.class.getRecordComponents())
                 .singleElement()
                 .extracting(component -> component.getType())
                 .isEqualTo(RedirectRuleCreationResult.Reason.class);
+    }
+
+    @Test
+    void deactivationResultsExposeSafeSummaryOrRequestedId() {
+        assertThat(DeactivateRedirectRuleResult.Deactivated.class.getRecordComponents())
+                .singleElement()
+                .extracting(component -> component.getType())
+                .isEqualTo(RedirectRuleChangeSummary.class);
+        assertThat(DeactivateRedirectRuleResult.AlreadyInactive.class.getRecordComponents())
+                .singleElement()
+                .extracting(component -> component.getType())
+                .isEqualTo(RedirectRuleChangeSummary.class);
+        assertThat(DeactivateRedirectRuleResult.NotFound.class.getRecordComponents())
+                .singleElement()
+                .extracting(component -> component.getType())
+                .isEqualTo(dev.persefonia.discovery.domain.RedirectRuleId.class);
+    }
+
+    @Test
+    void redirectChangeSummaryContainsOnlySafeMutationFacts() {
+        assertThat(RedirectRuleChangeSummary.class.getRecordComponents())
+                .extracting(component -> component.getName())
+                .containsExactly("redirectRuleId", "sourceUrl", "targetUrl", "statusCode", "reason");
     }
 
     private static SourceEntityId sourceEntityId() {
