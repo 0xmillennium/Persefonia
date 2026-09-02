@@ -10,7 +10,6 @@ import dev.persefonia.contentpublishing.application.discovery.ContentPublicRoute
 import dev.persefonia.contentpublishing.application.discovery.SeriesDiscoverabilityCoordinator;
 import dev.persefonia.contentpublishing.application.discovery.SeriesDiscoveryProjectionFactory;
 import dev.persefonia.contentpublishing.application.port.ContentPublishingEventPublisher;
-import dev.persefonia.contentpublishing.application.port.ContentTagAssignmentStore;
 import dev.persefonia.contentpublishing.application.port.ContentTagVocabularyPort;
 import dev.persefonia.contentpublishing.application.port.PublicSeriesEntryReadModel;
 import dev.persefonia.contentpublishing.application.port.PublicTaggedContentReadModel;
@@ -150,10 +149,9 @@ class ContentApplicationConfiguration {
     @Bean
     ContentTagAssignmentService contentTagAssignmentService(
             ContentItemRepository contentItems,
-            ContentTagAssignmentStore assignments,
             ContentTagVocabularyPort vocabulary,
             ContentCommandAuthorizationPolicy authorization) {
-        return new ContentTagAssignmentService(contentItems, assignments, vocabulary, authorization);
+        return new ContentTagAssignmentService(contentItems, vocabulary, authorization);
     }
 
     @Bean

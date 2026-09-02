@@ -122,16 +122,18 @@ class JdbcProjectPublicReadModelAdapterTest extends PortfolioRepositoryTestDatab
     }
 
     @Test
-    void detailIncludesPublicAndUnlistedButRejectsPrivateArchivedLanguageAndSlugMismatch() {
+    void detailIncludesPublicAndUnlistedIncludingArchivedButRejectsPrivateLanguageAndSlugMismatch() {
         Project publicProject = projects.save(project("public-detail", ProjectVisibility.PUBLIC, ProjectStatus.ACTIVE, false, ContentLanguage.TR));
         Project unlistedProject = projects.save(project("unlisted-detail", ProjectVisibility.UNLISTED, ProjectStatus.ACTIVE, false, ContentLanguage.TR));
         Project privateProject = projects.save(project("private-detail", ProjectVisibility.PRIVATE, ProjectStatus.ACTIVE, false, ContentLanguage.TR));
-        Project archivedProject = projects.save(project("archived-detail", ProjectVisibility.PUBLIC, ProjectStatus.ARCHIVED, false, ContentLanguage.TR));
+        Project archivedPublic = projects.save(project("archived-public", ProjectVisibility.PUBLIC, ProjectStatus.ARCHIVED, false, ContentLanguage.TR));
+        Project archivedUnlisted = projects.save(project("archived-unlisted", ProjectVisibility.UNLISTED, ProjectStatus.ARCHIVED, false, ContentLanguage.TR));
 
         assertThat(publicReadModel.findDetail(publicProject.id(), ContentLanguage.TR, ProjectSlug.of("public-detail"))).isPresent();
         assertThat(publicReadModel.findDetail(unlistedProject.id(), ContentLanguage.TR, ProjectSlug.of("unlisted-detail"))).isPresent();
         assertThat(publicReadModel.findDetail(privateProject.id(), ContentLanguage.TR, ProjectSlug.of("private-detail"))).isEmpty();
-        assertThat(publicReadModel.findDetail(archivedProject.id(), ContentLanguage.TR, ProjectSlug.of("archived-detail"))).isEmpty();
+        assertThat(publicReadModel.findDetail(archivedPublic.id(), ContentLanguage.TR, ProjectSlug.of("archived-public"))).isPresent();
+        assertThat(publicReadModel.findDetail(archivedUnlisted.id(), ContentLanguage.TR, ProjectSlug.of("archived-unlisted"))).isPresent();
         assertThat(publicReadModel.findDetail(publicProject.id(), ContentLanguage.EN, ProjectSlug.of("public-detail"))).isEmpty();
         assertThat(publicReadModel.findDetail(publicProject.id(), ContentLanguage.TR, ProjectSlug.of("old-detail"))).isEmpty();
     }

@@ -30,7 +30,7 @@ public final class ProjectDiscoveryProjectionFactory {
 
     public List<DiscoverableResourceProjectionInput> projectionsFor(Project project) {
         Objects.requireNonNull(project, "project");
-        if (project.status() == ProjectStatus.ARCHIVED || project.visibility() == ProjectVisibility.PRIVATE) {
+        if (project.visibility() == ProjectVisibility.PRIVATE) {
             return List.of();
         }
         return project.localizations().stream()
@@ -74,17 +74,19 @@ public final class ProjectDiscoveryProjectionFactory {
     }
 
     private static IndexingPolicy indexingPolicy(Project project) {
-        return project.visibility() == ProjectVisibility.PUBLIC ? IndexingPolicy.INDEX : IndexingPolicy.NO_INDEX;
+        return project.status() != ProjectStatus.ARCHIVED && project.visibility() == ProjectVisibility.PUBLIC
+                ? IndexingPolicy.INDEX
+                : IndexingPolicy.NO_INDEX;
     }
 
     private static DiscoveryEligibility searchEligibility(Project project) {
-        return project.visibility() == ProjectVisibility.PUBLIC
+        return project.status() != ProjectStatus.ARCHIVED && project.visibility() == ProjectVisibility.PUBLIC
                 ? DiscoveryEligibility.ELIGIBLE
                 : DiscoveryEligibility.NOT_ELIGIBLE;
     }
 
     private static DiscoveryEligibility sitemapEligibility(Project project) {
-        return project.visibility() == ProjectVisibility.PUBLIC
+        return project.status() != ProjectStatus.ARCHIVED && project.visibility() == ProjectVisibility.PUBLIC
                 ? DiscoveryEligibility.ELIGIBLE
                 : DiscoveryEligibility.NOT_ELIGIBLE;
     }

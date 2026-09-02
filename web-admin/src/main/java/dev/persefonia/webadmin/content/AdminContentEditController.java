@@ -11,7 +11,7 @@ import dev.persefonia.contentpublishing.application.service.ContentTagAssignment
 import dev.persefonia.contentpublishing.application.service.ContentTagAssignmentService;
 import dev.persefonia.contentpublishing.application.service.TranslationGroupAdminQueryService;
 import dev.persefonia.contentpublishing.domain.content.ContentId;
-import dev.persefonia.contentpublishing.domain.content.ReferencedTagId;
+import dev.persefonia.contentpublishing.domain.content.TagId;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
@@ -145,9 +145,9 @@ public final class AdminContentEditController {
         List<String> submitted = tagIds == null ? List.of() : tagIds;
         Set<String> selected = Set.copyOf(submitted);
         try {
-            List<ReferencedTagId> requested = submitted.stream()
+            List<TagId> requested = submitted.stream()
                     .map(UUID::fromString)
-                    .map(ReferencedTagId::from)
+                    .map(TagId::from)
                     .toList();
             tagAssignmentCommands.assign(new AssignContentTagsCommand(
                     actors.resolve(authentication), id, requested, Instant.now()));

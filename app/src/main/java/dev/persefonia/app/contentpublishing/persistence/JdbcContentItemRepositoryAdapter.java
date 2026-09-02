@@ -21,9 +21,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @Repository
 public class JdbcContentItemRepositoryAdapter implements ContentItemRepository {
-    private static final String TAG_PERSISTENCE_REQUIRES_ASSIGNMENT_STORE =
-            "Content tag assignments must be persisted through ContentTagAssignmentStore.";
-
     private final ObjectProvider<SpringDataContentItemRows> rootRows;
     private final ObjectProvider<NamedParameterJdbcTemplate> jdbc;
     private final ObjectProvider<TransactionTemplate> transactions;
@@ -41,9 +38,6 @@ public class JdbcContentItemRepositoryAdapter implements ContentItemRepository {
     @Override
     public ContentItem save(ContentItem item) {
         Objects.requireNonNull(item, "item");
-        if (!item.tagIds().isEmpty()) {
-            throw new UnsupportedOperationException(TAG_PERSISTENCE_REQUIRES_ASSIGNMENT_STORE);
-        }
         return transactionTemplate().execute(status -> {
             SpringDataContentItemRows rows = rootRows();
             Optional<ContentItemPersistenceEntity> existing = rows.findById(item.id().value());
@@ -52,6 +46,7 @@ public class JdbcContentItemRepositoryAdapter implements ContentItemRepository {
                     .orElse(null);
             ContentItemPersistenceEntity saved = rows.save(mapper.toEntity(item, jdbcVersion));
             replaceRenderSnapshot(saved.id(), item);
+            tags().synchronize(saved.id(), item.tagIds(), item.updatedAt());
             return load(saved).orElseThrow(() -> new ContentPublishingPersistenceException(
                     "Saved content item could not be reloaded: " + saved.id()));
         });
@@ -136,7 +131,7 @@ public class JdbcContentItemRepositoryAdapter implements ContentItemRepository {
         List<ContentItemRenderedHeadingTable.Row> headingRows = snapshot == null
                 ? List.of()
                 : headings.findByContentItemId(entity.id());
-        return Optional.of(mapper.toDomain(entity, snapshot, headingRows));
+        return Optional.of(mapper.toDomain(entity, snapshot, headingRows, tags().findByContentItemId(entity.id())));
     }
 
     private SpringDataContentItemRows rootRows() {
@@ -153,6 +148,10 @@ public class JdbcContentItemRepositoryAdapter implements ContentItemRepository {
 
     private ContentItemRenderedHeadingTable headings() {
         return new ContentItemRenderedHeadingTable(jdbc());
+    }
+
+    private ContentItemTagTable tags() {
+        return new ContentItemTagTable(jdbc());
     }
 
     private NamedParameterJdbcTemplate jdbc() {

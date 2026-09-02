@@ -33,8 +33,9 @@ class AdminContentTestConfiguration {
 
     @Bean
     @Primary
-    AdminContentTagAssignmentTestSupport adminContentTagAssignmentTestSupport() {
-        return new AdminContentTagAssignmentTestSupport();
+    AdminContentTagAssignmentTestSupport adminContentTagAssignmentTestSupport(
+            AdminContentTestRepository contentItems) {
+        return new AdminContentTagAssignmentTestSupport(contentItems);
     }
 
     @Bean

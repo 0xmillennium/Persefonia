@@ -57,6 +57,8 @@ class ContentItemEditingTest {
         tags.clear();
 
         assertThat(item.tagIds()).containsExactly(tagId);
+        assertThat(item.updatedAt()).isEqualTo(ContentItemTestFixtures.EDITED_AT);
+        assertThat(item.version().value()).isEqualTo(1L);
         assertThatThrownBy(() -> item.tagIds().add(TagId.newId()))
                 .isInstanceOf(UnsupportedOperationException.class);
     }
@@ -79,6 +81,8 @@ class ContentItemEditingTest {
         item.archive(ContentItemTestFixtures.EDITED_AT);
 
         assertThatThrownBy(() -> item.changeTitle(Title.of("Nope"), LATER))
+                .isInstanceOf(ContentLifecycleException.class);
+        assertThatThrownBy(() -> item.replaceTags(Set.of(TagId.newId()), LATER))
                 .isInstanceOf(ContentLifecycleException.class);
     }
 }

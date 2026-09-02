@@ -4,7 +4,8 @@ public final class ContentTagAssignmentRejectedException extends ContentApplicat
     public enum Reason {
         MISSING_TAG,
         ARCHIVED_TAG,
-        TOO_MANY_TAGS
+        TOO_MANY_TAGS,
+        CONTENT_NOT_EDITABLE
     }
 
     private final Reason reason;

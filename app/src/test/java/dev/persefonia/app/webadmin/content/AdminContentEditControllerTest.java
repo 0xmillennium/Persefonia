@@ -216,6 +216,23 @@ class AdminContentEditControllerTest {
         org.assertj.core.api.Assertions.assertThat(tags.assigned(item.id())).isEmpty();
     }
 
+    @Test
+    void archivedContentTagAssignmentRendersControlledSafeError() throws Exception {
+        var item = AdminContentTestFixtures.archived();
+        items.add(item);
+        var active = tags.active("Active tag");
+
+        mockMvc.perform(post("/admin/content/" + item.id().value() + "/tags")
+                        .with(authentication(AdminAuthenticationTestSupport.authentication(AdminRole.OWNER)))
+                        .with(csrf())
+                        .param("tagId", active.value().toString()))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("Tags cannot be changed for content that is not editable.")))
+                .andExpect(content().string(not(containsString("Exception"))));
+        org.assertj.core.api.Assertions.assertThat(tags.assigned(item.id())).isEmpty();
+        org.assertj.core.api.Assertions.assertThat(items.saveCount()).isZero();
+    }
+
     private static org.springframework.util.LinkedMultiValueMap<String, String> validUpdate() {
         var values = new org.springframework.util.LinkedMultiValueMap<String, String>();
         values.add("type", "ARTICLE");

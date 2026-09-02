@@ -113,6 +113,23 @@ class PublicIndexAdapterTest extends DiscoveryRepositoryTestDatabase {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
+    @Test
+    void archivedProjectDirectProjectionDoesNotLeakIntoSearchSitemapOrFeed() {
+        insertResource("PROFILE_PORTFOLIO", "PROJECT", "PROJECT", "DETAIL",
+                "/en/projects/archived-aurora", "NO_INDEX", "NOT_ELIGIBLE", "NOT_ELIGIBLE", "NOT_ELIGIBLE",
+                null, UPDATED, "archived aurora project");
+
+        assertThat(search.search(new PublicSearchRequest("aurora", 20, 0)).results())
+                .extracting(result -> result.publicUrl())
+                .doesNotContain("/en/projects/archived-aurora");
+        assertThat(sitemap.findSitemapEntries(20))
+                .extracting(entry -> entry.publicUrl())
+                .doesNotContain("/en/projects/archived-aurora");
+        assertThat(feed.findLatestFeedEntries(20))
+                .extracting(entry -> entry.publicUrl())
+                .doesNotContain("/en/projects/archived-aurora");
+    }
+
     private void seedPublicIndexRows() {
         insertResource("CONTENT_PUBLISHING", "CONTENT_ITEM", "ARTICLE", "DETAIL",
                 "/en/articles/aurora-article", "INDEX", "ELIGIBLE", "ELIGIBLE", "ELIGIBLE",

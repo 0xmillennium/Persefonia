@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dev.persefonia.contentpublishing.domain.content.AssetId;
 import dev.persefonia.contentpublishing.domain.content.ContentStatus;
+import dev.persefonia.contentpublishing.domain.content.TagId;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -50,7 +51,8 @@ class ContentItemPersistenceMapperTest {
                 new ContentItemRenderedHeadingTable.Row(UUID.randomUUID(), entity.id(), 1, "Intro", "intro", 1),
                 new ContentItemRenderedHeadingTable.Row(UUID.randomUUID(), entity.id(), 2, "Details", "details", 2));
 
-        var item = mapper.toDomain(entity, snapshot, headings);
+        TagId tagId = TagId.newId();
+        var item = mapper.toDomain(entity, snapshot, headings, java.util.Set.of(tagId));
 
         assertThat(item.status()).isEqualTo(ContentStatus.PUBLISHED);
         assertThat(item.metadata().ogImageAssetId()).contains(AssetId.from(assetId));
@@ -60,11 +62,13 @@ class ContentItemPersistenceMapperTest {
         assertThat(item.renderSnapshot().orElseThrow().headings())
                 .extracting(heading -> heading.anchor().value())
                 .containsExactly("intro", "details");
+        assertThat(item.tagIds()).containsExactly(tagId);
     }
 
     @Test
     void mapsNullOptionalColumnsToAbsentDomainValues() {
-        var item = mapper.toDomain(entity("ARTICLE", "DRAFT", "PRIVATE", "TR", null), null, List.of());
+        var item = mapper.toDomain(
+                entity("ARTICLE", "DRAFT", "PRIVATE", "TR", null), null, List.of(), java.util.Set.of());
 
         assertThat(item.slug()).isEmpty();
         assertThat(item.metadata().seoTitle()).isEmpty();
@@ -74,16 +78,16 @@ class ContentItemPersistenceMapperTest {
 
     @Test
     void invalidPersistedEnumsFailClearly() {
-        assertThatThrownBy(() -> mapper.toDomain(entity("BROKEN", "DRAFT", "PRIVATE", "EN", null), null, List.of()))
+        assertThatThrownBy(() -> mapper.toDomain(entity("BROKEN", "DRAFT", "PRIVATE", "EN", null), null, List.of(), java.util.Set.of()))
                 .isInstanceOf(ContentPublishingPersistenceException.class)
                 .hasMessageContaining("ContentType");
-        assertThatThrownBy(() -> mapper.toDomain(entity("ARTICLE", "BROKEN", "PRIVATE", "EN", null), null, List.of()))
+        assertThatThrownBy(() -> mapper.toDomain(entity("ARTICLE", "BROKEN", "PRIVATE", "EN", null), null, List.of(), java.util.Set.of()))
                 .isInstanceOf(ContentPublishingPersistenceException.class)
                 .hasMessageContaining("ContentStatus");
-        assertThatThrownBy(() -> mapper.toDomain(entity("ARTICLE", "DRAFT", "BROKEN", "EN", null), null, List.of()))
+        assertThatThrownBy(() -> mapper.toDomain(entity("ARTICLE", "DRAFT", "BROKEN", "EN", null), null, List.of(), java.util.Set.of()))
                 .isInstanceOf(ContentPublishingPersistenceException.class)
                 .hasMessageContaining("ContentVisibility");
-        assertThatThrownBy(() -> mapper.toDomain(entity("ARTICLE", "DRAFT", "PRIVATE", "FR", null), null, List.of()))
+        assertThatThrownBy(() -> mapper.toDomain(entity("ARTICLE", "DRAFT", "PRIVATE", "FR", null), null, List.of(), java.util.Set.of()))
                 .isInstanceOf(ContentPublishingPersistenceException.class)
                 .hasMessageContaining("ContentLanguage");
     }

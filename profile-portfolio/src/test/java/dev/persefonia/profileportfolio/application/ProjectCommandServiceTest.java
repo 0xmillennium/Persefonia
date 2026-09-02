@@ -41,6 +41,8 @@ import java.util.Set;
 import java.util.UUID;
 import dev.persefonia.discovery.application.port.RemoveDiscoverableResourcePort;
 import dev.persefonia.discovery.application.port.UpdateDiscoverableResourcePort;
+import dev.persefonia.discovery.application.contract.DiscoveryEligibility;
+import dev.persefonia.discovery.application.contract.IndexingPolicy;
 import dev.persefonia.discovery.application.projection.DiscoverableResourceProjectionInput;
 import dev.persefonia.discovery.application.projection.DiscoverableResourceProjectionResult;
 import dev.persefonia.discovery.application.projection.RemoveDiscoverableResourceCommand;
@@ -115,6 +117,28 @@ class ProjectCommandServiceTest {
 
         assertThat(removePort.commands).hasSize(1);
         assertThat(updatePort.inputs).isEmpty();
+    }
+
+    @Test
+    void updatePublicProjectToArchivedReplacesProjectionWithDirectOnlyNoIndexProjection() {
+        var service = service(ContentLanguage.TR);
+        ProjectId projectId = ProjectId.from(service.create(
+                create(OWNER, false, "PUBLIC", Set.of(), "TR")).projectId());
+        updatePort.inputs.clear();
+        removePort.commands.clear();
+
+        service.update(update(projectId, Set.of(), "ARCHIVED", "PUBLIC"));
+
+        assertThat(removePort.commands).hasSize(1);
+        assertThat(updatePort.inputs)
+                .singleElement()
+                .satisfies(input -> {
+                    assertThat(input.publicUrl().value()).isEqualTo("/tr/projects/tr-project");
+                    assertThat(input.indexingPolicy()).isEqualTo(IndexingPolicy.NO_INDEX);
+                    assertThat(input.searchEligibility()).isEqualTo(DiscoveryEligibility.NOT_ELIGIBLE);
+                    assertThat(input.sitemapEligibility()).isEqualTo(DiscoveryEligibility.NOT_ELIGIBLE);
+                    assertThat(input.feedEligibility()).isEqualTo(DiscoveryEligibility.NOT_ELIGIBLE);
+                });
     }
 
     @Test
@@ -202,11 +226,19 @@ class ProjectCommandServiceTest {
     }
 
     private static UpdateProjectCommand update(ProjectId projectId, Set<TagId> tagIds) {
+        return update(projectId, tagIds, "ACTIVE", "PRIVATE");
+    }
+
+    private static UpdateProjectCommand update(
+            ProjectId projectId,
+            Set<TagId> tagIds,
+            String status,
+            String visibility) {
         return new UpdateProjectCommand(
                 OWNER,
                 projectId.value(),
-                "ACTIVE",
-                "PRIVATE",
+                status,
+                visibility,
                 false,
                 null,
                 tagIds.stream().map(TagId::value).collect(java.util.stream.Collectors.toSet()),

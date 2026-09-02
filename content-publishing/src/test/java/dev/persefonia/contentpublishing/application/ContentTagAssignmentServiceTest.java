@@ -8,7 +8,6 @@ import dev.persefonia.contentpublishing.application.command.AssignContentTagsCom
 import dev.persefonia.contentpublishing.application.exception.ContentNotFoundException;
 import dev.persefonia.contentpublishing.application.exception.ContentTagAssignmentRejectedException;
 import dev.persefonia.contentpublishing.application.port.AssignableTagOption;
-import dev.persefonia.contentpublishing.application.port.ContentTagAssignmentStore;
 import dev.persefonia.contentpublishing.application.port.ContentTagVocabularyPort;
 import dev.persefonia.contentpublishing.application.port.ReferencedTagDetails;
 import dev.persefonia.contentpublishing.application.port.TagAssignmentValidation;
@@ -17,9 +16,11 @@ import dev.persefonia.contentpublishing.domain.common.AdminIdentityRef;
 import dev.persefonia.contentpublishing.domain.content.ContentId;
 import dev.persefonia.contentpublishing.domain.content.ContentItem;
 import dev.persefonia.contentpublishing.domain.content.ContentLanguage;
+import dev.persefonia.contentpublishing.domain.content.ContentStatus;
 import dev.persefonia.contentpublishing.domain.content.ContentType;
 import dev.persefonia.contentpublishing.domain.content.ContentVisibility;
-import dev.persefonia.contentpublishing.domain.content.ReferencedTagId;
+import dev.persefonia.contentpublishing.domain.content.Slug;
+import dev.persefonia.contentpublishing.domain.content.TagId;
 import dev.persefonia.contentpublishing.domain.content.port.ContentItemRepository;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -35,68 +36,117 @@ import org.junit.jupiter.api.Test;
 class ContentTagAssignmentServiceTest {
     private static final Instant NOW = Instant.parse("2026-06-15T10:00:00Z");
     private static final ContentCommandActor OWNER =
-            new ContentCommandActor(AdminIdentityRef.from(UUID.randomUUID()), true, true);
+            new ContentCommandActor(AdminIdentityRef.newId(), true, true);
     private static final ContentCommandActor EDITOR =
-            new ContentCommandActor(AdminIdentityRef.from(UUID.randomUUID()), true, false);
+            new ContentCommandActor(AdminIdentityRef.newId(), true, false);
 
     private final Items items = new Items();
-    private final Assignments assignments = new Assignments();
     private final Vocabulary vocabulary = new Vocabulary();
     private final ContentTagAssignmentService service = new ContentTagAssignmentService(
-            items, assignments, vocabulary, (actor, command) -> {
-                if (!actor.active() || !actor.owner()) throw new SecurityException("OWNER required");
+            items,
+            vocabulary,
+            (actor, command) -> {
+                if (!actor.active() || !actor.owner()) {
+                    throw new SecurityException("OWNER required");
+                }
             });
-    private final ContentId contentId = items.add();
+    private final ContentId contentId = items.addDraft();
 
     @Test
-    void ownerCanReplaceActiveTagsAndDuplicatesCollapse() {
-        ReferencedTagId first = vocabulary.active("First");
-        ReferencedTagId second = vocabulary.active("Second");
+    void ownerReplacesTagsThroughAggregateRepositoryAndDuplicatesCollapse() {
+        TagId first = vocabulary.active("First");
+        TagId second = vocabulary.active("Second");
 
         service.assign(command(OWNER, contentId, List.of(first, first, second)));
 
-        assertThat(assignments.values.get(contentId)).containsExactlyInAnyOrder(first, second);
+        assertThat(items.values.get(contentId).tagIds()).containsExactlyInAnyOrder(first, second);
+        assertThat(items.saveCount).isEqualTo(1);
+        assertThat(items.values.get(contentId).updatedAt()).isEqualTo(NOW);
     }
 
     @Test
-    void nonOwnerAndMissingContentAreRejected() {
-        ReferencedTagId tag = vocabulary.active("Tag");
+    void nonOwnerIsRejectedBeforeMutationAndMissingContentUsesExistingBehavior() {
+        TagId tag = vocabulary.active("Tag");
+
         assertThatThrownBy(() -> service.assign(command(EDITOR, contentId, List.of(tag))))
                 .isInstanceOf(SecurityException.class);
+        assertThat(items.values.get(contentId).tagIds()).isEmpty();
+        assertThat(items.saveCount).isZero();
+
         assertThatThrownBy(() -> service.assign(command(OWNER, ContentId.newId(), List.of(tag))))
                 .isInstanceOf(ContentNotFoundException.class);
+        assertThat(items.saveCount).isZero();
     }
 
     @Test
-    void missingAndNewArchivedTagsAreRejectedWithoutChangingAssignments() {
-        ReferencedTagId existing = vocabulary.active("Existing");
-        assignments.values.put(contentId, new LinkedHashSet<>(Set.of(existing)));
+    void missingAndNewArchivedTagsAreRejectedWithoutMutation() {
+        TagId existing = vocabulary.active("Existing");
+        items.values.get(contentId).replaceTags(Set.of(existing), NOW.minusSeconds(1));
 
-        assertThatThrownBy(() -> service.assign(command(OWNER, contentId, List.of(ReferencedTagId.from(UUID.randomUUID())))))
-                .isInstanceOf(ContentTagAssignmentRejectedException.class);
-        assertThat(assignments.values.get(contentId)).containsExactly(existing);
+        assertThatThrownBy(() -> service.assign(command(OWNER, contentId, List.of(TagId.newId()))))
+                .isInstanceOf(ContentTagAssignmentRejectedException.class)
+                .extracting(exception -> ((ContentTagAssignmentRejectedException) exception).reason())
+                .isEqualTo(ContentTagAssignmentRejectedException.Reason.MISSING_TAG);
 
-        ReferencedTagId archived = vocabulary.archived("Archived");
+        TagId archived = vocabulary.archived("Archived");
         assertThatThrownBy(() -> service.assign(command(OWNER, contentId, List.of(archived))))
-                .isInstanceOf(ContentTagAssignmentRejectedException.class);
-        assertThat(assignments.values.get(contentId)).containsExactly(existing);
+                .isInstanceOf(ContentTagAssignmentRejectedException.class)
+                .extracting(exception -> ((ContentTagAssignmentRejectedException) exception).reason())
+                .isEqualTo(ContentTagAssignmentRejectedException.Reason.ARCHIVED_TAG);
+
+        assertThat(items.values.get(contentId).tagIds()).containsExactly(existing);
+        assertThat(items.saveCount).isZero();
     }
 
     @Test
-    void currentlyAssignedArchivedTagMayRemainOrBeRemoved() {
-        ReferencedTagId archived = vocabulary.archived("Archived");
-        assignments.values.put(contentId, new LinkedHashSet<>(Set.of(archived)));
+    void existingArchivedTagMayRemainOrBeRemovedButCannotLaterBeReadded() {
+        TagId archived = vocabulary.archived("Archived");
+        items.values.get(contentId).replaceTags(Set.of(archived), NOW.minusSeconds(2));
 
         service.assign(command(OWNER, contentId, List.of(archived)));
-        assertThat(assignments.values.get(contentId)).containsExactly(archived);
+        assertThat(items.values.get(contentId).tagIds()).containsExactly(archived);
 
         service.assign(command(OWNER, contentId, List.of()));
-        assertThat(assignments.values.get(contentId)).isEmpty();
+        assertThat(items.values.get(contentId).tagIds()).isEmpty();
+
+        assertThatThrownBy(() -> service.assign(command(OWNER, contentId, List.of(archived))))
+                .isInstanceOf(ContentTagAssignmentRejectedException.class)
+                .extracting(exception -> ((ContentTagAssignmentRejectedException) exception).reason())
+                .isEqualTo(ContentTagAssignmentRejectedException.Reason.ARCHIVED_TAG);
     }
 
     @Test
-    void tooManyTagsAreRejected() {
-        List<ReferencedTagId> requested = new ArrayList<>();
+    void archivedContentIsRejectedAsControlledApplicationFailureBeforeVocabularyValidation() {
+        ContentId archivedId = items.addArchived();
+        TagId requested = vocabulary.active("Requested");
+
+        assertThatThrownBy(() -> service.assign(command(OWNER, archivedId, List.of(requested))))
+                .isInstanceOf(ContentTagAssignmentRejectedException.class)
+                .extracting(exception -> ((ContentTagAssignmentRejectedException) exception).reason())
+                .isEqualTo(ContentTagAssignmentRejectedException.Reason.CONTENT_NOT_EDITABLE);
+        assertThat(vocabulary.validationCalls).isZero();
+        assertThat(items.saveCount).isZero();
+    }
+
+    @Test
+    void viewUsesTagIdsFromLoadedAggregate() {
+        TagId assigned = vocabulary.archived("Assigned");
+        items.values.get(contentId).replaceTags(Set.of(assigned), NOW.minusSeconds(1));
+
+        var view = service.view(OWNER, contentId);
+
+        assertThat(view.assignedTags()).extracting(ReferencedTagDetails::id).containsExactly(assigned);
+        assertThat(vocabulary.lastDetailsRequest).containsExactly(assigned);
+        assertThat(items.saveCount).isZero();
+    }
+
+    @Test
+    void maximumTagPolicyIsEnforcedAfterDeduplication() {
+        TagId duplicate = vocabulary.active("Duplicate");
+        service.assign(command(OWNER, contentId, java.util.Collections.nCopies(30, duplicate)));
+        assertThat(items.values.get(contentId).tagIds()).containsExactly(duplicate);
+
+        List<TagId> requested = new ArrayList<>();
         for (int index = 0; index <= ContentTagAssignmentService.MAX_TAGS; index++) {
             requested.add(vocabulary.active("Tag " + index));
         }
@@ -107,37 +157,44 @@ class ContentTagAssignmentServiceTest {
     }
 
     private static AssignContentTagsCommand command(
-            ContentCommandActor actor, ContentId contentId, List<ReferencedTagId> tagIds) {
+            ContentCommandActor actor, ContentId contentId, List<TagId> tagIds) {
         return new AssignContentTagsCommand(actor, contentId, tagIds, NOW);
     }
 
-    private static final class Assignments implements ContentTagAssignmentStore {
-        private final Map<ContentId, Set<ReferencedTagId>> values = new LinkedHashMap<>();
-        @Override public Set<ReferencedTagId> findAssignedTagIds(ContentId id) {
-            return Set.copyOf(values.getOrDefault(id, Set.of()));
-        }
-        @Override public void replaceAssignedTagIds(ContentId id, Set<ReferencedTagId> ids, Instant assignedAt) {
-            values.put(id, new LinkedHashSet<>(ids));
-        }
-    }
-
     private static final class Vocabulary implements ContentTagVocabularyPort {
-        private final Map<ReferencedTagId, ReferencedTagDetails> values = new LinkedHashMap<>();
-        ReferencedTagId active(String name) { return add(name, false); }
-        ReferencedTagId archived(String name) { return add(name, true); }
-        private ReferencedTagId add(String name, boolean archived) {
-            ReferencedTagId id = ReferencedTagId.from(UUID.randomUUID());
+        private final Map<TagId, ReferencedTagDetails> values = new LinkedHashMap<>();
+        private int validationCalls;
+        private Set<TagId> lastDetailsRequest = Set.of();
+
+        TagId active(String name) { return add(name, false); }
+        TagId archived(String name) { return add(name, true); }
+
+        private TagId add(String name, boolean archived) {
+            TagId id = TagId.newId();
             values.put(id, new ReferencedTagDetails(id, name, name.toLowerCase().replace(' ', '-'), archived));
             return id;
         }
-        @Override public List<AssignableTagOption> findAssignableTags() { return List.of(); }
-        @Override public List<ReferencedTagDetails> findByIds(Set<ReferencedTagId> ids) {
+
+        @Override
+        public List<AssignableTagOption> findAssignableTags() {
+            return values.values().stream()
+                    .filter(tag -> !tag.archived())
+                    .map(tag -> new AssignableTagOption(tag.id(), tag.name(), tag.slug()))
+                    .toList();
+        }
+
+        @Override
+        public List<ReferencedTagDetails> findByIds(Set<TagId> ids) {
+            lastDetailsRequest = Set.copyOf(ids);
             return ids.stream().map(values::get).filter(java.util.Objects::nonNull).toList();
         }
-        @Override public TagAssignmentValidation validateAssignments(Set<ReferencedTagId> current, Set<ReferencedTagId> requested) {
-            Set<ReferencedTagId> missing = new LinkedHashSet<>(requested);
+
+        @Override
+        public TagAssignmentValidation validateAssignments(Set<TagId> current, Set<TagId> requested) {
+            validationCalls++;
+            Set<TagId> missing = new LinkedHashSet<>(requested);
             missing.removeAll(values.keySet());
-            Set<ReferencedTagId> archived = new LinkedHashSet<>();
+            Set<TagId> archived = new LinkedHashSet<>();
             requested.stream()
                     .filter(id -> values.containsKey(id) && values.get(id).archived() && !current.contains(id))
                     .forEach(archived::add);
@@ -147,32 +204,28 @@ class ContentTagAssignmentServiceTest {
 
     private static final class Items implements ContentItemRepository {
         private final Map<ContentId, ContentItem> values = new LinkedHashMap<>();
-        ContentId add() {
-            ContentId id = ContentId.newId();
-            values.put(id, ContentItem.createDraft(id, ContentType.ARTICLE, ContentVisibility.PRIVATE, ContentLanguage.EN, NOW));
+        private int saveCount;
+
+        ContentId addDraft() {
+            ContentItem item = ContentItem.createDraft(
+                    ContentId.newId(), ContentType.ARTICLE, ContentVisibility.PRIVATE, ContentLanguage.EN, NOW.minusSeconds(10));
+            values.put(item.id(), item);
+            return item.id();
+        }
+
+        ContentId addArchived() {
+            ContentId id = addDraft();
+            values.get(id).archive(NOW.minusSeconds(1));
             return id;
         }
-        @Override public ContentItem save(ContentItem item) { values.put(item.id(), item); return item; }
+
+        @Override public ContentItem save(ContentItem item) { saveCount++; values.put(item.id(), item); return item; }
         @Override public Optional<ContentItem> findById(ContentId id) { return Optional.ofNullable(values.get(id)); }
-        @Override public Optional<ContentItem> findBySlugAndTypeAndLanguage(
-                dev.persefonia.contentpublishing.domain.content.Slug slug, ContentType type, ContentLanguage language) {
-            return Optional.empty();
-        }
-        @Override public Optional<ContentItem> findPublishedByRoute(
-                ContentType type, dev.persefonia.contentpublishing.domain.content.Slug slug, ContentLanguage language) {
-            return Optional.empty();
-        }
+        @Override public Optional<ContentItem> findBySlugAndTypeAndLanguage(Slug slug, ContentType type, ContentLanguage language) { return Optional.empty(); }
+        @Override public Optional<ContentItem> findPublishedByRoute(ContentType type, Slug slug, ContentLanguage language) { return Optional.empty(); }
         @Override public List<ContentItem> findDrafts() { return List.of(); }
-        @Override public List<ContentItem> findByStatus(dev.persefonia.contentpublishing.domain.content.ContentStatus status) {
-            return List.of();
-        }
-        @Override public List<ContentItem> findByAssignedTagId(
-                dev.persefonia.contentpublishing.domain.content.TagId tagId) {
-            return List.of();
-        }
-        @Override public boolean existsSlugInNamespace(
-                ContentType type, ContentLanguage language, dev.persefonia.contentpublishing.domain.content.Slug slug) {
-            return false;
-        }
+        @Override public List<ContentItem> findByStatus(ContentStatus status) { return List.of(); }
+        @Override public List<ContentItem> findByAssignedTagId(TagId tagId) { return List.of(); }
+        @Override public boolean existsSlugInNamespace(ContentType type, ContentLanguage language, Slug slug) { return false; }
     }
 }

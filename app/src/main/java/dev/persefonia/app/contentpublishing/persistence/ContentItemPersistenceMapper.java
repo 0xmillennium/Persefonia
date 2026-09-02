@@ -25,6 +25,7 @@ import dev.persefonia.contentpublishing.domain.content.SeoTitle;
 import dev.persefonia.contentpublishing.domain.content.Slug;
 import dev.persefonia.contentpublishing.domain.content.SortOrder;
 import dev.persefonia.contentpublishing.domain.content.Summary;
+import dev.persefonia.contentpublishing.domain.content.TagId;
 import dev.persefonia.contentpublishing.domain.content.Title;
 import dev.persefonia.contentpublishing.domain.content.Version;
 import java.util.List;
@@ -62,7 +63,8 @@ final class ContentItemPersistenceMapper {
     ContentItem toDomain(
             ContentItemPersistenceEntity entity,
             ContentItemRenderSnapshotTable.Row snapshot,
-            List<ContentItemRenderedHeadingTable.Row> headings) {
+            List<ContentItemRenderedHeadingTable.Row> headings,
+            Set<TagId> tagIds) {
         return ContentItem.rehydrate(
                 ContentId.from(entity.id()),
                 enumValue(ContentType.class, entity.type(), "ContentType"),
@@ -81,7 +83,7 @@ final class ContentItemPersistenceMapper {
                         entity.ogDescription(),
                         entity.ogImageAssetId()),
                 snapshot(snapshot, headings),
-                Set.of(),
+                tagIds,
                 entity.publishedAt(),
                 entity.unpublishedAt(),
                 entity.createdAt(),

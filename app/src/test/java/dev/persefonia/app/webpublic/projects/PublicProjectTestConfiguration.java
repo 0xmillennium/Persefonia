@@ -66,7 +66,6 @@ public class PublicProjectTestConfiguration {
         public Optional<ProjectDetailRow> findDetail(ProjectId projectId, ContentLanguage language, ProjectSlug expectedSlug) {
             return Optional.ofNullable(projects.get(projectId))
                     .filter(project -> project.visibility() == Visibility.PUBLIC || project.visibility() == Visibility.UNLISTED)
-                    .filter(project -> project.status() != Status.ARCHIVED)
                     .flatMap(project -> project.detailRow(language, expectedSlug.value()));
         }
 

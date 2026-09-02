@@ -132,14 +132,31 @@ class PublicProjectDetailControllerTest {
     }
 
     @Test
-    void detailRejectsPrivateArchivedMissingLocalizationAndSlugMismatch() throws Exception {
+    void archivedPublicAndUnlistedDetailsRequireDiscoveryAndRenderNoindex() throws Exception {
+        ProjectId publicId = projects.add(ProjectRecord.project(
+                "archived-public", Visibility.PUBLIC, Status.ARCHIVED, ContentLanguage.TR));
+        ProjectId unlistedId = projects.add(ProjectRecord.project(
+                "archived-unlisted", Visibility.UNLISTED, Status.ARCHIVED, ContentLanguage.EN));
+
+        mockMvc.perform(get("/tr/projects/archived-public")).andExpect(status().isNotFound());
+
+        routes.addUnlistedProjectFound("/tr/projects/archived-public", publicId.value());
+        routes.addUnlistedProjectFound("/en/projects/archived-unlisted", unlistedId.value());
+        mockMvc.perform(get("/tr/projects/archived-public"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("<meta name=\"robots\" content=\"noindex, follow\">")))
+                .andExpect(content().string(containsString("Project archived-public")));
+        mockMvc.perform(get("/en/projects/archived-unlisted"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("<meta name=\"robots\" content=\"noindex, follow\">")))
+                .andExpect(content().string(containsString("Project archived-unlisted")));
+    }
+
+    @Test
+    void detailRejectsPrivateMissingLocalizationAndSlugMismatch() throws Exception {
         ProjectId privateId = projects.add(ProjectRecord.project("private-detail", Visibility.PRIVATE, Status.ACTIVE, ContentLanguage.TR));
         routes.addProjectFound("/tr/projects/private-detail", privateId.value());
         mockMvc.perform(get("/tr/projects/private-detail")).andExpect(status().isNotFound());
-
-        ProjectId archivedId = projects.add(ProjectRecord.project("archived-detail", Visibility.PUBLIC, Status.ARCHIVED, ContentLanguage.TR));
-        routes.addProjectFound("/tr/projects/archived-detail", archivedId.value());
-        mockMvc.perform(get("/tr/projects/archived-detail")).andExpect(status().isNotFound());
 
         ProjectId englishId = projects.add(ProjectRecord.project("english-detail", Visibility.PUBLIC, Status.ACTIVE, ContentLanguage.EN));
         routes.addProjectFound("/tr/projects/english-detail", englishId.value());

@@ -66,7 +66,6 @@ public class JdbcProjectPublicReadModelAdapter implements ProjectPublicReadModel
                  AND localizations.slug = :slug
                 WHERE projects.id = :projectId
                   AND projects.visibility IN ('PUBLIC', 'UNLISTED')
-                  AND projects.status <> 'ARCHIVED'
                 """, Map.of(
                 "projectId", projectId.value(),
                 "language", language.name(),

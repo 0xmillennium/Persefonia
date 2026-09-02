@@ -6,11 +6,12 @@ import dev.persefonia.contentpublishing.application.authorization.ContentCommand
 import dev.persefonia.contentpublishing.application.authorization.ContentCommandAuthorizationPolicy;
 import dev.persefonia.contentpublishing.application.command.AssignContentTagsCommand;
 import dev.persefonia.contentpublishing.application.exception.ContentTagAssignmentRejectedException;
-import dev.persefonia.contentpublishing.application.port.ContentTagAssignmentStore;
 import dev.persefonia.contentpublishing.application.port.ContentTagVocabularyPort;
 import dev.persefonia.contentpublishing.application.query.ContentTagAssignmentView;
 import dev.persefonia.contentpublishing.domain.content.ContentId;
-import dev.persefonia.contentpublishing.domain.content.ReferencedTagId;
+import dev.persefonia.contentpublishing.domain.content.ContentItem;
+import dev.persefonia.contentpublishing.domain.content.ContentLifecycleException;
+import dev.persefonia.contentpublishing.domain.content.TagId;
 import dev.persefonia.contentpublishing.domain.content.port.ContentItemRepository;
 import java.util.LinkedHashSet;
 import java.util.Objects;
@@ -20,41 +21,41 @@ public final class ContentTagAssignmentService {
     public static final int MAX_TAGS = 12;
 
     private final ContentItemRepository contentItems;
-    private final ContentTagAssignmentStore assignments;
     private final ContentTagVocabularyPort vocabulary;
     private final ContentCommandAuthorizationPolicy authorization;
 
     public ContentTagAssignmentService(
             ContentItemRepository contentItems,
-            ContentTagAssignmentStore assignments,
             ContentTagVocabularyPort vocabulary,
             ContentCommandAuthorizationPolicy authorization) {
         this.contentItems = Objects.requireNonNull(contentItems, "contentItems");
-        this.assignments = Objects.requireNonNull(assignments, "assignments");
         this.vocabulary = Objects.requireNonNull(vocabulary, "vocabulary");
         this.authorization = Objects.requireNonNull(authorization, "authorization");
     }
 
     public ContentTagAssignmentView view(ContentCommandActor actor, ContentId contentId) {
         authorization.requireOwner(actor, "content.tag.admin-view");
-        requiredContent(contentItems, contentId);
-        Set<ReferencedTagId> assigned = assignments.findAssignedTagIds(contentId);
-        return new ContentTagAssignmentView(contentId, vocabulary.findAssignableTags(), vocabulary.findByIds(assigned));
+        ContentItem content = requiredContent(contentItems, contentId);
+        return new ContentTagAssignmentView(
+                contentId,
+                vocabulary.findAssignableTags(),
+                vocabulary.findByIds(content.tagIds()));
     }
 
     public void assign(AssignContentTagsCommand command) {
         Objects.requireNonNull(command, "command");
         authorization.requireOwner(command.actor(), "content.tag.assign");
-        requiredContent(contentItems, command.contentId());
+        ContentItem content = requiredContent(contentItems, command.contentId());
 
-        Set<ReferencedTagId> requested = new LinkedHashSet<>(command.requestedTagIds());
+        Set<TagId> requested = new LinkedHashSet<>(command.requestedTagIds());
         if (requested.size() > MAX_TAGS) {
             throw new ContentTagAssignmentRejectedException(
                     ContentTagAssignmentRejectedException.Reason.TOO_MANY_TAGS,
                     "A content item may have at most " + MAX_TAGS + " tags.");
         }
+        rejectIfNotEditable(content);
 
-        Set<ReferencedTagId> current = assignments.findAssignedTagIds(command.contentId());
+        Set<TagId> current = content.tagIds();
         var validation = vocabulary.validateAssignments(current, requested);
         if (!validation.missingTagIds().isEmpty()) {
             throw new ContentTagAssignmentRejectedException(
@@ -67,6 +68,27 @@ public final class ContentTagAssignmentService {
                     "Archived tags cannot be newly assigned.");
         }
 
-        assignments.replaceAssignedTagIds(command.contentId(), requested, command.assignedAt());
+        try {
+            content.replaceTags(requested, command.assignedAt());
+        } catch (ContentLifecycleException exception) {
+            throw notEditable(exception);
+        }
+        contentItems.save(content);
+    }
+
+    private static void rejectIfNotEditable(ContentItem content) {
+        if (content.isArchived()) {
+            throw notEditable(null);
+        }
+    }
+
+    private static ContentTagAssignmentRejectedException notEditable(RuntimeException cause) {
+        var rejection = new ContentTagAssignmentRejectedException(
+                ContentTagAssignmentRejectedException.Reason.CONTENT_NOT_EDITABLE,
+                "Tags cannot be changed for content that is not editable.");
+        if (cause != null) {
+            rejection.initCause(cause);
+        }
+        return rejection;
     }
 }

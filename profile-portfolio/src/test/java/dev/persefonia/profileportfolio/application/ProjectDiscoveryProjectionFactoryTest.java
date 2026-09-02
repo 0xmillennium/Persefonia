@@ -93,11 +93,47 @@ class ProjectDiscoveryProjectionFactoryTest {
     }
 
     @Test
-    void privateAndArchivedProjectsProduceNoProjections() {
+    void privateProjectProducesNoProjection() {
         assertThat(factory.projectionsFor(project(ProjectVisibility.PRIVATE, ProjectStatus.ACTIVE, localization(ContentLanguage.TR))))
                 .isEmpty();
-        assertThat(factory.projectionsFor(project(ProjectVisibility.PUBLIC, ProjectStatus.ARCHIVED, localization(ContentLanguage.TR))))
-                .isEmpty();
+    }
+
+    @Test
+    void archivedPublicProjectCreatesDirectOnlyNoIndexProjectionPerLocalization() {
+        Project project = project(
+                ProjectVisibility.PUBLIC,
+                ProjectStatus.ARCHIVED,
+                localization(ContentLanguage.TR),
+                localization(ContentLanguage.EN));
+
+        assertThat(factory.projectionsFor(project))
+                .hasSize(2)
+                .allSatisfy(input -> {
+                    assertThat(input.routePurpose()).isEqualTo(RoutePurpose.DETAIL);
+                    assertThat(input.indexingPolicy()).isEqualTo(IndexingPolicy.NO_INDEX);
+                    assertThat(input.searchEligibility()).isEqualTo(DiscoveryEligibility.NOT_ELIGIBLE);
+                    assertThat(input.sitemapEligibility()).isEqualTo(DiscoveryEligibility.NOT_ELIGIBLE);
+                    assertThat(input.feedEligibility()).isEqualTo(DiscoveryEligibility.NOT_ELIGIBLE);
+                    assertThat(input.canonicalUrl().value()).startsWith("https://example.test/");
+                });
+        assertThat(factory.projectionsFor(project)).extracting(input -> input.publicUrl().value())
+                .containsExactly("/tr/projects/tr-project", "/en/projects/en-project");
+    }
+
+    @Test
+    void archivedUnlistedProjectCreatesDirectOnlyNoIndexProjection() {
+        assertThat(factory.projectionsFor(project(
+                ProjectVisibility.UNLISTED,
+                ProjectStatus.ARCHIVED,
+                localization(ContentLanguage.EN))))
+                .singleElement()
+                .satisfies(input -> {
+                    assertThat(input.publicUrl().value()).isEqualTo("/en/projects/en-project");
+                    assertThat(input.indexingPolicy()).isEqualTo(IndexingPolicy.NO_INDEX);
+                    assertThat(input.searchEligibility()).isEqualTo(DiscoveryEligibility.NOT_ELIGIBLE);
+                    assertThat(input.sitemapEligibility()).isEqualTo(DiscoveryEligibility.NOT_ELIGIBLE);
+                    assertThat(input.feedEligibility()).isEqualTo(DiscoveryEligibility.NOT_ELIGIBLE);
+                });
     }
 
     private static Project project(

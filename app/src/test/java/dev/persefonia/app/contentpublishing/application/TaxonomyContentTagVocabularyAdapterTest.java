@@ -4,10 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import dev.persefonia.contentpublishing.domain.content.ReferencedTagId;
+import dev.persefonia.contentpublishing.domain.content.TagId;
 import dev.persefonia.taxonomy.application.query.TagVocabularyItem;
 import dev.persefonia.taxonomy.application.service.TagVocabularyQueryService;
-import dev.persefonia.taxonomy.domain.model.TagId;
 import dev.persefonia.taxonomy.domain.model.TagStatus;
 import java.util.List;
 import java.util.Set;
@@ -34,9 +33,11 @@ class TaxonomyContentTagVocabularyAdapterTest {
     @Test
     void validationRejectsMissingAndNewArchivedButAllowsExistingArchived() {
         TagVocabularyItem archived = item(TagStatus.ARCHIVED);
-        ReferencedTagId archivedReference = reference(archived);
-        ReferencedTagId missing = ReferencedTagId.from(java.util.UUID.randomUUID());
-        when(queries.findByIds(Set.of(archived.id(), TagId.from(missing.value())))).thenReturn(List.of(archived));
+        TagId archivedReference = reference(archived);
+        TagId missing = TagId.from(java.util.UUID.randomUUID());
+        when(queries.findByIds(Set.of(
+                archived.id(),
+                dev.persefonia.taxonomy.domain.model.TagId.from(missing.value())))).thenReturn(List.of(archived));
 
         var rejected = adapter.validateAssignments(Set.of(), Set.of(archivedReference, missing));
         assertThat(rejected.missingTagIds()).containsExactly(missing);
@@ -47,10 +48,14 @@ class TaxonomyContentTagVocabularyAdapterTest {
     }
 
     private static TagVocabularyItem item(TagStatus status) {
-        return new TagVocabularyItem(TagId.newId(), status.name(), status.name().toLowerCase(), status);
+        return new TagVocabularyItem(
+                dev.persefonia.taxonomy.domain.model.TagId.newId(),
+                status.name(),
+                status.name().toLowerCase(),
+                status);
     }
 
-    private static ReferencedTagId reference(TagVocabularyItem item) {
-        return ReferencedTagId.from(item.id().value());
+    private static TagId reference(TagVocabularyItem item) {
+        return TagId.from(item.id().value());
     }
 }

@@ -102,22 +102,28 @@ class ProjectPublicExposureTest {
     }
 
     @Test
-    void privateArchivedAndMissingLocalizationAreNotListedOrRendered() throws Exception {
+    void archivedPublicAndUnlistedAreDirectOnlyNoindexWhilePrivateRemainsDenied() throws Exception {
         ProjectId privateId = projects.add(ProjectRecord.project("private-project", Visibility.PRIVATE, Status.ACTIVE, ContentLanguage.TR));
-        ProjectId archivedId = projects.add(ProjectRecord.project("archived-project", Visibility.PUBLIC, Status.ARCHIVED, ContentLanguage.TR));
-        ProjectId englishId = projects.add(ProjectRecord.project("english-project", Visibility.PUBLIC, Status.ACTIVE, ContentLanguage.EN));
+        ProjectId archivedPublicId = projects.add(ProjectRecord.project(
+                "archived-public", Visibility.PUBLIC, Status.ARCHIVED, ContentLanguage.TR));
+        ProjectId archivedUnlistedId = projects.add(ProjectRecord.project(
+                "archived-unlisted", Visibility.UNLISTED, Status.ARCHIVED, ContentLanguage.TR));
         routes.addProjectFound("/tr/projects/private-project", privateId.value());
-        routes.addProjectFound("/tr/projects/archived-project", archivedId.value());
-        routes.addProjectFound("/tr/projects/english-project", englishId.value());
+        routes.addUnlistedProjectFound("/tr/projects/archived-public", archivedPublicId.value());
+        routes.addUnlistedProjectFound("/tr/projects/archived-unlisted", archivedUnlistedId.value());
 
         mockMvc.perform(get("/tr/projects"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(not(containsString("private-project"))))
-                .andExpect(content().string(not(containsString("archived-project"))))
-                .andExpect(content().string(not(containsString("english-project"))));
+                .andExpect(content().string(not(containsString("archived-public"))))
+                .andExpect(content().string(not(containsString("archived-unlisted"))));
         mockMvc.perform(get("/tr/projects/private-project")).andExpect(status().isNotFound());
-        mockMvc.perform(get("/tr/projects/archived-project")).andExpect(status().isNotFound());
-        mockMvc.perform(get("/tr/projects/english-project")).andExpect(status().isNotFound());
+        mockMvc.perform(get("/tr/projects/archived-public"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("<meta name=\"robots\" content=\"noindex, follow\">")));
+        mockMvc.perform(get("/tr/projects/archived-unlisted"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("<meta name=\"robots\" content=\"noindex, follow\">")));
     }
 
     @Test
