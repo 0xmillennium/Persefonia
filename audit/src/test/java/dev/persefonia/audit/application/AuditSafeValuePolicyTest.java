@@ -66,6 +66,14 @@ class AuditSafeValuePolicyTest {
     @Test
     void embeddedAndScopedIpv6ValuesAreRejectedWhileUnrelatedValuesRemainSafe() {
         List<String> unsafeValues = List.of(
+                "2001:db8::/32",
+                "network=2001:db8::/32",
+                "peer=2001:db8::1/path",
+                "peer=2001:db8::1#fragment",
+                "peer=2001:db8::1.",
+                "peer=2001:db8::1!",
+                "ip:2001:db8::1",
+                "peer@2001:db8::1",
                 "client=2001:db8::1",
                 "peer 2001:db8::1",
                 "fe80::1%eth0",
@@ -82,7 +90,9 @@ class AuditSafeValuePolicyTest {
 
         List<String> safeValues = List.of(
                 "/writing/old-slug",
+                "/projects/persefonia",
                 "manual review",
+                "12:30:45",
                 "550e8400-e29b-41d4-a716-446655440000");
         for (String value : safeValues) {
             assertThat(policy.auditValue(value).value()).isEqualTo(value);

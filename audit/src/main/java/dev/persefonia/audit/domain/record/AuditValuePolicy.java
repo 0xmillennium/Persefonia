@@ -39,8 +39,6 @@ final class AuditValuePolicy {
     private static final Pattern DIGEST = Pattern.compile("(?i)^(?:[0-9a-f]{32}|[0-9a-f]{40}|[0-9a-f]{64})$");
     private static final Pattern IPV4_CANDIDATE =
             Pattern.compile("(?<![0-9.])(?:[0-9]{1,3}\\.){3}[0-9]{1,3}(?![0-9.])");
-    private static final Pattern NETWORK_TOKEN = Pattern.compile(
-            "\\[[^\\]\\s]+\\](?::[0-9]+)?|[^\\s=,;(){}<>\\\"']+");
     private static final Pattern INTERNAL_HOSTNAME =
             Pattern.compile("(?i)^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*\\.(?:internal|local)$");
 
@@ -180,14 +178,28 @@ final class AuditValuePolicy {
     }
 
     private static boolean containsIpv6Literal(String value) {
-        Matcher matcher = NETWORK_TOKEN.matcher(value);
-        while (matcher.find()) {
-            String token = matcher.group();
-            if (isIpv6Literal(networkHost(token))) {
-                return true;
+        for (int start = 0; start < value.length(); start++) {
+            if (!isIpv6SyntaxCharacter(value.charAt(start))) {
+                continue;
+            }
+            int runEnd = start;
+            while (runEnd < value.length() && isIpv6SyntaxCharacter(value.charAt(runEnd))) {
+                runEnd++;
+            }
+            int candidateLimit = Math.min(runEnd, start + 45);
+            for (int end = start + 2; end <= candidateLimit; end++) {
+                if (isIpv6Literal(value.substring(start, end))) {
+                    return true;
+                }
             }
         }
         return false;
+    }
+
+    private static boolean isIpv6SyntaxCharacter(char value) {
+        return value == ':'
+                || value >= '0' && value <= '9'
+                || value >= 'a' && value <= 'f';
     }
 
     private static void rejectRequestTarget(String value, String field) {
