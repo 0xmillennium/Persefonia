@@ -25,6 +25,7 @@ public record CacheTargetValue(String value) {
                 || value.contains("//")
                 || value.contains("?")
                 || value.contains("#")
+                || value.contains(";")
                 || value.contains("\\")
                 || value.contains("%")
                 || value.chars().anyMatch(Character::isWhitespace)

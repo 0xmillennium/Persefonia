@@ -25,6 +25,15 @@ class CacheTargetValueTest {
     }
 
     @Test
+    void rejectsPathParameterSyntaxInEveryUrlTarget() {
+        List.of("/admin;foo", "/admin;jsessionid=abc", "/oauth2;foo",
+                        "/oauth2;authorization=authelia", "/login;foo", "/logout;foo", "/actuator;foo",
+                        "/actuator;prometheus", "/foo;bar", "/projects/persefonia;v=1")
+                .forEach(value -> assertThatThrownBy(() -> CacheTargetValue.url(value))
+                        .as(value).isInstanceOf(CacheInvalidationValidationException.class));
+    }
+
+    @Test
     void cacheTagsUseBoundedProviderIndependentGrammar() {
         List.of("content:550e8400-e29b-41d4-a716-446655440000",
                         "project:550e8400-e29b-41d4-a716-446655440000", "site:public-documents")

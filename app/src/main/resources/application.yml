@@ -34,6 +34,13 @@ management:
       application: persefonia
 
 persefonia:
+  cache-purge:
+    provider: ${PERSEFONIA_CACHE_PURGE_PROVIDER:LOCAL}
+    connect-timeout: ${PERSEFONIA_CACHE_PURGE_CONNECT_TIMEOUT:2s}
+    read-timeout: ${PERSEFONIA_CACHE_PURGE_READ_TIMEOUT:5s}
+    cloudflare:
+      zone-id: ${PERSEFONIA_CLOUDFLARE_ZONE_ID:}
+      api-token: ${PERSEFONIA_CLOUDFLARE_API_TOKEN:}
   observability:
     request-id:
       response-header: X-Request-Id
