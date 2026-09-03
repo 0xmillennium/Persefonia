@@ -20,7 +20,7 @@ public final class AdminNavigationFactory {
                 link(AdminNavigationSection.MEDIA, activeSection, "Media", "/admin/media"),
                 link(AdminNavigationSection.CONTACT, activeSection, "Contact", "/admin/contact"),
                 link(AdminNavigationSection.ANALYTICS, activeSection, "Analytics", "/admin/analytics"),
-                AdminNavigationItem.disabled("Audit"),
+                link(AdminNavigationSection.AUDIT, activeSection, "Audit", "/admin/audit"),
                 link(AdminNavigationSection.SETTINGS, activeSection, "Settings", "/admin/settings/site"));
     }
 

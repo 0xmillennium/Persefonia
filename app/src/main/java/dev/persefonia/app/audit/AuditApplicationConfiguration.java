@@ -2,6 +2,7 @@ package dev.persefonia.app.audit;
 
 import dev.persefonia.audit.application.port.AppendAuditRecordPort;
 import dev.persefonia.audit.application.port.AuditQueryPort;
+import dev.persefonia.audit.application.port.AuditRecordReadPort;
 import dev.persefonia.audit.application.service.AuditAppendService;
 import dev.persefonia.audit.application.service.AuditQueryService;
 import dev.persefonia.audit.application.service.AuditRecordFactory;
@@ -34,7 +35,7 @@ class AuditApplicationConfiguration {
     }
 
     @Bean
-    AuditQueryPort auditQueryPort(AuditRecordRepository repository) {
-        return new AuditQueryService(repository);
+    AuditQueryPort auditQueryPort(AuditRecordReadPort records) {
+        return new AuditQueryService(records);
     }
 }

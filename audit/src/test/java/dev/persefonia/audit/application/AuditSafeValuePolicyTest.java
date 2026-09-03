@@ -64,6 +64,33 @@ class AuditSafeValuePolicyTest {
     }
 
     @Test
+    void embeddedAndScopedIpv6ValuesAreRejectedWhileUnrelatedValuesRemainSafe() {
+        List<String> unsafeValues = List.of(
+                "client=2001:db8::1",
+                "peer 2001:db8::1",
+                "fe80::1%eth0",
+                "[fe80::1%25eth0]:443");
+
+        for (String value : unsafeValues) {
+            assertThatThrownBy(() -> policy.auditValue(value))
+                    .isInstanceOf(AuditValidationException.class)
+                    .hasMessageNotContaining(value);
+            assertThatThrownBy(() -> policy.metadataValue(value))
+                    .isInstanceOf(AuditValidationException.class)
+                    .hasMessageNotContaining(value);
+        }
+
+        List<String> safeValues = List.of(
+                "/writing/old-slug",
+                "manual review",
+                "550e8400-e29b-41d4-a716-446655440000");
+        for (String value : safeValues) {
+            assertThat(policy.auditValue(value).value()).isEqualTo(value);
+            assertThat(policy.metadataValue(value).value()).isEqualTo(value);
+        }
+    }
+
+    @Test
     void completeContactStatusCommandIsAccepted() {
         policy.validate(AuditCommands.contactStatusChangedCommand());
     }

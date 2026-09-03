@@ -15,9 +15,6 @@ import gg.jte.TemplateEngine;
 import gg.jte.output.StringOutput;
 
 class AdminDashboardRenderingTest {
-    private static final List<String> UNIMPLEMENTED_ROUTES = List.of(
-            "/admin/audit");
-
     @Test
     void dashboardShellRendersNavigationPlaceholders() {
         assertThat(render()).contains(
@@ -33,10 +30,8 @@ class AdminDashboardRenderingTest {
     }
 
     @Test
-    void disabledNavigationItemsDoNotLinkToUnimplementedRoutes() {
-        assertThat(render())
-                .contains("aria-disabled=\"true\"")
-                .doesNotContain(UNIMPLEMENTED_ROUTES.toArray(String[]::new));
+    void dashboardLinksToAuditAdmin() {
+        assertThat(render()).contains("href=\"/admin/audit\"");
     }
 
     @Test

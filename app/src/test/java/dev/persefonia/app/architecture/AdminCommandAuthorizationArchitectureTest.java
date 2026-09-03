@@ -44,8 +44,14 @@ class AdminCommandAuthorizationArchitectureTest {
                         .map(javaClass -> javaClass.getSimpleName()))
                 .doesNotContain(
                         "AdminContentController",
-                        "AdminAuditController",
                         "AdminSettingsController");
+    }
+
+    @Test
+    void auditAdminControllerIsAllowedAfterReadOnlyAuditImplementation() {
+        assertThat(ArchitectureTestSupport.PRODUCTION_CLASSES.stream()
+                        .map(javaClass -> javaClass.getSimpleName()))
+                .contains("AdminAuditController");
     }
 
     @Test

@@ -39,6 +39,8 @@ final class AuditValuePolicy {
     private static final Pattern DIGEST = Pattern.compile("(?i)^(?:[0-9a-f]{32}|[0-9a-f]{40}|[0-9a-f]{64})$");
     private static final Pattern IPV4_CANDIDATE =
             Pattern.compile("(?<![0-9.])(?:[0-9]{1,3}\\.){3}[0-9]{1,3}(?![0-9.])");
+    private static final Pattern NETWORK_TOKEN = Pattern.compile(
+            "\\[[^\\]\\s]+\\](?::[0-9]+)?|[^\\s=,;(){}<>\\\"']+");
     private static final Pattern INTERNAL_HOSTNAME =
             Pattern.compile("(?i)^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*\\.(?:internal|local)$");
 
@@ -86,7 +88,7 @@ final class AuditValuePolicy {
         if (host.equals("localhost")
                 || INTERNAL_HOSTNAME.matcher(host).matches()
                 || containsIpv4Literal(normalized)
-                || isIpv6Literal(host)) {
+                || containsIpv6Literal(normalized)) {
             throw new AuditValidationException(field + " must not contain raw network identity data");
         }
     }
@@ -145,6 +147,13 @@ final class AuditValuePolicy {
         if (candidate.startsWith("[") && candidate.endsWith("]")) {
             candidate = candidate.substring(1, candidate.length() - 1);
         }
+        int scopeDelimiter = candidate.indexOf('%');
+        if (scopeDelimiter >= 0) {
+            if (scopeDelimiter == candidate.length() - 1) {
+                return false;
+            }
+            candidate = candidate.substring(0, scopeDelimiter);
+        }
         if (!candidate.contains(":")
                 || !candidate.matches("[0-9a-f:]+")
                 || candidate.contains(":::")) {
@@ -168,6 +177,17 @@ final class AuditValuePolicy {
             return populatedParts < 8;
         }
         return parts.length == 8 && populatedParts == 8;
+    }
+
+    private static boolean containsIpv6Literal(String value) {
+        Matcher matcher = NETWORK_TOKEN.matcher(value);
+        while (matcher.find()) {
+            String token = matcher.group();
+            if (isIpv6Literal(networkHost(token))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static void rejectRequestTarget(String value, String field) {
