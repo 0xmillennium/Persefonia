@@ -25,6 +25,7 @@ import org.springframework.aop.support.AopUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -62,7 +63,7 @@ class TransactionalContactMessageStatusCommandGatewayTest {
     @BeforeEach
     void resetDatabase() {
         migrateOnce();
-        jdbc.execute("TRUNCATE communication.contact_messages CASCADE");
+        jdbc.execute("TRUNCATE communication.contact_messages, audit.audit_records CASCADE");
     }
 
     @Test
@@ -82,6 +83,18 @@ class TransactionalContactMessageStatusCommandGatewayTest {
                 message.id(), ContactMessageStatus.NEW, ContactMessageStatus.READ));
         assertThat(messages.findById(message.id()).orElseThrow().status()).isEqualTo(ContactMessageStatus.READ);
         assertThat(historyCount(message.id())).isEqualTo(1);
+        assertThat(jdbc.queryForObject(
+                "SELECT count(*) FROM audit.audit_records WHERE action = 'contact_message.status.changed'",
+                Long.class)).isEqualTo(1);
+        assertThat(jdbc.queryForMap("""
+                SELECT c.field_path, c.old_value, c.new_value
+                FROM audit.audit_record_changes c
+                JOIN audit.audit_records r ON r.id = c.audit_record_id
+                WHERE r.action = 'contact_message.status.changed'
+                """))
+                .containsEntry("field_path", "status")
+                .containsEntry("old_value", "NEW")
+                .containsEntry("new_value", "READ");
     }
 
     @Test
@@ -97,6 +110,7 @@ class TransactionalContactMessageStatusCommandGatewayTest {
 
         assertThat(messages.findById(message.id()).orElseThrow().status()).isEqualTo(ContactMessageStatus.NEW);
         assertThat(historyCount(message.id())).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM audit.audit_records", Long.class)).isZero();
     }
 
     @Test
@@ -109,6 +123,24 @@ class TransactionalContactMessageStatusCommandGatewayTest {
 
         assertThat(messages.findById(message.id()).orElseThrow().status()).isEqualTo(ContactMessageStatus.NEW);
         assertThat(historyCount(message.id())).isZero();
+    }
+
+    @Test
+    void mandatoryAuditFailureRollsBackStatusAndHistory() {
+        ContactMessage message = saveMessage("audit-failure");
+
+        assertThatThrownBy(() -> transactions.executeWithoutResult(status -> {
+                    jdbc.execute("""
+                            ALTER TABLE audit.audit_records
+                            ADD CONSTRAINT reject_contact_audit_test CHECK (false)
+                            """);
+                    gateway.update(command(message.id(), OWNER));
+                }))
+                .isInstanceOf(DataIntegrityViolationException.class);
+
+        assertThat(messages.findById(message.id()).orElseThrow().status()).isEqualTo(ContactMessageStatus.NEW);
+        assertThat(historyCount(message.id())).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM audit.audit_records", Long.class)).isZero();
     }
 
     private UpdateContactMessageStatusCommand command(

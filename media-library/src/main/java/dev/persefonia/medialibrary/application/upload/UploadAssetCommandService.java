@@ -2,6 +2,7 @@ package dev.persefonia.medialibrary.application.upload;
 
 import dev.persefonia.medialibrary.application.asset.AssetRepository;
 import dev.persefonia.medialibrary.application.storage.AssetStoragePort;
+import dev.persefonia.medialibrary.application.storage.AssetStorageRollbackCompensationPort;
 import dev.persefonia.medialibrary.application.storage.FinalAssetStorageKey;
 import dev.persefonia.medialibrary.application.storage.OriginalAssetStagingRequest;
 import dev.persefonia.medialibrary.application.storage.StagedAssetObject;
@@ -35,6 +36,7 @@ public final class UploadAssetCommandService {
     private final MediaContentSniffer contentSniffer;
     private final ChecksumCalculator checksumCalculator;
     private final Clock clock;
+    private final AssetStorageRollbackCompensationPort rollbackCompensation;
 
     public UploadAssetCommandService(
             AssetRepository assetRepository,
@@ -43,12 +45,31 @@ public final class UploadAssetCommandService {
             MediaContentSniffer contentSniffer,
             ChecksumCalculator checksumCalculator,
             Clock clock) {
+        this(
+                assetRepository,
+                storage,
+                validationPolicy,
+                contentSniffer,
+                checksumCalculator,
+                clock,
+                AssetStorageRollbackCompensationPort.noOp());
+    }
+
+    public UploadAssetCommandService(
+            AssetRepository assetRepository,
+            AssetStoragePort storage,
+            UploadValidationPolicy validationPolicy,
+            MediaContentSniffer contentSniffer,
+            ChecksumCalculator checksumCalculator,
+            Clock clock,
+            AssetStorageRollbackCompensationPort rollbackCompensation) {
         this.assetRepository = Objects.requireNonNull(assetRepository, "assetRepository");
         this.storage = Objects.requireNonNull(storage, "storage");
         this.validationPolicy = Objects.requireNonNull(validationPolicy, "validationPolicy");
         this.contentSniffer = Objects.requireNonNull(contentSniffer, "contentSniffer");
         this.checksumCalculator = Objects.requireNonNull(checksumCalculator, "checksumCalculator");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.rollbackCompensation = Objects.requireNonNull(rollbackCompensation, "rollbackCompensation");
     }
 
     public UploadAssetResult upload(UploadAssetCommand command) {
@@ -97,6 +118,7 @@ public final class UploadAssetCommandService {
             FinalAssetStorageKey finalKey =
                     new FinalAssetStorageKey("original/" + assetId.value() + "/" + storedFilename);
             storedObject = storage.commitStaged(stagedObject, finalKey);
+            rollbackCompensation.deleteOnRollback(StoragePath.of(storedObject.logicalPath()));
 
             Instant now = clock.instant();
             List<AssetValidationResult> validationResults = acceptedValidationResults(now);

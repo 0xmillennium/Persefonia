@@ -144,6 +144,11 @@ class RedirectManagementArchitectureTest {
                 "/app/src/main/java/dev/persefonia/app/communication/application/PublicContactSubmissionService.java")) {
             return false;
         }
+        if (path.toString().endsWith(
+                "/app/src/main/java/dev/persefonia/app/medialibrary/application/"
+                        + "SpringAssetStorageRollbackCompensationAdapter.java")) {
+            return false;
+        }
         return source.contains("TransactionSynchronization") || source.contains("afterCommit");
     }
 }

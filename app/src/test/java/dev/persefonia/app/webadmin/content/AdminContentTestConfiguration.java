@@ -1,5 +1,6 @@
 package dev.persefonia.app.webadmin.content;
 
+import dev.persefonia.app.audit.MvcAuditTestConfiguration;
 import dev.persefonia.app.contentpublishing.application.InMemoryContentReadModelAdapter;
 import dev.persefonia.contentpublishing.domain.model.series.port.SeriesRepository;
 import dev.persefonia.contentpublishing.domain.translation.port.TranslationGroupRepository;
@@ -13,11 +14,13 @@ import dev.persefonia.discovery.domain.RedirectRuleId;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
 
 @TestConfiguration(proxyBeanMethods = false)
 @Profile("admin-content-mvc-test")
+@Import(MvcAuditTestConfiguration.class)
 class AdminContentTestConfiguration {
     @Bean
     @Primary

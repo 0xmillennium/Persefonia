@@ -1,5 +1,7 @@
 package dev.persefonia.app.contentpublishing.application;
 
+import dev.persefonia.app.audit.integration.ContentPublishingAuditMapper;
+import dev.persefonia.audit.application.port.AppendAuditRecordPort;
 import dev.persefonia.contentpublishing.application.command.AddTranslationEntryCommand;
 import dev.persefonia.contentpublishing.application.command.CreateTranslationGroupCommand;
 import dev.persefonia.contentpublishing.application.command.RemoveTranslationEntryCommand;
@@ -13,26 +15,39 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 public class TransactionalTranslationGroupCommandGateway implements TranslationGroupCommandGateway {
     private final TranslationGroupCommandService service;
+    private final AppendAuditRecordPort audit;
+    private final ContentPublishingAuditMapper auditMapper;
 
-    public TransactionalTranslationGroupCommandGateway(TranslationGroupCommandService service) {
+    public TransactionalTranslationGroupCommandGateway(
+            TranslationGroupCommandService service,
+            AppendAuditRecordPort audit,
+            ContentPublishingAuditMapper auditMapper) {
         this.service = Objects.requireNonNull(service, "service");
+        this.audit = Objects.requireNonNull(audit, "audit");
+        this.auditMapper = Objects.requireNonNull(auditMapper, "auditMapper");
     }
 
     @Override
     @Transactional
     public TranslationGroupResult create(CreateTranslationGroupCommand command) {
-        return service.create(command);
+        TranslationGroupResult result = service.create(command);
+        audit.append(auditMapper.translationGroupCreated(command, result));
+        return result;
     }
 
     @Override
     @Transactional
     public TranslationGroupResult addEntry(AddTranslationEntryCommand command) {
-        return service.addEntry(command);
+        TranslationGroupResult result = service.addEntry(command);
+        audit.append(auditMapper.translationGroupEntryAdded(command, result));
+        return result;
     }
 
     @Override
     @Transactional
     public TranslationGroupResult removeEntry(RemoveTranslationEntryCommand command) {
-        return service.removeEntry(command);
+        TranslationGroupResult result = service.removeEntry(command);
+        audit.append(auditMapper.translationGroupEntryRemoved(command, result));
+        return result;
     }
 }

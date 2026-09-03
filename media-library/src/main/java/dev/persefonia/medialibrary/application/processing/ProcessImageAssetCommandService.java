@@ -2,6 +2,7 @@ package dev.persefonia.medialibrary.application.processing;
 
 import dev.persefonia.medialibrary.application.asset.AssetRepository;
 import dev.persefonia.medialibrary.application.storage.AssetStoragePort;
+import dev.persefonia.medialibrary.application.storage.AssetStorageRollbackCompensationPort;
 import dev.persefonia.medialibrary.application.storage.StoredAssetObject;
 import dev.persefonia.medialibrary.application.storage.VariantStorageRequest;
 import dev.persefonia.medialibrary.application.upload.ChecksumCalculator;
@@ -35,6 +36,7 @@ public final class ProcessImageAssetCommandService {
     private final ImageVariantGenerator variantGenerator;
     private final ChecksumCalculator checksumCalculator;
     private final Clock clock;
+    private final AssetStorageRollbackCompensationPort rollbackCompensation;
 
     public ProcessImageAssetCommandService(
             AssetRepository assetRepository,
@@ -43,12 +45,31 @@ public final class ProcessImageAssetCommandService {
             ImageVariantGenerator variantGenerator,
             ChecksumCalculator checksumCalculator,
             Clock clock) {
+        this(
+                assetRepository,
+                storage,
+                metadataReader,
+                variantGenerator,
+                checksumCalculator,
+                clock,
+                AssetStorageRollbackCompensationPort.noOp());
+    }
+
+    public ProcessImageAssetCommandService(
+            AssetRepository assetRepository,
+            AssetStoragePort storage,
+            ImageMetadataReader metadataReader,
+            ImageVariantGenerator variantGenerator,
+            ChecksumCalculator checksumCalculator,
+            Clock clock,
+            AssetStorageRollbackCompensationPort rollbackCompensation) {
         this.assetRepository = Objects.requireNonNull(assetRepository, "assetRepository");
         this.storage = Objects.requireNonNull(storage, "storage");
         this.metadataReader = Objects.requireNonNull(metadataReader, "metadataReader");
         this.variantGenerator = Objects.requireNonNull(variantGenerator, "variantGenerator");
         this.checksumCalculator = Objects.requireNonNull(checksumCalculator, "checksumCalculator");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.rollbackCompensation = Objects.requireNonNull(rollbackCompensation, "rollbackCompensation");
     }
 
     public ProcessImageAssetResult process(ProcessImageAssetCommand command) {
@@ -141,6 +162,7 @@ public final class ProcessImageAssetCommandService {
             StoredAssetObject stored = storage.storeVariant(new VariantStorageRequest(storagePath, bytes));
             StoragePath storedPath = StoragePath.of(stored.logicalPath());
             storedVariantPaths.add(storedPath);
+            rollbackCompensation.deleteOnRollback(storedPath);
             variants.add(new AssetVariant(
                     AssetVariantId.newId(),
                     generatedVariant.name(),

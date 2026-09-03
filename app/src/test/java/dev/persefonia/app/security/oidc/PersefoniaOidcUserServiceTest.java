@@ -2,6 +2,7 @@ package dev.persefonia.app.security.oidc;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -14,7 +15,9 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 
+import dev.persefonia.app.audit.integration.IdentityAccessAuditMapper;
 import dev.persefonia.app.identityaccess.bootstrap.TransactionalAdminBootstrapGateway;
+import dev.persefonia.audit.application.port.AppendAuditRecordPort;
 import dev.persefonia.identityaccess.application.admin.bootstrap.AdminBootstrapUseCase;
 import dev.persefonia.identityaccess.domain.admin.AdminAccount;
 import dev.persefonia.identityaccess.domain.admin.AdminAccountId;
@@ -152,7 +155,10 @@ class PersefoniaOidcUserServiceTest {
                 Clock.fixed(NOW, ZoneOffset.UTC));
         return new PersefoniaOidcUserService(
                 new OidcClaimMapper(),
-                new TransactionalAdminBootstrapGateway(useCase),
+                new TransactionalAdminBootstrapGateway(
+                        useCase,
+                        mock(AppendAuditRecordPort.class),
+                        mock(IdentityAccessAuditMapper.class)),
                 request -> delegateUser);
     }
 

@@ -1,7 +1,10 @@
 package dev.persefonia.app.profileportfolio.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
+import dev.persefonia.app.audit.integration.ProfilePortfolioAuditMapper;
+import dev.persefonia.audit.application.port.AppendAuditRecordPort;
 import dev.persefonia.profileportfolio.application.authorization.PortfolioCommandActor;
 import dev.persefonia.profileportfolio.application.authorization.PortfolioCommandAuthorizationPolicy;
 import dev.persefonia.profileportfolio.application.command.ActiveCvSelectionInput;
@@ -41,7 +44,9 @@ class TransactionalActiveCvCommandGatewayTest {
                 profiles,
                 new FakeSettingsRepository(),
                 eligibility(),
-                allowOwner()));
+                allowOwner()),
+                mock(AppendAuditRecordPort.class),
+                mock(ProfilePortfolioAuditMapper.class));
 
         var result = gateway.update(new UpdateActiveCvCommand(
                 new PortfolioCommandActor(UUID.randomUUID(), true, true),

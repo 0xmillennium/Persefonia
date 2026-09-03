@@ -65,10 +65,12 @@ public final class TagCommandService {
     public TagCommandResult archive(ArchiveTagCommand command) {
         authorization.requireOwner(command.actor(), "taxonomy.tag.archive");
         Tag tag = requiredTag(command.tagId());
-        if (!tag.isArchived()) {
-            tag.archive(command.requestedAt());
-            tag = tags.save(tag);
+        if (tag.isArchived()) {
+            discoverability.sync(tag);
+            return new TagCommandResult(tag.id(), tag.status(), tag.updatedAt(), false);
         }
+        tag.archive(command.requestedAt());
+        tag = tags.save(tag);
         discoverability.sync(tag);
         return result(tag);
     }

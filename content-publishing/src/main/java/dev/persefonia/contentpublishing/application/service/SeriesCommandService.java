@@ -92,7 +92,7 @@ public final class SeriesCommandService {
         authorization.requireOwner(command.actor(), "series.archive");
         Series series = requiredSeries(command.seriesId());
         if (series.isArchived()) {
-            return new SeriesResult(series.id());
+            return new SeriesResult(series.id(), null, false);
         }
         series.archive(command.requestedAt());
         Series saved = seriesRepository.save(series);
@@ -132,8 +132,10 @@ public final class SeriesCommandService {
         authorization.requireOwner(command.actor(), "series.remove-entry");
         Series series = requiredSeries(command.seriesId());
         rejectArchived(series);
-        boolean present = series.entries().stream().anyMatch(entry -> entry.id().equals(command.entryId()));
-        if (!present) {
+        var removedEntry = series.entries().stream()
+                .filter(entry -> entry.id().equals(command.entryId()))
+                .findFirst();
+        if (removedEntry.isEmpty()) {
             throw new SeriesCommandRejectedException(
                     SeriesCommandRejectedException.Reason.ENTRY_NOT_FOUND,
                     "The series entry does not exist.");
@@ -143,7 +145,7 @@ public final class SeriesCommandService {
         } catch (SeriesValidationException exception) {
             throw translate(exception);
         }
-        return new SeriesResult(seriesRepository.save(series).id());
+        return new SeriesResult(seriesRepository.save(series).id(), removedEntry.orElseThrow().contentItemId());
     }
 
     public SeriesResult reorderEntries(ReorderSeriesEntriesCommand command) {

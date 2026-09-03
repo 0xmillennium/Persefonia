@@ -20,7 +20,6 @@ final class AuditValuePolicy {
             Pattern.compile("\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}\\b");
     private static final Pattern ABSOLUTE_HTTP_URL =
             Pattern.compile("\\bhttps?://[^\\s]+", Pattern.CASE_INSENSITIVE);
-    private static final Pattern QUERY_BEARING_TARGET = Pattern.compile("\\?[^\\s]*=");
     private static final Pattern EXCEPTION_PAYLOAD = Pattern.compile(
             "\\b(?:[a-z_$][\\w$]*\\.)*[A-Z][\\w$]*(?:Exception|Error):\\s+\\S");
     private static final Pattern STACK_FRAME =
@@ -83,12 +82,44 @@ final class AuditValuePolicy {
 
     private static void rejectNetworkLocation(String value, String field) {
         String normalized = value.trim().toLowerCase(Locale.ROOT);
-        if (normalized.equals("localhost")
-                || INTERNAL_HOSTNAME.matcher(normalized).matches()
+        String host = networkHost(normalized);
+        if (host.equals("localhost")
+                || INTERNAL_HOSTNAME.matcher(host).matches()
                 || containsIpv4Literal(normalized)
-                || isIpv6Literal(normalized)) {
+                || isIpv6Literal(host)) {
             throw new AuditValidationException(field + " must not contain raw network identity data");
         }
+    }
+
+    private static String networkHost(String value) {
+        if (value.startsWith("[")) {
+            int closingBracket = value.indexOf(']');
+            if (closingBracket > 1
+                    && (closingBracket == value.length() - 1
+                    || isPortSuffix(value.substring(closingBracket + 1)))) {
+                return value.substring(1, closingBracket);
+            }
+        }
+
+        int lastColon = value.lastIndexOf(':');
+        if (lastColon > 0
+                && value.indexOf(':') == lastColon
+                && isPortSuffix(value.substring(lastColon))) {
+            return value.substring(0, lastColon);
+        }
+        return value;
+    }
+
+    private static boolean isPortSuffix(String value) {
+        if (value.length() < 2 || value.charAt(0) != ':') {
+            return false;
+        }
+        for (int index = 1; index < value.length(); index++) {
+            if (!Character.isDigit(value.charAt(index))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static boolean containsIpv4Literal(String value) {
@@ -140,9 +171,22 @@ final class AuditValuePolicy {
     }
 
     private static void rejectRequestTarget(String value, String field) {
-        if (ABSOLUTE_HTTP_URL.matcher(value).find() || QUERY_BEARING_TARGET.matcher(value).find()) {
+        if (ABSOLUTE_HTTP_URL.matcher(value).find() || isQueryBearingRelativeTarget(value)) {
             throw new AuditValidationException(field + " must not contain unsafe request data");
         }
+    }
+
+    private static boolean isQueryBearingRelativeTarget(String value) {
+        int queryDelimiter = value.indexOf('?');
+        if (queryDelimiter < 0) {
+            return false;
+        }
+        for (int index = 0; index < value.length(); index++) {
+            if (Character.isWhitespace(value.charAt(index))) {
+                return false;
+            }
+        }
+        return !value.contains("://");
     }
 
     private static void rejectFailureInternals(String value, String field) {

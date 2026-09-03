@@ -1,5 +1,6 @@
 package dev.persefonia.app.webadmin.settings;
 
+import dev.persefonia.app.audit.MvcAuditTestConfiguration;
 import dev.persefonia.profileportfolio.domain.common.ContentLanguage;
 import dev.persefonia.profileportfolio.domain.settings.HomepageSettings;
 import dev.persefonia.profileportfolio.domain.settings.PositiveInteger;
@@ -15,11 +16,13 @@ import java.util.Optional;
 import java.util.Set;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
 
 @TestConfiguration(proxyBeanMethods = false)
 @Profile("admin-site-settings-mvc-test")
+@Import(MvcAuditTestConfiguration.class)
 class AdminSiteSettingsTestConfiguration {
     @Bean
     @Primary

@@ -18,6 +18,7 @@ import java.util.UUID;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.MDC;
 import org.springframework.aop.support.AopUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -59,7 +60,7 @@ class TransactionalAdminRedirectCommandGatewayTest {
     @BeforeEach
     void resetDatabase() {
         migrateOnce();
-        jdbc.execute("TRUNCATE discovery.redirect_rules, discovery.discoverable_resources");
+        jdbc.execute("TRUNCATE discovery.redirect_rules, discovery.discoverable_resources, audit.audit_records CASCADE");
     }
 
     @Test
@@ -75,6 +76,23 @@ class TransactionalAdminRedirectCommandGatewayTest {
 
         assertThat(redirects.findById(created.redirect().redirectRuleId()))
                 .hasValueSatisfying(rule -> assertThat(rule.active()).isTrue());
+        assertThat(jdbc.queryForObject(
+                "SELECT count(*) FROM audit.audit_records WHERE action = 'redirect.created'", Long.class))
+                .isEqualTo(1);
+    }
+
+    @Test
+    void currentRequestIdFlowsIntoPersistedAuditRecord() {
+        MDC.put("request_id", "known-request-123");
+        try {
+            create("request-id");
+        } finally {
+            MDC.remove("request_id");
+        }
+
+        assertThat(jdbc.queryForObject(
+                "SELECT request_id FROM audit.audit_records WHERE action = 'redirect.created'", String.class))
+                .isEqualTo("known-request-123");
     }
 
     @Test
@@ -88,6 +106,7 @@ class TransactionalAdminRedirectCommandGatewayTest {
         });
 
         assertThat(redirects.findById(createdId[0])).isEmpty();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM audit.audit_records", Long.class)).isZero();
     }
 
     @Test
@@ -132,6 +151,21 @@ class TransactionalAdminRedirectCommandGatewayTest {
                 .isInstanceOf(DataIntegrityViolationException.class);
 
         assertThat(jdbc.queryForObject("SELECT count(*) FROM discovery.redirect_rules", Long.class)).isZero();
+    }
+
+    @Test
+    void mandatoryAuditFailureRollsBackRedirectCreation() {
+        assertThatThrownBy(() -> transactions.executeWithoutResult(status -> {
+                    jdbc.execute("""
+                            ALTER TABLE audit.audit_records
+                            ADD CONSTRAINT reject_redirect_audit_test CHECK (false)
+                            """);
+                    gateway.create(command("audit-failure", OWNER));
+                }))
+                .isInstanceOf(DataIntegrityViolationException.class);
+
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM discovery.redirect_rules", Long.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM audit.audit_records", Long.class)).isZero();
     }
 
     private RedirectRuleCreationResult.Created create(String key) {

@@ -14,12 +14,14 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import dev.persefonia.app.identityaccess.bootstrap.TransactionalAdminBootstrapGateway;
 import dev.persefonia.identityaccess.domain.admin.AdminAccountRepository;
@@ -66,6 +68,9 @@ class OidcAdminBootstrapIntegrationTest {
 
     @Autowired
     private DataSource dataSource;
+
+    @Autowired
+    private TransactionTemplate transactions;
 
     @DynamicPropertySource
     static void databaseProperties(DynamicPropertyRegistry registry) {
@@ -114,6 +119,15 @@ class OidcAdminBootstrapIntegrationTest {
 
         assertThat(countAccounts()).isEqualTo(1);
         assertThat(repository.findByOidcSubject(OidcSubject.of("owner-subject"))).isPresent();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM audit.audit_records WHERE action = 'admin_account.bootstrapped'",
+                Long.class)).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM audit.audit_record_metadata m JOIN audit.audit_records r "
+                        + "ON r.id = m.audit_record_id WHERE r.action = 'admin_account.bootstrapped' "
+                        + "AND m.metadata_key = 'bootstrap_outcome' "
+                        + "AND m.metadata_value = 'INITIAL_OWNER_BOOTSTRAPPED'",
+                Long.class)).isEqualTo(1);
     }
 
     @Test
@@ -143,6 +157,29 @@ class OidcAdminBootstrapIntegrationTest {
 
         assertThat(lastLoginAt("owner-subject")).isAfterOrEqualTo(firstLogin);
         assertThat(version("owner-subject")).isGreaterThan(1);
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM audit.audit_records", Long.class))
+                .isEqualTo(1);
+    }
+
+    @Test
+    void mandatoryAuditFailureRollsBackNewAdminProvisioning() {
+        var claims = claimMapper.toAdminIdentityClaims(OidcTestFixtures.user(Map.of(
+                "sub", "owner-subject",
+                "email", "owner@example.com",
+                "name", "Admin",
+                "email_verified", true)));
+
+        assertThatThrownBy(() -> transactions.executeWithoutResult(status -> {
+                    jdbcTemplate.execute("""
+                            ALTER TABLE audit.audit_records
+                            ADD CONSTRAINT reject_bootstrap_audit_test CHECK (false)
+                            """);
+                    bootstrapGateway.resolveOrBootstrap(claims);
+                }))
+                .isInstanceOf(DataIntegrityViolationException.class);
+
+        assertThat(countAccounts()).isZero();
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM audit.audit_records", Long.class)).isZero();
     }
 
     private PersefoniaOidcUser loadUser(String subject, String email) {

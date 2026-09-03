@@ -1,6 +1,7 @@
 package dev.persefonia.app.contentpublishing.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dev.persefonia.contentpublishing.application.authorization.ContentCommandActor;
 import dev.persefonia.contentpublishing.application.command.ContentFieldUpdate;
@@ -28,10 +29,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.postgresql.PostgreSQLContainer;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @SpringBootTest(
         properties = {"management.server.port=0", "management.health.redis.enabled=false"},
@@ -55,6 +58,9 @@ class ContentDiscoveryIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbc;
+
+    @Autowired
+    private TransactionTemplate transactions;
 
     @DynamicPropertySource
     static void datasourceProperties(DynamicPropertyRegistry registry) {
@@ -80,7 +86,8 @@ class ContentDiscoveryIntegrationTest {
                     publishing.content_revisions,
                     publishing.content_rendered_headings,
                     publishing.content_render_snapshots,
-                    publishing.content_items
+                    publishing.content_items,
+                    audit.audit_records
                 RESTART IDENTITY CASCADE
                 """);
     }
@@ -91,6 +98,10 @@ class ContentDiscoveryIntegrationTest {
         contentItems.save(item);
 
         gateway.publishContent(new PublishContentCommand(OWNER, item.id(), PUBLISHED_AT, null));
+
+        assertThat(jdbc.queryForObject(
+                "SELECT count(*) FROM audit.audit_records WHERE action = 'content.published'", Long.class))
+                .isEqualTo(1);
 
         Map<String, Object> publicProjection = discoveryProjection(item.id());
         assertThat(publicProjection)
@@ -165,6 +176,31 @@ class ContentDiscoveryIntegrationTest {
                 .containsEntry("target_url", "/en/articles/discovery-sync-unlisted-updated")
                 .containsEntry("status_code", 301)
                 .containsEntry("reason", "SLUG_CHANGED");
+    }
+
+    @Test
+    void mandatoryAuditFailureRollsBackPublishRevisionAndDiscoveryProjection() {
+        ContentItem item = completeDraft();
+        contentItems.save(item);
+
+        assertThatThrownBy(() -> transactions.executeWithoutResult(status -> {
+                    jdbc.execute("""
+                            ALTER TABLE audit.audit_records
+                            ADD CONSTRAINT reject_content_audit_test CHECK (false)
+                            """);
+                    gateway.publishContent(new PublishContentCommand(OWNER, item.id(), PUBLISHED_AT, null));
+                }))
+                .isInstanceOf(DataIntegrityViolationException.class);
+
+        assertThat(contentItems.findById(item.id()).orElseThrow().status())
+                .isEqualTo(dev.persefonia.contentpublishing.domain.content.ContentStatus.DRAFT);
+        assertThat(jdbc.queryForObject(
+                "SELECT count(*) FROM publishing.content_revisions WHERE content_item_id = ?",
+                Long.class, item.id().value())).isZero();
+        assertThat(jdbc.queryForObject(
+                "SELECT count(*) FROM discovery.discoverable_resources WHERE source_entity_id = ?",
+                Long.class, item.id().value())).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM audit.audit_records", Long.class)).isZero();
     }
 
     private Map<String, Object> discoveryProjection(ContentId contentId) {

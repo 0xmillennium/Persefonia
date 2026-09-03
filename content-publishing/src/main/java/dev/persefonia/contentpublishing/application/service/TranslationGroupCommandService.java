@@ -71,8 +71,10 @@ public final class TranslationGroupCommandService {
         TranslationGroup group = requiredGroup(command.translationGroupId());
 
         TranslationGroupEntryId entryId = command.entryId();
-        boolean present = group.entries().stream().anyMatch(entry -> entry.id().equals(entryId));
-        if (!present) {
+        var removedEntry = group.entries().stream()
+                .filter(entry -> entry.id().equals(entryId))
+                .findFirst();
+        if (removedEntry.isEmpty()) {
             throw new TranslationGroupCommandRejectedException(
                     TranslationGroupCommandRejectedException.Reason.ENTRY_NOT_FOUND,
                     "The translation entry does not exist in this group.");
@@ -84,7 +86,8 @@ public final class TranslationGroupCommandService {
         }
 
         group.removeEntry(entryId, command.removedAt());
-        return new TranslationGroupResult(translationGroups.save(group).id());
+        return new TranslationGroupResult(
+                translationGroups.save(group).id(), removedEntry.orElseThrow().contentItemId());
     }
 
     private void requireNotInAnyGroup(ContentItem item) {

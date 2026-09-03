@@ -1,5 +1,6 @@
 package dev.persefonia.app.webadmin.cv;
 
+import dev.persefonia.app.audit.MvcAuditTestConfiguration;
 import dev.persefonia.profileportfolio.application.port.ActiveCvAssetEligibilityPort;
 import dev.persefonia.profileportfolio.application.port.EligibleCvAsset;
 import dev.persefonia.profileportfolio.domain.common.ContentLanguage;
@@ -23,11 +24,13 @@ import java.util.Set;
 import java.util.UUID;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
 
 @TestConfiguration(proxyBeanMethods = false)
 @Profile("admin-cv-mvc-test")
+@Import(MvcAuditTestConfiguration.class)
 class AdminCvTestConfiguration {
     static final Instant NOW = Instant.parse("2026-06-18T10:00:00Z");
     static final MediaAssetId PUBLIC_PDF_ID = MediaAssetId.from(UUID.fromString("00000000-0000-0000-0000-00000000c801"));

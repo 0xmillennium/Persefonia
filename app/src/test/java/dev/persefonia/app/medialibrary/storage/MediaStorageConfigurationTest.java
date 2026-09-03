@@ -1,8 +1,12 @@
 package dev.persefonia.app.medialibrary.storage;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
+import dev.persefonia.app.audit.integration.MediaAuditMapper;
+import dev.persefonia.audit.application.port.AppendAuditRecordPort;
 import dev.persefonia.medialibrary.application.asset.AssetRepository;
+import dev.persefonia.medialibrary.application.authorization.MediaCommandAuthorizationPolicy;
 import dev.persefonia.medialibrary.application.storage.AssetStoragePort;
 import dev.persefonia.medialibrary.application.storage.StorageWriteException;
 import dev.persefonia.medialibrary.application.upload.UploadAssetCommandService;
@@ -19,7 +23,10 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 class MediaStorageConfigurationTest {
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
             .withUserConfiguration(MediaStorageConfiguration.class, MediaStorageRequiredConfiguration.class)
-            .withBean(AssetRepository.class, NoOpAssetRepository::new);
+            .withBean(AssetRepository.class, NoOpAssetRepository::new)
+            .withBean(MediaCommandAuthorizationPolicy.class, () -> mock(MediaCommandAuthorizationPolicy.class))
+            .withBean(AppendAuditRecordPort.class, () -> mock(AppendAuditRecordPort.class))
+            .withBean(MediaAuditMapper.class, () -> mock(MediaAuditMapper.class));
 
     @TempDir
     Path tempDirectory;

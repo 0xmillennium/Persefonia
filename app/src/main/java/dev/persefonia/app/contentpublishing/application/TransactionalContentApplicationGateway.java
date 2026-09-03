@@ -1,5 +1,7 @@
 package dev.persefonia.app.contentpublishing.application;
 
+import dev.persefonia.app.audit.integration.ContentPublishingAuditMapper;
+import dev.persefonia.audit.application.port.AppendAuditRecordPort;
 import dev.persefonia.contentpublishing.application.command.ArchiveContentCommand;
 import dev.persefonia.contentpublishing.application.command.ContentArchiveResult;
 import dev.persefonia.contentpublishing.application.command.ContentDraftResult;
@@ -20,21 +22,32 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 public class TransactionalContentApplicationGateway implements ContentCommandGateway {
     private final ContentCommandService service;
+    private final AppendAuditRecordPort audit;
+    private final ContentPublishingAuditMapper auditMapper;
 
-    public TransactionalContentApplicationGateway(ContentCommandService service) {
+    public TransactionalContentApplicationGateway(
+            ContentCommandService service,
+            AppendAuditRecordPort audit,
+            ContentPublishingAuditMapper auditMapper) {
         this.service = Objects.requireNonNull(service, "service");
+        this.audit = Objects.requireNonNull(audit, "audit");
+        this.auditMapper = Objects.requireNonNull(auditMapper, "auditMapper");
     }
 
     @Override
     @Transactional
     public ContentDraftResult createDraft(CreateContentDraftCommand command) {
-        return service.createDraft(command);
+        ContentDraftResult result = service.createDraft(command);
+        audit.append(auditMapper.draftCreated(command, result));
+        return result;
     }
 
     @Override
     @Transactional
     public ContentDraftResult updateDraft(UpdateContentDraftCommand command) {
-        return service.updateDraft(command);
+        ContentDraftResult result = service.updateDraft(command);
+        audit.append(auditMapper.draftUpdated(command, result));
+        return result;
     }
 
     @Override
@@ -46,18 +59,24 @@ public class TransactionalContentApplicationGateway implements ContentCommandGat
     @Override
     @Transactional
     public ContentPublishResult publishContent(PublishContentCommand command) {
-        return service.publishContent(command);
+        ContentPublishResult result = service.publishContent(command);
+        audit.append(auditMapper.published(command, result));
+        return result;
     }
 
     @Override
     @Transactional
     public ContentUnpublishResult unpublishContent(UnpublishContentCommand command) {
-        return service.unpublishContent(command);
+        ContentUnpublishResult result = service.unpublishContent(command);
+        audit.append(auditMapper.unpublished(command, result));
+        return result;
     }
 
     @Override
     @Transactional
     public ContentArchiveResult archiveContent(ArchiveContentCommand command) {
-        return service.archiveContent(command);
+        ContentArchiveResult result = service.archiveContent(command);
+        audit.append(auditMapper.archived(command, result));
+        return result;
     }
 }
