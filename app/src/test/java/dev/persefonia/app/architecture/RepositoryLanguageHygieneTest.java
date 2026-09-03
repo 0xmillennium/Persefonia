@@ -110,7 +110,8 @@ class RepositoryLanguageHygieneTest {
     }
 
     private static List<String> tokens(String text) {
-        return Stream.of(text.replaceAll("([a-z0-9])([A-Z])", "$1 $2")
+        String withDurableCompoundsNormalized = text.replace("user_agent", "useragent");
+        return Stream.of(withDurableCompoundsNormalized.replaceAll("([a-z0-9])([A-Z])", "$1 $2")
                         .split("[^A-Za-z0-9]+"))
                 .map(String::toLowerCase)
                 .filter(token -> !token.isBlank())

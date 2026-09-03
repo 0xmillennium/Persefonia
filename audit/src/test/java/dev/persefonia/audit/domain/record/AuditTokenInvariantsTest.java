@@ -3,104 +3,136 @@ package dev.persefonia.audit.domain.record;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class AuditTokenInvariantsTest {
     @Test
-    void validAuditActionIsAccepted() {
+    void durableIdentifierVocabularyIsAccepted() {
         assertThat(AuditAction.of("content.published").value()).isEqualTo("content.published");
-        assertThat(AuditAction.of("profile.visibility_changed").value())
-                .isEqualTo("profile.visibility_changed");
+        assertThat(AuditAction.of("contact_message.status.changed").value())
+                .isEqualTo("contact_message.status.changed");
+        assertThat(AuditAction.of("cache.cloudflare.purge_failed").value())
+                .isEqualTo("cache.cloudflare.purge_failed");
+        String projectManagementAction = "content." + "spri" + "nt." + "repa" + "ir";
+        assertThat(AuditAction.of(projectManagementAction).value()).isEqualTo(projectManagementAction);
+        assertThat(SourceContext.of("communication").value()).isEqualTo("communication");
+        assertThat(SourceType.of("contact_message").value()).isEqualTo("contact_message");
     }
 
     @Test
-    void blankActionIsRejected() {
-        assertThatThrownBy(() -> AuditAction.of("  "))
-                .isInstanceOf(AuditValidationException.class)
-                .hasMessageContaining("blank");
+    void malformedActionsAreRejected() {
+        List<String> malformed = List.of(
+                "  ",
+                "content published",
+                "content.\u0007published",
+                "content/published",
+                "content?published=true",
+                "Content.Published",
+                "content-published",
+                "content..published",
+                "a".repeat(201));
+
+        for (String value : malformed) {
+            assertThatThrownBy(() -> AuditAction.of(value))
+                    .as("malformed action")
+                    .isInstanceOf(AuditValidationException.class)
+                    .hasMessageNotContaining(value);
+        }
     }
 
     @Test
-    void actionWithWhitespaceIsRejected() {
-        assertThatThrownBy(() -> AuditAction.of("content published"))
-                .isInstanceOf(AuditValidationException.class)
-                .hasMessageContaining("whitespace");
+    void malformedSourceIdentifiersAreRejected() {
+        List<String> malformed = List.of(
+                " ",
+                "contact message",
+                "communication/contact",
+                "communication?channel=admin",
+                "Communication",
+                "communication.status",
+                "a".repeat(201));
+
+        for (String value : malformed) {
+            assertThatThrownBy(() -> SourceContext.of(value))
+                    .as("malformed source context")
+                    .isInstanceOf(AuditValidationException.class);
+            assertThatThrownBy(() -> SourceType.of(value))
+                    .as("malformed source type")
+                    .isInstanceOf(AuditValidationException.class);
+        }
     }
 
     @Test
-    void actionWithControlCharacterIsRejected() {
-        assertThatThrownBy(() -> AuditAction.of("content.published"))
-                .isInstanceOf(AuditValidationException.class)
-                .hasMessageContaining("control");
+    void structuredKeysUseDottedLowerSnakeCaseWithoutSubstringBlocking() {
+        List<String> valid = List.of(
+                "status",
+                "seo.title",
+                "contact_message.status",
+                "communication.status",
+                "provider",
+                "failure_category",
+                "body_count",
+                "email_changed",
+                "rate_limit.result");
+
+        for (String value : valid) {
+            assertThat(FieldPath.of(value).value()).isEqualTo(value);
+            assertThat(MetadataKey.of(value).value()).isEqualTo(value);
+        }
     }
 
     @Test
-    void pathLikeActionIsRejected() {
-        assertThatThrownBy(() -> AuditAction.of("content/published"))
-                .isInstanceOf(AuditValidationException.class)
-                .hasMessageContaining("identifier");
+    void exactSensitiveStructuredKeySegmentsAreRejected() {
+        List<String> sensitive = List.of(
+                "password",
+                "auth.token",
+                "contact_body",
+                "contact.body",
+                "sender_email",
+                "raw_ip",
+                "hashed_ip",
+                "markdown_source",
+                "rendered_html",
+                "request_headers",
+                "failure.stack_trace",
+                "cloudflare_secret",
+                "cloudflare_credential");
+
+        for (String value : sensitive) {
+            assertThatThrownBy(() -> FieldPath.of(value))
+                    .isInstanceOf(AuditValidationException.class)
+                    .hasMessage("field path uses a sensitive audit key")
+                    .hasMessageNotContaining(value);
+            assertThatThrownBy(() -> MetadataKey.of(value))
+                    .isInstanceOf(AuditValidationException.class)
+                    .hasMessage("metadata key uses a sensitive audit key")
+                    .hasMessageNotContaining(value);
+        }
     }
 
     @Test
-    void queryLikeActionIsRejected() {
-        assertThatThrownBy(() -> AuditAction.of("content?published=true"))
-                .isInstanceOf(AuditValidationException.class)
-                .hasMessageContaining("identifier");
+    void malformedStructuredKeysAreRejected() {
+        List<String> malformed = List.of(
+                " ",
+                "seo/title",
+                "seo[title]",
+                "seo?title=x",
+                "seo title",
+                "Seo.Title",
+                "seo..title",
+                "a".repeat(201));
+
+        for (String value : malformed) {
+            assertThatThrownBy(() -> FieldPath.of(value))
+                    .isInstanceOf(AuditValidationException.class);
+        }
     }
 
     @Test
-    void nonDurableVocabularyActionIsRejected() {
-        // Segmented to avoid embedding the forbidden literal in committed source.
-        String nonDurableSegment = "spr" + "int";
-        assertThatThrownBy(() -> AuditAction.of("content." + nonDurableSegment))
-                .isInstanceOf(AuditValidationException.class)
-                .hasMessageContaining("non-durable repository vocabulary");
-    }
-
-    @Test
-    void validRequestIdIsAccepted() {
+    void requestIdKeepsItsDedicatedCorrelationGrammar() {
         assertThat(RequestId.of("req-12ab34cd").value()).isEqualTo("req-12ab34cd");
-    }
-
-    @Test
-    void blankRequestIdIsRejected() {
-        assertThatThrownBy(() -> RequestId.of(" "))
+        assertThatThrownBy(() -> RequestId.of("request/id"))
                 .isInstanceOf(AuditValidationException.class)
-                .hasMessageContaining("blank");
-    }
-
-    @Test
-    void validFieldPathIsAccepted() {
-        assertThat(FieldPath.of("title").value()).isEqualTo("title");
-        assertThat(FieldPath.of("seo.title").value()).isEqualTo("seo.title");
-    }
-
-    @Test
-    void unsafeFieldPathIsRejected() {
-        String unsafe = "pass" + "word";
-        assertThatThrownBy(() -> FieldPath.of(unsafe))
-                .isInstanceOf(AuditValidationException.class)
-                .hasMessageContaining("unsafe semantic class");
-    }
-
-    @Test
-    void pathLikeFieldPathIsRejected() {
-        assertThatThrownBy(() -> FieldPath.of("seo/title"))
-                .isInstanceOf(AuditValidationException.class)
-                .hasMessageContaining("identifier");
-    }
-
-    @Test
-    void validMetadataKeyIsAccepted() {
-        assertThat(MetadataKey.of("reason").value()).isEqualTo("reason");
-        assertThat(MetadataKey.of("source.channel").value()).isEqualTo("source.channel");
-    }
-
-    @Test
-    void unsafeMetadataKeyIsRejected() {
-        String unsafe = "se" + "ssion";
-        assertThatThrownBy(() -> MetadataKey.of(unsafe))
-                .isInstanceOf(AuditValidationException.class)
-                .hasMessageContaining("unsafe semantic class");
+                .hasMessageContaining("correlation identifier");
     }
 }

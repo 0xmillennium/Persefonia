@@ -2,7 +2,7 @@ package dev.persefonia.audit.domain.record;
 
 public record AuditAction(String value) {
     public AuditAction {
-        value = AuditSafeText.actionToken(value, "audit action");
+        value = AuditIdentifierPolicy.action(value);
     }
 
     public static AuditAction of(String value) {

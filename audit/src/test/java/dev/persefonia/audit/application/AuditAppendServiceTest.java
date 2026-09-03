@@ -41,6 +41,22 @@ class AuditAppendServiceTest {
     }
 
     @Test
+    void rejectsSensitiveKeyBeforeRepositoryAppend() {
+        assertThatThrownBy(() -> service.append(AuditCommands.unsafeKeyCommand()))
+                .isInstanceOf(AuditValidationException.class);
+
+        assertThat(repository.appended).isEmpty();
+    }
+
+    @Test
+    void rejectsRawIpBeforeRepositoryAppend() {
+        assertThatThrownBy(() -> service.append(AuditCommands.rawIpValueCommand()))
+                .isInstanceOf(AuditValidationException.class);
+
+        assertThat(repository.appended).isEmpty();
+    }
+
+    @Test
     void propagatesRepositoryFailureWithoutSwallowing() {
         AuditAppendService failing = new AuditAppendService(
                 new AuditRecordFactory(

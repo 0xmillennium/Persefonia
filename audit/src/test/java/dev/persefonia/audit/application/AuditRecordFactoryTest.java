@@ -52,6 +52,18 @@ class AuditRecordFactoryTest {
     }
 
     @Test
+    void createsContactStatusRecordWithDurableCommunicationVocabulary() {
+        AuditRecord record = factory.create(AuditCommands.contactStatusChangedCommand());
+
+        assertThat(record.action().value()).isEqualTo("contact_message.status.changed");
+        assertThat(record.entity().context().value()).isEqualTo("communication");
+        assertThat(record.entity().type().value()).isEqualTo("contact_message");
+        assertThat(record.changes().getFirst().oldValue().value()).isEqualTo("NEW");
+        assertThat(record.changes().getFirst().newValue().value()).isEqualTo("READ");
+        assertThat(record.metadata().getFirst().value().value()).isEqualTo("owner_review");
+    }
+
+    @Test
     void rejectsUnsafeCommand() {
         assertThatThrownBy(() -> factory.create(AuditCommands.unsafeValueCommand()))
                 .isInstanceOf(AuditValidationException.class);

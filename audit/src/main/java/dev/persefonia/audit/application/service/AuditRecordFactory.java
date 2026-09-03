@@ -12,7 +12,6 @@ import dev.persefonia.audit.domain.record.AuditRecordId;
 import dev.persefonia.audit.domain.record.AuditedEntityRef;
 import dev.persefonia.audit.domain.record.DisplayName;
 import dev.persefonia.audit.domain.record.RequestId;
-import dev.persefonia.audit.domain.record.SafeAuditValue;
 import dev.persefonia.audit.domain.record.SourceContext;
 import dev.persefonia.audit.domain.record.SourceEntityId;
 import dev.persefonia.audit.domain.record.SourceType;
@@ -23,10 +22,10 @@ import java.util.Objects;
 
 /**
  * Converts a validated {@link AppendAuditRecordCommand} into an {@link AuditRecord}
- * aggregate. It applies the {@link AuditSafeValuePolicy} before constructing any
- * domain value object, preserves command order for changes and metadata, and
- * relies on domain invariants to reject duplicate field paths and metadata keys.
- * It never touches infrastructure.
+ * aggregate. It applies the complete command boundary
+ * {@link AuditSafeValuePolicy}, preserves command order for changes and metadata,
+ * and relies on domain value objects and aggregate invariants as an independent
+ * validation layer. It never touches infrastructure.
  */
 public final class AuditRecordFactory {
     private final AuditSafeValuePolicy policy;
@@ -68,8 +67,8 @@ public final class AuditRecordFactory {
         for (AppendAuditChangeCommand change : command.changes()) {
             changes.add(new AuditChange(
                     policy.fieldPath(change.fieldPath()),
-                    change.oldValue() == null ? null : SafeAuditValue.of(change.oldValue()),
-                    change.newValue() == null ? null : SafeAuditValue.of(change.newValue())));
+                    change.oldValue() == null ? null : policy.auditValue(change.oldValue()),
+                    change.newValue() == null ? null : policy.auditValue(change.newValue())));
         }
         return changes;
     }

@@ -117,6 +117,42 @@ class JdbcAuditRecordRepositoryAdapterTest {
     }
 
     @Test
+    void communicationIdentifiersRoundTripWithChangesAndMetadata() {
+        AuditRecord record = AuditRecord.create(
+                AuditRecordId.newId(),
+                AuditAction.of("contact_message.status.changed"),
+                AuditActorRef.admin(
+                        SourceContext.of("iam"),
+                        SourceType.of("admin_account"),
+                        SourceEntityId.from(UUID.randomUUID()),
+                        DisplayName.of("Jane Admin")),
+                AuditedEntityRef.of("communication", "contact_message", UUID.randomUUID()),
+                null,
+                Instant.parse("2026-06-25T10:00:00Z"),
+                CREATED_AT,
+                List.of(AuditChange.of(
+                        FieldPath.of("status"), SafeAuditValue.of("NEW"), SafeAuditValue.of("READ"))),
+                List.of(AuditMetadataEntry.of(
+                        MetadataKey.of("source.channel"), SafeMetadataValue.of("admin"))));
+
+        adapter.append(record);
+
+        AuditRecord found = adapter.findById(record.id()).orElseThrow();
+        assertThat(found.action().value()).isEqualTo("contact_message.status.changed");
+        assertThat(found.entity().context().value()).isEqualTo("communication");
+        assertThat(found.entity().type().value()).isEqualTo("contact_message");
+        assertThat(found.changes()).singleElement().satisfies(change -> {
+            assertThat(change.fieldPath().value()).isEqualTo("status");
+            assertThat(change.oldValue().value()).isEqualTo("NEW");
+            assertThat(change.newValue().value()).isEqualTo("READ");
+        });
+        assertThat(found.metadata()).singleElement().satisfies(entry -> {
+            assertThat(entry.key().value()).isEqualTo("source.channel");
+            assertThat(entry.value().value()).isEqualTo("admin");
+        });
+    }
+
+    @Test
     void findByIdReturnsEmptyForMissingId() {
         assertThat(adapter.findById(AuditRecordId.newId())).isEmpty();
     }

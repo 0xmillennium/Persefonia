@@ -2,7 +2,7 @@ package dev.persefonia.audit.domain.record;
 
 public record DisplayName(String value) {
     public DisplayName {
-        value = AuditSafeText.displayName(value, "display name");
+        value = AuditTextRules.requiredSingleLine(value, "display name", AuditTextRules.MAX_DISPLAY_LENGTH);
     }
 
     public static DisplayName of(String value) {

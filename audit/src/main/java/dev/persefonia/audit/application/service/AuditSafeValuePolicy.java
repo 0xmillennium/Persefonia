@@ -3,18 +3,26 @@ package dev.persefonia.audit.application.service;
 import dev.persefonia.audit.application.command.AppendAuditChangeCommand;
 import dev.persefonia.audit.application.command.AppendAuditMetadataCommand;
 import dev.persefonia.audit.application.command.AppendAuditRecordCommand;
+import dev.persefonia.audit.domain.record.AuditAction;
+import dev.persefonia.audit.domain.record.AuditActorRef;
 import dev.persefonia.audit.domain.record.AuditValidationException;
+import dev.persefonia.audit.domain.record.AuditedEntityRef;
+import dev.persefonia.audit.domain.record.DisplayName;
 import dev.persefonia.audit.domain.record.FieldPath;
 import dev.persefonia.audit.domain.record.MetadataKey;
+import dev.persefonia.audit.domain.record.RequestId;
 import dev.persefonia.audit.domain.record.SafeAuditValue;
 import dev.persefonia.audit.domain.record.SafeMetadataValue;
+import dev.persefonia.audit.domain.record.SourceContext;
+import dev.persefonia.audit.domain.record.SourceEntityId;
+import dev.persefonia.audit.domain.record.SourceType;
+import java.time.Instant;
 import java.util.Objects;
 
 /**
- * Validates that an append command and every field path, metadata key, audit
- * value, and metadata value it carries is privacy-safe before it can reach the
- * repository. It delegates per-value rules to the domain value objects, which are
- * the single source of truth, and adds command-level actor-shape checks.
+ * Validates the complete append command before it can reach the repository. It
+ * delegates identifier, display, correlation, key, and persisted-value checks to
+ * domain value objects and adds command-level actor-shape checks.
  *
  * <p>Rejection messages name the offending category only; they never echo the
  * rejected raw value.
@@ -22,7 +30,13 @@ import java.util.Objects;
 public final class AuditSafeValuePolicy {
     public void validate(AppendAuditRecordCommand command) {
         Objects.requireNonNull(command, "command");
-        validateActorShape(command);
+        AuditAction.of(command.action());
+        validateActor(command);
+        AuditedEntityRef.of(command.entityContext(), command.entityType(), command.entityId());
+        requireOccurredAt(command.occurredAt());
+        if (command.requestId() != null) {
+            RequestId.of(command.requestId());
+        }
         for (AppendAuditChangeCommand change : command.changes()) {
             validateChange(change);
         }
@@ -47,7 +61,7 @@ public final class AuditSafeValuePolicy {
         return SafeMetadataValue.of(value);
     }
 
-    private void validateActorShape(AppendAuditRecordCommand command) {
+    private void validateActor(AppendAuditRecordCommand command) {
         switch (command.actorType()) {
             case ADMIN -> {
                 if (command.actorContext() == null
@@ -57,6 +71,11 @@ public final class AuditSafeValuePolicy {
                     throw new AuditValidationException(
                             "admin actor requires context, source type, id, and display");
                 }
+                AuditActorRef.admin(
+                        SourceContext.of(command.actorContext()),
+                        SourceType.of(command.actorSourceType()),
+                        SourceEntityId.from(command.actorId()),
+                        DisplayName.of(command.actorDisplay()));
             }
             case SYSTEM -> {
                 if (command.actorContext() != null
@@ -68,7 +87,14 @@ public final class AuditSafeValuePolicy {
                 if (command.actorDisplay() == null) {
                     throw new AuditValidationException("system actor requires a display");
                 }
+                AuditActorRef.system(DisplayName.of(command.actorDisplay()));
             }
+        }
+    }
+
+    private static void requireOccurredAt(Instant occurredAt) {
+        if (occurredAt == null) {
+            throw new AuditValidationException("audit occurrence time must not be null");
         }
     }
 

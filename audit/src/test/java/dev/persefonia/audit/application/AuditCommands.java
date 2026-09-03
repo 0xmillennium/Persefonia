@@ -50,8 +50,25 @@ final class AuditCommands {
                 List.of());
     }
 
+    static AppendAuditRecordCommand contactStatusChangedCommand() {
+        return new AppendAuditRecordCommand(
+                "contact_message.status.changed",
+                AuditActorType.ADMIN,
+                "iam",
+                "admin_account",
+                UUID.randomUUID(),
+                "Jane Admin",
+                "communication",
+                "contact_message",
+                UUID.randomUUID(),
+                "req-contact-status-1",
+                OCCURRED_AT,
+                List.of(new AppendAuditChangeCommand("status", "NEW", "READ")),
+                List.of(new AppendAuditMetadataCommand("reason", "owner_review")));
+    }
+
     static AppendAuditRecordCommand unsafeValueCommand() {
-        String unsafe = "pass" + "word=hunter2";
+        String unsafe = "password=hunter2";
         return new AppendAuditRecordCommand(
                 "content.published",
                 AuditActorType.SYSTEM,
@@ -65,6 +82,40 @@ final class AuditCommands {
                 null,
                 OCCURRED_AT,
                 List.of(new AppendAuditChangeCommand("title", null, unsafe)),
+                List.of());
+    }
+
+    static AppendAuditRecordCommand unsafeKeyCommand() {
+        return new AppendAuditRecordCommand(
+                "contact_message.status.changed",
+                AuditActorType.ADMIN,
+                "iam",
+                "admin_account",
+                UUID.randomUUID(),
+                "Jane Admin",
+                "communication",
+                "contact_message",
+                UUID.randomUUID(),
+                null,
+                OCCURRED_AT,
+                List.of(new AppendAuditChangeCommand("sender_email", null, "changed")),
+                List.of());
+    }
+
+    static AppendAuditRecordCommand rawIpValueCommand() {
+        return new AppendAuditRecordCommand(
+                "contact_message.status.changed",
+                AuditActorType.SYSTEM,
+                null,
+                null,
+                null,
+                "System",
+                "communication",
+                "contact_message",
+                UUID.randomUUID(),
+                null,
+                OCCURRED_AT,
+                List.of(new AppendAuditChangeCommand("status", "NEW", "8.8.8.8")),
                 List.of());
     }
 }
