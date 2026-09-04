@@ -4,6 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dev.persefonia.taxonomy.application.authorization.TaxonomyCommandActor;
+import dev.persefonia.contentpublishing.application.authorization.ContentCommandActor;
+import dev.persefonia.contentpublishing.application.command.CreateSeriesCommand;
+import dev.persefonia.contentpublishing.application.service.SeriesCommandGateway;
+import dev.persefonia.contentpublishing.domain.common.AdminIdentityRef;
+import dev.persefonia.contentpublishing.domain.content.ContentLanguage;
 import dev.persefonia.taxonomy.application.command.CreateTagCommand;
 import dev.persefonia.taxonomy.application.command.TagCommandResult;
 import dev.persefonia.taxonomy.application.service.TagCommandGateway;
@@ -39,6 +44,7 @@ class TaxonomyAuditTransactionIntegrationTest {
     }
 
     @Autowired TagCommandGateway gateway;
+    @Autowired SeriesCommandGateway seriesGateway;
     @Autowired TagRepository tags;
     @Autowired JdbcTemplate jdbc;
     @Autowired TransactionTemplate transactions;
@@ -60,7 +66,8 @@ class TaxonomyAuditTransactionIntegrationTest {
                 .createSchemas(true)
                 .load()
                 .migrate();
-        jdbc.execute("TRUNCATE taxonomy.tags, discovery.discoverable_resources, audit.audit_records CASCADE");
+        jdbc.execute("TRUNCATE taxonomy.tags, publishing.series, discovery.discoverable_resources, "
+                + "audit.audit_records, operations.cache_invalidation_batches CASCADE");
     }
 
     @Test
@@ -71,6 +78,23 @@ class TaxonomyAuditTransactionIntegrationTest {
         assertThat(jdbc.queryForObject(
                 "SELECT count(*) FROM audit.audit_records WHERE action = 'tag.created'", Long.class))
                 .isEqualTo(1);
+        assertThat(jdbc.queryForObject(
+                "SELECT count(*) FROM operations.cache_invalidation_batches", Long.class)).isZero();
+    }
+
+    @Test
+    void successfulSeriesCreateCommitsWithoutCacheExecutionOrBatch() {
+        var actor = new ContentCommandActor(AdminIdentityRef.from(UUID.randomUUID()), true, true);
+
+        seriesGateway.create(new CreateSeriesCommand(
+                actor, ContentLanguage.EN, "Series", "series-zero-cache", "Description", NOW));
+
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM publishing.series", Long.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject(
+                "SELECT count(*) FROM audit.audit_records WHERE action = 'series.created'", Long.class))
+                .isEqualTo(1);
+        assertThat(jdbc.queryForObject(
+                "SELECT count(*) FROM operations.cache_invalidation_batches", Long.class)).isZero();
     }
 
     @Test

@@ -7,6 +7,15 @@ plugins {
     java
 }
 
+springBoot {
+    buildInfo {
+        excludes.set(setOf("group", "artifact", "time"))
+        properties {
+            name.set("persefonia")
+        }
+    }
+}
+
 val precompiledJteDirectory = layout.buildDirectory.dir("generated/jte-classes")
 
 jte {

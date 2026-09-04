@@ -88,7 +88,7 @@ class PublicCacheInvalidationSignalMatrixTest {
     }
 
     @Test
-    void seriesCreateUpdateSlugArchiveAndEntryMutationsTargetOldAndCurrentRoutes() {
+    void seriesUpdateSlugArchiveAndEntryMutationsTargetOldAndCurrentRoutes() {
         for (var change : PublicCacheInvalidationSignal.SeriesChange.values()) {
             execution.clear();
             coordinator().handle(new PublicCacheInvalidationSignal.SeriesChanged(change,
@@ -122,7 +122,7 @@ class PublicCacheInvalidationSignalMatrixTest {
     }
 
     @Test
-    void tagCreateUpdateArchiveAndProjectDependenciesProduceExactPublicSurfaces() {
+    void tagUpdateArchiveAndProjectDependenciesProduceExactPublicSurfaces() {
         var surface = new ProjectPublicSurface(
                 Map.of(dev.persefonia.profileportfolio.domain.common.ContentLanguage.EN,
                         new PublicUrl("/en/projects/example")), true, true);

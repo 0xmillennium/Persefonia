@@ -5,6 +5,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import dev.persefonia.app.platformoperations.cache.config.CachePurgeProperties;
+import dev.persefonia.app.medialibrary.storage.MediaStorageReadinessService;
 import dev.persefonia.platformoperations.application.operations.*;
 import dev.persefonia.platformoperations.domain.cache.CachePurgeProvider;
 import org.junit.jupiter.api.Test;
@@ -34,12 +35,13 @@ class ActuatorOperationsHealthAdapterTest {
         properties.setProvider(CachePurgeProvider.CLOUDFLARE);
 
         OperationsHealthSnapshot snapshot =
-                new ActuatorOperationsHealthAdapter(provider, migrations, properties).snapshot();
+                new ActuatorOperationsHealthAdapter(provider, migrations, properties, readyMedia()).snapshot();
 
         assertThat(snapshot).isEqualTo(new OperationsHealthSnapshot(
                 OperationsComponentStatus.UP,
                 OperationsComponentStatus.DOWN,
                 OperationsComponentStatus.UNKNOWN,
+                OperationsComponentStatus.UP,
                 CachePurgeProvider.CLOUDFLARE,
                 OperationsComponentStatus.UP,
                 migrationStatus));
@@ -54,7 +56,7 @@ class ActuatorOperationsHealthAdapterTest {
         when(migrations.status()).thenReturn(new MigrationStatusSummary(null, null, 0, MigrationStatus.UNKNOWN));
 
         OperationsHealthSnapshot snapshot = new ActuatorOperationsHealthAdapter(
-                provider, migrations, new CachePurgeProperties()).snapshot();
+                provider, migrations, new CachePurgeProperties(), emptyMedia()).snapshot();
 
         assertThat(snapshot.application()).isEqualTo(OperationsComponentStatus.UNKNOWN);
         assertThat(snapshot.database()).isEqualTo(OperationsComponentStatus.UNKNOWN);
@@ -65,5 +67,21 @@ class ActuatorOperationsHealthAdapterTest {
         HealthDescriptor descriptor = mock(IndicatedHealthDescriptor.class);
         when(descriptor.getStatus()).thenReturn(status);
         return descriptor;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static ObjectProvider<MediaStorageReadinessService> emptyMedia() {
+        ObjectProvider<MediaStorageReadinessService> provider = mock(ObjectProvider.class);
+        when(provider.getIfAvailable()).thenReturn(null);
+        return provider;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static ObjectProvider<MediaStorageReadinessService> readyMedia() {
+        ObjectProvider<MediaStorageReadinessService> provider = mock(ObjectProvider.class);
+        MediaStorageReadinessService readiness = mock(MediaStorageReadinessService.class);
+        when(readiness.isRuntimeReady()).thenReturn(true);
+        when(provider.getIfAvailable()).thenReturn(readiness);
+        return provider;
     }
 }

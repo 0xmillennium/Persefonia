@@ -8,20 +8,24 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.health.actuate.endpoint.HealthDescriptor;
 import org.springframework.boot.health.actuate.endpoint.HealthEndpoint;
 import org.springframework.stereotype.Component;
+import dev.persefonia.app.medialibrary.storage.MediaStorageReadinessService;
 
 @Component
 public final class ActuatorOperationsHealthAdapter implements OperationsHealthQueryPort {
     private final ObjectProvider<HealthEndpoint> health;
     private final FlywayMigrationStatusAdapter migrations;
     private final CachePurgeProperties cachePurge;
+    private final ObjectProvider<MediaStorageReadinessService> mediaStorage;
 
     public ActuatorOperationsHealthAdapter(
             ObjectProvider<HealthEndpoint> health,
             FlywayMigrationStatusAdapter migrations,
-            CachePurgeProperties cachePurge) {
+            CachePurgeProperties cachePurge,
+            ObjectProvider<MediaStorageReadinessService> mediaStorage) {
         this.health = Objects.requireNonNull(health, "health");
         this.migrations = Objects.requireNonNull(migrations, "migrations");
         this.cachePurge = Objects.requireNonNull(cachePurge, "cachePurge");
+        this.mediaStorage = Objects.requireNonNull(mediaStorage, "mediaStorage");
     }
 
     @Override
@@ -31,9 +35,16 @@ public final class ActuatorOperationsHealthAdapter implements OperationsHealthQu
                 component(endpoint, null),
                 component(endpoint, "db"),
                 component(endpoint, "redis"),
+                mediaStorageStatus(),
                 cachePurge.getProvider(),
                 cachePurge.getProvider() == null ? OperationsComponentStatus.UNKNOWN : OperationsComponentStatus.UP,
                 migrations.status());
+    }
+
+    private OperationsComponentStatus mediaStorageStatus() {
+        MediaStorageReadinessService readiness = mediaStorage.getIfAvailable();
+        return readiness == null ? OperationsComponentStatus.UNKNOWN
+                : readiness.isRuntimeReady() ? OperationsComponentStatus.UP : OperationsComponentStatus.DOWN;
     }
 
     private static OperationsComponentStatus component(HealthEndpoint endpoint, String path) {

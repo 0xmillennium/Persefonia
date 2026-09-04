@@ -7,6 +7,7 @@ public record OperationsHealthSnapshot(
         OperationsComponentStatus application,
         OperationsComponentStatus database,
         OperationsComponentStatus redis,
+        OperationsComponentStatus mediaStorage,
         CachePurgeProvider cacheProvider,
         OperationsComponentStatus cacheProviderReadiness,
         MigrationStatusSummary migrations) {
@@ -14,6 +15,7 @@ public record OperationsHealthSnapshot(
         Objects.requireNonNull(application, "application");
         Objects.requireNonNull(database, "database");
         Objects.requireNonNull(redis, "redis");
+        Objects.requireNonNull(mediaStorage, "mediaStorage");
         Objects.requireNonNull(cacheProvider, "cacheProvider");
         Objects.requireNonNull(cacheProviderReadiness, "cacheProviderReadiness");
         Objects.requireNonNull(migrations, "migrations");

@@ -1,6 +1,7 @@
 package dev.persefonia.webadmin.operations;
 
 import dev.persefonia.platformoperations.application.operations.*;
+import dev.persefonia.platformoperations.application.recovery.RecoveryVerificationQueryPort;
 import dev.persefonia.platformoperations.domain.cache.CacheInvalidationBatchId;
 import dev.persefonia.platformoperations.domain.cache.CacheInvalidationStatus;
 import java.time.Clock;
@@ -22,6 +23,7 @@ public final class AdminOperationsController {
     private final AdminOperationsActorResolver actors;
     private final AdminOperationsPageChromeFactory chrome;
     private final Clock clock;
+    private final RecoveryVerificationQueryPort recoveryVerification;
 
     public AdminOperationsController(
             CacheInvalidationOperationsQueryPort cacheQueries,
@@ -29,13 +31,31 @@ public final class AdminOperationsController {
             CacheInvalidationRecoveryGateway recovery,
             AdminOperationsActorResolver actors,
             AdminOperationsPageChromeFactory chrome,
-            Clock clock) {
+            Clock clock,
+            RecoveryVerificationQueryPort recoveryVerification) {
         this.cacheQueries = Objects.requireNonNull(cacheQueries, "cacheQueries");
         this.healthQueries = Objects.requireNonNull(healthQueries, "healthQueries");
         this.recovery = Objects.requireNonNull(recovery, "recovery");
         this.actors = Objects.requireNonNull(actors, "actors");
         this.chrome = Objects.requireNonNull(chrome, "chrome");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.recoveryVerification = Objects.requireNonNull(recoveryVerification, "recoveryVerification");
+    }
+
+    @GetMapping("/admin/operations/recovery")
+    public String recovery(Authentication authentication, CsrfToken csrfToken, Model model) {
+        var context = recoveryVerification.context();
+        model.addAttribute("page", new AdminOperationsRecoveryPage(
+                chrome.create(authentication, csrfToken), context, null));
+        return "admin/operations/recovery";
+    }
+
+    @PostMapping("/admin/operations/recovery/verify")
+    public String verifyRecovery(Authentication authentication, CsrfToken csrfToken, Model model) {
+        var report = recoveryVerification.verify();
+        model.addAttribute("page", new AdminOperationsRecoveryPage(
+                chrome.create(authentication, csrfToken), report.context(), report));
+        return "admin/operations/recovery";
     }
 
     @GetMapping("/admin/operations")

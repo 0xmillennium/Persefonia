@@ -31,11 +31,54 @@ class AdminOperationsControllerTest {
     @Autowired MockMvc mvc;
     @Autowired AdminOperationsTestConfiguration.TestQueries queries;
     @Autowired AdminOperationsTestConfiguration.TestRecovery recovery;
+    @Autowired AdminOperationsTestConfiguration.TestRecoveryVerification verification;
 
     @BeforeEach void reset() {
         recovery.result = CacheRecoveryCommandResult.ACCEPTED;
         recovery.initial = recovery.retry = recovery.resume = 0;
         queries.detailAction = CacheRecoveryAction.RESUME_STRANDED;
+        verification.contextCalls = verification.verifyCalls = 0;
+    }
+
+    @Test
+    void ownerRecoveryGetIsCheapPrivateAndShowsSafeCompatibilityContext() throws Exception {
+        mvc.perform(get("/admin/operations/recovery").with(owner()))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", allOf(containsString("no-store"), containsString("private"))))
+                .andExpect(content().string(containsString("noindex,nofollow,noarchive")))
+                .andExpect(content().string(containsString("0.1.0-SNAPSHOT")))
+                .andExpect(content().string(containsString("PostgreSQL business metadata together with durable Media storage")))
+                .andExpect(content().string(containsString("does not prove that external backups were captured from the same recovery point")))
+                .andExpect(content().string(containsString("Deep verification has not been run")));
+        assertThat(verification.contextCalls).isEqualTo(1);
+        assertThat(verification.verifyCalls).isZero();
+    }
+
+    @Test
+    void ownerRecoveryPostRequiresCsrfAndRendersEphemeralEscapedReportExactlyOnce() throws Exception {
+        mvc.perform(post("/admin/operations/recovery/verify").with(owner()))
+                .andExpect(status().isForbidden());
+        assertThat(verification.verifyCalls).isZero();
+
+        mvc.perform(post("/admin/operations/recovery/verify").with(owner()).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("INCONSISTENT")))
+                .andExpect(content().string(containsString(AdminOperationsTestConfiguration.NOW.toString())))
+                .andExpect(content().string(containsString("CHECKSUM_MISMATCH")))
+                .andExpect(content().string(containsString("DISCOVERY_OG_IMAGE")))
+                .andExpect(content().string(containsString("&lt;script&gt;")))
+                .andExpect(content().string(not(containsString("<script>"))));
+        assertThat(verification.verifyCalls).isEqualTo(1);
+    }
+
+    @Test
+    void recoveryRoutesAreOwnerOnly() throws Exception {
+        mvc.perform(get("/admin/operations/recovery")).andExpect(status().is4xxClientError());
+        mvc.perform(post("/admin/operations/recovery/verify").with(csrf())).andExpect(status().is4xxClientError());
+        mvc.perform(get("/admin/operations/recovery").with(editor())).andExpect(status().isForbidden());
+        mvc.perform(post("/admin/operations/recovery/verify").with(editor()).with(csrf()))
+                .andExpect(status().isForbidden());
+        assertThat(verification.contextCalls + verification.verifyCalls).isZero();
     }
 
     @Test

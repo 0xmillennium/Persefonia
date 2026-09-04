@@ -50,7 +50,6 @@ public class TransactionalSeriesCommandGateway implements SeriesCommandGateway {
     public SeriesResult create(CreateSeriesCommand command) {
         SeriesResult result = service.create(command);
         audit.append(auditMapper.seriesCreated(command, result));
-        cacheInvalidation.register(new PublicCacheInvalidationSignal.SeriesChanged(SeriesChange.CREATE, result));
         return result;
     }
 

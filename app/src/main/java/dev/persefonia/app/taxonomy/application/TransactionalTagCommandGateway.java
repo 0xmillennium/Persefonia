@@ -47,7 +47,6 @@ public class TransactionalTagCommandGateway implements TagCommandGateway {
     public TagCommandResult create(CreateTagCommand command) {
         TagCommandResult result = service.create(command);
         audit.append(auditMapper.created(command, result));
-        cacheInvalidation.register(new PublicCacheInvalidationSignal.TagChanged(TagChange.CREATE, result));
         return result;
     }
 

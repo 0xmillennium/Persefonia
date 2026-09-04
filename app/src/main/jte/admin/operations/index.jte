@@ -10,6 +10,7 @@
                 <dt>Application</dt><dd>${page.health().application().name()}</dd>
                 <dt>Database</dt><dd>${page.health().database().name()}</dd>
                 <dt>Redis</dt><dd>${page.health().redis().name()}</dd>
+                <dt>Media Storage</dt><dd>${page.health().mediaStorage().name()}</dd>
                 <dt>Cache purge provider</dt><dd>${page.health().cacheProvider().name()} — ${page.health().cacheProviderReadiness().name()}</dd>
                 <dt>Database migrations</dt><dd>${page.health().migrations().status().name()}</dd>
                 <dt>Current applied migration</dt><dd>${page.health().migrations().currentAppliedVersionOptional().orElse("Unknown")}</dd>
@@ -19,6 +20,12 @@
             @if(page.health().redis().name().equals("DOWN"))
                 <p>Contact rate limiting is unavailable.</p>
             @endif
+        </section>
+
+        <section>
+            <h2>Recovery readiness</h2>
+            <p>Review the PostgreSQL and durable Media recovery unit and run an explicit consistency verification.</p>
+            <p><a href="/admin/operations/recovery">Open recovery diagnostics</a></p>
         </section>
 
         <section>

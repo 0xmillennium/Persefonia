@@ -2,6 +2,7 @@ package dev.persefonia.app.webadmin.operations;
 
 import dev.persefonia.platformoperations.application.operations.*;
 import dev.persefonia.platformoperations.domain.cache.*;
+import dev.persefonia.platformoperations.application.recovery.*;
 import java.time.Instant;
 import java.util.*;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -18,8 +19,32 @@ class AdminOperationsTestConfiguration {
     @Bean @Primary OperationsHealthQueryPort operationsHealth() {
         return () -> new OperationsHealthSnapshot(
                 OperationsComponentStatus.UP, OperationsComponentStatus.UP, OperationsComponentStatus.DOWN,
+                OperationsComponentStatus.UP,
                 CachePurgeProvider.LOCAL, OperationsComponentStatus.UP,
                 new MigrationStatusSummary("21", "21", 0, MigrationStatus.UP_TO_DATE));
+    }
+    @Bean @Primary TestRecoveryVerification recoveryVerification() { return new TestRecoveryVerification(); }
+
+    static final class TestRecoveryVerification implements RecoveryVerificationQueryPort {
+        int contextCalls;
+        int verifyCalls;
+        private final RecoveryVerificationContext context = new RecoveryVerificationContext(
+                new ApplicationReleaseInfo("persefonia", "0.1.0-SNAPSHOT"),
+                new MigrationStatusSummary("21", "21", 0, MigrationStatus.UP_TO_DATE),
+                OperationsComponentStatus.UP);
+        @Override public RecoveryVerificationContext context() { contextCalls++; return context; }
+        @Override public RecoveryVerificationReport verify() {
+            verifyCalls++;
+            return new RecoveryVerificationReport(context, RecoveryVerificationStatus.INCONSISTENT, NOW,
+                    new RecoveryMediaIntegritySummary(2, 1, 0, 0, 1, 1,
+                            List.of(new RecoveryMediaIssue(
+                                    RecoveryMediaIssueCategory.CHECKSUM_MISMATCH,
+                                    RecoveryMediaObjectKind.VARIANT, BATCH_ID, "<script>")), false),
+                    new DurableAssetReferenceIntegritySummary(1, 1,
+                            List.of(new DurableAssetReferenceIssue(
+                                    DurableAssetReferenceKind.DISCOVERY_OG_IMAGE, BATCH_ID,
+                                    UUID.fromString("22222222-2222-2222-2222-222222222222"))), false));
+        }
     }
 
     static final class TestQueries implements CacheInvalidationOperationsQueryPort {

@@ -22,8 +22,11 @@ import dev.persefonia.medialibrary.application.upload.ChecksumCalculator;
 import dev.persefonia.medialibrary.application.upload.MediaContentSniffer;
 import dev.persefonia.medialibrary.application.upload.UploadAssetCommandService;
 import dev.persefonia.medialibrary.application.upload.UploadValidationPolicy;
+import dev.persefonia.medialibrary.application.recovery.MediaRecoveryConsistencyService;
+import dev.persefonia.medialibrary.application.recovery.MediaRecoveryInventoryReadPort;
 import java.time.Clock;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -44,6 +47,13 @@ public class MediaStorageConfiguration {
     @Bean
     AssetStoragePort assetStoragePort(MediaStorageReadinessService readiness) {
         return new LocalFileAssetStorageAdapter(readiness.storageRoot());
+    }
+
+    @Bean
+    @ConditionalOnBean(MediaRecoveryInventoryReadPort.class)
+    MediaRecoveryConsistencyService mediaRecoveryConsistencyService(
+            MediaRecoveryInventoryReadPort inventory, AssetStoragePort storage) {
+        return new MediaRecoveryConsistencyService(inventory, storage);
     }
 
     @Bean
