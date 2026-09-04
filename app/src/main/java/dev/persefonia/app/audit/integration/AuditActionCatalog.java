@@ -30,6 +30,12 @@ public final class AuditActionCatalog {
     public static final String REDIRECT_DEACTIVATED = "redirect.deactivated";
     public static final String CONTACT_MESSAGE_STATUS_CHANGED = "contact_message.status.changed";
     public static final String ADMIN_ACCOUNT_BOOTSTRAPPED = "admin_account.bootstrapped";
+    public static final String CACHE_INVALIDATION_INITIAL_EXECUTION_REQUESTED =
+            "cache_invalidation.initial_execution.requested";
+    public static final String CACHE_INVALIDATION_RETRY_REQUESTED =
+            "cache_invalidation.retry.requested";
+    public static final String CACHE_INVALIDATION_STRANDED_RESUME_REQUESTED =
+            "cache_invalidation.stranded_resume.requested";
 
     private AuditActionCatalog() {
     }

@@ -38,6 +38,7 @@ persefonia:
     provider: ${PERSEFONIA_CACHE_PURGE_PROVIDER:LOCAL}
     connect-timeout: ${PERSEFONIA_CACHE_PURGE_CONNECT_TIMEOUT:2s}
     read-timeout: ${PERSEFONIA_CACHE_PURGE_READ_TIMEOUT:5s}
+    stranded-after: ${PERSEFONIA_CACHE_PURGE_STRANDED_AFTER:15m}
     cloudflare:
       zone-id: ${PERSEFONIA_CLOUDFLARE_ZONE_ID:}
       api-token: ${PERSEFONIA_CLOUDFLARE_API_TOKEN:}

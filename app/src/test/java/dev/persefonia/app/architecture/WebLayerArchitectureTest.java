@@ -55,6 +55,7 @@ class WebLayerArchitectureTest {
                 .and().resideOutsideOfPackage("dev.persefonia.webadmin.analytics..")
                 .and().resideOutsideOfPackage("dev.persefonia.webadmin.discovery..")
                 .and().resideOutsideOfPackage("dev.persefonia.webadmin.audit..")
+                .and().resideOutsideOfPackage("dev.persefonia.webadmin.operations..")
                 .should().dependOnClassesThat().resideInAnyPackage(
                         "dev.persefonia.app..",
                         "dev.persefonia.identityaccess..",
@@ -81,6 +82,26 @@ class WebLayerArchitectureTest {
                         "org.postgresql..",
                         "io.lettuce..",
                         "redis.clients..")
+                .allowEmptyShould(true)
+                .check(ArchitectureTestSupport.PRODUCTION_CLASSES);
+    }
+
+    @Test
+    void adminOperationsWebUsesContractsWithoutCompositionPersistenceOrProviders() {
+        noClasses()
+                .that().resideInAPackage("dev.persefonia.webadmin.operations..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "dev.persefonia.app..",
+                        "dev.persefonia.platformoperations.infrastructure..",
+                        "org.springframework.data..",
+                        "org.springframework.jdbc..",
+                        "org.flywaydb..",
+                        "org.postgresql..",
+                        "io.lettuce..",
+                        "redis.clients..")
+                .orShould().dependOnClassesThat().haveSimpleNameEndingWith("Repository")
+                .orShould().dependOnClassesThat().haveSimpleNameEndingWith("Provider")
+                .orShould().dependOnClassesThat().haveSimpleNameEndingWith("Adapter")
                 .allowEmptyShould(true)
                 .check(ArchitectureTestSupport.PRODUCTION_CLASSES);
     }

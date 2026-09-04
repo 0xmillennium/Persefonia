@@ -38,6 +38,7 @@ class PublicCachePostCommitTimingTest {
             @Override public void requestAndExecute(CacheInvalidationRequest request) { executions.incrementAndGet(); }
             @Override public void executeInitial(CacheInvalidationBatchId batchId) { }
             @Override public void executeManualRetry(CacheInvalidationBatchId batchId) { }
+            @Override public void resumeStranded(CacheInvalidationBatchId batchId) { }
         };
         var coordinator = new PublicCacheInvalidationCoordinator(
                 (id, limit) -> new dev.persefonia.contentpublishing.application.publicview.ContentPublicSurfaceDependencies(

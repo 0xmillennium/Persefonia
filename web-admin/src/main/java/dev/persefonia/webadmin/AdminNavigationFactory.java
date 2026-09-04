@@ -21,6 +21,7 @@ public final class AdminNavigationFactory {
                 link(AdminNavigationSection.CONTACT, activeSection, "Contact", "/admin/contact"),
                 link(AdminNavigationSection.ANALYTICS, activeSection, "Analytics", "/admin/analytics"),
                 link(AdminNavigationSection.AUDIT, activeSection, "Audit", "/admin/audit"),
+                link(AdminNavigationSection.OPERATIONS, activeSection, "Operations", "/admin/operations"),
                 link(AdminNavigationSection.SETTINGS, activeSection, "Settings", "/admin/settings/site"));
     }
 

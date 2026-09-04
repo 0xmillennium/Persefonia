@@ -88,7 +88,7 @@ public sealed interface PublicCacheInvalidationSignal {
         @Override public String kind() { return "redirect.changed"; }
     }
 
-    enum SeriesChange { UPDATE, ARCHIVE, ENTRY_ADD, ENTRY_REMOVE, ENTRY_REORDER }
+    enum SeriesChange { CREATE, UPDATE, ARCHIVE, ENTRY_ADD, ENTRY_REMOVE, ENTRY_REORDER }
     enum TranslationChange { ADD, REMOVE }
-    enum TagChange { UPDATE, ARCHIVE }
+    enum TagChange { CREATE, UPDATE, ARCHIVE }
 }

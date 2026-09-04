@@ -97,7 +97,7 @@ public final class PublicCacheInvalidationCoordinator {
         Set<TagId> tagIds = new LinkedHashSet<>();
         facts.oldTagIds().forEach(id -> tagIds.add(TagId.from(id.value())));
         facts.newTagIds().forEach(id -> tagIds.add(TagId.from(id.value())));
-        var routes = tagRouteQuery.findActiveRoutes(
+        var routes = tagRouteQuery.findExistingPublicRoutes(
                 tagIds, DiscoveryLanguage.valueOf(facts.language().name()), DEPENDENCY_QUERY_LIMIT);
         rejectDependencyOverflow(routes);
         return values(routes);

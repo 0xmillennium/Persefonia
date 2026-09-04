@@ -14,6 +14,8 @@ public final class AuditEntityCatalog {
     public static final Entity REDIRECT_RULE = new Entity("discovery", "redirect_rule");
     public static final Entity CONTACT_MESSAGE = new Entity("communication", "contact_message");
     public static final Entity ADMIN_ACCOUNT = new Entity("iam", "admin_account");
+    public static final Entity CACHE_INVALIDATION_BATCH =
+            new Entity("platform_operations", "cache_invalidation_batch");
 
     private AuditEntityCatalog() {
     }

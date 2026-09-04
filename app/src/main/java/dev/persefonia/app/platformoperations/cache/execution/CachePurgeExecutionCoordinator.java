@@ -19,14 +19,17 @@ public class CachePurgeExecutionCoordinator implements CacheInvalidationExecutio
     private final CachePurgeTransactionService transactions;
     private final NonTransactionalCachePurgeInvoker providerInvoker;
     private final Clock clock;
+    private final CachePurgeMetrics metrics;
 
     public CachePurgeExecutionCoordinator(
             CachePurgeTransactionService transactions,
             NonTransactionalCachePurgeInvoker providerInvoker,
-            Clock clock) {
+            Clock clock,
+            CachePurgeMetrics metrics) {
         this.transactions = Objects.requireNonNull(transactions, "transactions");
         this.providerInvoker = Objects.requireNonNull(providerInvoker, "providerInvoker");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.metrics = Objects.requireNonNull(metrics, "metrics");
     }
 
     @Override
@@ -44,11 +47,17 @@ public class CachePurgeExecutionCoordinator implements CacheInvalidationExecutio
         execute(() -> transactions.reserveManualRetry(batchId), batchId);
     }
 
+    @Override
+    public void resumeStranded(CacheInvalidationBatchId batchId) {
+        execute(() -> transactions.reserveStrandedReplay(batchId), batchId);
+    }
+
     private void execute(Supplier<CachePurgeWorkItem> reservation, CacheInvalidationBatchId requestedBatchId) {
         CachePurgeWorkItem workItem;
         try {
             workItem = reservation.get();
         } catch (RuntimeException operationalFailure) {
+            metrics.reservationFailure();
             LOGGER.warn("Cache purge reservation failed. batchId={} phase=reservation",
                     safeId(requestedBatchId));
             return;
@@ -71,9 +80,14 @@ public class CachePurgeExecutionCoordinator implements CacheInvalidationExecutio
                     workItem.batchId().value(), workItem.attemptNumber(), invocation.provider(),
                     invocation.result().failureReason());
         }
+        metrics.providerExecution(invocation.provider(), invocation.result().result());
+        if (invocation.result().result() == CachePurgeResult.FAILED) {
+            metrics.providerFailure(invocation.provider(), invocation.result().failureReason());
+        }
         try {
             transactions.recordResult(workItem, invocation.provider(), invocation.result(), attemptedAt, recordedAt);
         } catch (RuntimeException operationalFailure) {
+            metrics.resultPersistenceFailure();
             LOGGER.warn("Cache purge result persistence failed. batchId={} attemptNumber={} phase=result_persistence",
                     workItem.batchId().value(), workItem.attemptNumber());
         }

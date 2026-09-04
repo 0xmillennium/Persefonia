@@ -71,6 +71,7 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.POST, "/logout").authenticated()
                         .requestMatchers(HttpMethod.GET, "/admin/analytics").hasRole("OWNER")
                         .requestMatchers("/admin/audit", "/admin/audit/**").hasRole("OWNER")
+                        .requestMatchers("/admin/operations", "/admin/operations/**").hasRole("OWNER")
                         .requestMatchers("/admin", "/admin/**").authenticated()
                         .requestMatchers(HttpMethod.GET, PUBLIC_CONTENT_GET_PATTERNS).permitAll()
                         .requestMatchers(HttpMethod.GET, PUBLIC_TAG_GET_PATTERNS).permitAll()

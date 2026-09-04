@@ -7,5 +7,5 @@ import java.util.List;
 import java.util.Set;
 
 public interface TagPublicRouteQuery {
-    List<PublicUrl> findActiveRoutes(Set<TagId> tagIds, DiscoveryLanguage language, int limit);
+    List<PublicUrl> findExistingPublicRoutes(Set<TagId> tagIds, DiscoveryLanguage language, int limit);
 }

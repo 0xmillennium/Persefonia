@@ -12,11 +12,12 @@ import java.util.Objects;
 public record CachePurgeWorkItem(
         CacheInvalidationBatchId batchId,
         int attemptNumber,
+        long reservationVersion,
         List<CachePurgeProviderTarget> pendingTargets) {
     public CachePurgeWorkItem {
         Objects.requireNonNull(batchId, "batchId");
         pendingTargets = List.copyOf(Objects.requireNonNull(pendingTargets, "pendingTargets"));
-        if (attemptNumber < 1 || attemptNumber > 3 || pendingTargets.isEmpty()) {
+        if (attemptNumber < 1 || attemptNumber > 3 || reservationVersion < 1 || pendingTargets.isEmpty()) {
             throw new CacheInvalidationValidationException("reserved purge work item is invalid");
         }
     }
@@ -26,7 +27,7 @@ public record CachePurgeWorkItem(
                 .filter(target -> target.status() == CacheTargetStatus.PENDING)
                 .map(target -> new CachePurgeProviderTarget(target.id(), target.targetType(), target.value()))
                 .toList();
-        return new CachePurgeWorkItem(batch.id(), batch.attempts().size() + 1, targets);
+        return new CachePurgeWorkItem(batch.id(), batch.attempts().size() + 1, batch.version(), targets);
     }
 
     CachePurgeProviderRequest providerRequest() {

@@ -25,9 +25,18 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
+import dev.persefonia.app.transaction.PostCommitTaskExecutor;
+import dev.persefonia.app.transaction.SpringTransactionSynchronizationPostCommitTaskExecutor;
+import dev.persefonia.platformoperations.application.cache.CacheInvalidationExecutionPort;
+import dev.persefonia.platformoperations.application.cache.CacheInvalidationRequest;
+import dev.persefonia.platformoperations.domain.cache.CacheInvalidationBatchId;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
-@SpringBootTest(properties = {
+@SpringBootTest(classes = {dev.persefonia.app.PersefoniaApplication.class,
+        ProjectAuditTransactionIntegrationTest.CacheIsolationConfiguration.class}, properties = {
         "management.server.port=0",
         "management.health.redis.enabled=false"
 })
@@ -46,6 +55,8 @@ class ProjectAuditTransactionIntegrationTest {
     @Autowired ProjectRepository projects;
     @Autowired JdbcTemplate jdbc;
     @Autowired TransactionTemplate transactions;
+    @Autowired RecordingCacheExecution cacheExecution;
+    @Autowired RegistrationControllablePostCommit postCommit;
 
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {
@@ -66,6 +77,8 @@ class ProjectAuditTransactionIntegrationTest {
                 .load()
                 .migrate();
         jdbc.execute("TRUNCATE portfolio.projects, discovery.discoverable_resources, audit.audit_records CASCADE");
+        cacheExecution.invocations = 0;
+        postCommit.failRegistration = false;
     }
 
     @Test
@@ -97,6 +110,23 @@ class ProjectAuditTransactionIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM portfolio.projects", Long.class)).isZero();
         assertThat(jdbc.queryForObject("SELECT count(*) FROM discovery.discoverable_resources", Long.class)).isZero();
         assertThat(jdbc.queryForObject("SELECT count(*) FROM audit.audit_records", Long.class)).isZero();
+        assertThat(cacheExecution.invocations).isZero();
+    }
+
+    @Test
+    void postCommitRegistrationFailureIsFailOpenAfterRealProjectMutation() {
+        postCommit.failRegistration = true;
+
+        ProjectMutationResult result = gateway.create(command("registration-failure"));
+
+        assertThat(projects.findById(ProjectId.from(result.projectId()))).isPresent();
+        assertThat(jdbc.queryForObject(
+                "SELECT count(*) FROM discovery.discoverable_resources WHERE source_entity_id = ?",
+                Long.class, result.projectId())).isPositive();
+        assertThat(jdbc.queryForObject(
+                "SELECT count(*) FROM audit.audit_records WHERE action = 'project.created'", Long.class))
+                .isEqualTo(1);
+        assertThat(cacheExecution.invocations).isZero();
     }
 
     private static CreateProjectCommand command(String slugSuffix) {
@@ -123,5 +153,30 @@ class ProjectAuditTransactionIntegrationTest {
         postgres.withUsername("persefonia");
         postgres.withPassword("persefonia_dev");
         return postgres;
+    }
+
+    @TestConfiguration(proxyBeanMethods = false)
+    static class CacheIsolationConfiguration {
+        @Bean @Primary RecordingCacheExecution recordingCacheExecution() { return new RecordingCacheExecution(); }
+        @Bean @Primary RegistrationControllablePostCommit registrationControllablePostCommit() {
+            return new RegistrationControllablePostCommit();
+        }
+    }
+
+    static final class RecordingCacheExecution implements CacheInvalidationExecutionPort {
+        int invocations;
+        @Override public void requestAndExecute(CacheInvalidationRequest request) { invocations++; }
+        @Override public void executeInitial(CacheInvalidationBatchId batchId) { }
+        @Override public void executeManualRetry(CacheInvalidationBatchId batchId) { }
+        @Override public void resumeStranded(CacheInvalidationBatchId batchId) { }
+    }
+
+    static final class RegistrationControllablePostCommit implements PostCommitTaskExecutor {
+        private final PostCommitTaskExecutor delegate = new SpringTransactionSynchronizationPostCommitTaskExecutor();
+        boolean failRegistration;
+        @Override public void afterCommit(Runnable task) {
+            if (failRegistration) throw new IllegalStateException("forced registration failure");
+            delegate.afterCommit(task);
+        }
     }
 }

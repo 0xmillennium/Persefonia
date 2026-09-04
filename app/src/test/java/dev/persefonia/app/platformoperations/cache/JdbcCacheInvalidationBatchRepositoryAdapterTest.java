@@ -80,7 +80,7 @@ class JdbcCacheInvalidationBatchRepositoryAdapterTest {
         List<CacheInvalidationTargetId> targetIds = batch.targets().stream().map(CacheInvalidationTarget::id).toList();
         repository.save(batch);
 
-        batch.beginInitialAttempt();
+        batch.beginInitialAttempt(BASE.plusSeconds(1));
         repository.save(batch);
         assertThat(repository.findById(batch.id()).orElseThrow().status()).isEqualTo(CacheInvalidationStatus.RUNNING);
 
@@ -88,7 +88,7 @@ class JdbcCacheInvalidationBatchRepositoryAdapterTest {
         repository.save(batch);
         List<List<Object>> firstAttempt = attemptRows(batch.id());
         for (int attempt = 2; attempt <= 3; attempt++) {
-            batch.beginManualRetry();
+            batch.beginManualRetry(BASE.plusSeconds((attempt - 1L) * 10L + 1));
             repository.save(batch);
             failPending(batch, attempt, BASE.plusSeconds(attempt * 10L));
             repository.save(batch);
@@ -109,9 +109,9 @@ class JdbcCacheInvalidationBatchRepositoryAdapterTest {
         repository.save(original);
         CacheInvalidationBatch first = repository.findById(original.id()).orElseThrow();
         CacheInvalidationBatch stale = repository.findById(original.id()).orElseThrow();
-        first.beginInitialAttempt();
+        first.beginInitialAttempt(BASE.plusSeconds(1));
         repository.save(first);
-        stale.beginInitialAttempt();
+        stale.beginInitialAttempt(BASE.plusSeconds(1));
 
         assertThatThrownBy(() -> repository.save(stale)).isInstanceOf(OptimisticLockingFailureException.class);
         CacheInvalidationBatch loaded = repository.findById(original.id()).orElseThrow();
@@ -124,7 +124,7 @@ class JdbcCacheInvalidationBatchRepositoryAdapterTest {
     void childPersistenceFailureRollsBackRootTargetsAndAttemptTogether() {
         CacheInvalidationBatch batch = requested(BASE, "/articles/atomic");
         repository.save(batch);
-        batch.beginInitialAttempt();
+        batch.beginInitialAttempt(BASE.plusSeconds(1));
         repository.save(batch);
         CacheInvalidationBatch running = repository.findById(batch.id()).orElseThrow();
         failPending(running, 1, BASE.plusSeconds(10));
@@ -151,11 +151,11 @@ class JdbcCacheInvalidationBatchRepositoryAdapterTest {
         repository.save(older);
         repository.save(failure);
         repository.save(partial);
-        failure.beginInitialAttempt();
+        failure.beginInitialAttempt(BASE.plusSeconds(3));
         repository.save(failure);
         failPending(failure, 1, BASE.plusSeconds(20));
         repository.save(failure);
-        partial.beginInitialAttempt();
+        partial.beginInitialAttempt(BASE.plusSeconds(4));
         repository.save(partial);
         partial.recordAttemptResult(1, CachePurgeProvider.CLOUDFLARE, BASE.plusSeconds(30), CachePurgeResult.FAILED,
                 CachePurgeFailureReason.NETWORK_ERROR,

@@ -2,6 +2,7 @@ package dev.persefonia.app.platformoperations.cache;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dev.persefonia.app.platformoperations.cache.execution.CachePurgeExecutionCoordinator;
 import dev.persefonia.app.platformoperations.cache.execution.CachePurgeTransactionService;
@@ -25,6 +26,15 @@ import dev.persefonia.platformoperations.domain.cache.CacheTargetStatus;
 import dev.persefonia.platformoperations.domain.cache.CacheTargetType;
 import dev.persefonia.platformoperations.domain.cache.InvalidationReason;
 import dev.persefonia.platformoperations.domain.cache.InvalidationRequester;
+import dev.persefonia.platformoperations.domain.cache.CacheInvalidationTarget;
+import dev.persefonia.platformoperations.domain.cache.CacheInvalidationTargetId;
+import dev.persefonia.platformoperations.domain.cache.CacheTargetValue;
+import dev.persefonia.app.platformoperations.cache.execution.CachePurgeWorkItem;
+import dev.persefonia.platformoperations.application.cache.CachePurgeProviderTarget;
+import dev.persefonia.platformoperations.application.operations.CacheInvalidationRecoveryPolicy;
+import dev.persefonia.app.platformoperations.cache.execution.CachePurgeMetrics;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.time.Duration;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -206,6 +216,66 @@ class CachePurgeExecutionIntegrationTest {
     }
 
     @Test
+    void strandedReplayRefreshesReservationAndRecordsTheSameUnresolvedAttemptThroughExistingTopology() {
+        Instant requestedAt = NOW.minusSeconds(3600);
+        CacheInvalidationBatch batch = CacheInvalidationBatch.request(
+                CacheInvalidationBatchId.newId(), InvalidationReason.PUBLIC_RESOURCE_CHANGED,
+                InvalidationRequester.SYSTEM, requestedAt,
+                List.of(CacheInvalidationTarget.pending(CacheInvalidationTargetId.newId(), CacheTargetType.URL,
+                        CacheTargetValue.url("/articles/stranded"))));
+        repository.save(batch);
+        batch.beginInitialAttempt(requestedAt.plusSeconds(1));
+        repository.save(batch);
+        long strandedVersion = batch.version();
+
+        execution.resumeStranded(batch.id());
+
+        CacheInvalidationBatch completed = repository.findById(batch.id()).orElseThrow();
+        assertThat(provider.calls).isEqualTo(1);
+        assertThat(provider.transactionActive).isFalse();
+        assertThat(provider.durableStatusAtInvocation).isEqualTo(CacheInvalidationStatus.RUNNING);
+        assertThat(provider.durableRunningSinceAtInvocation).isEqualTo(NOW);
+        assertThat(provider.durableAttemptCountAtInvocation).isZero();
+        assertThat(completed.status()).isEqualTo(CacheInvalidationStatus.COMPLETED);
+        assertThat(completed.runningSince()).isEmpty();
+        assertThat(completed.version()).isEqualTo(strandedVersion + 2);
+        assertThat(completed.attempts()).singleElement().satisfies(attempt ->
+                assertThat(attempt.attemptNumber()).isEqualTo(1));
+    }
+
+    @Test
+    void delayedOldResultCannotOverwriteANewerStrandedReplayReservation() {
+        Instant requestedAt = NOW.minusSeconds(3600);
+        CacheInvalidationBatch batch = CacheInvalidationBatch.request(
+                CacheInvalidationBatchId.newId(), InvalidationReason.PUBLIC_RESOURCE_CHANGED,
+                InvalidationRequester.SYSTEM, requestedAt,
+                List.of(CacheInvalidationTarget.pending(CacheInvalidationTargetId.newId(), CacheTargetType.URL,
+                        CacheTargetValue.url("/articles/race"))));
+        repository.save(batch);
+        batch.beginInitialAttempt(requestedAt.plusSeconds(1));
+        repository.save(batch);
+        CachePurgeWorkItem oldWork = new CachePurgeWorkItem(batch.id(), 1, batch.version(),
+                batch.targets().stream().map(target -> new CachePurgeProviderTarget(
+                        target.id(), target.targetType(), target.value())).toList());
+        CachePurgeTransactionService transactionService = context.getBean(CachePurgeTransactionService.class);
+
+        CachePurgeWorkItem replayWork = transactionService.reserveStrandedReplay(batch.id());
+        CachePurgeProviderResult oldResult = success(oldWork);
+
+        assertThatThrownBy(() -> transactionService.recordResult(
+                oldWork, CachePurgeProvider.LOCAL, oldResult, NOW, NOW))
+                .isInstanceOf(dev.persefonia.platformoperations.domain.cache.CacheInvalidationValidationException.class);
+        CacheInvalidationBatch stillReplayed = repository.findById(batch.id()).orElseThrow();
+        assertThat(stillReplayed.version()).isEqualTo(replayWork.reservationVersion());
+        assertThat(stillReplayed.attempts()).isEmpty();
+        assertThat(stillReplayed.targets()).allMatch(target -> target.status() == CacheTargetStatus.PENDING);
+
+        transactionService.recordResult(replayWork, CachePurgeProvider.LOCAL, success(replayWork), NOW, NOW);
+        assertThat(repository.findById(batch.id()).orElseThrow().status())
+                .isEqualTo(CacheInvalidationStatus.COMPLETED);
+    }
+
+    @Test
     void manualRetriesUseOnlyFailedTargetsAndFourthAttemptIsImpossible() {
         providerBehavior = ProviderBehavior.RATE_LIMITED;
         execution.requestAndExecute(request());
@@ -283,6 +353,13 @@ class CachePurgeExecutionIntegrationTest {
                         new CacheInvalidationTargetRequest(CacheTargetType.CACHE_TAG, "site:public-documents")));
     }
 
+    private static CachePurgeProviderResult success(CachePurgeWorkItem work) {
+        CachePurgeProviderRequest request = new CachePurgeProviderRequest(
+                work.batchId(), work.attemptNumber(), work.pendingTargets());
+        return CachePurgeProviderResult.success(request, work.pendingTargets().stream()
+                .map(target -> CacheTargetOutcome.of(target.targetId(), CacheTargetStatus.SKIPPED)).toList());
+    }
+
     @Configuration(proxyBeanMethods = false)
     @EnableTransactionManagement
     static class ExecutionTestConfiguration {
@@ -304,9 +381,14 @@ class CachePurgeExecutionIntegrationTest {
             return new CacheInvalidationRequestService(batches, clock);
         }
         @Bean CachePurgeTransactionService purgeTransactions(
-                CacheInvalidationRequestPort requests, FailingRepository batches) {
-            return new CachePurgeTransactionService(requests, batches);
+                CacheInvalidationRequestPort requests, FailingRepository batches, Clock clock,
+                CacheInvalidationRecoveryPolicy recoveryPolicy) {
+            return new CachePurgeTransactionService(requests, batches, clock, recoveryPolicy);
         }
+        @Bean CacheInvalidationRecoveryPolicy recoveryPolicy() {
+            return new CacheInvalidationRecoveryPolicy(Duration.ofMinutes(15));
+        }
+        @Bean CachePurgeMetrics metrics() { return new CachePurgeMetrics(new SimpleMeterRegistry()); }
         @Bean FakeProvider provider() { return new FakeProvider(providerIdentity, jdbc); }
         @Bean NonTransactionalCachePurgeInvoker invoker(FakeProvider provider) {
             return new NonTransactionalCachePurgeInvoker(provider);
@@ -314,8 +396,9 @@ class CachePurgeExecutionIntegrationTest {
         @Bean CachePurgeExecutionCoordinator coordinator(
                 CachePurgeTransactionService transactions,
                 NonTransactionalCachePurgeInvoker invoker,
-                Clock clock) {
-            return new CachePurgeExecutionCoordinator(transactions, invoker, clock);
+                Clock clock,
+                CachePurgeMetrics metrics) {
+            return new CachePurgeExecutionCoordinator(transactions, invoker, clock, metrics);
         }
     }
 
@@ -349,6 +432,7 @@ class CachePurgeExecutionIntegrationTest {
         private int calls;
         private boolean transactionActive;
         private CacheInvalidationStatus durableStatusAtInvocation;
+        private Instant durableRunningSinceAtInvocation;
         private int durableAttemptCountAtInvocation;
         private int durablePendingCountAtInvocation;
         private int lastTargetCount;
@@ -368,6 +452,9 @@ class CachePurgeExecutionIntegrationTest {
             durableStatusAtInvocation = CacheInvalidationStatus.valueOf(independentJdbc.queryForObject(
                     "SELECT status FROM operations.cache_invalidation_batches WHERE id = ?",
                     String.class, request.batchId().value()));
+            durableRunningSinceAtInvocation = independentJdbc.queryForObject(
+                    "SELECT running_since FROM operations.cache_invalidation_batches WHERE id = ?",
+                    java.sql.Timestamp.class, request.batchId().value()).toInstant();
             durableAttemptCountAtInvocation = independentJdbc.queryForObject(
                     "SELECT count(*) FROM operations.cache_purge_attempts WHERE batch_id = ?",
                     Integer.class, request.batchId().value());

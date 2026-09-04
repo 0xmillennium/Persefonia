@@ -103,9 +103,9 @@ public class JdbcCacheInvalidationBatchRepositoryAdapter implements CacheInvalid
         }
         jdbc().update("""
                 INSERT INTO operations.cache_invalidation_batches (
-                    id, reason, requested_by, requested_at, status, completed_at, failure_reason, version
+                    id, reason, requested_by, requested_at, status, running_since, completed_at, failure_reason, version
                 ) VALUES (
-                    :id, :reason, :requestedBy, :requestedAt, :status, :completedAt, :failureReason, :version
+                    :id, :reason, :requestedBy, :requestedAt, :status, :runningSince, :completedAt, :failureReason, :version
                 )
                 """, batchParameters(batch));
     }
@@ -118,6 +118,7 @@ public class JdbcCacheInvalidationBatchRepositoryAdapter implements CacheInvalid
         int updated = jdbc().update("""
                 UPDATE operations.cache_invalidation_batches
                 SET status = :status,
+                    running_since = :runningSince,
                     completed_at = :completedAt,
                     failure_reason = :failureReason,
                     version = :version
@@ -135,6 +136,7 @@ public class JdbcCacheInvalidationBatchRepositoryAdapter implements CacheInvalid
                 .addValue("requestedBy", batch.requestedBy().name())
                 .addValue("requestedAt", Timestamp.from(batch.requestedAt()))
                 .addValue("status", batch.status().name())
+                .addValue("runningSince", batch.runningSince().map(Timestamp::from).orElse(null))
                 .addValue("completedAt", batch.completedAt().map(Timestamp::from).orElse(null))
                 .addValue("failureReason", batch.failureReason().map(Enum::name).orElse(null))
                 .addValue("version", batch.version());
@@ -218,7 +220,7 @@ public class JdbcCacheInvalidationBatchRepositoryAdapter implements CacheInvalid
 
     private List<BatchRow> queryRoots(String suffix, Map<String, ?> parameters) {
         return jdbc().query("""
-                SELECT id, reason, requested_by, requested_at, status, completed_at, failure_reason, version
+                SELECT id, reason, requested_by, requested_at, status, running_since, completed_at, failure_reason, version
                 FROM operations.cache_invalidation_batches
                 """ + suffix, parameters, (resultSet, rowNumber) -> new BatchRow(
                 resultSet.getObject("id", UUID.class),
@@ -226,6 +228,7 @@ public class JdbcCacheInvalidationBatchRepositoryAdapter implements CacheInvalid
                 InvalidationRequester.valueOf(resultSet.getString("requested_by")),
                 resultSet.getTimestamp("requested_at").toInstant(),
                 CacheInvalidationStatus.valueOf(resultSet.getString("status")),
+                instantOrNull(resultSet.getTimestamp("running_since")),
                 instantOrNull(resultSet.getTimestamp("completed_at")),
                 enumOrNull(CachePurgeFailureReason.class, resultSet.getString("failure_reason")),
                 resultSet.getLong("version")));
@@ -245,7 +248,7 @@ public class JdbcCacheInvalidationBatchRepositoryAdapter implements CacheInvalid
         return roots.stream().map(root -> CacheInvalidationBatch.rehydrate(
                 CacheInvalidationBatchId.from(root.id()), root.reason(), root.requestedBy(), root.requestedAt(),
                 root.status(), targets.getOrDefault(root.id(), List.of()), attempts.getOrDefault(root.id(), List.of()),
-                root.completedAt(), root.failureReason(), root.version())).toList();
+                root.runningSince(), root.completedAt(), root.failureReason(), root.version())).toList();
     }
 
     private List<TargetRow> queryTargetRows(List<UUID> batchIds) {
@@ -297,7 +300,7 @@ public class JdbcCacheInvalidationBatchRepositoryAdapter implements CacheInvalid
     }
 
     private record BatchRow(UUID id, InvalidationReason reason, InvalidationRequester requestedBy,
-            Instant requestedAt, CacheInvalidationStatus status, Instant completedAt,
+            Instant requestedAt, CacheInvalidationStatus status, Instant runningSince, Instant completedAt,
             CachePurgeFailureReason failureReason, long version) { }
     private record TargetRow(UUID id, UUID batchId, CacheTargetType type, String value, CacheTargetStatus status) {
         CacheInvalidationTarget toDomain() {

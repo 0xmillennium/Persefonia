@@ -21,6 +21,7 @@ public final class CacheInvalidationBatch {
     private CacheInvalidationStatus status;
     private final List<CacheInvalidationTarget> targets;
     private final List<CachePurgeAttempt> attempts;
+    private Instant runningSince;
     private Instant completedAt;
     private CachePurgeFailureReason failureReason;
     private long version;
@@ -33,6 +34,7 @@ public final class CacheInvalidationBatch {
             CacheInvalidationStatus status,
             List<CacheInvalidationTarget> targets,
             List<CachePurgeAttempt> attempts,
+            Instant runningSince,
             Instant completedAt,
             CachePurgeFailureReason failureReason,
             long version) {
@@ -43,6 +45,7 @@ public final class CacheInvalidationBatch {
         this.status = Objects.requireNonNull(status, "status");
         this.targets = new ArrayList<>(Objects.requireNonNull(targets, "targets"));
         this.attempts = new ArrayList<>(Objects.requireNonNull(attempts, "attempts"));
+        this.runningSince = runningSince;
         this.completedAt = completedAt;
         this.failureReason = failureReason;
         this.version = version;
@@ -65,7 +68,7 @@ public final class CacheInvalidationBatch {
             unique.putIfAbsent(new TargetKey(target.targetType(), target.value().value()), target);
         }
         return new CacheInvalidationBatch(id, reason, requestedBy, requestedAt,
-                CacheInvalidationStatus.REQUESTED, List.copyOf(unique.values()), List.of(), null, null, 0);
+                CacheInvalidationStatus.REQUESTED, List.copyOf(unique.values()), List.of(), null, null, null, 0);
     }
 
     public static CacheInvalidationBatch rehydrate(
@@ -76,36 +79,57 @@ public final class CacheInvalidationBatch {
             CacheInvalidationStatus status,
             List<CacheInvalidationTarget> targets,
             List<CachePurgeAttempt> attempts,
+            Instant runningSince,
             Instant completedAt,
             CachePurgeFailureReason failureReason,
             long version) {
         return new CacheInvalidationBatch(id, reason, requestedBy, requestedAt, status, targets, attempts,
-                completedAt, failureReason, version);
+                runningSince, completedAt, failureReason, version);
     }
 
-    public void beginInitialAttempt() {
+    public void beginInitialAttempt(Instant reservationStartedAt) {
         if (status != CacheInvalidationStatus.REQUESTED || !attempts.isEmpty()
                 || targets.stream().anyMatch(target -> target.status() != CacheTargetStatus.PENDING)) {
             throw invalid("initial attempt can begin only from a pristine requested batch");
         }
+        requireNotBefore(reservationStartedAt, requestedAt,
+                "initial reservation timestamp cannot precede the request");
         status = CacheInvalidationStatus.RUNNING;
+        runningSince = reservationStartedAt;
         version++;
         validateInvariants();
     }
 
-    public void beginManualRetry() {
+    public void beginManualRetry(Instant reservationStartedAt) {
         if ((status != CacheInvalidationStatus.FAILED && status != CacheInvalidationStatus.PARTIAL)
                 || attempts.size() >= MAX_ATTEMPTS || completedAt != null) {
             throw invalid("manual retry is not available for this batch");
         }
+        requireNotBefore(reservationStartedAt, attempts.getLast().attemptedAt(),
+                "manual retry reservation cannot precede the latest attempt");
         for (CacheInvalidationTarget target : targets) {
             if (target.status() == CacheTargetStatus.FAILED) {
                 target.changeStatus(CacheTargetStatus.PENDING);
             }
         }
         status = CacheInvalidationStatus.RUNNING;
+        runningSince = reservationStartedAt;
         failureReason = null;
         completedAt = null;
+        version++;
+        validateInvariants();
+    }
+
+    public void beginStrandedReplay(Instant replayStartedAt, Instant strandedCutoff) {
+        Objects.requireNonNull(strandedCutoff, "strandedCutoff");
+        if (status != CacheInvalidationStatus.RUNNING || runningSince == null
+                || runningSince.isAfter(strandedCutoff)
+                || targets.stream().noneMatch(target -> target.status() == CacheTargetStatus.PENDING)) {
+            throw invalid("stranded replay is not available for this batch");
+        }
+        requireNotBefore(replayStartedAt, runningSince,
+                "stranded replay timestamp cannot precede the current reservation");
+        runningSince = replayStartedAt;
         version++;
         validateInvariants();
     }
@@ -129,7 +153,7 @@ public final class CacheInvalidationBatch {
         Objects.requireNonNull(result, "result");
         Objects.requireNonNull(outcomes, "outcomes");
         Objects.requireNonNull(recordedAt, "recordedAt");
-        if (attemptedAt.isBefore(requestedAt)
+        if (runningSince == null || attemptedAt.isBefore(runningSince)
                 || !attempts.isEmpty() && attemptedAt.isBefore(attempts.getLast().attemptedAt())
                 || recordedAt.isBefore(attemptedAt)) {
             throw invalid("attempt timestamps violate cache invalidation temporal ordering");
@@ -166,6 +190,7 @@ public final class CacheInvalidationBatch {
         }
         attempts.add(attempt);
         deriveTerminalState(failureReason, recordedAt);
+        runningSince = null;
         version++;
         validateInvariants();
     }
@@ -218,6 +243,12 @@ public final class CacheInvalidationBatch {
         boolean pending = targets.stream().anyMatch(target -> target.status() == CacheTargetStatus.PENDING);
         boolean failed = targets.stream().anyMatch(target -> target.status() == CacheTargetStatus.FAILED);
         boolean satisfied = targets.stream().anyMatch(target -> isSatisfied(target.status()));
+        require((status == CacheInvalidationStatus.RUNNING) == (runningSince != null),
+                "running reservation timestamp must match running status");
+        if (runningSince != null) {
+            require(!runningSince.isBefore(requestedAt) && !runningSince.isBefore(previousAttemptedAt),
+                    "running reservation timestamp violates temporal ordering");
+        }
         switch (status) {
             case REQUESTED -> {
                 require(attempts.isEmpty() && targets.stream().allMatch(t -> t.status() == CacheTargetStatus.PENDING)
@@ -226,17 +257,17 @@ public final class CacheInvalidationBatch {
             }
             case RUNNING -> require(pending && !failed && attempts.size() < MAX_ATTEMPTS
                             && attempts.stream().noneMatch(a -> a.result() == CachePurgeResult.SUCCESS)
-                            && failureReason == null && completedAt == null && version == attempts.size() * 2L + 1,
+                            && failureReason == null && completedAt == null && version >= attempts.size() * 2L + 1,
                     "invalid running batch state");
             case COMPLETED -> require(!pending && !failed && !attempts.isEmpty()
                             && attempts.getLast().result() == CachePurgeResult.SUCCESS
-                            && failureReason == null && completedAt != null && version == attempts.size() * 2L,
+                            && failureReason == null && completedAt != null && version >= attempts.size() * 2L,
                     "invalid completed batch state");
             case FAILED -> require(!pending && failed && !satisfied && failureReason != null
-                            && latestAttemptFailed() && completionMatchesBudget() && version == attempts.size() * 2L,
+                            && latestAttemptFailed() && completionMatchesBudget() && version >= attempts.size() * 2L,
                     "invalid failed batch state");
             case PARTIAL -> require(!pending && failed && satisfied && failureReason != null
-                            && latestAttemptFailed() && completionMatchesBudget() && version == attempts.size() * 2L,
+                            && latestAttemptFailed() && completionMatchesBudget() && version >= attempts.size() * 2L,
                     "invalid partial batch state");
         }
         if ((status == CacheInvalidationStatus.FAILED || status == CacheInvalidationStatus.PARTIAL)
@@ -261,6 +292,11 @@ public final class CacheInvalidationBatch {
         if (!valid) throw invalid(message);
     }
 
+    private static void requireNotBefore(Instant value, Instant floor, String message) {
+        Objects.requireNonNull(value, "timestamp");
+        if (value.isBefore(floor)) throw invalid(message);
+    }
+
     private static CacheInvalidationValidationException invalid(String message) {
         return new CacheInvalidationValidationException(message);
     }
@@ -272,6 +308,7 @@ public final class CacheInvalidationBatch {
     public CacheInvalidationStatus status() { return status; }
     public List<CacheInvalidationTarget> targets() { return List.copyOf(targets); }
     public List<CachePurgeAttempt> attempts() { return List.copyOf(attempts); }
+    public Optional<Instant> runningSince() { return Optional.ofNullable(runningSince); }
     public Optional<Instant> completedAt() { return Optional.ofNullable(completedAt); }
     public Optional<CachePurgeFailureReason> failureReason() { return Optional.ofNullable(failureReason); }
     public long version() { return version; }

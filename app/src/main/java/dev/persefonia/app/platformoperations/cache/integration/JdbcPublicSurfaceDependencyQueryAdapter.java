@@ -20,8 +20,11 @@ import dev.persefonia.medialibrary.domain.asset.VariantName;
 import dev.persefonia.profileportfolio.application.discovery.ProjectPublicRouteFactory;
 import dev.persefonia.profileportfolio.application.port.ProjectPublicSurfaceDependencyQuery;
 import dev.persefonia.profileportfolio.application.publicview.ProjectPublicSurface;
+import dev.persefonia.profileportfolio.application.publicview.ProjectPublicExposurePolicy;
 import dev.persefonia.profileportfolio.domain.common.TagId;
 import dev.persefonia.profileportfolio.domain.project.ProjectSlug;
+import dev.persefonia.profileportfolio.domain.project.ProjectStatus;
+import dev.persefonia.profileportfolio.domain.project.ProjectVisibility;
 import dev.persefonia.taxonomy.application.discovery.TagPublicRouteFactory;
 import dev.persefonia.taxonomy.domain.model.TagSlug;
 import dev.persefonia.taxonomy.application.port.TagPublicRouteQuery;
@@ -30,6 +33,7 @@ import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.Set;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -46,14 +50,18 @@ public final class JdbcPublicSurfaceDependencyQueryAdapter implements
         TagPublicRouteQuery {
 
     private final ObjectProvider<NamedParameterJdbcTemplate> jdbc;
+    private final ProjectPublicExposurePolicy projectExposurePolicy;
     private final TagPublicRouteFactory tagRoutes = new TagPublicRouteFactory();
     private final SeriesPublicRouteFactory seriesRoutes = new SeriesPublicRouteFactory();
     private final ContentPublicRouteFactory contentRoutes = new ContentPublicRouteFactory();
     private final ProjectPublicRouteFactory projectRoutes = new ProjectPublicRouteFactory();
     private final AssetPublicVariantRouteFactory variantRoutes = new AssetPublicVariantRouteFactory();
 
-    public JdbcPublicSurfaceDependencyQueryAdapter(ObjectProvider<NamedParameterJdbcTemplate> jdbc) {
+    public JdbcPublicSurfaceDependencyQueryAdapter(
+            ObjectProvider<NamedParameterJdbcTemplate> jdbc,
+            ProjectPublicExposurePolicy projectExposurePolicy) {
         this.jdbc = jdbc;
+        this.projectExposurePolicy = Objects.requireNonNull(projectExposurePolicy, "projectExposurePolicy");
     }
 
     @Override
@@ -64,7 +72,7 @@ public final class JdbcPublicSurfaceDependencyQueryAdapter implements
                 FROM publishing.content_items content
                 JOIN publishing.content_item_tags assignment ON assignment.content_item_id = content.id
                 JOIN taxonomy.tags tag ON tag.id = assignment.tag_id
-                WHERE content.id = :contentId AND tag.status = 'ACTIVE'
+                WHERE content.id = :contentId
                 ORDER BY tag.slug
                 LIMIT :limit
                 """, parameters, (rs, row) -> tagRoutes.publicUrl(
@@ -138,7 +146,8 @@ public final class JdbcPublicSurfaceDependencyQueryAdapter implements
                 ORDER BY affected.id, localization.language
                 """, new MapSqlParameterSource("tagId", tagId.value()).addValue("limit", limit),
                 (rs, row) -> new ProjectRow(
-                        rs.getObject("id", UUID.class), rs.getString("status"), rs.getString("visibility"),
+                        rs.getObject("id", UUID.class), ProjectStatus.valueOf(rs.getString("status")),
+                        ProjectVisibility.valueOf(rs.getString("visibility")),
                         rs.getBoolean("featured"),
                         dev.persefonia.profileportfolio.domain.common.ContentLanguage.valueOf(rs.getString("language")),
                         ProjectSlug.of(rs.getString("slug"))));
@@ -163,7 +172,7 @@ public final class JdbcPublicSurfaceDependencyQueryAdapter implements
     }
 
     @Override
-    public List<PublicUrl> findActiveRoutes(
+    public List<PublicUrl> findExistingPublicRoutes(
             Set<dev.persefonia.taxonomy.domain.model.TagId> tagIds,
             DiscoveryLanguage language,
             int limit) {
@@ -173,7 +182,7 @@ public final class JdbcPublicSurfaceDependencyQueryAdapter implements
         return jdbc().query("""
                 SELECT slug
                 FROM taxonomy.tags
-                WHERE id IN (:tagIds) AND status = 'ACTIVE'
+                WHERE id IN (:tagIds)
                 ORDER BY slug
                 LIMIT :limit
                 """, new MapSqlParameterSource("tagIds", tagIds.stream().map(
@@ -190,27 +199,29 @@ public final class JdbcPublicSurfaceDependencyQueryAdapter implements
     }
 
     private record ProjectRow(
-            UUID id, String status, String visibility, boolean featured,
+            UUID id, ProjectStatus status, ProjectVisibility visibility, boolean featured,
             dev.persefonia.profileportfolio.domain.common.ContentLanguage language, ProjectSlug slug) {
     }
 
-    private static final class MutableProjectSurface {
-        private final String status;
-        private final String visibility;
+    private final class MutableProjectSurface {
+        private final ProjectStatus status;
+        private final ProjectVisibility visibility;
         private final boolean featured;
         private final Map<dev.persefonia.profileportfolio.domain.common.ContentLanguage, PublicUrl> routes =
                 new EnumMap<>(dev.persefonia.profileportfolio.domain.common.ContentLanguage.class);
 
-        private MutableProjectSurface(String status, String visibility, boolean featured) {
+        private MutableProjectSurface(ProjectStatus status, ProjectVisibility visibility, boolean featured) {
             this.status = status;
             this.visibility = visibility;
             this.featured = featured;
         }
 
         private ProjectPublicSurface toPublicSurface() {
-            boolean direct = visibility.equals("PUBLIC") || visibility.equals("UNLISTED");
-            boolean listed = visibility.equals("PUBLIC") && !status.equals("ARCHIVED");
-            return new ProjectPublicSurface(direct ? routes : Map.of(), listed, listed && featured);
+            var exposure = projectExposurePolicy.snapshot(status, visibility, featured);
+            return new ProjectPublicSurface(
+                    exposure.directReachable() ? routes : Map.of(),
+                    exposure.listed(),
+                    exposure.homepageFeaturedEligible());
         }
     }
 }

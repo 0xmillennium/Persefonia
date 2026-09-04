@@ -41,6 +41,7 @@ class PublicCacheInvalidationRegistrarTest {
             @Override public void requestAndExecute(CacheInvalidationRequest request) { call.accept(request); }
             @Override public void executeInitial(CacheInvalidationBatchId batchId) { }
             @Override public void executeManualRetry(CacheInvalidationBatchId batchId) { }
+            @Override public void resumeStranded(CacheInvalidationBatchId batchId) { }
         };
         return new PublicCacheInvalidationCoordinator(
                 (id, limit) -> null, (id, limit) -> List.of(), (ids, language, limit) -> List.of(),

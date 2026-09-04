@@ -41,7 +41,8 @@ class CacheInvalidationMigrationTest {
                 ORDER BY table_name
                 """, String.class)).containsExactly("cache_invalidation_batches", "cache_invalidation_targets", "cache_purge_attempts");
         assertThat(columns("cache_invalidation_batches")).containsExactlyInAnyOrder(
-                "id", "reason", "requested_by", "requested_at", "status", "completed_at", "failure_reason", "version");
+                "id", "reason", "requested_by", "requested_at", "status", "running_since",
+                "completed_at", "failure_reason", "version");
         assertThat(columns("cache_invalidation_targets")).containsExactlyInAnyOrder(
                 "id", "batch_id", "target_type", "target_value", "status");
         assertThat(columns("cache_purge_attempts")).containsExactlyInAnyOrder(
@@ -59,11 +60,12 @@ class CacheInvalidationMigrationTest {
                 """, String.class)).containsExactly("CASCADE", "CASCADE");
 
         assertThat(nullableColumns("cache_invalidation_batches"))
-                .containsExactlyInAnyOrder("completed_at", "failure_reason");
+                .containsExactlyInAnyOrder("completed_at", "failure_reason", "running_since");
         assertThat(nullableColumns("cache_invalidation_targets")).isEmpty();
         assertThat(nullableColumns("cache_purge_attempts")).containsExactly("failure_reason");
         assertThat(indexes()).contains(
                 "cache_invalidation_batches_status_idx", "cache_invalidation_batches_requested_at_idx",
+                "cache_invalidation_batches_running_since_running_idx",
                 "cache_invalidation_targets_batch_id_idx", "cache_invalidation_targets_status_idx",
                 "cache_purge_attempts_batch_id_idx", "cache_purge_attempts_attempted_at_idx",
                 "cache_purge_attempts_result_idx");
@@ -83,6 +85,19 @@ class CacheInvalidationMigrationTest {
                 .isInstanceOf(DataIntegrityViolationException.class);
         assertThatThrownBy(() -> insertBatch(UUID.randomUUID(), "PUBLIC_RESOURCE_CHANGED", "SYSTEM", "REQUESTED", null, null, -1))
                 .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void runningReservationTimestampMatchesStateAndCannotPrecedeRequest() {
+        assertThatThrownBy(() -> insertBatchWithRunning(UUID.randomUUID(), "REQUESTED", NOW, null))
+                .isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> insertBatchWithRunning(UUID.randomUUID(), "RUNNING", null, null))
+                .isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> insertBatchWithRunning(
+                UUID.randomUUID(), "RUNNING", NOW.minusSeconds(1), null))
+                .isInstanceOf(DataIntegrityViolationException.class);
+
+        insertBatchWithRunning(UUID.randomUUID(), "RUNNING", NOW, null);
     }
 
     @Test
@@ -141,6 +156,15 @@ class CacheInvalidationMigrationTest {
     private static void insertTarget(UUID id, UUID batch, String type, String value, String status) {
         jdbc.update("INSERT INTO operations.cache_invalidation_targets (id, batch_id, target_type, target_value, status) VALUES (?, ?, ?, ?, ?)",
                 id, batch, type, value, status);
+    }
+    private static void insertBatchWithRunning(UUID id, String status, Instant runningSince, Instant completedAt) {
+        jdbc.update("""
+                INSERT INTO operations.cache_invalidation_batches
+                    (id, reason, requested_by, requested_at, status, running_since, completed_at, failure_reason, version)
+                VALUES (?, 'PUBLIC_RESOURCE_CHANGED', 'SYSTEM', ?, ?, ?, ?, NULL, ?)
+                """, id, Timestamp.from(NOW), status,
+                runningSince == null ? null : Timestamp.from(runningSince),
+                completedAt == null ? null : Timestamp.from(completedAt), status.equals("RUNNING") ? 1 : 0);
     }
     private static void insertAttempt(UUID id, UUID batch, int number, String provider, String result, String failure) {
         jdbc.update("""

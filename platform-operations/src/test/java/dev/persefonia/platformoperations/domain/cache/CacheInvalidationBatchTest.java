@@ -25,6 +25,7 @@ class CacheInvalidationBatchTest {
         assertThat(batch.targets()).hasSize(2).allMatch(target -> target.status() == CacheTargetStatus.PENDING);
         assertThat(batch.targets().getFirst().id()).isEqualTo(first.id());
         assertThat(batch.attempts()).isEmpty();
+        assertThat(batch.runningSince()).isEmpty();
         assertThat(batch.completedAt()).isEmpty();
         assertThat(batch.failureReason()).isEmpty();
         assertThat(batch.version()).isZero();
@@ -38,19 +39,40 @@ class CacheInvalidationBatchTest {
     @Test
     void initialAttemptOnlyReservesExecution() {
         CacheInvalidationBatch batch = requestedBatch();
-        batch.beginInitialAttempt();
+        batch.beginInitialAttempt(ATTEMPTED_AT);
 
         assertThat(batch.status()).isEqualTo(CacheInvalidationStatus.RUNNING);
         assertThat(batch.version()).isEqualTo(1);
+        assertThat(batch.runningSince()).contains(ATTEMPTED_AT);
         assertThat(batch.attempts()).isEmpty();
         assertThat(batch.targets()).allMatch(target -> target.status() == CacheTargetStatus.PENDING);
-        assertThatThrownBy(batch::beginInitialAttempt).isInstanceOf(CacheInvalidationValidationException.class);
+        assertThatThrownBy(() -> batch.beginInitialAttempt(ATTEMPTED_AT.plusSeconds(1)))
+                .isInstanceOf(CacheInvalidationValidationException.class);
+    }
+
+    @Test
+    void strandedReplayRefreshesReservationWithoutAdvancingAttemptHistoryOrTargets() {
+        CacheInvalidationBatch batch = requestedBatch();
+        Instant original = REQUESTED_AT.plusSeconds(10);
+        Instant cutoff = REQUESTED_AT.plusSeconds(20);
+        Instant replayed = REQUESTED_AT.plusSeconds(30);
+        batch.beginInitialAttempt(original);
+
+        batch.beginStrandedReplay(replayed, cutoff);
+
+        assertThat(batch.status()).isEqualTo(CacheInvalidationStatus.RUNNING);
+        assertThat(batch.runningSince()).contains(replayed);
+        assertThat(batch.attempts()).isEmpty();
+        assertThat(batch.targets()).allMatch(target -> target.status() == CacheTargetStatus.PENDING);
+        assertThat(batch.version()).isEqualTo(2);
+        assertThatThrownBy(() -> batch.beginStrandedReplay(replayed.plusSeconds(1), replayed.minusNanos(1)))
+                .isInstanceOf(CacheInvalidationValidationException.class);
     }
 
     @Test
     void successfulAttemptCompletesAndRetainsTerminalTargetOutcomes() {
         CacheInvalidationBatch batch = requestedBatch();
-        batch.beginInitialAttempt();
+        batch.beginInitialAttempt(ATTEMPTED_AT);
         batch.recordAttemptResult(1, CachePurgeProvider.LOCAL, ATTEMPTED_AT, CachePurgeResult.SUCCESS, null,
                 List.of(outcome(batch, 0, CacheTargetStatus.PURGED), outcome(batch, 1, CacheTargetStatus.SKIPPED)),
                 RECORDED_AT);
@@ -63,13 +85,14 @@ class CacheInvalidationBatchTest {
         assertThat(batch.completedAt()).contains(RECORDED_AT);
         assertThat(batch.failureReason()).isEmpty();
         assertThat(batch.version()).isEqualTo(2);
-        assertThatThrownBy(batch::beginManualRetry).isInstanceOf(CacheInvalidationValidationException.class);
+        assertThatThrownBy(() -> batch.beginManualRetry(RECORDED_AT.plusSeconds(1)))
+                .isInstanceOf(CacheInvalidationValidationException.class);
     }
 
     @Test
     void failureAndPartialFailureDeriveRetryableState() {
         CacheInvalidationBatch failed = requestedBatch();
-        failed.beginInitialAttempt();
+        failed.beginInitialAttempt(ATTEMPTED_AT);
         failed.recordAttemptResult(1, CachePurgeProvider.CLOUDFLARE, ATTEMPTED_AT, CachePurgeResult.FAILED,
                 CachePurgeFailureReason.TIMEOUT,
                 List.of(outcome(failed, 0, CacheTargetStatus.FAILED), outcome(failed, 1, CacheTargetStatus.FAILED)),
@@ -78,13 +101,13 @@ class CacheInvalidationBatchTest {
         assertThat(failed.completedAt()).isEmpty();
 
         CacheInvalidationBatch partial = requestedBatch();
-        partial.beginInitialAttempt();
+        partial.beginInitialAttempt(ATTEMPTED_AT);
         partial.recordAttemptResult(1, CachePurgeProvider.CLOUDFLARE, ATTEMPTED_AT, CachePurgeResult.FAILED,
                 CachePurgeFailureReason.NETWORK_ERROR,
                 List.of(outcome(partial, 0, CacheTargetStatus.PURGED), outcome(partial, 1, CacheTargetStatus.FAILED)),
                 RECORDED_AT);
         assertThat(partial.status()).isEqualTo(CacheInvalidationStatus.PARTIAL);
-        partial.beginManualRetry();
+        partial.beginManualRetry(RECORDED_AT);
         assertThat(partial.status()).isEqualTo(CacheInvalidationStatus.RUNNING);
         assertThat(partial.targets()).extracting(CacheInvalidationTarget::status)
                 .containsExactly(CacheTargetStatus.PURGED, CacheTargetStatus.PENDING);
@@ -95,7 +118,8 @@ class CacheInvalidationBatchTest {
     void thirdFailureExhaustsBudgetAndFourthAttemptIsImpossible() {
         CacheInvalidationBatch batch = requestedBatch();
         for (int number = 1; number <= 3; number++) {
-            if (number == 1) batch.beginInitialAttempt(); else batch.beginManualRetry();
+            Instant reservation = ATTEMPTED_AT.plusSeconds(number - 1L);
+            if (number == 1) batch.beginInitialAttempt(reservation); else batch.beginManualRetry(reservation);
             Instant attempted = ATTEMPTED_AT.plusSeconds(number);
             batch.recordAttemptResult(number, CachePurgeProvider.CLOUDFLARE, attempted, CachePurgeResult.FAILED,
                     CachePurgeFailureReason.PROVIDER_5XX,
@@ -104,19 +128,20 @@ class CacheInvalidationBatchTest {
 
         assertThat(batch.attempts()).extracting(CachePurgeAttempt::attemptNumber).containsExactly(1, 2, 3);
         assertThat(batch.completedAt()).isPresent();
-        assertThatThrownBy(batch::beginManualRetry).isInstanceOf(CacheInvalidationValidationException.class);
+        assertThatThrownBy(() -> batch.beginManualRetry(RECORDED_AT.plusSeconds(10)))
+                .isInstanceOf(CacheInvalidationValidationException.class);
     }
 
     @Test
     void partialFailureCanSucceedOnManualRetryWithoutOverwritingHistory() {
         CacheInvalidationBatch batch = requestedBatch();
-        batch.beginInitialAttempt();
+        batch.beginInitialAttempt(ATTEMPTED_AT);
         batch.recordAttemptResult(1, CachePurgeProvider.CLOUDFLARE, ATTEMPTED_AT, CachePurgeResult.FAILED,
                 CachePurgeFailureReason.RATE_LIMITED,
                 List.of(outcome(batch, 0, CacheTargetStatus.PURGED), outcome(batch, 1, CacheTargetStatus.FAILED)),
                 RECORDED_AT);
         CacheInvalidationTargetId satisfiedId = batch.targets().getFirst().id();
-        batch.beginManualRetry();
+        batch.beginManualRetry(RECORDED_AT);
         batch.recordAttemptResult(2, CachePurgeProvider.CLOUDFLARE, RECORDED_AT.plusSeconds(1),
                 CachePurgeResult.SUCCESS, null, pendingOutcomes(batch, CacheTargetStatus.PURGED),
                 RECORDED_AT.plusSeconds(2));
@@ -131,7 +156,7 @@ class CacheInvalidationBatchTest {
     @Test
     void resultRequiresExactPendingCoverageAndConsistentResult() {
         CacheInvalidationBatch batch = requestedBatch();
-        batch.beginInitialAttempt();
+        batch.beginInitialAttempt(ATTEMPTED_AT);
         CacheTargetOutcome first = outcome(batch, 0, CacheTargetStatus.PURGED);
         CacheTargetOutcome second = outcome(batch, 1, CacheTargetStatus.PURGED);
 
@@ -238,6 +263,7 @@ class CacheInvalidationBatchTest {
             CachePurgeFailureReason reason) {
         assertThatThrownBy(() -> CacheInvalidationBatch.rehydrate(CacheInvalidationBatchId.from(UUID.randomUUID()),
                 InvalidationReason.PUBLIC_RESOURCE_CHANGED, InvalidationRequester.SYSTEM, REQUESTED_AT, status,
-                targets, attempts, completedAt, reason, 0)).isInstanceOf(CacheInvalidationValidationException.class);
+                targets, attempts, null, completedAt, reason, 0))
+                .isInstanceOf(CacheInvalidationValidationException.class);
     }
 }

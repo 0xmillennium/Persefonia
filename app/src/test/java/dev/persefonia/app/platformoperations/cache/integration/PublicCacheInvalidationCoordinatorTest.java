@@ -92,5 +92,6 @@ class PublicCacheInvalidationCoordinatorTest {
         @Override public void requestAndExecute(CacheInvalidationRequest request) { requests.add(request); }
         @Override public void executeInitial(CacheInvalidationBatchId batchId) { }
         @Override public void executeManualRetry(CacheInvalidationBatchId batchId) { }
+        @Override public void resumeStranded(CacheInvalidationBatchId batchId) { }
     }
 }

@@ -13,6 +13,7 @@ dependencies {
     implementation(project(":discovery"))
     implementation(project(":insights"))
     implementation(project(":audit"))
+    implementation(project(":platform-operations"))
     implementation(libs.spring.webmvc)
     implementation(libs.spring.security.core)
     implementation(libs.spring.security.web)

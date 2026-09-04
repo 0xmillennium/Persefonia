@@ -13,5 +13,6 @@ public enum AdminNavigationSection {
     CONTACT,
     ANALYTICS,
     AUDIT,
+    OPERATIONS,
     SETTINGS
 }
