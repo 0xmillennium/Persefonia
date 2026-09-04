@@ -3,6 +3,8 @@ package dev.persefonia.app.medialibrary.storage;
 import dev.persefonia.app.audit.integration.MediaAuditMapper;
 import dev.persefonia.app.medialibrary.application.SpringAssetStorageRollbackCompensationAdapter;
 import dev.persefonia.app.medialibrary.application.TransactionalMediaAdminCommandGateway;
+import dev.persefonia.app.platformoperations.cache.integration.PublicCacheInvalidationRegistrar;
+import org.springframework.beans.factory.ObjectProvider;
 import dev.persefonia.app.medialibrary.processing.JavaImageIoImageMetadataReader;
 import dev.persefonia.app.medialibrary.processing.JavaImageIoImageVariantGenerator;
 import dev.persefonia.audit.application.port.AppendAuditRecordPort;
@@ -125,8 +127,11 @@ public class MediaStorageConfiguration {
     TransactionalMediaAdminCommandGateway transactionalMediaAdminCommandGateway(
             MediaAdminCommandService service,
             AppendAuditRecordPort audit,
-            MediaAuditMapper auditMapper) {
-        return new TransactionalMediaAdminCommandGateway(service, audit, auditMapper);
+            MediaAuditMapper auditMapper,
+            ObjectProvider<PublicCacheInvalidationRegistrar> cacheInvalidation) {
+        return new TransactionalMediaAdminCommandGateway(
+                service, audit, auditMapper,
+                cacheInvalidation.getIfAvailable(PublicCacheInvalidationRegistrar::noOp));
     }
 
     @Bean

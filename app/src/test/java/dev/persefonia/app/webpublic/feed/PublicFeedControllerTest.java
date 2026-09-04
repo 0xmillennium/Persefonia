@@ -46,7 +46,7 @@ class PublicFeedControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(header().string("Content-Type", "application/atom+xml;charset=UTF-8"))
                 .andExpect(header().string("X-Content-Type-Options", "nosniff"))
-                .andExpect(header().string("Cache-Control", "public, max-age=300, must-revalidate"))
+                .andExpect(header().string("Cache-Control", "public, no-cache, must-revalidate"))
                 .andExpect(header().string("Cache-Control", not(containsString("immutable"))))
                 .andExpect(content().string(containsString(
                         "<feed xmlns=\"http://www.w3.org/2005/Atom\">")));

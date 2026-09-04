@@ -14,23 +14,33 @@ import dev.persefonia.profileportfolio.domain.project.Project;
 import dev.persefonia.profileportfolio.domain.project.ProjectLocalization;
 import dev.persefonia.profileportfolio.domain.project.ProjectStatus;
 import dev.persefonia.profileportfolio.domain.project.ProjectVisibility;
+import dev.persefonia.profileportfolio.application.publicview.ProjectPublicExposurePolicy;
 import java.util.List;
 import java.util.Objects;
 
 public final class ProjectDiscoveryProjectionFactory {
     private final ProjectPublicRouteFactory routeFactory;
     private final ConfiguredProjectCanonicalUrlFactory canonicalUrlFactory;
+    private final ProjectPublicExposurePolicy exposurePolicy;
 
     public ProjectDiscoveryProjectionFactory(
             ProjectPublicRouteFactory routeFactory,
             ConfiguredProjectCanonicalUrlFactory canonicalUrlFactory) {
+        this(routeFactory, canonicalUrlFactory, new ProjectPublicExposurePolicy());
+    }
+
+    public ProjectDiscoveryProjectionFactory(
+            ProjectPublicRouteFactory routeFactory,
+            ConfiguredProjectCanonicalUrlFactory canonicalUrlFactory,
+            ProjectPublicExposurePolicy exposurePolicy) {
         this.routeFactory = Objects.requireNonNull(routeFactory, "routeFactory");
         this.canonicalUrlFactory = Objects.requireNonNull(canonicalUrlFactory, "canonicalUrlFactory");
+        this.exposurePolicy = Objects.requireNonNull(exposurePolicy, "exposurePolicy");
     }
 
     public List<DiscoverableResourceProjectionInput> projectionsFor(Project project) {
         Objects.requireNonNull(project, "project");
-        if (project.visibility() == ProjectVisibility.PRIVATE) {
+        if (!exposurePolicy.snapshot(project).directReachable()) {
             return List.of();
         }
         return project.localizations().stream()
@@ -73,20 +83,20 @@ public final class ProjectDiscoveryProjectionFactory {
                 title + "\n" + summary);
     }
 
-    private static IndexingPolicy indexingPolicy(Project project) {
-        return project.status() != ProjectStatus.ARCHIVED && project.visibility() == ProjectVisibility.PUBLIC
+    private IndexingPolicy indexingPolicy(Project project) {
+        return exposurePolicy.snapshot(project).listed()
                 ? IndexingPolicy.INDEX
                 : IndexingPolicy.NO_INDEX;
     }
 
-    private static DiscoveryEligibility searchEligibility(Project project) {
-        return project.status() != ProjectStatus.ARCHIVED && project.visibility() == ProjectVisibility.PUBLIC
+    private DiscoveryEligibility searchEligibility(Project project) {
+        return exposurePolicy.snapshot(project).listed()
                 ? DiscoveryEligibility.ELIGIBLE
                 : DiscoveryEligibility.NOT_ELIGIBLE;
     }
 
-    private static DiscoveryEligibility sitemapEligibility(Project project) {
-        return project.status() != ProjectStatus.ARCHIVED && project.visibility() == ProjectVisibility.PUBLIC
+    private DiscoveryEligibility sitemapEligibility(Project project) {
+        return exposurePolicy.snapshot(project).sitemapEligible()
                 ? DiscoveryEligibility.ELIGIBLE
                 : DiscoveryEligibility.NOT_ELIGIBLE;
     }

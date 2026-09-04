@@ -88,6 +88,7 @@ public final class MediaAdminCommandService implements MediaAdminCommandGateway 
         }
 
         Asset asset = loaded.get();
+        AssetVisibility beforeVisibility = asset.visibility();
         if (asset.kind() == AssetKind.DOCUMENT) {
             return rejected("visibility", "Document media cannot be published from this workflow.");
         }
@@ -106,7 +107,8 @@ public final class MediaAdminCommandService implements MediaAdminCommandGateway 
                 asset.makePrivate(now);
             }
             assets.save(asset);
-            return new AssetMetadataUpdateResult.Updated(asset.id());
+            return new AssetMetadataUpdateResult.Updated(
+                    asset.id(), beforeVisibility, asset.visibility(), beforeVisibility != asset.visibility());
         } catch (IllegalArgumentException exception) {
             return rejected("visibility", userMessage(exception));
         }

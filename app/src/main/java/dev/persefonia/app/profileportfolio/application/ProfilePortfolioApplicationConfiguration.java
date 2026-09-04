@@ -6,6 +6,8 @@ import dev.persefonia.profileportfolio.application.discovery.ConfiguredProjectCa
 import dev.persefonia.profileportfolio.application.discovery.ProjectDiscoverabilityCoordinator;
 import dev.persefonia.profileportfolio.application.discovery.ProjectDiscoveryProjectionFactory;
 import dev.persefonia.profileportfolio.application.discovery.ProjectPublicRouteFactory;
+import dev.persefonia.profileportfolio.application.publicview.ProjectPublicExposurePolicy;
+import dev.persefonia.profileportfolio.application.publicview.ProjectPublicMutationFactsFactory;
 import dev.persefonia.identityaccess.application.admin.authorization.AdminCommandAuthorizationPolicy;
 import dev.persefonia.profileportfolio.application.authorization.PortfolioCommandAuthorizationPolicy;
 import dev.persefonia.profileportfolio.application.port.ActiveCvAssetEligibilityPort;
@@ -106,8 +108,9 @@ class ProfilePortfolioApplicationConfiguration {
             SitePresentationSettingsRepository settings,
             ProjectTagVocabularyPort tags,
             PortfolioCommandAuthorizationPolicy authorization,
-            ProjectDiscoverabilityCoordinator discoverability) {
-        return new ProjectCommandService(projects, settings, tags, authorization, discoverability);
+            ProjectDiscoverabilityCoordinator discoverability,
+            ProjectPublicMutationFactsFactory publicFacts) {
+        return new ProjectCommandService(projects, settings, tags, authorization, discoverability, publicFacts);
     }
 
     @Bean
@@ -129,6 +132,17 @@ class ProfilePortfolioApplicationConfiguration {
     }
 
     @Bean
+    ProjectPublicExposurePolicy projectPublicExposurePolicy() {
+        return new ProjectPublicExposurePolicy();
+    }
+
+    @Bean
+    ProjectPublicMutationFactsFactory projectPublicMutationFactsFactory(
+            ProjectPublicExposurePolicy policy, ProjectPublicRouteFactory routes) {
+        return new ProjectPublicMutationFactsFactory(policy, routes);
+    }
+
+    @Bean
     ConfiguredProjectCanonicalUrlFactory configuredProjectCanonicalUrlFactory(
             @Value("${site.public-base-url}") String publicBaseUrl) {
         return new ConfiguredProjectCanonicalUrlFactory(publicBaseUrl);
@@ -137,8 +151,9 @@ class ProfilePortfolioApplicationConfiguration {
     @Bean
     ProjectDiscoveryProjectionFactory projectDiscoveryProjectionFactory(
             ProjectPublicRouteFactory routeFactory,
-            ConfiguredProjectCanonicalUrlFactory canonicalUrlFactory) {
-        return new ProjectDiscoveryProjectionFactory(routeFactory, canonicalUrlFactory);
+            ConfiguredProjectCanonicalUrlFactory canonicalUrlFactory,
+            ProjectPublicExposurePolicy exposurePolicy) {
+        return new ProjectDiscoveryProjectionFactory(routeFactory, canonicalUrlFactory, exposurePolicy);
     }
 
     @Bean

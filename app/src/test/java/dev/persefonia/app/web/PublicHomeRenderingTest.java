@@ -3,6 +3,7 @@ package dev.persefonia.app.web;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,6 +29,8 @@ class PublicHomeRenderingTest {
     void rendersPublicHomeWithProductionAssets() throws Exception {
         String response = mockMvc.perform(get("/"))
                 .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "public, no-cache, must-revalidate"))
+                .andExpect(header().doesNotExist("Cache-Tag"))
                 .andExpect(content().contentTypeCompatibleWith("text/html"))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("Settings Driven Site")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("Settings Driven Site | Home")))

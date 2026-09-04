@@ -9,6 +9,9 @@ import dev.persefonia.profileportfolio.application.command.ProjectMutationResult
 import dev.persefonia.profileportfolio.application.command.ProjectTechnologyInput;
 import dev.persefonia.profileportfolio.application.command.UpdateProjectCommand;
 import dev.persefonia.profileportfolio.application.discovery.ProjectDiscoverabilityCoordinator;
+import dev.persefonia.profileportfolio.application.discovery.ProjectPublicRouteFactory;
+import dev.persefonia.profileportfolio.application.publicview.ProjectPublicExposurePolicy;
+import dev.persefonia.profileportfolio.application.publicview.ProjectPublicMutationFactsFactory;
 import dev.persefonia.profileportfolio.application.exception.ProjectApplicationException;
 import dev.persefonia.profileportfolio.application.exception.ProjectCommandRejectedException;
 import dev.persefonia.profileportfolio.application.exception.ProjectNotFoundException;
@@ -57,6 +60,7 @@ public final class ProjectCommandService {
     private final ProjectTagVocabularyPort tags;
     private final PortfolioCommandAuthorizationPolicy authorization;
     private final ProjectDiscoverabilityCoordinator discoverability;
+    private final ProjectPublicMutationFactsFactory publicFacts;
 
     public ProjectCommandService(
             ProjectRepository projects,
@@ -64,11 +68,24 @@ public final class ProjectCommandService {
             ProjectTagVocabularyPort tags,
             PortfolioCommandAuthorizationPolicy authorization,
             ProjectDiscoverabilityCoordinator discoverability) {
+        this(projects, settings, tags, authorization, discoverability,
+                new ProjectPublicMutationFactsFactory(
+                        new ProjectPublicExposurePolicy(), new ProjectPublicRouteFactory()));
+    }
+
+    public ProjectCommandService(
+            ProjectRepository projects,
+            SitePresentationSettingsRepository settings,
+            ProjectTagVocabularyPort tags,
+            PortfolioCommandAuthorizationPolicy authorization,
+            ProjectDiscoverabilityCoordinator discoverability,
+            ProjectPublicMutationFactsFactory publicFacts) {
         this.projects = Objects.requireNonNull(projects, "projects");
         this.settings = Objects.requireNonNull(settings, "settings");
         this.tags = Objects.requireNonNull(tags, "tags");
         this.authorization = Objects.requireNonNull(authorization, "authorization");
         this.discoverability = Objects.requireNonNull(discoverability, "discoverability");
+        this.publicFacts = Objects.requireNonNull(publicFacts, "publicFacts");
     }
 
     public ProjectMutationResult create(CreateProjectCommand command) {
@@ -96,7 +113,8 @@ public final class ProjectCommandService {
                     command.requestedAt());
             Project saved = projects.save(project);
             discoverability.sync(saved);
-            return new ProjectMutationResult(saved.id().value(), true, saved.updatedAt(), saved.version().value());
+            return new ProjectMutationResult(saved.id().value(), true, saved.updatedAt(), saved.version().value(),
+                    publicFacts.created(saved));
         } catch (IllegalArgumentException | PortfolioValidationException exception) {
             throw new ProjectApplicationException("Project creation was rejected.", exception);
         }
@@ -109,6 +127,7 @@ public final class ProjectCommandService {
         ProjectId projectId = ProjectId.from(command.projectId());
         Project project = projects.findById(projectId)
                 .orElseThrow(() -> new ProjectNotFoundException(command.projectId()));
+        var beforePublicState = publicFacts.capture(project);
         Set<TagId> requestedTags = tagIds(command.tagIds());
         validateTags(project.tagIds(), requestedTags);
         try {
@@ -127,7 +146,8 @@ public final class ProjectCommandService {
                     command.requestedAt());
             Project saved = projects.save(project);
             discoverability.sync(saved);
-            return new ProjectMutationResult(saved.id().value(), false, saved.updatedAt(), saved.version().value());
+            return new ProjectMutationResult(saved.id().value(), false, saved.updatedAt(), saved.version().value(),
+                    publicFacts.between(saved, beforePublicState));
         } catch (IllegalArgumentException | PortfolioValidationException exception) {
             throw new ProjectApplicationException("Project update was rejected.", exception);
         }

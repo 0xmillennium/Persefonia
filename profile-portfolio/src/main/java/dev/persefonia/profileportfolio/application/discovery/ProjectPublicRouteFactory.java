@@ -12,6 +12,11 @@ public final class ProjectPublicRouteFactory {
         return new PublicUrl("/" + languageSegment(language) + "/projects/" + slug.value());
     }
 
+    public PublicUrl listingUrl(ContentLanguage language) {
+        Objects.requireNonNull(language, "language");
+        return new PublicUrl("/" + languageSegment(language) + "/projects");
+    }
+
     private static String languageSegment(ContentLanguage language) {
         return switch (language) {
             case TR -> "tr";

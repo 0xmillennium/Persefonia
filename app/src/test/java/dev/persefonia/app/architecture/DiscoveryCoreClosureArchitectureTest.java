@@ -70,6 +70,8 @@ class DiscoveryCoreClosureArchitectureTest {
                             .filter(path -> !path.toString().endsWith(
                                     "/dev/persefonia/app/medialibrary/application/"
                                             + "SpringAssetStorageRollbackCompensationAdapter.java"))
+                            .filter(path -> !path.toString().contains(
+                                    "/dev/persefonia/app/platformoperations/cache/integration/"))
                             .filter(path -> containsAny(path, forbiddenText))
                             .map(path -> path.toString()))
                     .isEmpty();

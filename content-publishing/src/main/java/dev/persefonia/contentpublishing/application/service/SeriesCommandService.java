@@ -11,9 +11,11 @@ import dev.persefonia.contentpublishing.application.command.ReorderSeriesEntries
 import dev.persefonia.contentpublishing.application.command.SeriesResult;
 import dev.persefonia.contentpublishing.application.command.UpdateSeriesCommand;
 import dev.persefonia.contentpublishing.application.discovery.SeriesDiscoverabilityCoordinator;
+import dev.persefonia.contentpublishing.application.discovery.SeriesPublicRouteFactory;
 import dev.persefonia.contentpublishing.application.exception.SeriesCommandRejectedException;
 import dev.persefonia.contentpublishing.application.exception.SeriesNotFoundException;
 import dev.persefonia.contentpublishing.domain.content.ContentItem;
+import dev.persefonia.contentpublishing.domain.content.ContentId;
 import dev.persefonia.contentpublishing.domain.content.ContentStatus;
 import dev.persefonia.contentpublishing.domain.content.port.ContentItemRepository;
 import dev.persefonia.contentpublishing.domain.model.series.Series;
@@ -31,16 +33,27 @@ public final class SeriesCommandService {
     private final SeriesRepository seriesRepository;
     private final ContentCommandAuthorizationPolicy authorization;
     private final SeriesDiscoverabilityCoordinator discoverability;
+    private final SeriesPublicRouteFactory publicRoutes;
 
     public SeriesCommandService(
             ContentItemRepository contentItems,
             SeriesRepository seriesRepository,
             ContentCommandAuthorizationPolicy authorization,
             SeriesDiscoverabilityCoordinator discoverability) {
+        this(contentItems, seriesRepository, authorization, discoverability, new SeriesPublicRouteFactory());
+    }
+
+    public SeriesCommandService(
+            ContentItemRepository contentItems,
+            SeriesRepository seriesRepository,
+            ContentCommandAuthorizationPolicy authorization,
+            SeriesDiscoverabilityCoordinator discoverability,
+            SeriesPublicRouteFactory publicRoutes) {
         this.contentItems = Objects.requireNonNull(contentItems, "contentItems");
         this.seriesRepository = Objects.requireNonNull(seriesRepository, "seriesRepository");
         this.authorization = Objects.requireNonNull(authorization, "authorization");
         this.discoverability = Objects.requireNonNull(discoverability, "discoverability");
+        this.publicRoutes = Objects.requireNonNull(publicRoutes, "publicRoutes");
     }
 
     public SeriesResult create(CreateSeriesCommand command) {
@@ -59,13 +72,14 @@ public final class SeriesCommandService {
                 command.requestedAt());
         Series saved = seriesRepository.save(series);
         discoverability.sync(saved);
-        return new SeriesResult(saved.id());
+        return result(saved, null, null, true);
     }
 
     public SeriesResult update(UpdateSeriesCommand command) {
         Objects.requireNonNull(command, "command");
         authorization.requireOwner(command.actor(), "series.update");
         Series series = requiredSeries(command.seriesId());
+        var oldRoute = publicRoutes.publicUrl(series);
         rejectArchived(series);
         SeriesSlug slug = SeriesSlug.of(command.slug());
         seriesRepository.findByLanguageAndSlug(series.language(), slug)
@@ -84,7 +98,7 @@ public final class SeriesCommandService {
         }
         Series saved = seriesRepository.save(series);
         discoverability.sync(saved);
-        return new SeriesResult(saved.id());
+        return result(saved, null, oldRoute, true);
     }
 
     public SeriesResult archive(ArchiveSeriesCommand command) {
@@ -92,12 +106,12 @@ public final class SeriesCommandService {
         authorization.requireOwner(command.actor(), "series.archive");
         Series series = requiredSeries(command.seriesId());
         if (series.isArchived()) {
-            return new SeriesResult(series.id(), null, false);
+            return result(series, null, publicRoutes.publicUrl(series), false);
         }
         series.archive(command.requestedAt());
         Series saved = seriesRepository.save(series);
         discoverability.sync(saved);
-        return new SeriesResult(saved.id());
+        return result(saved, null, publicRoutes.publicUrl(saved), true);
     }
 
     public SeriesResult addEntry(AddSeriesEntryCommand command) {
@@ -124,7 +138,8 @@ public final class SeriesCommandService {
         } catch (SeriesValidationException exception) {
             throw translate(exception);
         }
-        return new SeriesResult(seriesRepository.save(series).id());
+        Series saved = seriesRepository.save(series);
+        return result(saved, null, publicRoutes.publicUrl(saved), true);
     }
 
     public SeriesResult removeEntry(RemoveSeriesEntryCommand command) {
@@ -145,7 +160,8 @@ public final class SeriesCommandService {
         } catch (SeriesValidationException exception) {
             throw translate(exception);
         }
-        return new SeriesResult(seriesRepository.save(series).id(), removedEntry.orElseThrow().contentItemId());
+        Series saved = seriesRepository.save(series);
+        return result(saved, removedEntry.orElseThrow().contentItemId(), publicRoutes.publicUrl(saved), true);
     }
 
     public SeriesResult reorderEntries(ReorderSeriesEntriesCommand command) {
@@ -160,7 +176,15 @@ public final class SeriesCommandService {
                     SeriesCommandRejectedException.Reason.INVALID_REORDER,
                     "The entry order must include each current entry exactly once.");
         }
-        return new SeriesResult(seriesRepository.save(series).id());
+        Series saved = seriesRepository.save(series);
+        return result(saved, null, publicRoutes.publicUrl(saved), true);
+    }
+
+    private SeriesResult result(Series series, ContentId contentItemId,
+            dev.persefonia.discovery.application.contract.PublicUrl oldRoute, boolean mutated) {
+        return new SeriesResult(series.id(), contentItemId, mutated,
+                java.util.Optional.ofNullable(oldRoute),
+                java.util.Optional.of(publicRoutes.publicUrl(series)));
     }
 
     private Series requiredSeries(SeriesId id) {

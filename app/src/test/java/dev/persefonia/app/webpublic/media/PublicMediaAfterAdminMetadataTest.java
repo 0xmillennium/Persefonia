@@ -115,7 +115,8 @@ class PublicMediaAfterAdminMetadataTest {
 
         assertThat(admin.updateMetadata(new UpdateAssetMetadataCommand(
                 OWNER, image.id(), AssetVisibility.PUBLIC, "Helpful chart", false)))
-                .isEqualTo(new AssetMetadataUpdateResult.Updated(image.id()));
+                .isEqualTo(new AssetMetadataUpdateResult.Updated(
+                        image.id(), AssetVisibility.PRIVATE, AssetVisibility.PUBLIC, true));
 
         publicMedia.perform(get(variantRoute(image.id(), "thumbnail")))
                 .andExpect(status().isOk())
@@ -123,7 +124,8 @@ class PublicMediaAfterAdminMetadataTest {
 
         assertThat(admin.updateMetadata(new UpdateAssetMetadataCommand(
                 OWNER, image.id(), AssetVisibility.PRIVATE, "Helpful chart", false)))
-                .isEqualTo(new AssetMetadataUpdateResult.Updated(image.id()));
+                .isEqualTo(new AssetMetadataUpdateResult.Updated(
+                        image.id(), AssetVisibility.PUBLIC, AssetVisibility.PRIVATE, true));
 
         publicMedia.perform(get(variantRoute(image.id(), "thumbnail")))
                 .andExpect(status().isNotFound());
@@ -137,7 +139,8 @@ class PublicMediaAfterAdminMetadataTest {
 
         assertThat(admin.updateMetadata(new UpdateAssetMetadataCommand(
                 OWNER, image.id(), AssetVisibility.PUBLIC, null, true)))
-                .isEqualTo(new AssetMetadataUpdateResult.Updated(image.id()));
+                .isEqualTo(new AssetMetadataUpdateResult.Updated(
+                        image.id(), AssetVisibility.PRIVATE, AssetVisibility.PUBLIC, true));
 
         publicMedia.perform(get(variantRoute(image.id(), "thumbnail")))
                 .andExpect(status().isOk())
@@ -199,7 +202,8 @@ class PublicMediaAfterAdminMetadataTest {
 
         assertThat(admin.updateMetadata(new UpdateAssetMetadataCommand(
                 OWNER, pdf.id(), AssetVisibility.PUBLIC, null, false)))
-                .isEqualTo(new AssetMetadataUpdateResult.Updated(pdf.id()));
+                .isEqualTo(new AssetMetadataUpdateResult.Updated(
+                        pdf.id(), AssetVisibility.PRIVATE, AssetVisibility.PUBLIC, true));
 
         publicMedia.perform(get(publicMediaAssetRoute(pdf.id(), "")))
                 .andExpect(status().isNotFound());

@@ -42,7 +42,7 @@ class PublicMediaSecurityAndCacheTest {
                         "/media/assets/00000000-0000-0000-0000-000000000001/variants/thumbnail"))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", containsString("public")))
-                .andExpect(header().string("Cache-Control", containsString("max-age=86400")))
+                .andExpect(header().string("Cache-Control", "public, no-cache, must-revalidate"))
                 .andExpect(header().string("Cache-Control", not(containsString("no-store"))))
                 .andExpect(header().string("Cache-Control", not(containsString("private"))))
                 .andExpect(header().string("X-Content-Type-Options", "nosniff"));

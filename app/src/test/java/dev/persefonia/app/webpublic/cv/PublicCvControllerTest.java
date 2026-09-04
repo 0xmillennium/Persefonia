@@ -114,7 +114,7 @@ class PublicCvControllerTest {
                 .andExpect(content().contentType("application/pdf"))
                 .andExpect(header().string("Content-Disposition", "attachment; filename=\"cv-en.pdf\""))
                 .andExpect(header().string("X-Content-Type-Options", "nosniff"))
-                .andExpect(header().string("Cache-Control", "public, max-age=300, must-revalidate"))
+                .andExpect(header().string("Cache-Control", "public, no-cache, must-revalidate"))
                 .andExpect(header().string("Cache-Control", not(containsString("immutable"))))
                 .andExpect(header().exists("Content-Length"))
                 .andExpect(content().bytes(("%PDF-" + PublicCvTestConfiguration.EN_PDF_ID.value()).getBytes()));
@@ -163,7 +163,9 @@ class PublicCvControllerTest {
         support.assets.reset();
         support.assets.removeContent(PublicCvTestConfiguration.EN_PDF_ID);
         mockMvc.perform(get("/cv")).andExpect(status().isNotFound());
-        mockMvc.perform(get("/cv/download")).andExpect(status().isNotFound());
+        mockMvc.perform(get("/cv/download"))
+                .andExpect(status().isNotFound())
+                .andExpect(header().string("Cache-Control", "no-store, private"));
     }
 
     @Test

@@ -21,6 +21,9 @@ import dev.persefonia.contentpublishing.domain.revision.ContentRevisionId;
 import dev.persefonia.contentpublishing.domain.revision.RevisionMetadata;
 import dev.persefonia.contentpublishing.domain.revision.RevisionNumber;
 import dev.persefonia.contentpublishing.domain.revision.port.ContentRevisionRepository;
+import dev.persefonia.contentpublishing.application.discovery.ContentPublicRouteFactory;
+import dev.persefonia.contentpublishing.application.publicview.ContentPublicExposurePolicy;
+import dev.persefonia.contentpublishing.application.publicview.ContentPublicMutationFactsFactory;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -31,6 +34,7 @@ public final class ContentPublishCommandHandler {
     private final ContentCommandAuthorizationPolicy authorization;
     private final ContentPublishingEventPublisher events;
     private final ContentDiscoverabilityCoordinator discoverability;
+    private final ContentPublicMutationFactsFactory publicFacts;
 
     public ContentPublishCommandHandler(
             ContentItemRepository contentItems,
@@ -39,17 +43,31 @@ public final class ContentPublishCommandHandler {
             ContentCommandAuthorizationPolicy authorization,
             ContentPublishingEventPublisher events,
             ContentDiscoverabilityCoordinator discoverability) {
+        this(contentItems, revisions, renderer, authorization, events, discoverability,
+                new ContentPublicMutationFactsFactory(new ContentPublicExposurePolicy(), new ContentPublicRouteFactory()));
+    }
+
+    public ContentPublishCommandHandler(
+            ContentItemRepository contentItems,
+            ContentRevisionRepository revisions,
+            MarkdownRenderingService renderer,
+            ContentCommandAuthorizationPolicy authorization,
+            ContentPublishingEventPublisher events,
+            ContentDiscoverabilityCoordinator discoverability,
+            ContentPublicMutationFactsFactory publicFacts) {
         this.contentItems = Objects.requireNonNull(contentItems, "contentItems");
         this.revisions = Objects.requireNonNull(revisions, "revisions");
         this.renderer = Objects.requireNonNull(renderer, "renderer");
         this.authorization = Objects.requireNonNull(authorization, "authorization");
         this.events = Objects.requireNonNull(events, "events");
         this.discoverability = Objects.requireNonNull(discoverability, "discoverability");
+        this.publicFacts = Objects.requireNonNull(publicFacts, "publicFacts");
     }
 
     public ContentPublishResult publish(PublishContentCommand command) {
         authorization.requireOwner(command.actor(), "content.publish");
         ContentItem item = requiredContent(contentItems, command.contentId());
+        var beforePublicState = publicFacts.capture(item);
         boolean alreadyPublished = item.isPublished();
         Optional<Slug> previousSlug = item.slug();
         ContentVisibility previousVisibility = item.visibility();
@@ -89,6 +107,7 @@ public final class ContentPublishCommandHandler {
                     command.requestedAt(), saved.publishedAt().orElseThrow()));
         }
         return new ContentPublishResult(
-                saved.id(), saved.status(), snapshot, revisionNumber, saved.publishedAt().orElseThrow());
+                saved.id(), saved.status(), snapshot, revisionNumber, saved.publishedAt().orElseThrow(),
+                publicFacts.between(saved.id(), beforePublicState, saved));
     }
 }

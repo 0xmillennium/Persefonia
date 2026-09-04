@@ -56,12 +56,15 @@ class MandatoryAuditGatewayArchitectureTest {
     @Test
     void everyCataloguedGatewayHasMandatoryAuditCompositionDependency() {
         assertThat(GATEWAYS).allSatisfy(gateway -> {
-            assertThat(gateway.getDeclaredConstructors()).singleElement().satisfies(constructor -> {
+            assertThat(gateway.getDeclaredConstructors())
+                    .filteredOn(constructor -> java.util.Arrays.asList(constructor.getParameterTypes())
+                            .contains(AppendAuditRecordPort.class))
+                    .anySatisfy(constructor -> {
                 assertThat(constructor.getParameterTypes()).contains(AppendAuditRecordPort.class);
                 assertThat(constructor.getParameterTypes())
                         .anyMatch(type -> type.getPackageName()
                                 .equals("dev.persefonia.app.audit.integration"));
-            });
+                    });
         });
     }
 

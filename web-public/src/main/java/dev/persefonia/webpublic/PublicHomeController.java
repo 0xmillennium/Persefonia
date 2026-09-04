@@ -6,6 +6,7 @@ import dev.persefonia.profileportfolio.application.service.PublicFeaturedProject
 import dev.persefonia.profileportfolio.application.service.PublicHomepageSettingsQueryService;
 import dev.persefonia.profileportfolio.application.service.PublicProfileSummaryQueryService;
 import dev.persefonia.webpublic.content.PublicCanonicalUrlFactory;
+import dev.persefonia.webpublic.content.PublicContentResponseHeaders;
 import dev.persefonia.webpublic.insights.PublicInsightSurface;
 import dev.persefonia.webpublic.insights.PublicInsightsObservationGateway;
 import dev.persefonia.webpublic.projects.PublicProjectPageCopy;
@@ -16,6 +17,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import jakarta.servlet.http.HttpServletResponse;
 
 @Controller
 public class PublicHomeController {
@@ -27,6 +29,7 @@ public class PublicHomeController {
     private final PublicFeaturedProjectQueryService featuredProjects;
     private final PublicCanonicalUrlFactory canonicalUrlFactory;
     private final PublicInsightsObservationGateway insights;
+    private final PublicContentResponseHeaders responseHeaders;
     private final String publicBaseUrl;
     private final String ownerAlias;
 
@@ -37,6 +40,7 @@ public class PublicHomeController {
             PublicFeaturedProjectQueryService featuredProjects,
             PublicCanonicalUrlFactory canonicalUrlFactory,
             PublicInsightsObservationGateway insights,
+            PublicContentResponseHeaders responseHeaders,
             @Value("${site.public-base-url}") String publicBaseUrl,
             @Value("${site.owner-alias}") String ownerAlias) {
         this.assetResolver = Objects.requireNonNull(assetResolver, "assetResolver");
@@ -45,12 +49,14 @@ public class PublicHomeController {
         this.featuredProjects = Objects.requireNonNull(featuredProjects, "featuredProjects");
         this.canonicalUrlFactory = Objects.requireNonNull(canonicalUrlFactory, "canonicalUrlFactory");
         this.insights = Objects.requireNonNull(insights, "insights");
+        this.responseHeaders = Objects.requireNonNull(responseHeaders, "responseHeaders");
         this.publicBaseUrl = publicBaseUrl;
         this.ownerAlias = ownerAlias;
     }
 
     @GetMapping("/")
-    public String home(Model model) {
+    public String home(Model model, HttpServletResponse response) {
+        responseHeaders.applyPublicContentHeaders(response);
         insights.recordPageView(PublicInsightSurface.HOME);
         PublicHomepageSettingsView homepage = settings.current();
         Optional<PublicProfileSummaryView> profile = profiles.currentSummary(homepage.defaultLanguage());

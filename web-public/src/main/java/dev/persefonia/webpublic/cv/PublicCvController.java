@@ -3,6 +3,7 @@ package dev.persefonia.webpublic.cv;
 import dev.persefonia.profileportfolio.application.query.ActiveCvDownload;
 import dev.persefonia.profileportfolio.application.service.ActiveCvPublicDownloadService;
 import dev.persefonia.profileportfolio.application.service.ActiveCvPublicQueryService;
+import dev.persefonia.profileportfolio.application.publicview.PublicCvRoutes;
 import dev.persefonia.webpublic.content.PublicCanonicalUrlFactory;
 import dev.persefonia.webpublic.content.PublicContentResponseHeaders;
 import dev.persefonia.webpublic.content.PublicContentViewModelFactory;
@@ -23,8 +24,6 @@ import org.springframework.web.servlet.ModelAndView;
 
 @Controller
 public final class PublicCvController {
-    private static final String DOWNLOAD_CACHE_CONTROL = "public, max-age=300, must-revalidate";
-
     private final ObjectProvider<ActiveCvPublicQueryService> queries;
     private final ObjectProvider<ActiveCvPublicDownloadService> downloads;
     private final PublicContentResponseHeaders responseHeaders;
@@ -47,7 +46,7 @@ public final class PublicCvController {
         this.insights = Objects.requireNonNull(insights, "insights");
     }
 
-    @GetMapping("/cv")
+    @GetMapping(PublicCvRoutes.DEFAULT_PAGE)
     public ModelAndView cv(HttpServletResponse response) {
         ActiveCvPublicQueryService queryService = queries.getIfAvailable();
         if (queryService == null) {
@@ -58,18 +57,18 @@ public final class PublicCvController {
                 .orElseGet(() -> notFound(response));
     }
 
-    @GetMapping("/cv/download")
+    @GetMapping(PublicCvRoutes.DEFAULT_DOWNLOAD)
     public ResponseEntity<InputStreamResource> cvDownload() {
         ActiveCvPublicDownloadService downloadService = downloads.getIfAvailable();
         if (downloadService == null) {
-            return ResponseEntity.notFound().build();
+            return missingDownload();
         }
         return downloadService.defaultLanguageDownload()
                 .map(this::observedDownloadResponse)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+                .orElseGet(PublicCvController::missingDownload);
     }
 
-    @GetMapping("/cv/{language}")
+    @GetMapping(PublicCvRoutes.LANGUAGE_PAGE)
     public ModelAndView cvForLanguage(
             @PathVariable("language") String language,
             HttpServletResponse response) {
@@ -82,15 +81,15 @@ public final class PublicCvController {
                 .orElseGet(() -> notFound(response));
     }
 
-    @GetMapping("/cv/{language}/download")
+    @GetMapping(PublicCvRoutes.LANGUAGE_DOWNLOAD)
     public ResponseEntity<InputStreamResource> cvDownloadForLanguage(@PathVariable("language") String language) {
         ActiveCvPublicDownloadService downloadService = downloads.getIfAvailable();
         if (downloadService == null) {
-            return ResponseEntity.notFound().build();
+            return missingDownload();
         }
         return downloadService.explicitLanguageDownload(language)
                 .map(this::observedDownloadResponse)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+                .orElseGet(PublicCvController::missingDownload);
     }
 
     private ModelAndView render(
@@ -117,8 +116,14 @@ public final class PublicCvController {
                 .contentLength(download.contentLength())
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + download.filename() + "\"")
                 .header("X-Content-Type-Options", "nosniff")
-                .header(HttpHeaders.CACHE_CONTROL, DOWNLOAD_CACHE_CONTROL)
+                .header(HttpHeaders.CACHE_CONTROL, PublicContentResponseHeaders.PUBLIC_MUTABLE_CACHE_CONTROL)
                 .body(new InputStreamResource(download.inputStream()));
+    }
+
+    private static ResponseEntity<InputStreamResource> missingDownload() {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .header(HttpHeaders.CACHE_CONTROL, PublicContentResponseHeaders.PUBLIC_NOT_FOUND_CACHE_CONTROL)
+                .build();
     }
 
     private ResponseEntity<InputStreamResource> observedDownloadResponse(ActiveCvDownload download) {

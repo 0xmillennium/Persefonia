@@ -1,6 +1,7 @@
 package dev.persefonia.webpublic.media;
 
 import dev.persefonia.medialibrary.application.publicview.PublicImageVariantContentService;
+import dev.persefonia.webpublic.content.PublicContentResponseHeaders;
 import java.io.InputStream;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.core.io.InputStreamResource;
@@ -13,8 +14,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 
 @Controller
 public final class PublicMediaAssetController {
-    private static final String CACHE_CONTROL = "public, max-age=86400";
-
     private final ObjectProvider<PublicImageVariantContentService> contentServices;
 
     public PublicMediaAssetController(ObjectProvider<PublicImageVariantContentService> contentServices) {
@@ -27,14 +26,14 @@ public final class PublicMediaAssetController {
             @PathVariable("variantName") String variantName) {
         PublicImageVariantContentService contentService = contentServices.getIfAvailable();
         if (contentService == null) {
-            return ResponseEntity.notFound().build();
+            return missing();
         }
         return contentService.openVariant(assetId, variantName)
                 .map(content -> response(
                         content.inputStream(),
                         content.contentType(),
                         content.contentLength()))
-                .orElseGet(() -> ResponseEntity.notFound().build());
+                .orElseGet(PublicMediaAssetController::missing);
     }
 
     private static ResponseEntity<InputStreamResource> response(
@@ -45,7 +44,13 @@ public final class PublicMediaAssetController {
                 .contentType(MediaType.parseMediaType(contentType))
                 .contentLength(contentLength)
                 .header("X-Content-Type-Options", "nosniff")
-                .header(HttpHeaders.CACHE_CONTROL, CACHE_CONTROL)
+                .header(HttpHeaders.CACHE_CONTROL, PublicContentResponseHeaders.PUBLIC_MUTABLE_CACHE_CONTROL)
                 .body(new InputStreamResource(inputStream));
+    }
+
+    private static ResponseEntity<InputStreamResource> missing() {
+        return ResponseEntity.notFound()
+                .header(HttpHeaders.CACHE_CONTROL, PublicContentResponseHeaders.PUBLIC_NOT_FOUND_CACHE_CONTROL)
+                .build();
     }
 }

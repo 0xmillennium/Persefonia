@@ -16,6 +16,8 @@ import dev.persefonia.contentpublishing.domain.content.port.ContentItemRepositor
 import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.Set;
+import dev.persefonia.contentpublishing.application.publicview.ContentPublicExposurePolicy;
+import dev.persefonia.contentpublishing.application.publicview.ContentTagMutationFacts;
 
 public final class ContentTagAssignmentService {
     public static final int MAX_TAGS = 12;
@@ -23,14 +25,24 @@ public final class ContentTagAssignmentService {
     private final ContentItemRepository contentItems;
     private final ContentTagVocabularyPort vocabulary;
     private final ContentCommandAuthorizationPolicy authorization;
+    private final ContentPublicExposurePolicy exposurePolicy;
 
     public ContentTagAssignmentService(
             ContentItemRepository contentItems,
             ContentTagVocabularyPort vocabulary,
             ContentCommandAuthorizationPolicy authorization) {
+        this(contentItems, vocabulary, authorization, new ContentPublicExposurePolicy());
+    }
+
+    public ContentTagAssignmentService(
+            ContentItemRepository contentItems,
+            ContentTagVocabularyPort vocabulary,
+            ContentCommandAuthorizationPolicy authorization,
+            ContentPublicExposurePolicy exposurePolicy) {
         this.contentItems = Objects.requireNonNull(contentItems, "contentItems");
         this.vocabulary = Objects.requireNonNull(vocabulary, "vocabulary");
         this.authorization = Objects.requireNonNull(authorization, "authorization");
+        this.exposurePolicy = Objects.requireNonNull(exposurePolicy, "exposurePolicy");
     }
 
     public ContentTagAssignmentView view(ContentCommandActor actor, ContentId contentId) {
@@ -43,6 +55,10 @@ public final class ContentTagAssignmentService {
     }
 
     public void assign(AssignContentTagsCommand command) {
+        assignWithFacts(command);
+    }
+
+    public ContentTagMutationFacts assignWithFacts(AssignContentTagsCommand command) {
         Objects.requireNonNull(command, "command");
         authorization.requireOwner(command.actor(), "content.tag.assign");
         ContentItem content = requiredContent(contentItems, command.contentId());
@@ -73,7 +89,10 @@ public final class ContentTagAssignmentService {
         } catch (ContentLifecycleException exception) {
             throw notEditable(exception);
         }
-        contentItems.save(content);
+        ContentItem saved = contentItems.save(content);
+        return new ContentTagMutationFacts(
+                saved.id(), saved.language(), exposurePolicy.snapshot(saved).listed(), current, requested,
+                !current.equals(requested));
     }
 
     private static void rejectIfNotEditable(ContentItem content) {

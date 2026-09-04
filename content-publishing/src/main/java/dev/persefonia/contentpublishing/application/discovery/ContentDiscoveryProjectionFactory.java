@@ -4,6 +4,7 @@ import dev.persefonia.contentpublishing.domain.content.ContentItem;
 import dev.persefonia.contentpublishing.domain.content.ContentMetadata;
 import dev.persefonia.contentpublishing.domain.content.ContentType;
 import dev.persefonia.contentpublishing.domain.content.ContentVisibility;
+import dev.persefonia.contentpublishing.application.publicview.ContentPublicExposurePolicy;
 import dev.persefonia.discovery.application.contract.DiscoverableResourceType;
 import dev.persefonia.discovery.application.contract.DiscoveryEligibility;
 import dev.persefonia.discovery.application.contract.DiscoveryLanguage;
@@ -20,23 +21,33 @@ import java.util.Optional;
 public final class ContentDiscoveryProjectionFactory {
     private final ContentPublicRouteFactory routeFactory;
     private final ConfiguredContentCanonicalUrlFactory canonicalUrlFactory;
+    private final ContentPublicExposurePolicy exposurePolicy;
 
     public ContentDiscoveryProjectionFactory(
             ContentPublicRouteFactory routeFactory,
             ConfiguredContentCanonicalUrlFactory canonicalUrlFactory) {
+        this(routeFactory, canonicalUrlFactory, new ContentPublicExposurePolicy());
+    }
+
+    public ContentDiscoveryProjectionFactory(
+            ContentPublicRouteFactory routeFactory,
+            ConfiguredContentCanonicalUrlFactory canonicalUrlFactory,
+            ContentPublicExposurePolicy exposurePolicy) {
         this.routeFactory = Objects.requireNonNull(routeFactory, "routeFactory");
         this.canonicalUrlFactory = Objects.requireNonNull(canonicalUrlFactory, "canonicalUrlFactory");
+        this.exposurePolicy = Objects.requireNonNull(exposurePolicy, "exposurePolicy");
     }
 
     public Optional<DiscoverableResourceProjectionInput> projectionFor(ContentItem item) {
         Objects.requireNonNull(item, "item");
-        if (!item.isPublished() || item.visibility() == ContentVisibility.PRIVATE) {
+        var exposure = exposurePolicy.snapshot(item);
+        if (!exposure.directReachable()) {
             return Optional.empty();
         }
 
         ContentMetadata metadata = item.metadata();
         var resourceType = resourceType(item.type());
-        var eligibility = eligibility(item.visibility(), resourceType);
+        var eligibility = eligibility(item.visibility(), resourceType, exposure);
         var publicUrl = routeFactory.publicUrl(item.type(), item.language(), item.slug().orElseThrow());
         return Optional.of(new DiscoverableResourceProjectionInput(
                 SourceContext.CONTENT_PUBLISHING,
@@ -74,8 +85,10 @@ public final class ContentDiscoveryProjectionFactory {
     }
 
     private static ProjectionEligibility eligibility(
-            ContentVisibility visibility, DiscoverableResourceType resourceType) {
-        if (visibility == ContentVisibility.UNLISTED) {
+            ContentVisibility visibility,
+            DiscoverableResourceType resourceType,
+            dev.persefonia.contentpublishing.application.publicview.ContentPublicExposureSnapshot exposure) {
+        if (!exposure.listed()) {
             return new ProjectionEligibility(
                     IndexingPolicy.NO_INDEX,
                     DiscoveryEligibility.NOT_ELIGIBLE,
@@ -83,9 +96,8 @@ public final class ContentDiscoveryProjectionFactory {
                     DiscoveryEligibility.NOT_ELIGIBLE);
         }
 
-        DiscoveryEligibility feedEligibility = resourceType == DiscoverableResourceType.PAGE
-                ? DiscoveryEligibility.NOT_ELIGIBLE
-                : DiscoveryEligibility.ELIGIBLE;
+        DiscoveryEligibility feedEligibility = exposure.feedEligible()
+                ? DiscoveryEligibility.ELIGIBLE : DiscoveryEligibility.NOT_ELIGIBLE;
         return new ProjectionEligibility(
                 IndexingPolicy.INDEX,
                 DiscoveryEligibility.ELIGIBLE,

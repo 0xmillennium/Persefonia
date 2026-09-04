@@ -21,6 +21,9 @@ import dev.persefonia.contentpublishing.domain.content.ContentStatus;
 import dev.persefonia.contentpublishing.domain.content.ContentVisibility;
 import dev.persefonia.contentpublishing.domain.content.Slug;
 import dev.persefonia.contentpublishing.domain.content.port.ContentItemRepository;
+import dev.persefonia.contentpublishing.application.discovery.ContentPublicRouteFactory;
+import dev.persefonia.contentpublishing.application.publicview.ContentPublicExposurePolicy;
+import dev.persefonia.contentpublishing.application.publicview.ContentPublicMutationFactsFactory;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
@@ -31,16 +34,28 @@ public final class ContentDraftCommandHandler {
     private final ContentCommandAuthorizationPolicy authorization;
     private final ContentPublishingEventPublisher events;
     private final ContentDiscoverabilityCoordinator discoverability;
+    private final ContentPublicMutationFactsFactory publicFacts;
 
     public ContentDraftCommandHandler(
             ContentItemRepository contentItems,
             ContentCommandAuthorizationPolicy authorization,
             ContentPublishingEventPublisher events,
             ContentDiscoverabilityCoordinator discoverability) {
+        this(contentItems, authorization, events, discoverability,
+                new ContentPublicMutationFactsFactory(new ContentPublicExposurePolicy(), new ContentPublicRouteFactory()));
+    }
+
+    public ContentDraftCommandHandler(
+            ContentItemRepository contentItems,
+            ContentCommandAuthorizationPolicy authorization,
+            ContentPublishingEventPublisher events,
+            ContentDiscoverabilityCoordinator discoverability,
+            ContentPublicMutationFactsFactory publicFacts) {
         this.contentItems = Objects.requireNonNull(contentItems, "contentItems");
         this.authorization = Objects.requireNonNull(authorization, "authorization");
         this.events = Objects.requireNonNull(events, "events");
         this.discoverability = Objects.requireNonNull(discoverability, "discoverability");
+        this.publicFacts = Objects.requireNonNull(publicFacts, "publicFacts");
     }
 
     public ContentDraftResult create(CreateContentDraftCommand command) {
@@ -50,12 +65,13 @@ public final class ContentDraftCommandHandler {
         ContentItem saved = contentItems.save(item);
         events.publish(new ContentCreated(
                 saved.id(), saved.type(), saved.language(), command.actor().identityRef(), command.requestedAt()));
-        return draftResult(saved);
+        return draftResult(saved, publicFacts.created(saved));
     }
 
     public ContentDraftResult update(UpdateContentDraftCommand command) {
         authorization.requireOwner(command.actor(), "content.update-draft");
         ContentItem item = requiredContent(contentItems, command.contentId());
+        var beforePublicState = publicFacts.capture(item);
         if (!item.isDraft() && !item.isUnpublished() && !item.isPublished()) {
             throw new ContentCommandRejectedException("Only draft, published, or unpublished content can be edited");
         }
@@ -82,7 +98,7 @@ public final class ContentDraftCommandHandler {
             events.publish(new ContentVisibilityChanged(
                     saved.id(), saved.type(), saved.language(), actor, occurredAt, oldVisibility, saved.visibility()));
         }
-        return draftResult(saved);
+        return draftResult(saved, publicFacts.between(saved.id(), beforePublicState, saved));
     }
 
     private void applyChanges(ContentItem item, UpdateContentDraftCommand command) {

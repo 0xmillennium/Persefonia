@@ -105,7 +105,7 @@ class ManualRedirectPublicRouteIntegrationTest {
                 .andExpect(status().is(308))
                 .andExpect(header().string("Location", "/tr/articles/new"))
                 .andExpect(header().string("Cache-Control", containsString("public")))
-                .andExpect(header().string("Cache-Control", containsString("max-age=300")))
+                .andExpect(header().string("Cache-Control", "public, no-cache, must-revalidate"))
                 .andExpect(content().string(not(containsString("source_entity_id"))));
 
         mockMvc.perform(post("/admin/discovery/redirects/" + redirectId + "/deactivate")

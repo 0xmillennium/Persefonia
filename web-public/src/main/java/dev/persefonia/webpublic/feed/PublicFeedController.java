@@ -1,6 +1,7 @@
 package dev.persefonia.webpublic.feed;
 
 import java.nio.charset.StandardCharsets;
+import dev.persefonia.webpublic.content.PublicContentResponseHeaders;
 import java.util.Objects;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -16,7 +17,7 @@ import org.springframework.web.bind.annotation.GetMapping;
  */
 @Controller
 public final class PublicFeedController {
-    static final String CACHE_CONTROL = "public, max-age=300, must-revalidate";
+    static final String CACHE_CONTROL = PublicContentResponseHeaders.PUBLIC_MUTABLE_CACHE_CONTROL;
     private static final MediaType ATOM_UTF8 =
             new MediaType("application", "atom+xml", StandardCharsets.UTF_8);
 

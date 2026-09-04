@@ -9,6 +9,9 @@ import dev.persefonia.contentpublishing.application.discovery.ContentDiscoveryRe
 import dev.persefonia.contentpublishing.application.discovery.ContentPublicRouteFactory;
 import dev.persefonia.contentpublishing.application.discovery.SeriesDiscoverabilityCoordinator;
 import dev.persefonia.contentpublishing.application.discovery.SeriesDiscoveryProjectionFactory;
+import dev.persefonia.contentpublishing.application.discovery.SeriesPublicRouteFactory;
+import dev.persefonia.contentpublishing.application.publicview.ContentPublicExposurePolicy;
+import dev.persefonia.contentpublishing.application.publicview.ContentPublicMutationFactsFactory;
 import dev.persefonia.contentpublishing.application.port.ContentPublishingEventPublisher;
 import dev.persefonia.contentpublishing.application.port.ContentTagVocabularyPort;
 import dev.persefonia.contentpublishing.application.port.PublicSeriesEntryReadModel;
@@ -70,6 +73,22 @@ class ContentApplicationConfiguration {
     }
 
     @Bean
+    ContentPublicExposurePolicy contentPublicExposurePolicy() {
+        return new ContentPublicExposurePolicy();
+    }
+
+    @Bean
+    ContentPublicMutationFactsFactory contentPublicMutationFactsFactory(
+            ContentPublicExposurePolicy policy, ContentPublicRouteFactory routes) {
+        return new ContentPublicMutationFactsFactory(policy, routes);
+    }
+
+    @Bean
+    SeriesPublicRouteFactory seriesPublicRouteFactory() {
+        return new SeriesPublicRouteFactory();
+    }
+
+    @Bean
     ConfiguredContentCanonicalUrlFactory configuredContentCanonicalUrlFactory(
             @Value("${site.public-base-url}") String publicBaseUrl) {
         return new ConfiguredContentCanonicalUrlFactory(publicBaseUrl);
@@ -78,8 +97,9 @@ class ContentApplicationConfiguration {
     @Bean
     ContentDiscoveryProjectionFactory contentDiscoveryProjectionFactory(
             ContentPublicRouteFactory routeFactory,
-            ConfiguredContentCanonicalUrlFactory canonicalUrlFactory) {
-        return new ContentDiscoveryProjectionFactory(routeFactory, canonicalUrlFactory);
+            ConfiguredContentCanonicalUrlFactory canonicalUrlFactory,
+            ContentPublicExposurePolicy exposurePolicy) {
+        return new ContentDiscoveryProjectionFactory(routeFactory, canonicalUrlFactory, exposurePolicy);
     }
 
     @Bean
@@ -99,8 +119,9 @@ class ContentApplicationConfiguration {
 
     @Bean
     SeriesDiscoveryProjectionFactory seriesDiscoveryProjectionFactory(
+            SeriesPublicRouteFactory routeFactory,
             ConfiguredContentCanonicalUrlFactory canonicalUrlFactory) {
-        return new SeriesDiscoveryProjectionFactory(canonicalUrlFactory);
+        return new SeriesDiscoveryProjectionFactory(routeFactory, canonicalUrlFactory);
     }
 
     @Bean
@@ -118,12 +139,14 @@ class ContentApplicationConfiguration {
             MarkdownRenderingService renderer,
             ContentCommandAuthorizationPolicy authorization,
             ContentPublishingEventPublisher events,
-            ContentDiscoverabilityCoordinator discoverability) {
+            ContentDiscoverabilityCoordinator discoverability,
+            ContentPublicMutationFactsFactory publicFacts) {
         return new ContentCommandService(
-                new ContentDraftCommandHandler(contentItems, authorization, events, discoverability),
+                new ContentDraftCommandHandler(contentItems, authorization, events, discoverability, publicFacts),
                 new ContentPreviewQueryHandler(contentItems, renderer, authorization),
-                new ContentPublishCommandHandler(contentItems, revisions, renderer, authorization, events, discoverability),
-                new ContentLifecycleCommandHandler(contentItems, authorization, events, discoverability));
+                new ContentPublishCommandHandler(
+                        contentItems, revisions, renderer, authorization, events, discoverability, publicFacts),
+                new ContentLifecycleCommandHandler(contentItems, authorization, events, discoverability, publicFacts));
     }
 
     @Bean
@@ -150,16 +173,20 @@ class ContentApplicationConfiguration {
     ContentTagAssignmentService contentTagAssignmentService(
             ContentItemRepository contentItems,
             ContentTagVocabularyPort vocabulary,
-            ContentCommandAuthorizationPolicy authorization) {
-        return new ContentTagAssignmentService(contentItems, vocabulary, authorization);
+            ContentCommandAuthorizationPolicy authorization,
+            ContentPublicExposurePolicy exposurePolicy) {
+        return new ContentTagAssignmentService(contentItems, vocabulary, authorization, exposurePolicy);
     }
 
     @Bean
     TranslationGroupCommandService translationGroupCommandService(
             ContentItemRepository contentItems,
             TranslationGroupRepository translationGroups,
-            ContentCommandAuthorizationPolicy authorization) {
-        return new TranslationGroupCommandService(contentItems, translationGroups, authorization);
+            ContentCommandAuthorizationPolicy authorization,
+            ContentPublicExposurePolicy exposurePolicy,
+            ContentPublicRouteFactory publicRoutes) {
+        return new TranslationGroupCommandService(
+                contentItems, translationGroups, authorization, exposurePolicy, publicRoutes);
     }
 
     @Bean
@@ -176,8 +203,9 @@ class ContentApplicationConfiguration {
             ContentItemRepository contentItems,
             SeriesRepository seriesRepository,
             ContentCommandAuthorizationPolicy authorization,
-            SeriesDiscoverabilityCoordinator discoverability) {
-        return new SeriesCommandService(contentItems, seriesRepository, authorization, discoverability);
+            SeriesDiscoverabilityCoordinator discoverability,
+            SeriesPublicRouteFactory publicRoutes) {
+        return new SeriesCommandService(contentItems, seriesRepository, authorization, discoverability, publicRoutes);
     }
 
     @Bean

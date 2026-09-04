@@ -4,6 +4,7 @@ import dev.persefonia.identityaccess.application.admin.authorization.AdminComman
 import dev.persefonia.discovery.application.port.UpdateDiscoverableResourcePort;
 import dev.persefonia.taxonomy.application.discovery.TagDiscoverabilityCoordinator;
 import dev.persefonia.taxonomy.application.discovery.TagDiscoveryProjectionFactory;
+import dev.persefonia.taxonomy.application.discovery.TagPublicRouteFactory;
 import dev.persefonia.taxonomy.application.authorization.TaxonomyCommandAuthorizationPolicy;
 import dev.persefonia.taxonomy.application.service.TagAdminQueryService;
 import dev.persefonia.taxonomy.application.service.TagCommandService;
@@ -38,8 +39,9 @@ class TaxonomyApplicationConfiguration {
 
     @Bean
     TagDiscoveryProjectionFactory tagDiscoveryProjectionFactory(
-            @Value("${site.public-base-url}") String publicBaseUrl) {
-        return new TagDiscoveryProjectionFactory(publicBaseUrl);
+            @Value("${site.public-base-url}") String publicBaseUrl,
+            TagPublicRouteFactory routeFactory) {
+        return new TagDiscoveryProjectionFactory(publicBaseUrl, routeFactory);
     }
 
     @Bean

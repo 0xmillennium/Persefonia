@@ -46,7 +46,7 @@ class PublicSitemapControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(header().string("Content-Type", "application/xml;charset=UTF-8"))
                 .andExpect(header().string("X-Content-Type-Options", "nosniff"))
-                .andExpect(header().string("Cache-Control", "public, max-age=3600, must-revalidate"))
+                .andExpect(header().string("Cache-Control", "public, no-cache, must-revalidate"))
                 .andExpect(header().string("Cache-Control", not(containsString("immutable"))))
                 .andExpect(content().string(containsString(
                         "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">")));

@@ -80,10 +80,10 @@ class MediaUploadArchitectureTest {
                 .doesNotContain("@GetMapping(\"/resume")
                 .doesNotContain("cv_entries");
         assertThat(publicSources)
-                .contains("@GetMapping(\"/cv\")")
-                .contains("@GetMapping(\"/cv/download\")")
-                .contains("@GetMapping(\"/cv/{language}\")")
-                .contains("@GetMapping(\"/cv/{language}/download\")");
+                .contains("@GetMapping(PublicCvRoutes.DEFAULT_PAGE)")
+                .contains("@GetMapping(PublicCvRoutes.DEFAULT_DOWNLOAD)")
+                .contains("@GetMapping(PublicCvRoutes.LANGUAGE_PAGE)")
+                .contains("@GetMapping(PublicCvRoutes.LANGUAGE_DOWNLOAD)");
         assertThat(publicMediaSources)
                 .doesNotContain("ActiveCv")
                 .doesNotContain("/cv");

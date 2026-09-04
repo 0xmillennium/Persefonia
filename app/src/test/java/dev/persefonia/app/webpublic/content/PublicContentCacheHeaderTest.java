@@ -98,7 +98,10 @@ class PublicContentCacheHeaderTest {
     }
 
     private static void assertPublicHtmlCache(MvcResult result) {
-        assertThat(cacheControlTokens(result)).contains("public", "max-age=300");
+        assertThat(cacheControlTokens(result)).containsExactly("public", "no-cache", "must-revalidate");
+        assertThat(result.getResponse().getHeader("Cache-Control"))
+                .doesNotContain("stale-while-revalidate", "stale-if-error");
+        assertThat(result.getResponse().getHeader("Cache-Tag")).isNull();
     }
 
     private static void assertNoStorePrivate(MvcResult result) {

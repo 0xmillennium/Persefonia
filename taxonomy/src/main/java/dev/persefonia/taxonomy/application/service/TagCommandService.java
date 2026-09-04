@@ -46,12 +46,13 @@ public final class TagCommandService {
                 TagId.newId(), name, normalizedName, slug, TagDescription.ofNullable(command.description()),
                 command.requestedAt()));
         discoverability.sync(saved);
-        return result(saved);
+        return result(saved, null, true);
     }
 
     public TagCommandResult update(UpdateTagCommand command) {
         authorization.requireOwner(command.actor(), "taxonomy.tag.update");
         Tag tag = requiredTag(command.tagId());
+        TagSlug oldSlug = tag.slug();
         TagName name = TagName.of(command.name());
         NormalizedTagName normalizedName = normalization.normalizeName(name);
         TagSlug slug = slug(command.slug(), name);
@@ -59,7 +60,7 @@ public final class TagCommandService {
         tag.update(name, normalizedName, slug, TagDescription.ofNullable(command.description()), command.requestedAt());
         Tag saved = tags.save(tag);
         discoverability.sync(saved);
-        return result(saved);
+        return result(saved, oldSlug, true);
     }
 
     public TagCommandResult archive(ArchiveTagCommand command) {
@@ -67,12 +68,12 @@ public final class TagCommandService {
         Tag tag = requiredTag(command.tagId());
         if (tag.isArchived()) {
             discoverability.sync(tag);
-            return new TagCommandResult(tag.id(), tag.status(), tag.updatedAt(), false);
+            return result(tag, tag.slug(), false);
         }
         tag.archive(command.requestedAt());
         tag = tags.save(tag);
         discoverability.sync(tag);
-        return result(tag);
+        return result(tag, tag.slug(), true);
     }
 
     private Tag requiredTag(TagId id) {
@@ -99,7 +100,8 @@ public final class TagCommandService {
                 });
     }
 
-    private static TagCommandResult result(Tag tag) {
-        return new TagCommandResult(tag.id(), tag.status(), tag.updatedAt());
+    private static TagCommandResult result(Tag tag, TagSlug oldSlug, boolean mutated) {
+        return new TagCommandResult(tag.id(), tag.status(), tag.updatedAt(), mutated,
+                java.util.Optional.ofNullable(oldSlug), tag.slug());
     }
 }

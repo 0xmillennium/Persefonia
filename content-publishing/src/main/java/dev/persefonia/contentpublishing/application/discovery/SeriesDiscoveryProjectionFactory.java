@@ -19,8 +19,16 @@ import java.util.Optional;
 
 public final class SeriesDiscoveryProjectionFactory {
     private final ConfiguredContentCanonicalUrlFactory canonicalUrlFactory;
+    private final SeriesPublicRouteFactory routeFactory;
 
     public SeriesDiscoveryProjectionFactory(ConfiguredContentCanonicalUrlFactory canonicalUrlFactory) {
+        this(new SeriesPublicRouteFactory(), canonicalUrlFactory);
+    }
+
+    public SeriesDiscoveryProjectionFactory(
+            SeriesPublicRouteFactory routeFactory,
+            ConfiguredContentCanonicalUrlFactory canonicalUrlFactory) {
+        this.routeFactory = Objects.requireNonNull(routeFactory, "routeFactory");
         this.canonicalUrlFactory = Objects.requireNonNull(canonicalUrlFactory, "canonicalUrlFactory");
     }
 
@@ -29,7 +37,7 @@ public final class SeriesDiscoveryProjectionFactory {
         if (series.isArchived()) {
             return Optional.empty();
         }
-        PublicUrl publicUrl = publicUrl(series);
+        PublicUrl publicUrl = routeFactory.publicUrl(series);
         String summary = summary(series);
         return Optional.of(new DiscoverableResourceProjectionInput(
                 SourceContext.CONTENT_PUBLISHING,
@@ -60,11 +68,6 @@ public final class SeriesDiscoveryProjectionFactory {
                 SourceContext.CONTENT_PUBLISHING,
                 SourceType.SERIES,
                 new SourceEntityId(series.id().value()));
-    }
-
-    private static PublicUrl publicUrl(Series series) {
-        return new PublicUrl("/" + series.language().name().toLowerCase(Locale.ROOT)
-                + "/series/" + series.slug().value());
     }
 
     private static String summary(Series series) {

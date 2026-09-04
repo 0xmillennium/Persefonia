@@ -13,6 +13,9 @@ import dev.persefonia.contentpublishing.application.event.ContentUnpublished;
 import dev.persefonia.contentpublishing.application.port.ContentPublishingEventPublisher;
 import dev.persefonia.contentpublishing.domain.content.ContentItem;
 import dev.persefonia.contentpublishing.domain.content.port.ContentItemRepository;
+import dev.persefonia.contentpublishing.application.discovery.ContentPublicRouteFactory;
+import dev.persefonia.contentpublishing.application.publicview.ContentPublicExposurePolicy;
+import dev.persefonia.contentpublishing.application.publicview.ContentPublicMutationFactsFactory;
 import java.util.Objects;
 
 public final class ContentLifecycleCommandHandler {
@@ -20,38 +23,54 @@ public final class ContentLifecycleCommandHandler {
     private final ContentCommandAuthorizationPolicy authorization;
     private final ContentPublishingEventPublisher events;
     private final ContentDiscoverabilityCoordinator discoverability;
+    private final ContentPublicMutationFactsFactory publicFacts;
 
     public ContentLifecycleCommandHandler(
             ContentItemRepository contentItems,
             ContentCommandAuthorizationPolicy authorization,
             ContentPublishingEventPublisher events,
             ContentDiscoverabilityCoordinator discoverability) {
+        this(contentItems, authorization, events, discoverability,
+                new ContentPublicMutationFactsFactory(new ContentPublicExposurePolicy(), new ContentPublicRouteFactory()));
+    }
+
+    public ContentLifecycleCommandHandler(
+            ContentItemRepository contentItems,
+            ContentCommandAuthorizationPolicy authorization,
+            ContentPublishingEventPublisher events,
+            ContentDiscoverabilityCoordinator discoverability,
+            ContentPublicMutationFactsFactory publicFacts) {
         this.contentItems = Objects.requireNonNull(contentItems, "contentItems");
         this.authorization = Objects.requireNonNull(authorization, "authorization");
         this.events = Objects.requireNonNull(events, "events");
         this.discoverability = Objects.requireNonNull(discoverability, "discoverability");
+        this.publicFacts = Objects.requireNonNull(publicFacts, "publicFacts");
     }
 
     public ContentUnpublishResult unpublish(UnpublishContentCommand command) {
         authorization.requireOwner(command.actor(), "content.unpublish");
         ContentItem item = requiredContent(contentItems, command.contentId());
+        var beforePublicState = publicFacts.capture(item);
         item.unpublish(command.requestedAt());
         ContentItem saved = contentItems.save(item);
         discoverability.removeContent(saved);
         events.publish(new ContentUnpublished(
                 saved.id(), saved.type(), saved.language(), command.actor().identityRef(),
                 command.requestedAt(), saved.unpublishedAt().orElseThrow()));
-        return new ContentUnpublishResult(saved.id(), saved.status(), saved.unpublishedAt().orElseThrow());
+        return new ContentUnpublishResult(saved.id(), saved.status(), saved.unpublishedAt().orElseThrow(),
+                publicFacts.between(saved.id(), beforePublicState, saved));
     }
 
     public ContentArchiveResult archive(ArchiveContentCommand command) {
         authorization.requireOwner(command.actor(), "content.archive");
         ContentItem item = requiredContent(contentItems, command.contentId());
+        var beforePublicState = publicFacts.capture(item);
         item.archive(command.requestedAt());
         ContentItem saved = contentItems.save(item);
         discoverability.removeContent(saved);
         events.publish(new ContentArchived(
                 saved.id(), saved.type(), saved.language(), command.actor().identityRef(), command.requestedAt()));
-        return new ContentArchiveResult(saved.id(), saved.status(), command.requestedAt());
+        return new ContentArchiveResult(saved.id(), saved.status(), command.requestedAt(),
+                publicFacts.between(saved.id(), beforePublicState, saved));
     }
 }

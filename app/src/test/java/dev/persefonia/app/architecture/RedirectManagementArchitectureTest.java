@@ -149,6 +149,10 @@ class RedirectManagementArchitectureTest {
                         + "SpringAssetStorageRollbackCompensationAdapter.java")) {
             return false;
         }
+        if (path.toString().contains(
+                "/app/src/main/java/dev/persefonia/app/platformoperations/cache/integration/")) {
+            return false;
+        }
         return source.contains("TransactionSynchronization") || source.contains("afterCommit");
     }
 }

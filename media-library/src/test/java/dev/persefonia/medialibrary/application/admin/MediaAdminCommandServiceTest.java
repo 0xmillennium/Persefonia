@@ -147,7 +147,8 @@ class MediaAdminCommandServiceTest {
 
         assertThat(fixture.service.updateMetadata(new UpdateAssetMetadataCommand(
                 OWNER, image.id(), AssetVisibility.PUBLIC, "Useful chart", false)))
-                .isEqualTo(new AssetMetadataUpdateResult.Updated(image.id()));
+                .isEqualTo(new AssetMetadataUpdateResult.Updated(
+                        image.id(), AssetVisibility.PRIVATE, AssetVisibility.PUBLIC, true));
         assertThat(fixture.repository.findById(image.id()).orElseThrow().visibility()).isEqualTo(AssetVisibility.PUBLIC);
 
         Asset decorative = fixture.uploadedProcessedPng();
@@ -169,7 +170,8 @@ class MediaAdminCommandServiceTest {
         fixture.repository.save(pdf);
         assertThat(fixture.service.updateMetadata(new UpdateAssetMetadataCommand(
                 OWNER, pdf.id(), AssetVisibility.PUBLIC, null, false)))
-                .isEqualTo(new AssetMetadataUpdateResult.Updated(pdf.id()));
+                .isEqualTo(new AssetMetadataUpdateResult.Updated(
+                        pdf.id(), AssetVisibility.PRIVATE, AssetVisibility.PUBLIC, true));
         assertThat(fixture.storage.storedVariants).hasSize(8);
     }
 

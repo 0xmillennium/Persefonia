@@ -46,7 +46,7 @@ class PublicMediaAssetControllerTest {
                 .andExpect(content().contentType("image/png"))
                 .andExpect(header().longValue("Content-Length", bytes.length))
                 .andExpect(header().string("X-Content-Type-Options", "nosniff"))
-                .andExpect(header().string("Cache-Control", "public, max-age=86400"))
+                .andExpect(header().string("Cache-Control", "public, no-cache, must-revalidate"))
                 .andExpect(content().string(org.hamcrest.Matchers.not(
                         org.hamcrest.Matchers.containsString("variants/asset/"))));
     }
@@ -58,6 +58,7 @@ class PublicMediaAssetControllerTest {
 
         mockMvc.perform(get("/media/assets/{assetId}/variants/{variantName}", assetId, "invalid"))
                 .andExpect(status().isNotFound())
+                .andExpect(header().string("Cache-Control", "no-store, private"))
                 .andExpect(content().string(""));
     }
 }

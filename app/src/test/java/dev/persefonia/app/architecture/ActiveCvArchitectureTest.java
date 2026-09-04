@@ -78,10 +78,10 @@ class ActiveCvArchitectureTest {
                 + sourceText(Path.of("src/main/jte/site"));
 
         assertThat(publicSources)
-                .contains("@GetMapping(\"/cv\")")
-                .contains("@GetMapping(\"/cv/download\")")
-                .contains("@GetMapping(\"/cv/{language}\")")
-                .contains("@GetMapping(\"/cv/{language}/download\")")
+                .contains("@GetMapping(PublicCvRoutes.DEFAULT_PAGE)")
+                .contains("@GetMapping(PublicCvRoutes.DEFAULT_DOWNLOAD)")
+                .contains("@GetMapping(PublicCvRoutes.LANGUAGE_PAGE)")
+                .contains("@GetMapping(PublicCvRoutes.LANGUAGE_DOWNLOAD)")
                 .doesNotContain("@GetMapping(\"/resume")
                 .doesNotContain("/media/assets/{assetId}/download")
                 .doesNotContain("/media/assets/{assetId}/original");

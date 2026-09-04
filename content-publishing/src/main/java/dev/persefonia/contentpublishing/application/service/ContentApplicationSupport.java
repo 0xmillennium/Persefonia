@@ -5,6 +5,7 @@ import dev.persefonia.contentpublishing.application.exception.ContentNotFoundExc
 import dev.persefonia.contentpublishing.domain.content.ContentId;
 import dev.persefonia.contentpublishing.domain.content.ContentItem;
 import dev.persefonia.contentpublishing.domain.content.port.ContentItemRepository;
+import dev.persefonia.contentpublishing.application.publicview.ContentPublicMutationFacts;
 
 final class ContentApplicationSupport {
     private ContentApplicationSupport() {
@@ -14,7 +15,7 @@ final class ContentApplicationSupport {
         return repository.findById(contentId).orElseThrow(() -> new ContentNotFoundException(contentId));
     }
 
-    static ContentDraftResult draftResult(ContentItem item) {
+    static ContentDraftResult draftResult(ContentItem item, ContentPublicMutationFacts facts) {
         return new ContentDraftResult(
                 item.id(),
                 item.status(),
@@ -25,6 +26,7 @@ final class ContentApplicationSupport {
                 item.summary(),
                 item.createdAt(),
                 item.updatedAt(),
-                item.version());
+                item.version(),
+                facts);
     }
 }

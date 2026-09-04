@@ -49,7 +49,7 @@ class PublicCvSecurityAndCacheTest {
 
         mockMvc.perform(get("/cv/download"))
                 .andExpect(status().isOk())
-                .andExpect(header().string("Cache-Control", "public, max-age=300, must-revalidate"))
+                .andExpect(header().string("Cache-Control", "public, no-cache, must-revalidate"))
                 .andExpect(header().string("Cache-Control", not(containsString("immutable"))))
                 .andExpect(header().string("X-Content-Type-Options", "nosniff"))
                 .andExpect(header().string("Content-Disposition", "attachment; filename=\"cv-en.pdf\""));

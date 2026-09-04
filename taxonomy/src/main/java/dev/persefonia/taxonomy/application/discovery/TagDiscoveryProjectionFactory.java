@@ -19,9 +19,15 @@ import java.util.Objects;
 
 public final class TagDiscoveryProjectionFactory {
     private final URI publicBaseUrl;
+    private final TagPublicRouteFactory routeFactory;
 
     public TagDiscoveryProjectionFactory(String publicBaseUrl) {
+        this(publicBaseUrl, new TagPublicRouteFactory());
+    }
+
+    public TagDiscoveryProjectionFactory(String publicBaseUrl, TagPublicRouteFactory routeFactory) {
         Objects.requireNonNull(publicBaseUrl, "publicBaseUrl");
+        this.routeFactory = Objects.requireNonNull(routeFactory, "routeFactory");
         URI parsed = URI.create(publicBaseUrl.endsWith("/")
                 ? publicBaseUrl.substring(0, publicBaseUrl.length() - 1)
                 : publicBaseUrl);
@@ -37,7 +43,7 @@ public final class TagDiscoveryProjectionFactory {
     }
 
     private DiscoverableResourceProjectionInput projectionFor(Tag tag, DiscoveryLanguage language) {
-        String path = "/" + language.name().toLowerCase(Locale.ROOT) + "/tags/" + tag.slug().value();
+        String path = routeFactory.publicUrl(language, tag.slug()).value();
         String description = tag.description().value().orElse("Content tagged " + tag.name().value());
         return new DiscoverableResourceProjectionInput(
                 SourceContext.TAXONOMY,
