@@ -6,8 +6,15 @@ spring:
   threads:
     virtual:
       enabled: true
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+  servlet:
+    multipart:
+      max-file-size: 10485760B
+      max-request-size: 11534336B
 
 server:
+  shutdown: graceful
   servlet:
     session:
       cookie:

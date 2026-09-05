@@ -36,6 +36,79 @@ class ProductionConfigurationValidationTest {
     }
 
     @Test
+    void rejectsNonNativeForwardedHeaderStrategy() {
+        for (String strategy : new String[] {"NONE", "FRAMEWORK"}) {
+            MockEnvironment environment = secureEnvironment();
+            environment.setProperty("server.forward-headers-strategy", strategy);
+
+            assertThatThrownBy(() -> validator(environment, strongRateLimit(), enabledMail(), OIDC_CONFIGURED)
+                    .afterPropertiesSet())
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("forwarded-header strategy");
+        }
+    }
+
+    @Test
+    void rejectsMissingOrUnsafeTrustedProxies() {
+        for (String value : new String[] {"", "127.0.0.1/32", "*", ".*", "0.0.0.0/0", "::/0"}) {
+            MockEnvironment environment = secureEnvironment();
+            environment.setProperty("server.tomcat.remoteip.internal-proxies", value);
+
+            assertThatThrownBy(() -> validator(environment, strongRateLimit(), enabledMail(), OIDC_CONFIGURED)
+                    .afterPropertiesSet())
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("trusted proxy");
+        }
+    }
+
+    @Test
+    void rejectsNonLoopbackManagementAddress() {
+        MockEnvironment environment = secureEnvironment();
+        environment.setProperty("management.server.address", "0.0.0.0");
+
+        assertThatThrownBy(() -> validator(environment, strongRateLimit(), enabledMail(), OIDC_CONFIGURED)
+                .afterPropertiesSet())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("management server address");
+    }
+
+    @Test
+    void rejectsSharedManagementAndApplicationPort() {
+        MockEnvironment environment = secureEnvironment();
+        environment.setProperty("server.port", "8080");
+        environment.setProperty("management.server.port", "8080");
+
+        assertThatThrownBy(() -> validator(environment, strongRateLimit(), enabledMail(), OIDC_CONFIGURED)
+                .afterPropertiesSet())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("management server port");
+    }
+
+    @Test
+    void rejectsWildcardOrExpandedActuatorExposure() {
+        for (String value : new String[] {"*", "health,info,metrics,prometheus,env"}) {
+            MockEnvironment environment = secureEnvironment();
+            environment.setProperty("management.endpoints.web.exposure.include", value);
+
+            assertThatThrownBy(() -> validator(environment, strongRateLimit(), enabledMail(), OIDC_CONFIGURED)
+                    .afterPropertiesSet())
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("Actuator exposure");
+        }
+    }
+
+    @Test
+    void rejectsProductionWhenMediaIsNotRequired() {
+        MockEnvironment environment = secureEnvironment();
+        environment.setProperty("persefonia.media.storage-required", "false");
+
+        assertThatThrownBy(() -> validator(environment, strongRateLimit(), enabledMail(), OIDC_CONFIGURED)
+                .afterPropertiesSet())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("media storage");
+    }
+
+    @Test
     void rejectsLocalDevelopmentRateLimitSecret() {
         ContactRateLimitProperties rateLimit = rateLimit(
                 ProductionConfigurationValidator.LOCAL_RATE_LIMIT_SECRET_DEFAULT);
@@ -164,6 +237,15 @@ class ProductionConfigurationValidationTest {
         MockEnvironment environment = new MockEnvironment();
         environment.setProperty("server.servlet.session.cookie.secure", "true");
         environment.setProperty("site.public-base-url", "https://example.test");
+        environment.setProperty("server.forward-headers-strategy", "NATIVE");
+        environment.setProperty("server.tomcat.remoteip.remote-ip-header", "X-Forwarded-For");
+        environment.setProperty("server.tomcat.remoteip.protocol-header", "X-Forwarded-Proto");
+        environment.setProperty("server.tomcat.remoteip.internal-proxies", "10.0.0.0/8");
+        environment.setProperty("management.server.address", "127.0.0.1");
+        environment.setProperty("management.server.port", "9001");
+        environment.setProperty("server.port", "8080");
+        environment.setProperty("management.endpoints.web.exposure.include", "health,info,metrics,prometheus");
+        environment.setProperty("persefonia.media.storage-required", "true");
         return environment;
     }
 

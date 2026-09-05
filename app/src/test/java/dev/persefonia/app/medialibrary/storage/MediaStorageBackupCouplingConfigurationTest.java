@@ -9,13 +9,11 @@ import org.junit.jupiter.api.Test;
 
 class MediaStorageBackupCouplingConfigurationTest {
     @Test
-    void envExampleNamesMediaStorageRootAndPostgresqlBackupCoupling() throws Exception {
+    void envExampleNamesMediaHostPathAndPostgresqlBackupCoupling() throws Exception {
         String envExample = Files.readString(envExamplePath());
 
-        assertThat(envExample).contains("PERSEFONIA_MEDIA_STORAGE_REQUIRED=true");
-        assertThat(envExample).contains("PERSEFONIA_MEDIA_STORAGE_ROOT=./var/persefonia-media");
-        assertThat(envExample).contains("Back up and restore this directory together with PostgreSQL");
-        assertThat(envExample).contains("Asset storage backup and PostgreSQL backup must be restored together");
+        assertThat(envExample).contains("PERSEFONIA_MEDIA_HOST_PATH=./.runtime/media");
+        assertThat(envExample).contains("Back up and restore it together with PostgreSQL");
     }
 
     private static Path envExamplePath() throws IOException {

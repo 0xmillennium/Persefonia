@@ -1,4 +1,8 @@
 services:
+  app:
+    ports:
+      - "127.0.0.1:${PERSEFONIA_APP_PORT:?PERSEFONIA_APP_PORT is required}:8080"
+
   postgres:
     ports:
       - "127.0.0.1:${POSTGRES_PORT:?POSTGRES_PORT is required}:5432"

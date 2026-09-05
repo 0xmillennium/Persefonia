@@ -3,7 +3,11 @@ package dev.persefonia.app.config;
 import dev.persefonia.app.communication.mail.ContactMailNotificationProperties;
 import dev.persefonia.app.platformoperations.ratelimit.ContactRateLimitProperties;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Configuration;
@@ -25,6 +29,9 @@ class ProductionConfigurationValidator implements InitializingBean {
     static final int MINIMUM_RATE_LIMIT_SECRET_LENGTH = 32;
     static final String CONTACT_MAIL_REQUIRED_PROPERTY =
             "persefonia.contact.mail.require-in-production";
+    private static final String TRUSTED_PROXY_SENTINEL = "127.0.0.1/32";
+    private static final Set<String> ACTUATOR_ENDPOINTS =
+            Set.of("health", "info", "metrics", "prometheus");
 
     private final Environment environment;
     private final ContactRateLimitProperties rateLimitProperties;
@@ -50,6 +57,10 @@ class ProductionConfigurationValidator implements InitializingBean {
         validatePublicBaseUrl(violations);
         validateAdminOidc(violations);
         validateContactMail(violations);
+        validateForwardedHeaders(violations);
+        validateManagementIsolation(violations);
+        validateActuatorExposure(violations);
+        validateRequiredMedia(violations);
 
         if (!violations.isEmpty()) {
             throw new IllegalStateException(
@@ -113,5 +124,74 @@ class ProductionConfigurationValidator implements InitializingBean {
                 violations.add("contact mail from address must be configured when mail is enabled");
             }
         }
+    }
+
+    private void validateForwardedHeaders(List<String> violations) {
+        String strategy = environment.getProperty("server.forward-headers-strategy");
+        if (!"NATIVE".equalsIgnoreCase(strategy)) {
+            violations.add("forwarded-header strategy must be NATIVE in production");
+        }
+        requireNonBlank("server.tomcat.remoteip.remote-ip-header", "remote IP header", violations);
+        requireNonBlank("server.tomcat.remoteip.protocol-header", "protocol header", violations);
+
+        String trustedProxies = environment.getProperty("server.tomcat.remoteip.internal-proxies");
+        if (isUnsafeTrustedProxyValue(trustedProxies)) {
+            violations.add("trusted proxy ranges must be explicitly configured and must not trust all proxies");
+        }
+    }
+
+    private void validateManagementIsolation(List<String> violations) {
+        String address = environment.getProperty("management.server.address", "127.0.0.1");
+        if (!isLoopbackAddress(address)) {
+            violations.add("management server address must be loopback in production");
+        }
+        int applicationPort = environment.getProperty("server.port", Integer.class, 8080);
+        int managementPort = environment.getProperty("management.server.port", Integer.class, 9001);
+        if (applicationPort == managementPort) {
+            violations.add("management server port must differ from the application port");
+        }
+    }
+
+    private void validateActuatorExposure(List<String> violations) {
+        String configured = environment.getProperty("management.endpoints.web.exposure.include", "");
+        Set<String> endpoints = Arrays.stream(configured.split(","))
+                .map(String::trim)
+                .filter(value -> !value.isEmpty())
+                .map(value -> value.toLowerCase(Locale.ROOT))
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        if (endpoints.contains("*") || !ACTUATOR_ENDPOINTS.containsAll(endpoints)
+                || !endpoints.equals(ACTUATOR_ENDPOINTS)) {
+            violations.add("Actuator exposure must be limited to health, info, metrics, and prometheus in production");
+        }
+    }
+
+    private void validateRequiredMedia(List<String> violations) {
+        if (!environment.getProperty("persefonia.media.storage-required", Boolean.class, false)) {
+            violations.add("media storage must be required in production");
+        }
+    }
+
+    private void requireNonBlank(String property, String label, List<String> violations) {
+        String value = environment.getProperty(property);
+        if (value == null || value.isBlank()) {
+            violations.add(label + " must be configured in production");
+        }
+    }
+
+    private static boolean isLoopbackAddress(String address) {
+        return "127.0.0.1".equals(address) || "::1".equals(address)
+                || "0:0:0:0:0:0:0:1".equals(address);
+    }
+
+    private static boolean isUnsafeTrustedProxyValue(String value) {
+        if (value == null || value.isBlank()) {
+            return true;
+        }
+        String normalized = value.trim();
+        return TRUSTED_PROXY_SENTINEL.equals(normalized)
+                || "*".equals(normalized)
+                || ".*".equals(normalized)
+                || "0.0.0.0/0".equals(normalized)
+                || "::/0".equals(normalized);
     }
 }

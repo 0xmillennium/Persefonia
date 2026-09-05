@@ -1,0 +1,56 @@
+services:
+  app:
+    environment:
+      SPRING_PROFILES_ACTIVE: docker,prod
+      PERSEFONIA_PUBLIC_BASE_URL: ${PERSEFONIA_PUBLIC_BASE_URL:?PERSEFONIA_PUBLIC_BASE_URL is required}
+      PERSEFONIA_TRUSTED_PROXY_CIDRS: ${PERSEFONIA_TRUSTED_PROXY_CIDRS:?PERSEFONIA_TRUSTED_PROXY_CIDRS is required}
+      PERSEFONIA_OIDC_ISSUER_URI: ${PERSEFONIA_OIDC_ISSUER_URI:?PERSEFONIA_OIDC_ISSUER_URI is required}
+      PERSEFONIA_OIDC_CLIENT_ID: ${PERSEFONIA_OIDC_CLIENT_ID:?PERSEFONIA_OIDC_CLIENT_ID is required}
+      PERSEFONIA_SMTP_HOST: ${PERSEFONIA_SMTP_HOST:?PERSEFONIA_SMTP_HOST is required}
+      PERSEFONIA_SMTP_PORT: ${PERSEFONIA_SMTP_PORT:?PERSEFONIA_SMTP_PORT is required}
+      PERSEFONIA_CONTACT_MAIL_ENABLED: ${PERSEFONIA_CONTACT_MAIL_ENABLED:-true}
+      PERSEFONIA_CONTACT_MAIL_OWNER_RECIPIENT: ${PERSEFONIA_CONTACT_MAIL_OWNER_RECIPIENT:?PERSEFONIA_CONTACT_MAIL_OWNER_RECIPIENT is required}
+      PERSEFONIA_CONTACT_MAIL_FROM: ${PERSEFONIA_CONTACT_MAIL_FROM:?PERSEFONIA_CONTACT_MAIL_FROM is required}
+      PERSEFONIA_CLOUDFLARE_ZONE_ID: ${PERSEFONIA_CLOUDFLARE_ZONE_ID:?PERSEFONIA_CLOUDFLARE_ZONE_ID is required}
+    secrets:
+      - source: oidc_client_secret
+        target: spring.security.oauth2.client.registration.authelia.client-secret
+      - source: cloudflare_api_token
+        target: persefonia.cache-purge.cloudflare.api-token
+    networks:
+      persefonia-internal: {}
+      persefonia-egress: {}
+      traefik: {}
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: ${PERSEFONIA_TRAEFIK_NETWORK:?PERSEFONIA_TRAEFIK_NETWORK is required}
+      traefik.http.routers.persefonia.rule: Host(`${PERSEFONIA_PUBLIC_HOST:?PERSEFONIA_PUBLIC_HOST is required}`)
+      traefik.http.routers.persefonia.entrypoints: websecure
+      traefik.http.routers.persefonia.tls: "true"
+      traefik.http.routers.persefonia.middlewares: persefonia-body-limit
+      traefik.http.middlewares.persefonia-body-limit.buffering.maxRequestBodyBytes: "11534336"
+      traefik.http.services.persefonia.loadbalancer.server.port: "8080"
+    restart: unless-stopped
+    stop_grace_period: 30s
+    logging:
+      driver: local
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  postgres:
+    restart: unless-stopped
+
+  redis:
+    restart: unless-stopped
+
+networks:
+  traefik:
+    name: ${PERSEFONIA_TRAEFIK_NETWORK:?PERSEFONIA_TRAEFIK_NETWORK is required}
+    external: true
+
+secrets:
+  oidc_client_secret:
+    file: ${PERSEFONIA_OIDC_CLIENT_SECRET_FILE:?PERSEFONIA_OIDC_CLIENT_SECRET_FILE is required}
+  cloudflare_api_token:
+    file: ${PERSEFONIA_CLOUDFLARE_API_TOKEN_FILE:?PERSEFONIA_CLOUDFLARE_API_TOKEN_FILE is required}

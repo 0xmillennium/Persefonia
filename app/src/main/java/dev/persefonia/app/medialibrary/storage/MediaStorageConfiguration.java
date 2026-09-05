@@ -44,6 +44,11 @@ public class MediaStorageConfiguration {
         return readiness;
     }
 
+    @Bean("mediaStorageHealthIndicator")
+    MediaStorageHealthIndicator mediaStorageHealthIndicator(MediaStorageReadinessService readiness) {
+        return new MediaStorageHealthIndicator(readiness);
+    }
+
     @Bean
     AssetStoragePort assetStoragePort(MediaStorageReadinessService readiness) {
         return new LocalFileAssetStorageAdapter(readiness.storageRoot());

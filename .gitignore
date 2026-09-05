@@ -114,3 +114,6 @@ app/jte-classes/
 
 # Local-only notes and scratch decisions
 .local/
+
+# Disposable local Compose runtime state
+.runtime/

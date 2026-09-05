@@ -1,8 +1,50 @@
-name: persefonia
-
 services:
+  app:
+    image: ${PERSEFONIA_IMAGE_REF:?PERSEFONIA_IMAGE_REF is required}
+    user: "10001:10001"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+    secrets:
+      - source: postgres_password
+        target: spring.datasource.password
+      - source: redis_password
+        target: spring.data.redis.password
+      - source: contact_rate_limit_secret
+        target: persefonia.contact.rate-limit.secret
+    volumes:
+      - type: bind
+        source: ${PERSEFONIA_MEDIA_HOST_PATH:?PERSEFONIA_MEDIA_HOST_PATH is required}
+        target: /var/lib/persefonia/media
+        bind:
+          create_host_path: false
+    tmpfs:
+      - /tmp
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+        required: false
+    healthcheck:
+      test:
+        ["CMD-SHELL", "curl --fail --silent --show-error http://127.0.0.1:9001/actuator/health/readiness >/dev/null && curl --fail --silent --show-error http://127.0.0.1:8080/robots.txt >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks:
+      persefonia-internal: {}
+      persefonia-egress: {}
+
   postgres:
-    image: postgres:17-alpine
+    image: postgres:17.11-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73
     user: "postgres"
     read_only: true
     cap_drop:
@@ -30,26 +72,28 @@ services:
       - persefonia-internal
 
   redis:
-    image: redis:8-alpine
+    image: redis:8.10-alpine@sha256:becdda6c7f4b3fb42e42fd7f120bbf5c54c4caaaf16f26da24e4563d2c1f0576
     user: "redis"
     read_only: true
     cap_drop:
       - ALL
     security_opt:
       - no-new-privileges:true
-    command: ["redis-server", "/run/secrets/redis.conf", "--save", "", "--appendonly", "no"]
+    command: ["/bin/sh", "/usr/local/bin/redis-start.sh"]
     secrets:
-      - source: redis_config
-        target: redis.conf
+      - redis_password
+    volumes:
+      - type: bind
+        source: ./docker/redis-start.sh
+        target: /usr/local/bin/redis-start.sh
+        read_only: true
+        bind:
+          create_host_path: false
     tmpfs:
       - /tmp
       - /data
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "redis-cli -a \"$$(awk '/^requirepass / {print $$2}' /run/secrets/redis.conf)\" ping | grep -q PONG"
-        ]
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$(cat /run/secrets/redis_password)\" redis-cli ping | grep -qx PONG"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -64,9 +108,13 @@ networks:
   persefonia-internal:
     name: persefonia-internal
     internal: true
+  persefonia-egress:
+    name: persefonia-egress
 
 secrets:
   postgres_password:
     file: ${PERSEFONIA_POSTGRES_PASSWORD_FILE:?PERSEFONIA_POSTGRES_PASSWORD_FILE is required}
-  redis_config:
-    file: ${PERSEFONIA_REDIS_CONFIG_FILE:?PERSEFONIA_REDIS_CONFIG_FILE is required}
+  redis_password:
+    file: ${PERSEFONIA_REDIS_PASSWORD_FILE:?PERSEFONIA_REDIS_PASSWORD_FILE is required}
+  contact_rate_limit_secret:
+    file: ${PERSEFONIA_CONTACT_RATE_LIMIT_SECRET_FILE:?PERSEFONIA_CONTACT_RATE_LIMIT_SECRET_FILE is required}

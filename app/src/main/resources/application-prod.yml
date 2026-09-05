@@ -1,0 +1,46 @@
+server:
+  servlet:
+    session:
+      cookie:
+        secure: true
+  forward-headers-strategy: NATIVE
+  tomcat:
+    remoteip:
+      remote-ip-header: X-Forwarded-For
+      protocol-header: X-Forwarded-Proto
+      protocol-header-https-value: https
+      host-header: X-Forwarded-Host
+      port-header: X-Forwarded-Port
+      internal-proxies: ${PERSEFONIA_TRUSTED_PROXY_CIDRS:127.0.0.1/32}
+    redirect-context-root: false
+
+site:
+  public-base-url: ${PERSEFONIA_PUBLIC_BASE_URL:?PERSEFONIA_PUBLIC_BASE_URL is required in production}
+
+spring:
+  security:
+    oauth2:
+      client:
+        registration:
+          authelia:
+            client-id: ${PERSEFONIA_OIDC_CLIENT_ID:?PERSEFONIA_OIDC_CLIENT_ID is required}
+            authorization-grant-type: authorization_code
+            scope: openid,profile,email
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+        provider:
+          authelia:
+            issuer-uri: ${PERSEFONIA_OIDC_ISSUER_URI:?PERSEFONIA_OIDC_ISSUER_URI is required}
+  mail:
+    host: ${PERSEFONIA_SMTP_HOST:?PERSEFONIA_SMTP_HOST is required}
+    port: ${PERSEFONIA_SMTP_PORT:?PERSEFONIA_SMTP_PORT is required}
+
+persefonia:
+  cache-purge:
+    provider: CLOUDFLARE
+    cloudflare:
+      zone-id: ${PERSEFONIA_CLOUDFLARE_ZONE_ID:?PERSEFONIA_CLOUDFLARE_ZONE_ID is required}
+  contact:
+    mail:
+      enabled: ${PERSEFONIA_CONTACT_MAIL_ENABLED:true}
+      owner-recipient: ${PERSEFONIA_CONTACT_MAIL_OWNER_RECIPIENT:}
+      from: ${PERSEFONIA_CONTACT_MAIL_FROM:}
