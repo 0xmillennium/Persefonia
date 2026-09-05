@@ -1,0 +1,320 @@
+name: D3 CI Verification
+
+on:
+  pull_request:
+    branches:
+      - master
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: d3-ci-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  primary-verification:
+    name: D3 / Primary Verification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Temurin Java 25
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - name: Show Java version
+        run: |
+          set -euo pipefail
+          java -version
+          javac -version
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Show Node version
+        run: |
+          set -euo pipefail
+          node --version
+          npm --version
+
+      - name: Show Docker versions
+        run: |
+          set -euo pipefail
+          docker version
+          docker compose version
+
+      - name: Verify Redis bootstrap contract
+        run: |
+          set -euo pipefail
+          ./docker/redis-start-test.sh
+
+      - name: Render delivery Compose configurations
+        env:
+          CI_TEMPORARY_DIRECTORY: ${{ runner.temp }}/persefonia-d3
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p "$CI_TEMPORARY_DIRECTORY/media"
+
+          printf '%s\n' 'ci-postgres-password' > "$CI_TEMPORARY_DIRECTORY/postgres_password"
+          printf '%s\n' '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef' > "$CI_TEMPORARY_DIRECTORY/redis_password"
+          printf '%s\n' 'ci-contact-rate-limit-secret-with-sufficient-length' > "$CI_TEMPORARY_DIRECTORY/contact_rate_limit_secret"
+          printf '%s\n' 'ci-oidc-client-secret' > "$CI_TEMPORARY_DIRECTORY/oidc_client_secret"
+          printf '%s\n' 'ci-cloudflare-api-token' > "$CI_TEMPORARY_DIRECTORY/cloudflare_api_token"
+
+          export POSTGRES_DB=persefonia
+          export POSTGRES_USER=persefonia
+          export PERSEFONIA_IMAGE_REF=example.invalid/persefonia:ci
+          export PERSEFONIA_MEDIA_HOST_PATH="$CI_TEMPORARY_DIRECTORY/media"
+          export PERSEFONIA_POSTGRES_PASSWORD_FILE="$CI_TEMPORARY_DIRECTORY/postgres_password"
+          export PERSEFONIA_REDIS_PASSWORD_FILE="$CI_TEMPORARY_DIRECTORY/redis_password"
+          export PERSEFONIA_CONTACT_RATE_LIMIT_SECRET_FILE="$CI_TEMPORARY_DIRECTORY/contact_rate_limit_secret"
+
+          docker compose -f compose.yaml config --quiet
+
+          export PERSEFONIA_PUBLIC_BASE_URL=https://persefonia.example.invalid
+          export PERSEFONIA_TRUSTED_PROXY_CIDRS=10.0.0.0/8
+          export PERSEFONIA_OIDC_ISSUER_URI=https://auth.example.invalid
+          export PERSEFONIA_OIDC_CLIENT_ID=persefonia-ci
+          export PERSEFONIA_OIDC_CLIENT_SECRET_FILE="$CI_TEMPORARY_DIRECTORY/oidc_client_secret"
+          export PERSEFONIA_SMTP_HOST=smtp.example.invalid
+          export PERSEFONIA_SMTP_PORT=587
+          export PERSEFONIA_CONTACT_MAIL_ENABLED=false
+          export PERSEFONIA_CONTACT_MAIL_OWNER_RECIPIENT=owner@example.invalid
+          export PERSEFONIA_CONTACT_MAIL_FROM=noreply@example.invalid
+          export PERSEFONIA_CLOUDFLARE_ZONE_ID=0123456789abcdef0123456789abcdef
+          export PERSEFONIA_CLOUDFLARE_API_TOKEN_FILE="$CI_TEMPORARY_DIRECTORY/cloudflare_api_token"
+          export PERSEFONIA_TRAEFIK_NETWORK=traefik-ci
+          export PERSEFONIA_PUBLIC_HOST=persefonia.example.invalid
+
+          docker compose -f compose.yaml -f compose.production.yaml config --quiet
+
+      - name: Run canonical repository verification
+        run: ./gradlew --no-daemon --stacktrace clean check :app:bootJar
+
+      - name: Verify build did not modify tracked files
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+
+      - name: Stage verified BootJar
+        env:
+          D3_ARTIFACT_DIRECTORY: app/build/delivery/d3
+        run: |
+          set -euo pipefail
+          bootjar=app/build/libs/persefonia.jar
+
+          test -f "$bootjar"
+          test -s "$bootjar"
+
+          build_info=$(mktemp)
+          trap 'rm -f "$build_info"' EXIT
+          unzip -p "$bootjar" META-INF/build-info.properties > "$build_info"
+          grep -Fx 'build.name=persefonia' "$build_info"
+          grep -Fx 'build.version=0.1.0' "$build_info"
+
+          rm -rf "$D3_ARTIFACT_DIRECTORY"
+          mkdir -p "$D3_ARTIFACT_DIRECTORY"
+          cp "$bootjar" "$D3_ARTIFACT_DIRECTORY/persefonia.jar"
+
+          (
+            cd "$D3_ARTIFACT_DIRECTORY"
+            sha256sum persefonia.jar > persefonia.jar.sha256
+          )
+          bootjar_sha256=$(awk '{print $1}' "$D3_ARTIFACT_DIRECTORY/persefonia.jar.sha256")
+
+          cat > "$D3_ARTIFACT_DIRECTORY/verification.properties" <<EOF
+          source.commit=$GITHUB_SHA
+          source.ref=$GITHUB_REF
+          source.event=$GITHUB_EVENT_NAME
+          repository=$GITHUB_REPOSITORY
+          workflow.run-id=$GITHUB_RUN_ID
+          workflow.run-attempt=$GITHUB_RUN_ATTEMPT
+          application.name=persefonia
+          application.version=0.1.0
+          build.java=25
+          compatibility.java=21
+          build.node=22
+          bootjar.file=persefonia.jar
+          bootjar.sha256=$bootjar_sha256
+          EOF
+
+          (
+            cd "$D3_ARTIFACT_DIRECTORY"
+            sha256sum --check persefonia.jar.sha256
+          )
+
+      - name: Upload primary verification diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: persefonia-primary-verification-diagnostics-${{ github.sha }}
+          path: |
+            **/build/reports/tests/**
+            **/build/test-results/**
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload verified BootJar
+        uses: actions/upload-artifact@v4
+        with:
+          name: persefonia-verified-bootjar-${{ github.sha }}
+          path: app/build/delivery/d3
+          if-no-files-found: error
+          retention-days: 14
+
+  java21-runtime:
+    name: D3 / Java 21 Runtime
+    needs: primary-verification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17.11-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73
+        env:
+          POSTGRES_DB: persefonia
+          POSTGRES_USER: persefonia
+          POSTGRES_PASSWORD: ci-postgres-password
+        options: >-
+          --health-cmd "pg_isready -U persefonia -d persefonia"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+        ports:
+          - 5432:5432
+      redis:
+        image: redis:8.10-alpine@sha256:becdda6c7f4b3fb42e42fd7f120bbf5c54c4caaaf16f26da24e4563d2c1f0576
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Set up Temurin Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Verify Java 21 runtime
+        run: |
+          set -euo pipefail
+          java -version
+          java -version 2>&1 | grep -Eq 'version "21([.\"]|$)'
+
+      - name: Download verified BootJar
+        uses: actions/download-artifact@v4
+        with:
+          name: persefonia-verified-bootjar-${{ github.sha }}
+          path: d3-artifact
+
+      - name: Verify artifact identity and run Java 21 smoke
+        working-directory: d3-artifact
+        env:
+          SPRING_PROFILES_ACTIVE: test
+          SPRING_DATASOURCE_URL: jdbc:postgresql://127.0.0.1:5432/persefonia
+          SPRING_DATASOURCE_USERNAME: persefonia
+          SPRING_DATASOURCE_PASSWORD: ci-postgres-password
+          SPRING_DATA_REDIS_HOST: 127.0.0.1
+          SPRING_DATA_REDIS_PORT: "6379"
+          PERSEFONIA_MANAGEMENT_ADDRESS: 127.0.0.1
+          PERSEFONIA_MANAGEMENT_PORT: "9001"
+        run: |
+          set -euo pipefail
+
+          test -f persefonia.jar
+          test -s persefonia.jar
+          test -f persefonia.jar.sha256
+          test -f verification.properties
+          sha256sum --check persefonia.jar.sha256
+
+          property() {
+            grep -m1 "^$1=" verification.properties | cut -d= -f2-
+          }
+
+          bootjar_sha256=$(sha256sum persefonia.jar | awk '{print $1}')
+          test "$(property source.commit)" = "$GITHUB_SHA"
+          test "$(property application.name)" = persefonia
+          test "$(property application.version)" = 0.1.0
+          test "$(property compatibility.java)" = 21
+          test "$(property bootjar.file)" = persefonia.jar
+          test "$(property bootjar.sha256)" = "$bootjar_sha256"
+
+          java_pid=
+          cleanup() {
+            status=$?
+            set +e
+            if [ -n "$java_pid" ] && kill -0 "$java_pid" 2>/dev/null; then
+              kill -TERM "$java_pid"
+              wait "$java_pid"
+            fi
+            if [ "$status" -ne 0 ] && [ -f java21-runtime.log ]; then
+              cat java21-runtime.log
+            fi
+            trap - EXIT
+            exit "$status"
+          }
+          trap cleanup EXIT
+
+          java -jar persefonia.jar > java21-runtime.log 2>&1 &
+          java_pid=$!
+
+          deadline=$((SECONDS + 120))
+          while [ "$SECONDS" -lt "$deadline" ]; do
+            if ! kill -0 "$java_pid" 2>/dev/null; then
+              echo "Java 21 application exited before readiness" >&2
+              exit 1
+            fi
+            if curl --fail --silent --show-error http://127.0.0.1:9001/actuator/health/readiness >/dev/null; then
+              break
+            fi
+            sleep 2
+          done
+
+          curl --fail --silent --show-error http://127.0.0.1:9001/actuator/health/readiness >/dev/null
+          curl --fail --silent --show-error http://127.0.0.1:8080/robots.txt >/dev/null
+
+      - name: Upload Java 21 runtime diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: persefonia-java21-runtime-diagnostics-${{ github.sha }}
+          path: d3-artifact/java21-runtime.log
+          if-no-files-found: ignore
+          retention-days: 14
+
+  d3-gate:
+    name: D3 / Gate
+    needs:
+      - primary-verification
+      - java21-runtime
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+
+    steps:
+      - name: Confirm both verification jobs succeeded
+        if: ${{ needs.primary-verification.result == 'success' && needs.java21-runtime.result == 'success' }}
+        run: exit 0
+
+      - name: Fail for an unsuccessful verification job
+        if: ${{ needs.primary-verification.result != 'success' || needs.java21-runtime.result != 'success' }}
+        run: |
+          echo "Primary Verification: ${{ needs.primary-verification.result }}"
+          echo "Java 21 Runtime: ${{ needs.java21-runtime.result }}"
+          exit 1
