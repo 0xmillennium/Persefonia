@@ -10,8 +10,8 @@ if [ ! -r "$secret_file" ]; then
 fi
 
 password=$(cat "$secret_file")
-if [ -z "$password" ]; then
-    echo "Redis password secret must not be empty." >&2
+if [ "${#password}" -ne 64 ] || ! printf '%s' "$password" | grep -Eq '^[0-9A-Fa-f]{64}$'; then
+    echo "Redis password secret must be exactly 64 hexadecimal characters." >&2
     exit 1
 fi
 

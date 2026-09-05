@@ -29,7 +29,6 @@ class ProductionConfigurationValidator implements InitializingBean {
     static final int MINIMUM_RATE_LIMIT_SECRET_LENGTH = 32;
     static final String CONTACT_MAIL_REQUIRED_PROPERTY =
             "persefonia.contact.mail.require-in-production";
-    private static final String TRUSTED_PROXY_SENTINEL = "127.0.0.1/32";
     private static final Set<String> ACTUATOR_ENDPOINTS =
             Set.of("health", "info", "metrics", "prometheus");
 
@@ -135,8 +134,8 @@ class ProductionConfigurationValidator implements InitializingBean {
         requireNonBlank("server.tomcat.remoteip.protocol-header", "protocol header", violations);
 
         String trustedProxies = environment.getProperty("server.tomcat.remoteip.internal-proxies");
-        if (isUnsafeTrustedProxyValue(trustedProxies)) {
-            violations.add("trusted proxy ranges must be explicitly configured and must not trust all proxies");
+        if (!TrustedProxyCidrs.isSafeConfiguredList(trustedProxies)) {
+            violations.add("trusted proxy ranges must be an explicit comma-separated list of non-global CIDRs");
         }
     }
 
@@ -183,15 +182,4 @@ class ProductionConfigurationValidator implements InitializingBean {
                 || "0:0:0:0:0:0:0:1".equals(address);
     }
 
-    private static boolean isUnsafeTrustedProxyValue(String value) {
-        if (value == null || value.isBlank()) {
-            return true;
-        }
-        String normalized = value.trim();
-        return TRUSTED_PROXY_SENTINEL.equals(normalized)
-                || "*".equals(normalized)
-                || ".*".equals(normalized)
-                || "0.0.0.0/0".equals(normalized)
-                || "::/0".equals(normalized);
-    }
 }

@@ -49,8 +49,40 @@ class ProductionConfigurationValidationTest {
     }
 
     @Test
-    void rejectsMissingOrUnsafeTrustedProxies() {
-        for (String value : new String[] {"", "127.0.0.1/32", "*", ".*", "0.0.0.0/0", "::/0"}) {
+    void acceptsExplicitTrustedProxyCidrs() {
+        for (String value : new String[] {
+            "172.20.0.0/16",
+            "10.20.0.0/16,172.30.0.0/16",
+            "fd00::/64",
+            "172.20.0.0/16,fd00::/64"
+        }) {
+            MockEnvironment environment = secureEnvironment();
+            environment.setProperty("server.tomcat.remoteip.internal-proxies", value);
+
+            assertThatCode(() -> validator(environment, strongRateLimit(), enabledMail(), OIDC_CONFIGURED)
+                            .afterPropertiesSet())
+                    .doesNotThrowAnyException();
+        }
+    }
+
+    @Test
+    void rejectsMissingUnsafeOrUnsupportedTrustedProxies() {
+        for (String value : new String[] {
+            "",
+            "127.0.0.1/32",
+            "*",
+            ".*",
+            "0.0.0.0/0",
+            "::/0",
+            "10.0.0.0/8,0.0.0.0/0",
+            "fd00::/8,::/0",
+            "10.0.0.1",
+            "10.0.0.0/not-a-prefix",
+            "10.0.0.0/33",
+            "fd00::/129",
+            "10.0.0.0/8,",
+            ",10.0.0.0/8"
+        }) {
             MockEnvironment environment = secureEnvironment();
             environment.setProperty("server.tomcat.remoteip.internal-proxies", value);
 
