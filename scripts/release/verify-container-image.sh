@@ -31,8 +31,6 @@ if ! command -v docker >/dev/null || ! command -v jq >/dev/null || ! command -v 
   exit 1
 fi
 
-"$(dirname "$0")/verify-image-platforms.sh" "$image_reference" "$supported_platforms_file"
-
 image_name=${image_reference%@*}
 index_digest=${image_reference#*@}
 registry=${image_name%%/*}
@@ -41,6 +39,15 @@ if [[ "$registry" != ghcr.io ]]; then
   echo "Candidate verification accepts the canonical GHCR image repository only: $image_name" >&2
   exit 1
 fi
+
+resolved_index_digest=$(docker buildx imagetools inspect "$image_reference" --format '{{.Digest}}')
+if [[ "$resolved_index_digest" != "$index_digest" ]]; then
+  echo "Registry-resolved top-level digest does not match the requested candidate digest: expected $index_digest, got $resolved_index_digest." >&2
+  exit 1
+fi
+echo "Registry-resolved top-level digest verified: $resolved_index_digest"
+
+"$(dirname "$0")/verify-image-platforms.sh" "$image_reference" "$supported_platforms_file"
 
 docker_config=${DOCKER_CONFIG:-"$HOME/.docker"}/config.json
 registry_auth=
@@ -133,28 +140,35 @@ fi
 attestation_manifest=$(registry_get "manifests/${attestation_digests[0]}")
 
 verify_attestation_predicate() {
-  local predicate_kind=$1 layer_digest
-  layer_digest=$(jq -r --arg predicate_kind "$predicate_kind" '.layers[] | select(.mediaType == "application/vnd.in-toto+json") | select(.annotations["in-toto.io/predicate-type"] | contains($predicate_kind)) | .digest' <<<"$attestation_manifest" | head -n 1)
+  local predicate_type=$1 layer_digest
+  layer_digest=$(jq -r --arg predicate_type "$predicate_type" '.layers[] | select(.mediaType == "application/vnd.in-toto+json") | select(.annotations["in-toto.io/predicate-type"] == $predicate_type) | .digest' <<<"$attestation_manifest" | head -n 1)
   if [[ ! "$layer_digest" =~ ^sha256:[a-f0-9]{64}$ ]]; then
-    echo "BuildKit attestation lacks a $predicate_kind predicate for $platform." >&2
+    echo "BuildKit attestation lacks a $predicate_type predicate for $platform." >&2
     exit 1
   fi
   registry_get "blobs/${layer_digest}" 'application/vnd.in-toto+json'
 }
 
-sbom=$(verify_attestation_predicate spdx.dev)
+sbom=$(verify_attestation_predicate https://spdx.dev/Document)
 if ! jq -e '(.predicateType | contains("spdx.dev")) and (.predicate.spdxVersion? // .predicate.SPDXID? // empty) != "" and ((.predicate.packages? // []) | length > 0)' <<<"$sbom" >/dev/null; then
   echo "BuildKit SPDX SBOM is missing, unparsable, or has no package inventory for $platform." >&2
   exit 1
 fi
 echo "BuildKit SPDX SBOM verified for $platform."
 
-provenance=$(verify_attestation_predicate slsa.dev/provenance)
-if ! jq -e '(.predicateType | contains("slsa.dev/provenance")) and (.predicate | type == "object" and length > 0) and ((.predicate.buildDefinition? // .predicate.buildType? // empty) != "")' <<<"$provenance" >/dev/null; then
-  echo "BuildKit provenance is missing, unparsable, or lacks build semantics for $platform." >&2
+expected_provenance_predicate_type=https://slsa.dev/provenance/v1
+expected_build_type=https://github.com/moby/buildkit/blob/master/docs/attestations/slsa-definitions.md
+provenance=$(verify_attestation_predicate "$expected_provenance_predicate_type")
+if ! jq -e --arg predicate_type "$expected_provenance_predicate_type" --arg build_type "$expected_build_type" '
+  .predicateType == $predicate_type and
+  (.predicate | type == "object" and length > 0) and
+  (.predicate.buildDefinition | type == "object") and
+  (.predicate.buildDefinition.buildType == $build_type)
+' <<<"$provenance" >/dev/null; then
+  echo "BuildKit provenance must be parseable SLSA v1 with BuildKit build type $expected_build_type for $platform." >&2
   exit 1
 fi
-echo "BuildKit provenance verified for $platform."
+echo "BuildKit SLSA v1 provenance verified for $platform."
 
 repository_slug=${expected_source_url#https://github.com/}
 if [[ "$repository_slug" == "$expected_source_url" || "$repository_slug" == */*/* ]]; then

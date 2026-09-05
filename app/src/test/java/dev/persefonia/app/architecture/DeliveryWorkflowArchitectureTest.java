@@ -41,6 +41,11 @@ class DeliveryWorkflowArchitectureTest {
     }
 
     @Test
+    void deliveryExplicitlyProducesSlsaV1BuildKitProvenance() throws Exception {
+        assertThat(Files.readString(DELIVERY_WORKFLOW)).contains("provenance: mode=max,version=v1");
+    }
+
+    @Test
     void bootJarStagingRemovesOnlyItsOwnOutputs() throws Exception {
         String verifier = Files.readString(BOOTJAR_VERIFIER);
 

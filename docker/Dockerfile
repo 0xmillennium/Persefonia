@@ -11,8 +11,7 @@ LABEL org.opencontainers.image.title="Persefonia" \
 
 WORKDIR /opt/persefonia
 
-COPY --chown=10001:10001 app/build/libs/persefonia.jar /opt/persefonia/persefonia.jar
-RUN chmod 0444 /opt/persefonia/persefonia.jar
+COPY --chown=10001:10001 --chmod=0444 app/build/libs/persefonia.jar /opt/persefonia/persefonia.jar
 
 USER 10001:10001
 
