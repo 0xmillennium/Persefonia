@@ -18,6 +18,7 @@ test -f "$checksum_file"
 
 java -version
 java -version 2>&1 | grep -Eq 'version "21([."]|$)'
+echo "Verified active Java 21 runtime."
 
 export SPRING_PROFILES_ACTIVE="${SPRING_PROFILES_ACTIVE:-test}"
 export SPRING_DATASOURCE_URL="${SPRING_DATASOURCE_URL:-jdbc:postgresql://127.0.0.1:5432/persefonia}"
@@ -40,10 +41,14 @@ cleanup() {
   if [[ "$status" -ne 0 && -f "$runtime_log" ]]; then
     cat "$runtime_log" >&2
   fi
+  if [[ "$status" -eq 0 ]]; then
+    echo "Java 21 compatibility verification passed."
+  fi
   exit "$status"
 }
 trap cleanup EXIT
 
+echo "Starting checksum-verified BootJar."
 java -jar "$bootjar" > "$runtime_log" 2>&1 &
 java_pid=$!
 
@@ -53,8 +58,8 @@ while [[ "$SECONDS" -lt "$deadline" ]]; do
     echo "Java 21 application exited before readiness" >&2
     exit 1
   fi
-  if curl --fail --silent --show-error \
-    "http://${PERSEFONIA_MANAGEMENT_ADDRESS}:${PERSEFONIA_MANAGEMENT_PORT}/actuator/health/readiness" >/dev/null; then
+  if curl --fail --silent \
+    "http://${PERSEFONIA_MANAGEMENT_ADDRESS}:${PERSEFONIA_MANAGEMENT_PORT}/actuator/health/readiness" >/dev/null 2>&1; then
     break
   fi
   sleep 2
@@ -62,4 +67,6 @@ done
 
 curl --fail --silent --show-error \
   "http://${PERSEFONIA_MANAGEMENT_ADDRESS}:${PERSEFONIA_MANAGEMENT_PORT}/actuator/health/readiness" >/dev/null
+echo "Readiness endpoint verified."
 curl --fail --silent --show-error "http://127.0.0.1:${SERVER_PORT}/robots.txt" >/dev/null
+echo "Public /robots.txt smoke verified."
