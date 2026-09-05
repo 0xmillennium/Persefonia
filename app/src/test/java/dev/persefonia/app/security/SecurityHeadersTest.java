@@ -21,8 +21,7 @@ import dev.persefonia.identityaccess.domain.admin.AdminRole;
 
 @SpringBootTest(
         properties = {
-                "management.server.port=0",
-                "management.health.redis.enabled=false",
+        "management.health.redis.enabled=false",
                 "spring.autoconfigure.exclude=org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration",
                 "spring.flyway.enabled=false"
         })

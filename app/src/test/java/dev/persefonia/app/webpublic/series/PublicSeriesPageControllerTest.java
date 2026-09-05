@@ -8,7 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import dev.persefonia.app.webpublic.content.InMemoryPublicRouteResolver;
-import dev.persefonia.app.webpublic.content.PublicContentTestConfiguration;
+import dev.persefonia.app.webpublic.content.PublicNavigationMvcTestConfiguration;
 import dev.persefonia.app.webpublic.content.PublicContentTestItems;
 import dev.persefonia.app.webpublic.content.PublicContentTestRepository;
 import dev.persefonia.contentpublishing.domain.content.CanonicalPath;
@@ -37,8 +37,8 @@ import org.springframework.test.web.servlet.MockMvc;
         "spring.flyway.enabled=false"
 })
 @AutoConfigureMockMvc
-@Import({PublicContentTestConfiguration.class, PublicSeriesTestConfiguration.class})
-@ActiveProfiles({"test", "public-content-mvc-test", "public-series-mvc-test"})
+@Import(PublicNavigationMvcTestConfiguration.class)
+@ActiveProfiles({"test", "public-content-mvc-test"})
 class PublicSeriesPageControllerTest {
     @Autowired MockMvc mockMvc;
     @Autowired PublicSeriesTestRepository seriesRepository;

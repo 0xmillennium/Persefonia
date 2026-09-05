@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import dev.persefonia.app.security.admin.AdminAuthenticationTestSupport;
 import dev.persefonia.app.webadmin.cv.AdminCvTestConfiguration.AdminCvEligibilityStub;
 import dev.persefonia.identityaccess.domain.admin.AdminRole;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -29,6 +30,11 @@ import org.springframework.test.web.servlet.MockMvc;
 class AdminCvTemplateSmokeTest {
     @Autowired MockMvc mockMvc;
     @Autowired AdminCvEligibilityStub eligibility;
+
+    @BeforeEach
+    void resetEligibility() {
+        eligibility.reset();
+    }
 
     @Test
     void templateRendersCandidatePdfsSafely() throws Exception {

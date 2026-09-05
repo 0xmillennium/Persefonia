@@ -16,6 +16,7 @@ import org.springframework.boot.test.web.server.LocalManagementPort;
         properties = {
                 "management.server.port=0",
                 "management.server.address=127.0.0.1",
+                "management.endpoints.web.exposure.include=health,info,metrics,prometheus",
                 "management.health.redis.enabled=false",
                 "spring.autoconfigure.exclude=org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration",
                 "spring.flyway.enabled=false"

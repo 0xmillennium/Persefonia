@@ -8,7 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import dev.persefonia.app.webpublic.content.PublicContentTestConfiguration;
+import dev.persefonia.app.webpublic.content.PublicNavigationMvcTestConfiguration;
 import dev.persefonia.app.webpublic.sitemap.PublicSitemapTestConfiguration.StubPublicSitemapIndexQueryService;
 import dev.persefonia.app.webpublic.sitemap.PublicSitemapTestConfiguration.ToggleablePublicCvAvailability;
 import java.util.List;
@@ -27,8 +27,8 @@ import org.springframework.test.web.servlet.MockMvc;
         "spring.flyway.enabled=false"
 })
 @AutoConfigureMockMvc
-@Import({PublicContentTestConfiguration.class, PublicSitemapTestConfiguration.class})
-@ActiveProfiles({"test", "public-content-mvc-test", "public-sitemap-mvc-test"})
+@Import(PublicNavigationMvcTestConfiguration.class)
+@ActiveProfiles({"test", "public-content-mvc-test"})
 class PublicSitemapControllerTest {
     @Autowired MockMvc mockMvc;
     @Autowired StubPublicSitemapIndexQueryService sitemapIndex;

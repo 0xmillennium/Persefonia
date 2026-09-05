@@ -29,7 +29,7 @@ import org.springframework.test.web.servlet.MvcResult;
 })
 @AutoConfigureMockMvc
 @Import(AdminContactTestConfiguration.class)
-@ActiveProfiles({"test", "admin-contact-security-test"})
+@ActiveProfiles({"test", "admin-contact-mvc-test"})
 class AdminContactSecurityAndCacheTest {
     @Autowired MockMvc mockMvc;
     @Autowired ContactMessageStore store;

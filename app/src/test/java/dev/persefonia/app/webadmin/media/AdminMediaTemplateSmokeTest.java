@@ -28,7 +28,7 @@ import org.springframework.test.web.servlet.MockMvc;
 })
 @AutoConfigureMockMvc
 @Import(AdminMediaTestConfiguration.class)
-@ActiveProfiles({"test", "admin-media-template-test"})
+@ActiveProfiles({"test", "admin-media-mvc-test"})
 class AdminMediaTemplateSmokeTest {
     @Autowired MockMvc mockMvc;
     @Autowired AdminMediaReadModelStub readModel;

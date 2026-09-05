@@ -8,7 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import dev.persefonia.app.webpublic.content.PublicContentTestConfiguration;
+import dev.persefonia.app.webpublic.content.PublicNavigationMvcTestConfiguration;
 import dev.persefonia.app.webpublic.feed.PublicFeedTestConfiguration.StubPublicFeedIndexQueryService;
 import dev.persefonia.discovery.application.contract.DiscoveryLanguage;
 import dev.persefonia.discovery.application.index.PublicFeedEntry;
@@ -29,8 +29,8 @@ import org.springframework.test.web.servlet.MockMvc;
         "spring.flyway.enabled=false"
 })
 @AutoConfigureMockMvc
-@Import({PublicContentTestConfiguration.class, PublicFeedTestConfiguration.class})
-@ActiveProfiles({"test", "public-content-mvc-test", "public-feed-mvc-test"})
+@Import(PublicNavigationMvcTestConfiguration.class)
+@ActiveProfiles({"test", "public-content-mvc-test"})
 class PublicFeedControllerTest {
     @Autowired MockMvc mockMvc;
     @Autowired StubPublicFeedIndexQueryService feedIndex;

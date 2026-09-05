@@ -10,7 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import dev.persefonia.app.webpublic.content.PublicContentTestConfiguration;
+import dev.persefonia.app.webpublic.content.PublicNavigationMvcTestConfiguration;
 import dev.persefonia.app.webpublic.search.PublicSearchTestConfiguration.TrackingPublicSearchIndexQueryService;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,8 +29,8 @@ import org.springframework.test.web.servlet.MvcResult;
         "spring.flyway.enabled=false"
 })
 @AutoConfigureMockMvc
-@Import({PublicContentTestConfiguration.class, PublicSearchTestConfiguration.class})
-@ActiveProfiles({"test", "public-content-mvc-test", "public-search-mvc-test"})
+@Import(PublicNavigationMvcTestConfiguration.class)
+@ActiveProfiles({"test", "public-content-mvc-test"})
 class PublicSearchControllerTest {
     @Autowired MockMvc mockMvc;
     @Autowired TrackingPublicSearchIndexQueryService searchIndex;

@@ -28,7 +28,7 @@ import org.springframework.test.web.servlet.MockMvc;
 })
 @AutoConfigureMockMvc
 @Import(AdminContactTestConfiguration.class)
-@ActiveProfiles({"test", "admin-contact-template-test"})
+@ActiveProfiles({"test", "admin-contact-mvc-test"})
 class AdminContactTemplateSmokeTest {
     @Autowired MockMvc mockMvc;
     @Autowired ContactMessageStore store;

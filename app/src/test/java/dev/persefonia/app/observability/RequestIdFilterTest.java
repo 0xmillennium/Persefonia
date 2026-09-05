@@ -17,6 +17,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest(properties = {
+        "management.health.redis.enabled=false",
         "spring.autoconfigure.exclude=org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration",
         "spring.flyway.enabled=false"
 })
@@ -73,6 +74,7 @@ class RequestIdFilterTest {
 
 @SpringBootTest(properties = {
         "persefonia.observability.request-id.trust-incoming-header=true",
+        "management.health.redis.enabled=false",
         "spring.autoconfigure.exclude=org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration",
         "spring.flyway.enabled=false"
 })
