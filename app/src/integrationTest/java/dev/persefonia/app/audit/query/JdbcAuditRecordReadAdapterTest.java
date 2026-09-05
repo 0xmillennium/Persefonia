@@ -18,7 +18,6 @@ import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -41,9 +40,6 @@ class JdbcAuditRecordReadAdapterTest {
         beans.addBean("namedParameterJdbcTemplate", new NamedParameterJdbcTemplate(dataSource));
         records = new JdbcAuditRecordReadAdapter(beans.getBeanProvider(NamedParameterJdbcTemplate.class));
     }
-
-    @BeforeEach
-    void clear() { jdbc.execute("TRUNCATE audit.audit_records CASCADE"); }
 
     @Test
     void defaultOrderingUsesOccurredAtThenIdAndListIgnoresChildren() {

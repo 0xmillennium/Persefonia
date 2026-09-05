@@ -13,7 +13,6 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -40,11 +39,6 @@ class JdbcInsightsCounterRepositoryAdapterTest {
 
     @AfterAll
     static void stopDatabase() {    }
-
-    @BeforeEach
-    void clearInsightsTables() {
-        jdbc.execute("TRUNCATE insights.analytics_dimensions CASCADE");
-    }
 
     @Test
     void firstIncrementPersistsDimensionAndCounter() {

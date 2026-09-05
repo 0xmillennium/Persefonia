@@ -33,8 +33,6 @@ class JdbcCacheInvalidationOperationsReadAdapterTest {
                 factory.getBeanProvider(NamedParameterJdbcTemplate.class),
                 new CacheInvalidationRecoveryPolicy(Duration.ofMinutes(15)));
     }
-    @BeforeEach void reset() { jdbc.execute("TRUNCATE operations.cache_invalidation_batches CASCADE"); }
-
     @Test
     void listFiltersOrdersPaginatesAndProjectsAggregatedLatestAttempt() {
         UUID older = insertBatch(CacheInvalidationStatus.FAILED, NOW.minusSeconds(60), null, null,

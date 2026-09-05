@@ -50,7 +50,7 @@ class MediaAuditRollbackIntegrationTest {
     }
 
     @BeforeEach
-    void reset() throws IOException {        jdbc.execute("TRUNCATE media.assets, audit.audit_records CASCADE");
+    void reset() throws IOException {
         clearStorageRoot();
     }
 

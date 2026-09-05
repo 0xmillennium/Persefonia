@@ -29,7 +29,6 @@ import dev.persefonia.contentpublishing.domain.content.port.ContentItemRepositor
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.UUID;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -70,18 +69,6 @@ class PublicRouteResolutionThroughDiscoveryIntegrationTest {
         registry.add("spring.datasource.username", POSTGRES::getUsername);
         registry.add("spring.datasource.password", POSTGRES::getPassword);
         registry.add("site.public-base-url", () -> "https://persefonia.test");
-    }
-
-    @BeforeEach
-    void prepareDatabase() {        jdbc.execute("""
-                TRUNCATE discovery.redirect_rules,
-                    discovery.discoverable_resources,
-                    publishing.content_revisions,
-                    publishing.content_rendered_headings,
-                    publishing.content_render_snapshots,
-                    publishing.content_items
-                RESTART IDENTITY CASCADE
-                """);
     }
 
     @Test

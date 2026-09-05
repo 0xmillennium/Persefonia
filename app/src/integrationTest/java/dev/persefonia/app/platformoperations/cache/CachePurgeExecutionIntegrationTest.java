@@ -83,7 +83,6 @@ class CachePurgeExecutionIntegrationTest {
 
     @BeforeEach
     void startContext() {
-        jdbc.execute("TRUNCATE operations.cache_invalidation_batches CASCADE");
         providerBehavior = ProviderBehavior.SKIP_SUCCESS;
         providerIdentity = CachePurgeProvider.LOCAL;
         openContext();

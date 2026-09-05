@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -49,11 +48,6 @@ class JdbcCacheInvalidationBatchRepositoryAdapterTest {
         beans.addBean("transactions", new TransactionTemplate(new DataSourceTransactionManager(dataSource)));
         repository = new JdbcCacheInvalidationBatchRepositoryAdapter(
                 beans.getBeanProvider(NamedParameterJdbcTemplate.class), beans.getBeanProvider(TransactionTemplate.class));
-    }
-
-    @BeforeEach
-    void clear() {
-        jdbc.execute("TRUNCATE operations.cache_invalidation_batches CASCADE");
     }
 
     @Test

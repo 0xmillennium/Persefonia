@@ -8,7 +8,6 @@ import java.util.Set;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
@@ -43,12 +42,6 @@ class JdbcAdminAccountRepositoryAdapterTest {
 
     @AfterAll
     static void stopDatabase() {    }
-
-    @BeforeEach
-    void cleanIamTables() {
-        jdbc.update("DELETE FROM iam.admin_account_roles");
-        jdbc.update("DELETE FROM iam.admin_accounts");
-    }
 
     @Test
     void saveInsertsAccountAndRoles() {

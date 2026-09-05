@@ -15,46 +15,23 @@ import dev.persefonia.taxonomy.application.service.TagCommandGateway;
 import dev.persefonia.taxonomy.domain.port.TagRepository;
 import java.time.Instant;
 import java.util.UUID;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.support.TransactionTemplate;
-import dev.persefonia.app.testsupport.SharedPostgresTestServer;
+import dev.persefonia.app.testsupport.SharedPostgresSpringIntegrationTest;
 
-@SpringBootTest(properties = {
-        "management.server.port=0",
-        "management.health.redis.enabled=false"
-})
-@ActiveProfiles("test")
-class TaxonomyAuditTransactionIntegrationTest {
+class TaxonomyAuditTransactionIntegrationTest extends SharedPostgresSpringIntegrationTest {
     private static final Instant NOW = Instant.parse("2026-09-03T12:00:00Z");
     private static final TaxonomyCommandActor OWNER =
             new TaxonomyCommandActor(UUID.randomUUID(), true, true);
-    private static final SharedPostgresTestServer.Database POSTGRES = postgresContainer();
 
     @Autowired TagCommandGateway gateway;
     @Autowired SeriesCommandGateway seriesGateway;
     @Autowired TagRepository tags;
     @Autowired JdbcTemplate jdbc;
     @Autowired TransactionTemplate transactions;
-
-    @DynamicPropertySource
-    static void properties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
-        registry.add("spring.datasource.username", POSTGRES::getUsername);
-        registry.add("spring.datasource.password", POSTGRES::getPassword);
-    }
-
-    @BeforeEach
-    void reset() {        jdbc.execute("TRUNCATE taxonomy.tags, publishing.series, discovery.discoverable_resources, "
-                + "audit.audit_records, operations.cache_invalidation_batches CASCADE");
-    }
 
     @Test
     void successfulCreateCommitsTagAndExactlyOneAuditRecord() {
@@ -102,11 +79,4 @@ class TaxonomyAuditTransactionIntegrationTest {
         return new CreateTagCommand(OWNER, "Tag " + suffix, "tag-" + suffix, "Description", NOW);
     }
 
-    private static SharedPostgresTestServer.Database postgresContainer() {
-        SharedPostgresTestServer.Database postgres = SharedPostgresTestServer.integrationDatabase();
-        postgres.withDatabaseName("persefonia_taxonomy_audit");
-        postgres.withUsername("persefonia");
-        postgres.withPassword("persefonia_dev");
-        return postgres;
-    }
 }

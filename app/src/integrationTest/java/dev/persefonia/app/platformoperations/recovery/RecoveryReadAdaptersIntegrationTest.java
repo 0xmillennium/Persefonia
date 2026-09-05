@@ -40,13 +40,6 @@ class RecoveryReadAdaptersIntegrationTest {
         namedJdbc = new NamedParameterJdbcTemplate(dataSource);
     }
 
-    @BeforeEach
-    void reset() {
-        jdbc.execute("TRUNCATE media.assets, publishing.content_items, portfolio.projects, "
-                + "portfolio.active_cv_documents, discovery.discoverable_resources CASCADE");
-        jdbc.update("UPDATE portfolio.site_presentation_settings SET default_og_image_asset_id = NULL");
-    }
-
     @Test
     void mediaInventoryUsesStableKeysetPagesAndIncludesAllPersistedStatesAndVariants() {
         for (int index = 0; index < 405; index++) {

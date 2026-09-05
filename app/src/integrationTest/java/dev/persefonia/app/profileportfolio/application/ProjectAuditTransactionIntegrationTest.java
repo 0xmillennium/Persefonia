@@ -62,7 +62,7 @@ class ProjectAuditTransactionIntegrationTest {
     }
 
     @BeforeEach
-    void reset() {        jdbc.execute("TRUNCATE portfolio.projects, discovery.discoverable_resources, audit.audit_records CASCADE");
+    void reset() {
         cacheExecution.invocations = 0;
         postCommit.failRegistration = false;
     }

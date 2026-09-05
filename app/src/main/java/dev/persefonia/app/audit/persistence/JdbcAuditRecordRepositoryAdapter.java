@@ -22,6 +22,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -62,27 +64,26 @@ public class JdbcAuditRecordRepositoryAdapter implements AuditRecordRepository {
     @Transactional(readOnly = true)
     public Optional<AuditRecord> findById(AuditRecordId id) {
         Objects.requireNonNull(id, "id");
-        return jdbc().query("""
+        List<AuditRecordRootRow> roots = jdbc().query("""
                 SELECT id, action, actor_type, actor_context, actor_source_type, actor_id, actor_display,
                        entity_context, entity_type, entity_id, request_id, occurred_at, created_at
                 FROM audit.audit_records
                 WHERE id = :id
-                """, Map.of("id", id.value()), this::mapRecord)
-                .stream()
-                .findFirst();
+                """, Map.of("id", id.value()), this::mapRoot);
+        return hydrate(roots).stream().findFirst();
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<AuditRecord> findRecent(int limit) {
         int bounded = Math.min(Math.max(limit, 1), MAX_RECENT_LIMIT);
-        return jdbc().query("""
+        return hydrate(jdbc().query("""
                 SELECT id, action, actor_type, actor_context, actor_source_type, actor_id, actor_display,
                        entity_context, entity_type, entity_id, request_id, occurred_at, created_at
                 FROM audit.audit_records
                 ORDER BY occurred_at DESC, id DESC
                 LIMIT :limit
-                """, Map.of("limit", bounded), this::mapRecord);
+                """, Map.of("limit", bounded), this::mapRoot));
     }
 
     private void insertRoot(AuditRecord record) {
@@ -161,11 +162,34 @@ public class JdbcAuditRecordRepositoryAdapter implements AuditRecordRepository {
                 """, batch);
     }
 
-    private AuditRecord mapRecord(ResultSet resultSet, int rowNumber) throws SQLException {
+    private List<AuditRecord> hydrate(List<AuditRecordRootRow> roots) {
+        if (roots.isEmpty()) {
+            return List.of();
+        }
+        List<UUID> recordIds = roots.stream().map(AuditRecordRootRow::id).toList();
+        Map<UUID, List<AuditChange>> changes = loadChanges(recordIds);
+        Map<UUID, List<AuditMetadataEntry>> metadata = loadMetadata(recordIds);
+        List<AuditRecord> records = new ArrayList<>(roots.size());
+        for (AuditRecordRootRow root : roots) {
+            records.add(AuditRecord.rehydrate(
+                    AuditRecordId.from(root.id()),
+                    root.action(),
+                    root.actor(),
+                    root.entity(),
+                    root.requestId(),
+                    root.occurredAt(),
+                    root.createdAt(),
+                    changes.getOrDefault(root.id(), List.of()),
+                    metadata.getOrDefault(root.id(), List.of())));
+        }
+        return List.copyOf(records);
+    }
+
+    private AuditRecordRootRow mapRoot(ResultSet resultSet, int rowNumber) throws SQLException {
         UUID recordId = resultSet.getObject("id", UUID.class);
         String requestId = resultSet.getString("request_id");
-        return AuditRecord.rehydrate(
-                AuditRecordId.from(recordId),
+        return new AuditRecordRootRow(
+                recordId,
                 AuditAction.of(resultSet.getString("action")),
                 mapActor(resultSet),
                 AuditedEntityRef.of(
@@ -174,9 +198,7 @@ public class JdbcAuditRecordRepositoryAdapter implements AuditRecordRepository {
                         SourceEntityId.from(resultSet.getObject("entity_id", UUID.class))),
                 requestId == null ? null : RequestId.of(requestId),
                 instant(resultSet, "occurred_at"),
-                instant(resultSet, "created_at"),
-                changes(recordId),
-                metadata(recordId));
+                instant(resultSet, "created_at"));
     }
 
     private static AuditActorRef mapActor(ResultSet resultSet) throws SQLException {
@@ -192,27 +214,39 @@ public class JdbcAuditRecordRepositoryAdapter implements AuditRecordRepository {
         };
     }
 
-    private List<AuditChange> changes(UUID recordId) {
-        return jdbc().query("""
-                SELECT field_path, old_value, new_value
+    private Map<UUID, List<AuditChange>> loadChanges(List<UUID> recordIds) {
+        Map<UUID, List<AuditChange>> changes = new HashMap<>();
+        jdbc().query("""
+                SELECT audit_record_id, field_path, old_value, new_value, position
                 FROM audit.audit_record_changes
-                WHERE audit_record_id = :recordId
-                ORDER BY position
-                """, Map.of("recordId", recordId), (resultSet, rowNumber) -> new AuditChange(
-                FieldPath.of(resultSet.getString("field_path")),
-                nullableAuditValue(resultSet.getString("old_value")),
-                nullableAuditValue(resultSet.getString("new_value"))));
+                WHERE audit_record_id IN (:recordIds)
+                ORDER BY audit_record_id, position
+                """, Map.of("recordIds", recordIds), (resultSet, rowNumber) -> {
+            UUID recordId = resultSet.getObject("audit_record_id", UUID.class);
+            changes.computeIfAbsent(recordId, ignored -> new ArrayList<>()).add(new AuditChange(
+                    FieldPath.of(resultSet.getString("field_path")),
+                    nullableAuditValue(resultSet.getString("old_value")),
+                    nullableAuditValue(resultSet.getString("new_value"))));
+            return null;
+        });
+        return changes;
     }
 
-    private List<AuditMetadataEntry> metadata(UUID recordId) {
-        return jdbc().query("""
-                SELECT metadata_key, metadata_value
+    private Map<UUID, List<AuditMetadataEntry>> loadMetadata(List<UUID> recordIds) {
+        Map<UUID, List<AuditMetadataEntry>> metadata = new HashMap<>();
+        jdbc().query("""
+                SELECT audit_record_id, metadata_key, metadata_value, position
                 FROM audit.audit_record_metadata
-                WHERE audit_record_id = :recordId
-                ORDER BY position
-                """, Map.of("recordId", recordId), (resultSet, rowNumber) -> new AuditMetadataEntry(
-                MetadataKey.of(resultSet.getString("metadata_key")),
-                SafeMetadataValue.of(resultSet.getString("metadata_value"))));
+                WHERE audit_record_id IN (:recordIds)
+                ORDER BY audit_record_id, position
+                """, Map.of("recordIds", recordIds), (resultSet, rowNumber) -> {
+            UUID recordId = resultSet.getObject("audit_record_id", UUID.class);
+            metadata.computeIfAbsent(recordId, ignored -> new ArrayList<>()).add(new AuditMetadataEntry(
+                    MetadataKey.of(resultSet.getString("metadata_key")),
+                    SafeMetadataValue.of(resultSet.getString("metadata_value"))));
+            return null;
+        });
+        return metadata;
     }
 
     private static SafeAuditValue nullableAuditValue(String value) {
@@ -230,4 +264,13 @@ public class JdbcAuditRecordRepositoryAdapter implements AuditRecordRepository {
         }
         return available;
     }
+
+    private record AuditRecordRootRow(
+            UUID id,
+            AuditAction action,
+            AuditActorRef actor,
+            AuditedEntityRef entity,
+            RequestId requestId,
+            Instant occurredAt,
+            Instant createdAt) {}
 }

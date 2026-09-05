@@ -18,48 +18,23 @@ import dev.persefonia.communication.domain.contact.SenderName;
 import dev.persefonia.identityaccess.application.admin.authorization.AdminCommandAuthorizationException;
 import java.time.Instant;
 import java.util.UUID;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.aop.support.AopUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.support.TransactionTemplate;
-import dev.persefonia.app.testsupport.SharedPostgresTestServer;
+import dev.persefonia.app.testsupport.SharedPostgresSpringIntegrationTest;
 
-@SpringBootTest(properties = {
-        "management.server.port=0",
-        "management.health.redis.enabled=false"
-})
-@ActiveProfiles("test")
-class TransactionalContactMessageStatusCommandGatewayTest {
+class TransactionalContactMessageStatusCommandGatewayTest extends SharedPostgresSpringIntegrationTest {
     private static final Instant NOW = Instant.parse("2026-09-02T08:00:00Z");
     private static final UUID OWNER_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
     private static final ContactMessageCommandActor OWNER = new ContactMessageCommandActor(OWNER_ID, true, true);
-    private static final SharedPostgresTestServer.Database POSTGRES = postgresContainer();
-    private static boolean migrated;
 
     @Autowired ContactMessageStatusCommandGateway gateway;
     @Autowired ContactMessageRepository messages;
     @Autowired JdbcTemplate jdbc;
     @Autowired TransactionTemplate transactions;
-
-    @DynamicPropertySource
-    static void datasourceProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
-        registry.add("spring.datasource.username", POSTGRES::getUsername);
-        registry.add("spring.datasource.password", POSTGRES::getPassword);
-    }
-
-    @BeforeEach
-    void resetDatabase() {
-        migrateOnce();
-        jdbc.execute("TRUNCATE communication.contact_messages, audit.audit_records CASCADE");
-    }
 
     @Test
     void gatewayImplementsFrameworkFreeContractAndIsTransactionallyProxied() {
@@ -163,17 +138,4 @@ class TransactionalContactMessageStatusCommandGatewayTest {
                 messageId.value());
     }
 
-    private static synchronized void migrateOnce() {
-        if (migrated) {
-            return;
-        }        migrated = true;
-    }
-
-    private static SharedPostgresTestServer.Database postgresContainer() {
-        SharedPostgresTestServer.Database postgres = SharedPostgresTestServer.integrationDatabase();
-        postgres.withDatabaseName("persefonia_contact_command_gateway");
-        postgres.withUsername("persefonia");
-        postgres.withPassword("persefonia_dev");
-        return postgres;
-    }
 }

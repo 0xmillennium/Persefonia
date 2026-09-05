@@ -22,8 +22,7 @@ final class IntegrationDatabaseResetManager {
             try {
                 if (applicationTables == null) applicationTables = discoverApplicationTables(connection);
                 try (Statement statement = connection.createStatement()) {
-                    statement.execute("TRUNCATE TABLE " + String.join(", ", applicationTables)
-                            + " RESTART IDENTITY CASCADE");
+                    statement.execute("TRUNCATE TABLE " + String.join(", ", applicationTables));
                 }
                 IntegrationBaselineRestorer.restore(connection);
                 connection.commit();

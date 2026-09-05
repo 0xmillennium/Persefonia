@@ -36,13 +36,12 @@ public final class SharedPostgresTestServer {
         return "jdbc:postgresql://" + SERVER.getHost() + ":" + SERVER.getMappedPort(5432) + "/" + database;
     }
 
-    private static synchronized boolean createDatabase(String database) {
+    private static synchronized void createDatabase(String database) {
         try (Connection connection = DriverManager.getConnection(jdbcUrl("postgres"), USERNAME, PASSWORD);
                 Statement statement = connection.createStatement()) {
             statement.execute("CREATE DATABASE " + quote(database));
-            return true;
         } catch (SQLException exception) {
-            if ("42P04".equals(exception.getSQLState())) return false;
+            if ("42P04".equals(exception.getSQLState())) return;
             throw new IllegalStateException("Could not create test database " + database, exception);
         }
     }
@@ -74,9 +73,9 @@ public final class SharedPostgresTestServer {
 
         public synchronized void start() {
             if (started) return;
-            boolean created = createDatabase(name);
+            createDatabase(name);
             started = true;
-            if (!isolated) IntegrationDatabaseManager.prepare(this, created);
+            if (!isolated) IntegrationDatabaseManager.prepare(this);
         }
 
         public synchronized void stop() { if (isolated && started) dropDatabase(name); started = false; }

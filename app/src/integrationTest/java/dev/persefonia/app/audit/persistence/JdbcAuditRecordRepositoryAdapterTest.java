@@ -19,12 +19,13 @@ import dev.persefonia.audit.domain.record.SourceContext;
 import dev.persefonia.audit.domain.record.SourceEntityId;
 import dev.persefonia.audit.domain.record.SourceType;
 import java.lang.reflect.Method;
+import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -51,11 +52,6 @@ class JdbcAuditRecordRepositoryAdapterTest {
 
     @AfterAll
     static void stopDatabase() {    }
-
-    @BeforeEach
-    void clearAuditTables() {
-        jdbc.execute("TRUNCATE audit.audit_records CASCADE");
-    }
 
     @Test
     void appendPersistsRootChangesAndMetadataInOrder() {
@@ -144,8 +140,14 @@ class JdbcAuditRecordRepositoryAdapterTest {
 
     @Test
     void findRecentReturnsNewestFirst() {
-        AuditRecord older = systemRecord(Instant.parse("2026-06-25T09:00:00Z"));
-        AuditRecord newer = systemRecord(Instant.parse("2026-06-25T11:00:00Z"));
+        AuditRecord older = adminRecord(Instant.parse("2026-06-25T09:00:00Z"), List.of(
+                AuditChange.of(FieldPath.of("status"), SafeAuditValue.of("DRAFT"), SafeAuditValue.of("PUBLISHED")),
+                AuditChange.of(FieldPath.of("title"), null, SafeAuditValue.of("Published title"))), List.of(
+                AuditMetadataEntry.of(MetadataKey.of("reason"), SafeMetadataValue.of("scheduled"))));
+        AuditRecord newer = adminRecord(Instant.parse("2026-06-25T10:00:00Z"), List.of(
+                AuditChange.of(FieldPath.of("visibility"), SafeAuditValue.of("PRIVATE"), SafeAuditValue.of("PUBLIC"))), List.of(
+                AuditMetadataEntry.of(MetadataKey.of("channel"), SafeMetadataValue.of("admin")),
+                AuditMetadataEntry.of(MetadataKey.of("source"), SafeMetadataValue.of("manual"))));
         adapter.append(older);
         adapter.append(newer);
 
@@ -153,13 +155,19 @@ class JdbcAuditRecordRepositoryAdapterTest {
 
         assertThat(recent).extracting(record -> record.id().value())
                 .containsExactly(newer.id().value(), older.id().value());
+        assertThat(recent.get(0).changes()).extracting(change -> change.fieldPath().value())
+                .containsExactly("visibility");
+        assertThat(recent.get(0).metadata()).extracting(entry -> entry.key().value())
+                .containsExactly("channel", "source");
+        assertThat(recent.get(1).changes()).extracting(change -> change.fieldPath().value())
+                .containsExactly("status", "title");
+        assertThat(recent.get(1).metadata()).extracting(entry -> entry.key().value())
+                .containsExactly("reason");
     }
 
     @Test
     void findRecentCapsLimitAtHundred() {
-        for (int index = 0; index < 101; index++) {
-            adapter.append(systemRecord(Instant.parse("2026-06-25T09:00:00Z").plusSeconds(index)));
-        }
+        seedRecentRoots(101);
 
         assertThat(adapter.findRecent(1000)).hasSize(100);
     }
@@ -235,5 +243,24 @@ class JdbcAuditRecordRepositoryAdapterTest {
                 CREATED_AT,
                 List.of(AuditChange.of(FieldPath.of("status"), SafeAuditValue.of("PUBLISHED"), SafeAuditValue.of("DRAFT"))),
                 List.of());
+    }
+
+    private static void seedRecentRoots(int count) {
+        List<Object[]> rows = new ArrayList<>(count);
+        Instant first = Instant.parse("2026-06-25T09:00:00Z");
+        for (int index = 0; index < count; index++) {
+            Instant occurredAt = first.plusSeconds(index);
+            rows.add(new Object[]{
+                    UUID.randomUUID(), "content.unpublished", "SYSTEM", null, null, null, "System",
+                    "publishing", "content_item", UUID.randomUUID(), null,
+                    Timestamp.from(occurredAt), Timestamp.from(CREATED_AT)
+            });
+        }
+        jdbc.batchUpdate("""
+                INSERT INTO audit.audit_records (
+                    id, action, actor_type, actor_context, actor_source_type, actor_id, actor_display,
+                    entity_context, entity_type, entity_id, request_id, occurred_at, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, rows);
     }
 }

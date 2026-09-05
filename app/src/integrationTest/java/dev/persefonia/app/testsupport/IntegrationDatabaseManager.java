@@ -2,7 +2,7 @@ package dev.persefonia.app.testsupport;
 
 import org.flywaydb.core.Flyway;
 
-/** Owns the one normal integration schema bootstrap and central reset lifecycle. */
+/** Owns the one normal integration schema bootstrap. */
 public final class IntegrationDatabaseManager {
     private static final IntegrationDatabaseResetManager RESET_MANAGER = new IntegrationDatabaseResetManager();
     private static boolean migrated;
@@ -10,7 +10,7 @@ public final class IntegrationDatabaseManager {
 
     private IntegrationDatabaseManager() {}
 
-    static synchronized void prepare(SharedPostgresTestServer.Database database, boolean created) {
+    static synchronized void prepare(SharedPostgresTestServer.Database database) {
         integrationDatabase = database;
         if (!migrated) {
             Flyway.configure()
@@ -23,7 +23,6 @@ public final class IntegrationDatabaseManager {
                     .migrate();
             migrated = true;
         }
-        if (!created || migrated) reset(database);
     }
 
     public static synchronized void reset(SharedPostgresTestServer.Database database) {

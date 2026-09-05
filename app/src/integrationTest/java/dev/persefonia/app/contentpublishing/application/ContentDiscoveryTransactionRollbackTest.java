@@ -83,15 +83,7 @@ class ContentDiscoveryTransactionRollbackTest {
     }
 
     @BeforeEach
-    void prepareDatabase() {        jdbc.execute("""
-                TRUNCATE discovery.redirect_rules,
-                    discovery.discoverable_resources,
-                    publishing.content_revisions,
-                    publishing.content_rendered_headings,
-                    publishing.content_render_snapshots,
-                    publishing.content_items
-                RESTART IDENTITY CASCADE
-                """);
+    void prepareDatabase() {
         discoveryScenario.reset();
     }
 

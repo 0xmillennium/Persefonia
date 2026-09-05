@@ -7,14 +7,11 @@ import dev.persefonia.profileportfolio.domain.common.ContentLanguage;
 import dev.persefonia.profileportfolio.domain.cv.ActiveCvProfile;
 import dev.persefonia.profileportfolio.domain.cv.CvDisplayLabel;
 import dev.persefonia.profileportfolio.domain.cv.MediaAssetId;
-import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.OptimisticLockingFailureException;
 
 class JdbcActiveCvProfileRepositoryAdapterTest extends PortfolioRepositoryTestDatabase {
-    private static final Instant NOW = Instant.parse("2026-06-18T10:00:00Z");
-
     @Test
     void loadsSeededSingleton() {
         ActiveCvProfile profile = activeCvProfiles.findSingleton().orElseThrow();
@@ -27,7 +24,7 @@ class JdbcActiveCvProfileRepositoryAdapterTest extends PortfolioRepositoryTestDa
     void savesSelections() {
         ActiveCvProfile profile = activeCvProfiles.findSingleton().orElseThrow();
         MediaAssetId assetId = MediaAssetId.from(UUID.randomUUID());
-        profile.selectDocument(ContentLanguage.EN, assetId, CvDisplayLabel.of("English CV"), NOW);
+        profile.selectDocument(ContentLanguage.EN, assetId, CvDisplayLabel.of("English CV"), after(profile));
 
         ActiveCvProfile saved = activeCvProfiles.save(profile);
 
@@ -39,10 +36,10 @@ class JdbcActiveCvProfileRepositoryAdapterTest extends PortfolioRepositoryTestDa
     @Test
     void replacesSelections() {
         ActiveCvProfile profile = activeCvProfiles.findSingleton().orElseThrow();
-        profile.selectDocument(ContentLanguage.EN, MediaAssetId.from(UUID.randomUUID()), null, NOW);
+        profile.selectDocument(ContentLanguage.EN, MediaAssetId.from(UUID.randomUUID()), null, after(profile));
         ActiveCvProfile saved = activeCvProfiles.save(profile);
         MediaAssetId replacement = MediaAssetId.from(UUID.randomUUID());
-        saved.selectDocument(ContentLanguage.EN, replacement, null, NOW.plusSeconds(1));
+        saved.selectDocument(ContentLanguage.EN, replacement, null, after(saved));
 
         ActiveCvProfile reloaded = activeCvProfiles.save(saved);
 
@@ -53,9 +50,9 @@ class JdbcActiveCvProfileRepositoryAdapterTest extends PortfolioRepositoryTestDa
     @Test
     void clearsSelection() {
         ActiveCvProfile profile = activeCvProfiles.findSingleton().orElseThrow();
-        profile.selectDocument(ContentLanguage.EN, MediaAssetId.from(UUID.randomUUID()), null, NOW);
+        profile.selectDocument(ContentLanguage.EN, MediaAssetId.from(UUID.randomUUID()), null, after(profile));
         ActiveCvProfile saved = activeCvProfiles.save(profile);
-        saved.removeDocument(ContentLanguage.EN, NOW.plusSeconds(1));
+        saved.removeDocument(ContentLanguage.EN, after(saved));
 
         ActiveCvProfile reloaded = activeCvProfiles.save(saved);
 
@@ -66,9 +63,9 @@ class JdbcActiveCvProfileRepositoryAdapterTest extends PortfolioRepositoryTestDa
     void optimisticVersionConflictFails() {
         ActiveCvProfile first = activeCvProfiles.findSingleton().orElseThrow();
         ActiveCvProfile second = activeCvProfiles.findSingleton().orElseThrow();
-        first.selectDocument(ContentLanguage.EN, MediaAssetId.from(UUID.randomUUID()), null, NOW);
+        first.selectDocument(ContentLanguage.EN, MediaAssetId.from(UUID.randomUUID()), null, after(first));
         activeCvProfiles.save(first);
-        second.selectDocument(ContentLanguage.TR, MediaAssetId.from(UUID.randomUUID()), null, NOW);
+        second.selectDocument(ContentLanguage.TR, MediaAssetId.from(UUID.randomUUID()), null, after(second));
 
         assertThatThrownBy(() -> activeCvProfiles.save(second))
                 .isInstanceOf(OptimisticLockingFailureException.class);
@@ -78,10 +75,14 @@ class JdbcActiveCvProfileRepositoryAdapterTest extends PortfolioRepositoryTestDa
     void doesNotRequireMediaForeignKey() {
         ActiveCvProfile profile = activeCvProfiles.findSingleton().orElseThrow();
         MediaAssetId nonexistentMediaAssetId = MediaAssetId.from(UUID.randomUUID());
-        profile.selectDocument(ContentLanguage.EN, nonexistentMediaAssetId, null, NOW);
+        profile.selectDocument(ContentLanguage.EN, nonexistentMediaAssetId, null, after(profile));
 
         ActiveCvProfile saved = activeCvProfiles.save(profile);
 
         assertThat(saved.documentFor(ContentLanguage.EN).orElseThrow().mediaAssetId()).isEqualTo(nonexistentMediaAssetId);
+    }
+
+    private static java.time.Instant after(ActiveCvProfile profile) {
+        return profile.updatedAt().plusSeconds(1);
     }
 }

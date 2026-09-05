@@ -19,7 +19,6 @@ import dev.persefonia.contentpublishing.domain.revision.port.ContentRevisionRepo
 import dev.persefonia.identityaccess.domain.admin.AdminRole;
 import java.util.List;
 import java.util.Optional;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -60,16 +59,6 @@ class AdminContentLifecycleTransactionIntegrationTest {
         registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
         registry.add("spring.datasource.username", POSTGRES::getUsername);
         registry.add("spring.datasource.password", POSTGRES::getPassword);
-    }
-
-    @BeforeEach
-    void prepareDatabase() {        jdbc.execute("""
-                TRUNCATE publishing.content_revisions,
-                    publishing.content_rendered_headings,
-                    publishing.content_render_snapshots,
-                    publishing.content_items
-                RESTART IDENTITY CASCADE
-                """);
     }
 
     @Test

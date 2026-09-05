@@ -15,48 +15,23 @@ import dev.persefonia.discovery.domain.RedirectRuleId;
 import dev.persefonia.discovery.domain.RedirectRuleRepository;
 import dev.persefonia.identityaccess.application.admin.authorization.AdminCommandAuthorizationException;
 import java.util.UUID;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
 import org.springframework.aop.support.AopUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.support.TransactionTemplate;
-import dev.persefonia.app.testsupport.SharedPostgresTestServer;
+import dev.persefonia.app.testsupport.SharedPostgresSpringIntegrationTest;
 
-@SpringBootTest(properties = {
-        "management.server.port=0",
-        "management.health.redis.enabled=false"
-})
-@ActiveProfiles("test")
-class TransactionalAdminRedirectCommandGatewayTest {
+class TransactionalAdminRedirectCommandGatewayTest extends SharedPostgresSpringIntegrationTest {
     private static final AdminRedirectCommandActor OWNER = new AdminRedirectCommandActor(
             UUID.fromString("11111111-1111-1111-1111-111111111111"), true, true);
-    private static final SharedPostgresTestServer.Database POSTGRES = postgresContainer();
-    private static boolean migrated;
 
     @Autowired AdminRedirectCommandGateway gateway;
     @Autowired RedirectRuleRepository redirects;
     @Autowired JdbcTemplate jdbc;
     @Autowired TransactionTemplate transactions;
-
-    @DynamicPropertySource
-    static void datasourceProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
-        registry.add("spring.datasource.username", POSTGRES::getUsername);
-        registry.add("spring.datasource.password", POSTGRES::getPassword);
-    }
-
-    @BeforeEach
-    void resetDatabase() {
-        migrateOnce();
-        jdbc.execute("TRUNCATE discovery.redirect_rules, discovery.discoverable_resources, audit.audit_records CASCADE");
-    }
 
     @Test
     void gatewayImplementsFrameworkFreeContractAndBothMutationsAreTransactionallyProxied() {
@@ -175,17 +150,4 @@ class TransactionalAdminRedirectCommandGatewayTest {
                 RedirectStatusCode.MOVED_PERMANENTLY_301);
     }
 
-    private static synchronized void migrateOnce() {
-        if (migrated) {
-            return;
-        }        migrated = true;
-    }
-
-    private static SharedPostgresTestServer.Database postgresContainer() {
-        SharedPostgresTestServer.Database postgres = SharedPostgresTestServer.integrationDatabase();
-        postgres.withDatabaseName("persefonia_redirect_command_gateway");
-        postgres.withUsername("persefonia");
-        postgres.withPassword("persefonia_dev");
-        return postgres;
-    }
 }
