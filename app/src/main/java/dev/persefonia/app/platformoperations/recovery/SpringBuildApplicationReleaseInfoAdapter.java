@@ -10,6 +10,8 @@ import org.springframework.stereotype.Component;
 
 @Component
 public final class SpringBuildApplicationReleaseInfoAdapter implements ApplicationReleaseInfoQueryPort {
+    private static final String UNKNOWN_VERSION = "UNKNOWN";
+
     private final ObjectProvider<BuildProperties> buildProperties;
     private final Environment environment;
 
@@ -23,10 +25,11 @@ public final class SpringBuildApplicationReleaseInfoAdapter implements Applicati
     public ApplicationReleaseInfo releaseInfo() {
         BuildProperties build = buildProperties.getIfAvailable();
         String name = environment.getProperty("spring.application.name", "persefonia");
-        String version = build == null
-                ? SpringBuildApplicationReleaseInfoAdapter.class.getPackage().getImplementationVersion()
-                : build.getVersion();
-        if (version == null || version.isBlank()) version = "0.1.0-SNAPSHOT";
+        String version = build == null ? null : build.getVersion();
+        if (version == null || version.isBlank()) {
+            version = SpringBuildApplicationReleaseInfoAdapter.class.getPackage().getImplementationVersion();
+        }
+        if (version == null || version.isBlank()) version = UNKNOWN_VERSION;
         return new ApplicationReleaseInfo(name, version);
     }
 }

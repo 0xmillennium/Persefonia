@@ -11,19 +11,30 @@ import org.springframework.mock.env.MockEnvironment;
 
 class SpringBuildApplicationReleaseInfoAdapterTest {
     @Test
-    void mapsOnlySafeApplicationNameAndSnapshotVersion() {
+    void mapsOnlySafeApplicationNameAndBuildVersion() {
         @SuppressWarnings("unchecked")
         ObjectProvider<BuildProperties> provider = mock(ObjectProvider.class);
         var properties = new java.util.Properties();
         properties.setProperty("name", "persefonia");
-        properties.setProperty("version", "0.1.0-SNAPSHOT");
+        properties.setProperty("version", "0.1.0");
         properties.setProperty("time", "2026-09-04T00:00:00Z");
         when(provider.getIfAvailable()).thenReturn(new BuildProperties(properties));
 
         var info = new SpringBuildApplicationReleaseInfoAdapter(provider, new MockEnvironment()).releaseInfo();
 
         assertThat(info.applicationName()).isEqualTo("persefonia");
-        assertThat(info.applicationVersion()).isEqualTo("0.1.0-SNAPSHOT");
+        assertThat(info.applicationVersion()).isEqualTo("0.1.0");
         assertThat(info.toString()).doesNotContain("time", "path", "environment");
+    }
+
+    @Test
+    void usesUnknownWhenBuildAndPackageVersionsAreUnavailable() {
+        @SuppressWarnings("unchecked")
+        ObjectProvider<BuildProperties> provider = mock(ObjectProvider.class);
+        when(provider.getIfAvailable()).thenReturn(null);
+
+        var info = new SpringBuildApplicationReleaseInfoAdapter(provider, new MockEnvironment()).releaseInfo();
+
+        assertThat(info.applicationVersion()).isEqualTo("UNKNOWN");
     }
 }

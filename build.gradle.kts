@@ -6,7 +6,7 @@ import org.gradle.api.tasks.testing.Test
 
 allprojects {
     group = "dev.persefonia"
-    version = "0.1.0-SNAPSHOT"
+    version = "0.1.0"
 
     repositories {
         mavenCentral()

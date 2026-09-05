@@ -1,0 +1,11 @@
+*
+!docker/
+docker/*
+!docker/Dockerfile
+!app/
+app/*
+!app/build/
+app/build/*
+!app/build/libs/
+app/build/libs/*
+!app/build/libs/persefonia.jar

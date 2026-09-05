@@ -29,7 +29,7 @@ class AdminOperationsTestConfiguration {
         int contextCalls;
         int verifyCalls;
         private final RecoveryVerificationContext context = new RecoveryVerificationContext(
-                new ApplicationReleaseInfo("persefonia", "0.1.0-SNAPSHOT"),
+                new ApplicationReleaseInfo("persefonia", "0.1.0"),
                 new MigrationStatusSummary("21", "21", 0, MigrationStatus.UP_TO_DATE),
                 OperationsComponentStatus.UP);
         @Override public RecoveryVerificationContext context() { contextCalls++; return context; }

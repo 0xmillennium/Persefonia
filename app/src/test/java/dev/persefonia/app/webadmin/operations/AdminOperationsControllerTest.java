@@ -46,7 +46,7 @@ class AdminOperationsControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", allOf(containsString("no-store"), containsString("private"))))
                 .andExpect(content().string(containsString("noindex,nofollow,noarchive")))
-                .andExpect(content().string(containsString("0.1.0-SNAPSHOT")))
+                .andExpect(content().string(containsString("0.1.0")))
                 .andExpect(content().string(containsString("PostgreSQL business metadata together with durable Media storage")))
                 .andExpect(content().string(containsString("does not prove that external backups were captured from the same recovery point")))
                 .andExpect(content().string(containsString("Deep verification has not been run")));

@@ -28,7 +28,7 @@ class RecoveryVerificationCoordinatorTest {
 
         assertThat(report.status()).isEqualTo(RecoveryVerificationStatus.CONSISTENT);
         assertThat(report.generatedAt()).isEqualTo(NOW);
-        assertThat(report.context().release().applicationVersion()).isEqualTo("0.1.0-SNAPSHOT");
+        assertThat(report.context().release().applicationVersion()).isEqualTo("0.1.0");
     }
 
     @Test
@@ -63,7 +63,7 @@ class RecoveryVerificationCoordinatorTest {
             OperationsComponentStatus mediaStatus,
             MediaRecoveryConsistencyReport mediaReport,
             DurableAssetReferenceIntegritySummary references) {
-        ApplicationReleaseInfoQueryPort release = () -> new ApplicationReleaseInfo("persefonia", "0.1.0-SNAPSHOT");
+        ApplicationReleaseInfoQueryPort release = () -> new ApplicationReleaseInfo("persefonia", "0.1.0");
         OperationsHealthQueryPort health = () -> new OperationsHealthSnapshot(
                 OperationsComponentStatus.UP, OperationsComponentStatus.UP, OperationsComponentStatus.DOWN,
                 mediaStatus, CachePurgeProvider.CLOUDFLARE, OperationsComponentStatus.DOWN,

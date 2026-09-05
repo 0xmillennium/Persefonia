@@ -197,8 +197,15 @@ tasks.test {
 
 tasks.named<BootJar>("bootJar") {
     dependsOn("precompileJte")
+    archiveFileName.set("persefonia.jar")
+    isPreserveFileTimestamps = false
+    isReproducibleFileOrder = true
     from(precompiledJteDirectory) {
         include("**/*.class")
         into("BOOT-INF/classes")
     }
+}
+
+tasks.named("jar") {
+    enabled = false
 }

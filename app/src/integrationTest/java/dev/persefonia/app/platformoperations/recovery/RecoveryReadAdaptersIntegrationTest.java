@@ -156,7 +156,7 @@ class RecoveryReadAdaptersIntegrationTest {
                 OperationsComponentStatus.UP, CachePurgeProvider.LOCAL, OperationsComponentStatus.UP,
                 new MigrationStatusSummary("21", "21", 0, MigrationStatus.UP_TO_DATE));
         var coordinator = new RecoveryVerificationCoordinator(
-                () -> new ApplicationReleaseInfo("persefonia", "0.1.0-SNAPSHOT"), health, mediaProvider,
+                () -> new ApplicationReleaseInfo("persefonia", "0.1.0"), health, mediaProvider,
                 new JdbcDurableAssetReferenceIntegrityReadAdapter(provider()),
                 Clock.fixed(Instant.parse("2026-09-04T12:00:00Z"), ZoneOffset.UTC));
 
