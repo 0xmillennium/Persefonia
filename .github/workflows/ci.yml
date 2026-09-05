@@ -52,6 +52,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up Temurin Java 25
         uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
@@ -67,7 +69,9 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@67621b124fd2e251c5e8a0e6e3b91318f2287669 # v6.3.0
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        with:
+          cache-provider: basic
 
       - name: Show build environment
         run: |
@@ -89,28 +93,8 @@ jobs:
       - name: Verify build did not modify tracked files
         run: git diff --exit-code
 
-      - name: Verify BootJar identity and checksum
-        run: |
-          bootjar=app/build/libs/persefonia.jar
-          artifact_directory=app/build/ci
-
-          test -f "$bootjar"
-          test -s "$bootjar"
-
-          build_info=$(mktemp)
-          trap 'rm -f "$build_info"' EXIT
-          unzip -p "$bootjar" META-INF/build-info.properties > "$build_info"
-          grep -Fx 'build.name=persefonia' "$build_info"
-          grep -Fx 'build.version=0.1.0' "$build_info"
-
-          rm -rf "$artifact_directory"
-          mkdir -p "$artifact_directory"
-          cp "$bootjar" "$artifact_directory/persefonia.jar"
-          (
-            cd "$artifact_directory"
-            sha256sum persefonia.jar > persefonia.jar.sha256
-            sha256sum --check persefonia.jar.sha256
-          )
+      - name: Verify BootJar
+        run: ./scripts/ci/verify-bootjar.sh app/build/libs/persefonia.jar app/build/ci
 
       - name: Set up Temurin Java 21
         uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0

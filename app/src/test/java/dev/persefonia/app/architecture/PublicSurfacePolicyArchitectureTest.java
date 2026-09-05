@@ -27,6 +27,7 @@ class PublicSurfacePolicyArchitectureTest {
             "@(?:GetMapping|PostMapping|RequestMapping)\\s*\\(([^)]*)\\)", Pattern.DOTALL);
     private static final Pattern ROUTE_LITERAL = Pattern.compile("\"([^\"]+)\"");
     private static final List<Path> APPROVED_CI_SCRIPTS = List.of(
+            Path.of("../scripts/ci/verify-bootjar.sh"),
             Path.of("../scripts/ci/verify-compose.sh"),
             Path.of("../scripts/ci/verify-java21-runtime.sh"));
 

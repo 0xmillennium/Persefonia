@@ -30,12 +30,25 @@ export SERVER_PORT="${SERVER_PORT:-8080}"
 export PERSEFONIA_MANAGEMENT_ADDRESS="${PERSEFONIA_MANAGEMENT_ADDRESS:-127.0.0.1}"
 export PERSEFONIA_MANAGEMENT_PORT="${PERSEFONIA_MANAGEMENT_PORT:-9001}"
 
+startup_timeout_seconds=120
+termination_grace_seconds=10
 java_pid=
 cleanup() {
   status=$?
   trap - EXIT
   if [[ -n "$java_pid" ]] && kill -0 "$java_pid" 2>/dev/null; then
-    kill -TERM "$java_pid"
+    kill -TERM "$java_pid" 2>/dev/null || true
+    termination_deadline=$((SECONDS + termination_grace_seconds))
+    while kill -0 "$java_pid" 2>/dev/null && [[ "$SECONDS" -lt "$termination_deadline" ]]; do
+      sleep 1
+    done
+    if kill -0 "$java_pid" 2>/dev/null; then
+      echo "Java application did not terminate within ${termination_grace_seconds} seconds; sending SIGKILL." >&2
+      kill -KILL "$java_pid" 2>/dev/null || true
+      if [[ "$status" -eq 0 ]]; then
+        status=1
+      fi
+    fi
     wait "$java_pid" || true
   fi
   if [[ "$status" -ne 0 && -f "$runtime_log" ]]; then
@@ -52,7 +65,7 @@ echo "Starting checksum-verified BootJar."
 java -jar "$bootjar" > "$runtime_log" 2>&1 &
 java_pid=$!
 
-deadline=$((SECONDS + 120))
+deadline=$((SECONDS + startup_timeout_seconds))
 while [[ "$SECONDS" -lt "$deadline" ]]; do
   if ! kill -0 "$java_pid" 2>/dev/null; then
     echo "Java 21 application exited before readiness" >&2
@@ -65,8 +78,11 @@ while [[ "$SECONDS" -lt "$deadline" ]]; do
   sleep 2
 done
 
-curl --fail --silent --show-error \
-  "http://${PERSEFONIA_MANAGEMENT_ADDRESS}:${PERSEFONIA_MANAGEMENT_PORT}/actuator/health/readiness" >/dev/null
+if ! curl --fail --silent \
+  "http://${PERSEFONIA_MANAGEMENT_ADDRESS}:${PERSEFONIA_MANAGEMENT_PORT}/actuator/health/readiness" >/dev/null; then
+  echo "Application did not become ready within ${startup_timeout_seconds} seconds." >&2
+  exit 1
+fi
 echo "Readiness endpoint verified."
 curl --fail --silent --show-error "http://127.0.0.1:${SERVER_PORT}/robots.txt" >/dev/null
 echo "Public /robots.txt smoke verified."
