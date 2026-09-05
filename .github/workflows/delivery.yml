@@ -1,0 +1,251 @@
+name: Delivery
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+    branches:
+      - master
+    types:
+      - completed
+
+permissions: {}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  publish-candidate:
+    name: Publish candidate
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'master' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.head_repository.fork == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
+      packages: write
+      attestations: write
+      id-token: write
+    outputs:
+      source_sha: ${{ steps.candidate.outputs.source_sha }}
+      image_name: ${{ steps.candidate.outputs.image_name }}
+      image_digest: ${{ steps.build.outputs.digest }}
+      source_url: ${{ steps.candidate.outputs.source_url }}
+      application_version: ${{ steps.candidate.outputs.application_version }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+
+      - name: Assert checked out source
+        env:
+          EXPECTED_SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
+
+      - name: Define candidate identity
+        id: candidate
+        env:
+          SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+          SOURCE_URL: ${{ github.server_url }}/${{ github.repository }}
+        run: |
+          image_name="ghcr.io/${GITHUB_REPOSITORY,,}"
+          printf 'source_sha=%s\n' "$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+          printf 'image_name=%s\n' "$image_name" >> "$GITHUB_OUTPUT"
+          printf 'source_url=%s\n' "$SOURCE_URL" >> "$GITHUB_OUTPUT"
+          printf 'application_version=0.1.0\n' >> "$GITHUB_OUTPUT"
+
+      - name: Download verified BootJar
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          name: persefonia-bootjar-${{ github.event.workflow_run.head_sha }}
+          path: delivery-input
+          run-id: ${{ github.event.workflow_run.id }}
+          repository: ${{ github.repository }}
+          github-token: ${{ github.token }}
+
+      - name: Verify and stage CI BootJar
+        run: |
+          sha256sum --check delivery-input/persefonia.jar.sha256
+          ./scripts/ci/verify-bootjar.sh delivery-input/persefonia.jar app/build/libs
+          sha256sum --check app/build/libs/persefonia.jar.sha256
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+
+      - name: Verify pinned runtime and service platform support
+        run: |
+          runtime_base=$(sed -nE 's/^FROM ([^[:space:]]+).*/\1/p' docker/Dockerfile)
+          test -n "$runtime_base"
+          ./scripts/release/verify-image-platforms.sh "$runtime_base" docker/supported-platforms.txt contains
+          ./scripts/release/verify-image-platforms.sh postgres:17.11-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73 docker/supported-platforms.txt contains
+          ./scripts/release/verify-image-platforms.sh redis:8.10-alpine@sha256:becdda6c7f4b3fb42e42fd7f120bbf5c54c4caaaf16f26da24e4563d2c1f0576 docker/supported-platforms.txt contains
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3.5.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Publish digest-only candidate
+        id: build
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          pull: true
+          outputs: type=image,name=${{ steps.candidate.outputs.image_name }},push=true,push-by-digest=true,name-canonical=true
+          build-args: |
+            OCI_SOURCE=${{ steps.candidate.outputs.source_url }}
+            OCI_REVISION=${{ steps.candidate.outputs.source_sha }}
+            OCI_VERSION=${{ steps.candidate.outputs.application_version }}
+          sbom: true
+          provenance: mode=max
+
+      - name: Verify published runtime platforms
+        run: |
+          ./scripts/release/verify-image-platforms.sh "${{ steps.candidate.outputs.image_name }}@${{ steps.build.outputs.digest }}" docker/supported-platforms.txt
+
+      - name: Attest candidate provenance
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-name: ${{ steps.candidate.outputs.image_name }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+          create-storage-record: false
+
+  verify-candidate:
+    name: Verify candidate (${{ matrix.platform }})
+    needs: publish-candidate
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: read
+      attestations: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-24.04
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.publish-candidate.outputs.source_sha }}
+          persist-credentials: false
+
+      - name: Assert checked out source
+        env:
+          EXPECTED_SOURCE_SHA: ${{ needs.publish-candidate.outputs.source_sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
+
+      - name: Assert native runner architecture
+        run: |
+          case "${{ matrix.platform }}:$(uname -m)" in
+            linux/amd64:x86_64|linux/arm64:aarch64) ;;
+            *) echo "Runner does not match required native platform ${{ matrix.platform }}." >&2; exit 1 ;;
+          esac
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3.5.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Verify registry artifact and supply-chain evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ./scripts/release/verify-container-image.sh \
+            "${{ needs.publish-candidate.outputs.image_name }}@${{ needs.publish-candidate.outputs.image_digest }}" \
+            "${{ matrix.platform }}" \
+            docker/supported-platforms.txt \
+            "${{ needs.publish-candidate.outputs.source_url }}" \
+            "${{ needs.publish-candidate.outputs.source_sha }}" \
+            "${{ needs.publish-candidate.outputs.application_version }}"
+
+      - name: Run native candidate smoke
+        run: |
+          ./scripts/release/smoke-container-image.sh \
+            "${{ needs.publish-candidate.outputs.image_name }}@${{ needs.publish-candidate.outputs.image_digest }}" \
+            "${{ matrix.platform }}"
+
+  publish-source-alias:
+    name: Publish source alias
+    needs:
+      - publish-candidate
+      - verify-candidate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Check out verification utilities
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.publish-candidate.outputs.source_sha }}
+          persist-credentials: false
+
+      - name: Assert checked out source
+        env:
+          EXPECTED_SOURCE_SHA: ${{ needs.publish-candidate.outputs.source_sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3.5.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Publish write-once source alias
+        run: |
+          ./scripts/release/publish-source-alias.sh \
+            "${{ needs.publish-candidate.outputs.image_name }}" \
+            "${{ needs.publish-candidate.outputs.image_digest }}" \
+            "${{ needs.publish-candidate.outputs.source_sha }}"
+
+      - name: Write delivery summary
+        run: |
+          image="${{ needs.publish-candidate.outputs.image_name }}"
+          digest="${{ needs.publish-candidate.outputs.image_digest }}"
+          manifest=$(docker buildx imagetools inspect --raw "$image@$digest")
+          amd64=$(jq -r '.manifests[] | select(.platform.os == "linux" and .platform.architecture == "amd64") | .digest' <<< "$manifest")
+          arm64=$(jq -r '.manifests[] | select(.platform.os == "linux" and .platform.architecture == "arm64") | .digest' <<< "$manifest")
+          cat >> "$GITHUB_STEP_SUMMARY" <<EOF
+          ## Delivery
+
+          | Field | Value |
+          |---|---|
+          | Source commit | ${{ needs.publish-candidate.outputs.source_sha }} |
+          | Canonical repository URL | ${{ needs.publish-candidate.outputs.source_url }} |
+          | Supported platforms | linux/amd64, linux/arm64 |
+          | Application version | ${{ needs.publish-candidate.outputs.application_version }} |
+          | Canonical image name | $image |
+          | Top-level OCI index digest | $digest |
+          | linux/amd64 child digest | $amd64 |
+          | linux/arm64 child digest | $arm64 |
+          | Source alias | $image:sha-${{ needs.publish-candidate.outputs.source_sha }} |
+          | BuildKit SBOM | verified on both platforms |
+          | BuildKit provenance | verified on both platforms |
+          | GitHub signed provenance | verified |
+          | Native runtime | linux/amd64 and linux/arm64 passed |
+          EOF

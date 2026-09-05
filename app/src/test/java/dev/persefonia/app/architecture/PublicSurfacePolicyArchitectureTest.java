@@ -26,10 +26,14 @@ class PublicSurfacePolicyArchitectureTest {
     private static final Pattern ROUTE_ANNOTATION = Pattern.compile(
             "@(?:GetMapping|PostMapping|RequestMapping)\\s*\\(([^)]*)\\)", Pattern.DOTALL);
     private static final Pattern ROUTE_LITERAL = Pattern.compile("\"([^\"]+)\"");
-    private static final List<Path> APPROVED_CI_SCRIPTS = List.of(
+    private static final List<Path> APPROVED_AUTOMATION_SCRIPTS = List.of(
             Path.of("../scripts/ci/verify-bootjar.sh"),
             Path.of("../scripts/ci/verify-compose.sh"),
-            Path.of("../scripts/ci/verify-java21-runtime.sh"));
+            Path.of("../scripts/ci/verify-java21-runtime.sh"),
+            Path.of("../scripts/release/verify-image-platforms.sh"),
+            Path.of("../scripts/release/verify-container-image.sh"),
+            Path.of("../scripts/release/smoke-container-image.sh"),
+            Path.of("../scripts/release/publish-source-alias.sh"));
 
     @Test
     void exposesExactCrawlerRoutesAndNoRssAtomOrWildcardRoutes() throws Exception {
@@ -71,7 +75,7 @@ class PublicSurfacePolicyArchitectureTest {
     }
 
     @Test
-    void allowsOnlyApprovedCommittedCiScripts() throws Exception {
+    void allowsOnlyApprovedCommittedAutomationScripts() throws Exception {
         assertThat(Path.of("../docs/architecture")).doesNotExist();
         assertThat(Path.of("../docs/verification")).doesNotExist();
         assertThat(Path.of("../docs/testing")).doesNotExist();
@@ -83,7 +87,7 @@ class PublicSurfacePolicyArchitectureTest {
         if (Files.exists(scripts)) {
             try (Stream<Path> paths = Files.walk(scripts, 2)) {
                 assertThat(paths.filter(Files::isRegularFile).toList())
-                        .containsExactlyInAnyOrderElementsOf(APPROVED_CI_SCRIPTS);
+                        .containsExactlyInAnyOrderElementsOf(APPROVED_AUTOMATION_SCRIPTS);
             }
         }
     }

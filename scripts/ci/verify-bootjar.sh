@@ -47,10 +47,11 @@ if ! grep -Fx 'build.version=0.1.0' "$build_info" >/dev/null; then
 fi
 
 source_sha=$(sha256sum "$source_bootjar" | awk '{print $1}')
-rm -rf -- "$artifact_directory"
 mkdir -p "$artifact_directory"
 
 staged_bootjar="$artifact_directory/persefonia.jar"
+staged_checksum="$artifact_directory/persefonia.jar.sha256"
+rm -f -- "$staged_bootjar" "$staged_checksum"
 cp -- "$source_bootjar" "$staged_bootjar"
 staged_sha=$(sha256sum "$staged_bootjar" | awk '{print $1}')
 if [[ "$source_sha" != "$staged_sha" ]]; then
@@ -58,7 +59,7 @@ if [[ "$source_sha" != "$staged_sha" ]]; then
   exit 1
 fi
 
-printf '%s  %s\n' "$staged_sha" persefonia.jar > "$artifact_directory/persefonia.jar.sha256"
+printf '%s  %s\n' "$staged_sha" persefonia.jar > "$staged_checksum"
 (
   cd "$artifact_directory"
   sha256sum --check persefonia.jar.sha256
