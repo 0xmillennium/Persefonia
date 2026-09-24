@@ -26,8 +26,8 @@ if [[ ! "$expected_source_sha" =~ ^[a-f0-9]{40}$ ]]; then
   echo "Expected source SHA must be a full lowercase 40-character Git SHA." >&2
   exit 1
 fi
-if ! command -v docker >/dev/null || ! command -v jq >/dev/null || ! command -v curl >/dev/null || ! command -v gh >/dev/null; then
-  echo "docker, jq, curl, and gh are required for candidate verification." >&2
+if ! command -v docker >/dev/null || ! command -v jq >/dev/null || ! command -v curl >/dev/null || ! command -v gh >/dev/null || ! command -v base64 >/dev/null || ! command -v sha256sum >/dev/null; then
+  echo "docker, jq, curl, gh, base64, and sha256sum are required for candidate verification." >&2
   exit 1
 fi
 
@@ -40,49 +40,146 @@ if [[ "$registry" != ghcr.io ]]; then
   exit 1
 fi
 
-resolved_index_digest=$(docker buildx imagetools inspect "$image_reference" --format '{{.Digest}}')
-if [[ "$resolved_index_digest" != "$index_digest" ]]; then
-  echo "Registry-resolved top-level digest does not match the requested candidate digest: expected $index_digest, got $resolved_index_digest." >&2
+docker_config=${DOCKER_CONFIG:-"$HOME/.docker"}/config.json
+if [[ ! -f "$docker_config" ]]; then
+  echo "Docker login credentials are unavailable for $registry." >&2
   exit 1
 fi
-echo "Registry-resolved top-level digest verified: $resolved_index_digest"
-
-"$(dirname "$0")/verify-image-platforms.sh" "$image_reference" "$supported_platforms_file"
-
-docker_config=${DOCKER_CONFIG:-"$HOME/.docker"}/config.json
-registry_auth=
-if [[ -f "$docker_config" ]]; then
-  registry_auth=$(jq -r --arg registry "$registry" '.auths[$registry].auth // empty' "$docker_config")
+registry_auth=$(jq -r --arg registry "$registry" '.auths[$registry].auth // empty' "$docker_config")
+if [[ -z "$registry_auth" ]] || ! registry_credentials=$(printf '%s' "$registry_auth" | base64 --decode 2>/dev/null) || [[ "$registry_credentials" != *:* ]]; then
+  echo "Docker login credentials are unavailable or invalid for $registry." >&2
+  exit 1
 fi
 
-registry_token=
-registry_get() {
-  local path=$1 accept=${2:-application/vnd.oci.image.manifest.v1+json}
-  local url="https://${registry}/v2/${repository}/${path}" response
-  if [[ -n "$registry_auth" ]]; then
-    response=$(curl --fail --silent --show-error --location --header "Accept: ${accept}" --header "Authorization: Basic ${registry_auth}" "$url")
-  else
-    if [[ -z "$registry_token" ]]; then
-      local headers realm service
-      headers=$(mktemp)
-      curl --silent --show-error --output /dev/null --dump-header "$headers" --header "Accept: ${accept}" "$url" || true
-      realm=$(sed -nE 's/^[Ww][Ww][Ww]-[Aa]uthenticate: Bearer realm="([^"]+)".*/\1/p' "$headers" | tr -d '\r' | head -n 1)
-      service=$(sed -nE 's/^[Ww][Ww][Ww]-[Aa]uthenticate: Bearer .*service="([^"]+)".*/\1/p' "$headers" | tr -d '\r' | head -n 1)
-      rm -f "$headers"
-      if [[ -z "$realm" ]]; then
-        echo "Could not obtain registry authentication challenge for $image_name." >&2
-        return 1
-      fi
-      registry_token=$(curl --fail --silent --show-error --get --data-urlencode "service=${service}" --data-urlencode "scope=repository:${repository}:pull" "$realm" | jq -r '.token // .access_token // empty')
-      if [[ -z "$registry_token" ]]; then
-        echo "Registry did not issue a pull token for $image_name." >&2
-        return 1
-      fi
-    fi
-    response=$(curl --fail --silent --show-error --location --header "Accept: ${accept}" --header "Authorization: Bearer ${registry_token}" "$url")
+registry_tmpdir=$(mktemp -d)
+trap 'rm -f -- "$registry_tmpdir/headers" "$registry_tmpdir/body"; rmdir -- "$registry_tmpdir"' EXIT
+registry_status=
+registry_digest=
+registry_body=
+registry_request() {
+  local method=$1 path=$2 accept=$3
+  local url="https://${registry}/v2/${repository}/${path}"
+  local headers body challenge realm service scope token response
+  local -a curl_options=(--silent --show-error --location --max-time 30 --dump-header)
+  headers="$registry_tmpdir/headers"
+  body="$registry_tmpdir/body"
+  curl_options+=("$headers" --output "$body" --header "Accept: $accept")
+  if [[ "$method" == HEAD ]]; then
+    curl_options+=(--head)
   fi
-  printf '%s' "$response"
+  if ! registry_status=$(curl "${curl_options[@]}" --write-out '%{http_code}' "$url"); then
+    rm -f -- "$headers" "$body"
+    echo "Registry $method request failed for $path." >&2
+    return 1
+  fi
+  if [[ "$registry_status" == 401 ]]; then
+    challenge=$(awk 'tolower($1) == "www-authenticate:" {sub(/\r$/, ""); print substr($0, index($0, $2))}' "$headers" | tail -n 1)
+    if [[ "$challenge" != Bearer\ * ]] || [[ ! "$challenge" =~ realm=\"([^\"]+)\" ]]; then
+      rm -f -- "$headers" "$body"
+      echo "Registry did not provide a valid Bearer challenge for $path." >&2
+      return 1
+    fi
+    realm=${BASH_REMATCH[1]}
+    if [[ ! "$challenge" =~ service=\"([^\"]+)\" ]]; then
+      rm -f -- "$headers" "$body"
+      echo "Registry Bearer challenge has no service for $path." >&2
+      return 1
+    fi
+    service=${BASH_REMATCH[1]}
+    if [[ ! "$challenge" =~ scope=\"([^\"]+)\" ]]; then
+      rm -f -- "$headers" "$body"
+      echo "Registry Bearer challenge has no scope for $path." >&2
+      return 1
+    fi
+    scope=${BASH_REMATCH[1]}
+    if [[ "$realm" != "https://${registry}/"* || "$service" != "$registry" || "$scope" != "repository:${repository}:pull" ]]; then
+      rm -f -- "$headers" "$body"
+      echo "Registry Bearer challenge is outside the expected repository pull scope." >&2
+      return 1
+    fi
+    if ! response=$(curl --fail --silent --show-error --max-time 30 --get --user "$registry_credentials" --data-urlencode "service=$service" --data-urlencode "scope=$scope" "$realm"); then
+      rm -f -- "$headers" "$body"
+      echo "Registry token request failed for $path." >&2
+      return 1
+    fi
+    if ! token=$(jq -er '.token // .access_token | select(type == "string" and length > 0)' <<< "$response"); then
+      rm -f -- "$headers" "$body"
+      echo "Registry token response was invalid for $path." >&2
+      return 1
+    fi
+    if ! registry_status=$(curl "${curl_options[@]}" --header "Authorization: Bearer $token" --write-out '%{http_code}' "$url"); then
+      rm -f -- "$headers" "$body"
+      echo "Authenticated registry $method request failed for $path." >&2
+      return 1
+    fi
+  fi
+  registry_digest=$(awk 'tolower($1) == "docker-content-digest:" {gsub(/\r/, "", $2); print $2}' "$headers")
+  registry_body=$body
+  rm -f -- "$headers"
 }
+
+registry_head() {
+  if ! registry_request HEAD "$1" 'application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json'; then
+    return 1
+  fi
+  rm -f -- "$registry_body"
+  registry_body=
+}
+
+verify_sha256_body() {
+  local expected=$1 body_file=$2 actual
+  if [[ ! "$expected" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+    echo "Requested registry digest is malformed: $expected" >&2
+    return 1
+  fi
+  if ! actual=$(sha256sum -- "$body_file"); then
+    echo "Could not hash registry response body for $expected." >&2
+    return 1
+  fi
+  actual=${actual%% *}
+  if [[ "sha256:$actual" != "$expected" ]]; then
+    echo "Registry response body does not match requested digest $expected." >&2
+    return 1
+  fi
+}
+
+registry_get() {
+  local path=$1 accept=${2:-application/vnd.oci.image.manifest.v1+json} requested_digest
+  if ! registry_request GET "$path" "$accept"; then
+    return 1
+  fi
+  if [[ "$registry_status" != 200 ]]; then
+    rm -f -- "$registry_body"
+    echo "Registry GET failed for $path (HTTP $registry_status)." >&2
+    return 1
+  fi
+  requested_digest=${path##*/}
+  if [[ "$requested_digest" == sha256:* ]]; then
+    if ! verify_sha256_body "$requested_digest" "$registry_body"; then
+      rm -f -- "$registry_body"
+      return 1
+    fi
+    if [[ -n "$registry_digest" && "$registry_digest" != "$requested_digest" ]]; then
+      echo "Registry Docker-Content-Digest does not match requested digest $requested_digest." >&2
+      rm -f -- "$registry_body"
+      return 1
+    fi
+  fi
+  if ! cat "$registry_body"; then
+    rm -f -- "$registry_body"
+    return 1
+  fi
+  rm -f -- "$registry_body"
+}
+
+registry_head "manifests/${index_digest}"
+if [[ "$registry_status" != 200 || ! "$registry_digest" =~ ^sha256:[a-f0-9]{64}$ || "$registry_digest" != "$index_digest" ]]; then
+  echo "Candidate registry HEAD failed exact top-level digest verification (HTTP $registry_status; digest $registry_digest; expected $index_digest)." >&2
+  exit 1
+fi
+echo "Registry top-level index digest verified: $registry_digest"
+
+"$(dirname "$0")/verify-image-platforms.sh" "$image_reference" "$supported_platforms_file"
 
 index_json=$(registry_get "manifests/${index_digest}" 'application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json')
 index_media_type=$(jq -r '.mediaType // empty' <<<"$index_json")
@@ -175,5 +272,14 @@ if [[ "$repository_slug" == "$expected_source_url" || "$repository_slug" == */*/
   echo "Expected source URL is not a canonical GitHub repository URL: $expected_source_url" >&2
   exit 1
 fi
-gh attestation verify "oci://${image_reference}" --repo "$repository_slug"
+signer_workflow="$repository_slug/.github/workflows/delivery.yml"
+gh attestation verify "oci://${image_reference}" \
+  --bundle-from-oci \
+  --repo "$repository_slug" \
+  --predicate-type https://slsa.dev/provenance/v1 \
+  --source-digest "$expected_source_sha" \
+  --source-ref refs/heads/master \
+  --signer-digest "$expected_source_sha" \
+  --signer-workflow "$signer_workflow" \
+  --deny-self-hosted-runners
 echo "GitHub signed provenance verified for $image_reference."

@@ -33,7 +33,8 @@ class PublicSurfacePolicyArchitectureTest {
             Path.of("../scripts/release/verify-image-platforms.sh"),
             Path.of("../scripts/release/verify-container-image.sh"),
             Path.of("../scripts/release/smoke-container-image.sh"),
-            Path.of("../scripts/release/publish-source-alias.sh"));
+            Path.of("../scripts/release/publish-source-alias.sh"),
+            Path.of("../scripts/release/write-delivery-summary.sh"));
 
     @Test
     void exposesExactCrawlerRoutesAndNoRssAtomOrWildcardRoutes() throws Exception {
