@@ -205,6 +205,8 @@ jobs:
           password: ${{ github.token }}
 
       - name: Verify registry artifact and supply-chain evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           ./scripts/release/verify-container-image.sh \
             "${{ needs.publish-candidate.outputs.image_name }}@${{ needs.publish-candidate.outputs.image_digest }}" \

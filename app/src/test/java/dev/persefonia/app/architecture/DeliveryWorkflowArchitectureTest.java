@@ -209,6 +209,17 @@ class DeliveryWorkflowArchitectureTest {
                 .contains("--signer-workflow \"$signer_workflow\"")
                 .contains("--deny-self-hosted-runners")
                 .contains("$repository_slug/.github/workflows/delivery.yml");
-        assertThat(workflow).doesNotContain("attestations: read", "GH_TOKEN: ${{ github.token }}");
+        int verificationStepStart = workflow.indexOf("      - name: Verify registry artifact and supply-chain evidence");
+        int verificationStepEnd = workflow.indexOf("\n      - name: Run native candidate smoke", verificationStepStart);
+        assertThat(workflow.substring(verificationStepStart, verificationStepEnd))
+                .contains("GH_TOKEN: ${{ github.token }}");
+        assertThat(workflow.split(Pattern.quote("GH_TOKEN: ${{ github.token }}"), -1)).hasSize(2);
+
+        int verifyJobStart = workflow.indexOf("\n  verify-candidate:");
+        int permissionsStart = workflow.indexOf("    permissions:", verifyJobStart);
+        int permissionsEnd = workflow.indexOf("    strategy:", permissionsStart);
+        assertThat(workflow.substring(permissionsStart, permissionsEnd))
+                .contains("contents: read", "packages: read")
+                .doesNotContain("attestations: read", "id-token: write", "packages: write", "contents: write");
     }
 }
