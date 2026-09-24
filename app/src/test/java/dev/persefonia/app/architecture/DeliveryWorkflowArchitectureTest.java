@@ -15,6 +15,7 @@ class DeliveryWorkflowArchitectureTest {
     private static final Path IMAGE_VERIFIER = Path.of("../scripts/release/verify-container-image.sh");
     private static final Path ALIAS_PUBLISHER = Path.of("../scripts/release/publish-source-alias.sh");
     private static final Path DELIVERY_SUMMARY = Path.of("../scripts/release/write-delivery-summary.sh");
+    private static final Path TOOLCHAIN_VERIFIER = Path.of("../scripts/release/verify-delivery-toolchain.sh");
 
     @Test
     void deliveryConsumesTheVerifiedArtifactWithoutApplicationBuildTooling() throws Exception {
@@ -82,13 +83,14 @@ class DeliveryWorkflowArchitectureTest {
                 .contains("BUILDKIT_VERSION: v0.33.0")
                 .containsPattern("BUILDKIT_IMAGE: moby/buildkit@sha256:[a-f0-9]{64}")
                 .doesNotContain("moby/buildkit:latest", "moby/buildkit:v0.33.0", "version: latest")
-                .contains("BUILDER_NODES: ${{ steps.buildx.outputs.nodes }}")
-                .contains(".buildkit == $version");
+                .contains("BUILDER_NODES: ${{ steps.buildx.outputs.nodes }}");
         assertThat(workflow.split("uses: docker/setup-buildx-action@", -1)).hasSize(4);
         assertThat(workflow.split(Pattern.quote("version: ${{ env.BUILDX_VERSION }}"), -1)).hasSize(4);
         assertThat(workflow.split(Pattern.quote("image=${{ env.BUILDKIT_IMAGE }}"), -1)).hasSize(4);
         assertThat(workflow.split("id: buildx", -1)).hasSize(4);
         assertThat(workflow.split(Pattern.quote("BUILDER_NODES: ${{ steps.buildx.outputs.nodes }}"), -1)).hasSize(4);
+        assertThat(workflow.split("scripts/release/verify-delivery-toolchain.sh", -1)).hasSize(4);
+        assertThat(workflow).doesNotContain("jq -e --arg version \"$BUILDKIT_VERSION\"");
         for (String job : List.of("publish-candidate", "verify-candidate", "publish-source-alias")) {
             int start = workflow.indexOf("\n  " + job + ":");
             assertThat(start).isPositive();
@@ -104,8 +106,21 @@ class DeliveryWorkflowArchitectureTest {
                     .contains("id: buildx")
                     .contains("version: ${{ env.BUILDX_VERSION }}")
                     .contains("image=${{ env.BUILDKIT_IMAGE }}")
-                    .contains("BUILDER_NODES: ${{ steps.buildx.outputs.nodes }}");
+                    .contains("BUILDER_NODES: ${{ steps.buildx.outputs.nodes }}")
+                    .contains("./scripts/release/verify-delivery-toolchain.sh \"$BUILDX_VERSION\" \"$BUILDKIT_VERSION\" \"$BUILDER_NODES\"");
         }
+    }
+
+    @Test
+    void toolchainVerifierChecksEveryEffectiveBuilderNode() throws Exception {
+        String verifier = Files.readString(TOOLCHAIN_VERIFIER);
+
+        assertThat(verifier)
+                .contains("docker buildx version")
+                .contains("actual_buildx")
+                .contains("\"$actual_buildx\" != \"$expected_buildx\"")
+                .contains("type == \"array\" and length > 0 and all(.[]; .buildkit == $version)")
+                .doesNotContain("v0.37.1", "v0.33.0", ".[0].buildkit");
     }
 
     @Test
@@ -169,14 +184,15 @@ class DeliveryWorkflowArchitectureTest {
 
         assertThat(workflow)
                 .contains("run: ./scripts/release/write-delivery-summary.sh \"$GITHUB_STEP_SUMMARY\"")
-                .contains("DELIVERY_AMD64_CHILD_DIGEST: ${{ steps.alias.outputs.amd64_child_digest }}")
-                .contains("DELIVERY_ARM64_CHILD_DIGEST: ${{ steps.alias.outputs.arm64_child_digest }}")
-                .doesNotContain("cat >> \"$GITHUB_STEP_SUMMARY\"", "manifest=$(docker buildx imagetools inspect --raw");
+                .doesNotContain("DELIVERY_AMD64_CHILD_DIGEST", "DELIVERY_ARM64_CHILD_DIGEST")
+                .doesNotContain("id: alias", "cat >> \"$GITHUB_STEP_SUMMARY\"", "manifest=$(docker buildx imagetools inspect --raw");
         assertThat(summary)
                 .contains("## Delivery", "Top-level OCI index digest", "BuildKit version")
-                .doesNotContain("curl ", "docker buildx imagetools", "gh attestation");
+                .doesNotContain("curl ", "docker buildx imagetools", "gh attestation")
+                .doesNotContain("DELIVERY_AMD64_CHILD_DIGEST", "DELIVERY_ARM64_CHILD_DIGEST");
         assertThat(Files.readString(ALIAS_PUBLISHER))
-                .contains("amd64_child_digest=%s", "arm64_child_digest=%s");
+                .contains("docker buildx imagetools create")
+                .doesNotContain("GITHUB_OUTPUT", "write_child_digest_outputs", "imagetools inspect --raw");
     }
 
     @Test

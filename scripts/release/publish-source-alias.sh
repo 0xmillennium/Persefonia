@@ -91,20 +91,6 @@ registry_head() {
   registry_digest=$(awk 'tolower($1) == "docker-content-digest:" {gsub(/\r/, "", $2); print $2}' "$registry_headers")
 }
 
-write_child_digest_outputs() {
-  local index amd64 arm64
-  index=$(docker buildx imagetools inspect --raw "$source_reference")
-  amd64=$(jq -r '[.manifests[] | select(.platform.os == "linux" and .platform.architecture == "amd64") | .digest] | if length == 1 then .[0] else empty end' <<< "$index")
-  arm64=$(jq -r '[.manifests[] | select(.platform.os == "linux" and .platform.architecture == "arm64") | .digest] | if length == 1 then .[0] else empty end' <<< "$index")
-  if [[ ! "$amd64" =~ ^sha256:[a-f0-9]{64}$ || ! "$arm64" =~ ^sha256:[a-f0-9]{64}$ ]]; then
-    echo "Qualified index lacks exactly one AMD64 and ARM64 child digest for delivery reporting." >&2
-    return 1
-  fi
-  if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
-    printf 'amd64_child_digest=%s\narm64_child_digest=%s\n' "$amd64" "$arm64" >> "$GITHUB_OUTPUT"
-  fi
-}
-
 registry_head "manifests/${image_digest}" "$index_accept"
 if [[ "$registry_status" != 200 || ! "$registry_digest" =~ ^sha256:[a-f0-9]{64}$ || "$registry_digest" != "$image_digest" ]]; then
   echo "Qualified source digest is unavailable or mismatched (HTTP $registry_status; digest $registry_digest; expected $image_digest)." >&2
@@ -119,7 +105,6 @@ case "$registry_status" in
       exit 1
     fi
     if [[ "$registry_digest" == "$image_digest" ]]; then
-      write_child_digest_outputs
       echo "Source alias already points to the qualified top-level index: $alias_reference"
       exit 0
     fi
@@ -137,5 +122,4 @@ if [[ "$registry_status" != 200 || ! "$registry_digest" =~ ^sha256:[a-f0-9]{64}$
   exit 1
 fi
 
-write_child_digest_outputs
 echo "Published write-once source alias: $alias_reference@$registry_digest"

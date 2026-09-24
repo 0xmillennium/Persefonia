@@ -101,13 +101,7 @@ jobs:
       - name: Verify effective delivery toolchain
         env:
           BUILDER_NODES: ${{ steps.buildx.outputs.nodes }}
-        run: |
-          docker version
-          docker buildx version
-          jq --version
-          curl --version
-          docker buildx version | awk -v expected="$BUILDX_VERSION" '{for (i=1; i<=NF; i++) if ($i == expected) found=1} END {exit !found}'
-          jq -e --arg version "$BUILDKIT_VERSION" 'type == "array" and length > 0 and all(.[]; .buildkit == $version)' <<< "$BUILDER_NODES"
+        run: ./scripts/release/verify-delivery-toolchain.sh "$BUILDX_VERSION" "$BUILDKIT_VERSION" "$BUILDER_NODES"
 
       - name: Verify pinned runtime and service platform support
         run: |
@@ -200,13 +194,8 @@ jobs:
         env:
           BUILDER_NODES: ${{ steps.buildx.outputs.nodes }}
         run: |
-          docker version
-          docker buildx version
-          jq --version
-          curl --version
+          ./scripts/release/verify-delivery-toolchain.sh "$BUILDX_VERSION" "$BUILDKIT_VERSION" "$BUILDER_NODES"
           gh --version
-          docker buildx version | awk -v expected="$BUILDX_VERSION" '{for (i=1; i<=NF; i++) if ($i == expected) found=1} END {exit !found}'
-          jq -e --arg version "$BUILDKIT_VERSION" 'type == "array" and length > 0 and all(.[]; .buildkit == $version)' <<< "$BUILDER_NODES"
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -265,13 +254,7 @@ jobs:
       - name: Verify effective delivery toolchain
         env:
           BUILDER_NODES: ${{ steps.buildx.outputs.nodes }}
-        run: |
-          docker version
-          docker buildx version
-          jq --version
-          curl --version
-          docker buildx version | awk -v expected="$BUILDX_VERSION" '{for (i=1; i<=NF; i++) if ($i == expected) found=1} END {exit !found}'
-          jq -e --arg version "$BUILDKIT_VERSION" 'type == "array" and length > 0 and all(.[]; .buildkit == $version)' <<< "$BUILDER_NODES"
+        run: ./scripts/release/verify-delivery-toolchain.sh "$BUILDX_VERSION" "$BUILDKIT_VERSION" "$BUILDER_NODES"
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -281,7 +264,6 @@ jobs:
           password: ${{ github.token }}
 
       - name: Publish write-once source alias
-        id: alias
         run: |
           ./scripts/release/publish-source-alias.sh \
             "${{ needs.publish-candidate.outputs.image_name }}" \
@@ -296,8 +278,6 @@ jobs:
           DELIVERY_IMAGE_NAME: ${{ needs.publish-candidate.outputs.image_name }}
           DELIVERY_IMAGE_DIGEST: ${{ needs.publish-candidate.outputs.image_digest }}
           DELIVERY_SOURCE_ALIAS: ${{ needs.publish-candidate.outputs.image_name }}:sha-${{ needs.publish-candidate.outputs.source_sha }}
-          DELIVERY_AMD64_CHILD_DIGEST: ${{ steps.alias.outputs.amd64_child_digest }}
-          DELIVERY_ARM64_CHILD_DIGEST: ${{ steps.alias.outputs.arm64_child_digest }}
           DELIVERY_BUILDX_VERSION: ${{ env.BUILDX_VERSION }}
           DELIVERY_BUILDKIT_VERSION: ${{ env.BUILDKIT_VERSION }}
           DELIVERY_BUILDKIT_IMAGE: ${{ env.BUILDKIT_IMAGE }}
