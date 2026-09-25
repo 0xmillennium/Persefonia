@@ -5,8 +5,10 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dev.persefonia.app.communication.mail.ContactMailNotificationProperties;
+import dev.persefonia.app.identityaccess.config.AdminAccessProperties;
 import dev.persefonia.app.platformoperations.ratelimit.ContactRateLimitProperties;
 import java.time.Duration;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -192,6 +194,41 @@ class ProductionConfigurationValidationTest {
     }
 
     @Test
+    void acceptsProductionAdminSubjectAllowlist() {
+        assertThatCode(() -> validator(adminAccess(List.of("subject-placeholder"), List.of()))
+                .afterPropertiesSet()).doesNotThrowAnyException();
+    }
+
+    @Test
+    void acceptsProductionAdminEmailAllowlist() {
+        assertThatCode(() -> validator(adminAccess(List.of(), List.of("owner@example.invalid")))
+                .afterPropertiesSet()).doesNotThrowAnyException();
+    }
+
+    @Test
+    void acceptsProductionAdminSubjectAndEmailAllowlists() {
+        assertThatCode(() -> validator(adminAccess(
+                List.of("subject-placeholder"), List.of("owner@example.invalid")))
+                .afterPropertiesSet()).doesNotThrowAnyException();
+    }
+
+    @Test
+    void rejectsProductionWithoutAnAdminAllowlist() {
+        assertThatThrownBy(() -> validator(adminAccess(List.of(), List.of()))
+                .afterPropertiesSet())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("production requires at least one admin allowlisted subject or email");
+    }
+
+    @Test
+    void rejectsProductionWithOnlyBlankAdminAllowlistEntries() {
+        assertThatThrownBy(() -> validator(adminAccess(
+                List.of("", "  "), List.of(" ", "\t"))).afterPropertiesSet())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("production requires at least one admin allowlisted subject or email");
+    }
+
+    @Test
     void rejectsEnabledMailWithoutRecipient() {
         ContactMailNotificationProperties mail =
                 new ContactMailNotificationProperties(true, null, "from@example.test", null, null);
@@ -231,6 +268,7 @@ class ProductionConfigurationValidationTest {
         new ApplicationContextRunner()
                 .withBean(ContactRateLimitProperties.class, ProductionConfigurationValidationTest::localRateLimit)
                 .withBean(ContactMailNotificationProperties.class, ProductionConfigurationValidationTest::disabledMail)
+                .withBean(AdminAccessProperties.class, ProductionConfigurationValidationTest::emptyAdminAccess)
                 .withUserConfiguration(ProductionConfigurationValidator.class)
                 .withInitializer(context -> context.getEnvironment().setActiveProfiles("prod"))
                 .run(context -> assertThat(context).hasFailed());
@@ -241,6 +279,7 @@ class ProductionConfigurationValidationTest {
         new ApplicationContextRunner()
                 .withBean(ContactRateLimitProperties.class, ProductionConfigurationValidationTest::localRateLimit)
                 .withBean(ContactMailNotificationProperties.class, ProductionConfigurationValidationTest::disabledMail)
+                .withBean(AdminAccessProperties.class, ProductionConfigurationValidationTest::emptyAdminAccess)
                 .withUserConfiguration(ProductionConfigurationValidator.class)
                 .withInitializer(context -> context.getEnvironment().setActiveProfiles("local"))
                 .run(context -> assertThat(context).hasNotFailed());
@@ -251,6 +290,7 @@ class ProductionConfigurationValidationTest {
         new ApplicationContextRunner()
                 .withBean(ContactRateLimitProperties.class, ProductionConfigurationValidationTest::localRateLimit)
                 .withBean(ContactMailNotificationProperties.class, ProductionConfigurationValidationTest::disabledMail)
+                .withBean(AdminAccessProperties.class, ProductionConfigurationValidationTest::emptyAdminAccess)
                 .withUserConfiguration(ProductionConfigurationValidator.class)
                 .withInitializer(context -> context.getEnvironment().setActiveProfiles("test"))
                 .run(context -> assertThat(context).hasNotFailed());
@@ -262,7 +302,25 @@ class ProductionConfigurationValidationTest {
             ContactMailNotificationProperties mail,
             ClientRegistrationRepository clientRegistration) {
         return new ProductionConfigurationValidator(
-                environment, rateLimit, mail, registrations(clientRegistration));
+                environment, rateLimit, mail, adminAccess(List.of("subject-placeholder"), List.of()),
+                registrations(clientRegistration));
+    }
+
+    private static ProductionConfigurationValidator validator(AdminAccessProperties adminAccess) {
+        return new ProductionConfigurationValidator(
+                secureEnvironment(), strongRateLimit(), enabledMail(), adminAccess,
+                registrations(OIDC_CONFIGURED));
+    }
+
+    private static AdminAccessProperties adminAccess(List<String> subjects, List<String> emails) {
+        AdminAccessProperties properties = new AdminAccessProperties();
+        properties.setAllowlistedSubjects(subjects);
+        properties.setAllowlistedEmails(emails);
+        return properties;
+    }
+
+    private static AdminAccessProperties emptyAdminAccess() {
+        return new AdminAccessProperties();
     }
 
     private static MockEnvironment secureEnvironment() {

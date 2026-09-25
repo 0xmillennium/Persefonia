@@ -30,6 +30,8 @@ export PERSEFONIA_PUBLIC_BASE_URL=https://persefonia.example.invalid
 export PERSEFONIA_TRUSTED_PROXY_CIDRS=10.0.0.0/8
 export PERSEFONIA_OIDC_ISSUER_URI=https://auth.example.invalid
 export PERSEFONIA_OIDC_CLIENT_ID=persefonia-ci
+export PERSEFONIA_ADMIN_ALLOWLISTED_SUBJECTS=ci-subject-placeholder
+export PERSEFONIA_ADMIN_ALLOWLISTED_EMAILS=
 export PERSEFONIA_OIDC_CLIENT_SECRET_FILE="$temporary_directory/oidc_client_secret"
 export PERSEFONIA_SMTP_HOST=smtp.example.invalid
 export PERSEFONIA_SMTP_PORT=587
@@ -42,3 +44,8 @@ export PERSEFONIA_TRAEFIK_NETWORK=traefik-ci
 export PERSEFONIA_PUBLIC_HOST=persefonia.example.invalid
 
 docker compose -f compose.yaml -f compose.production.yaml config --quiet
+
+docker compose -f compose.yaml -f compose.production.yaml config --format json \
+  | jq -e '.services.app.environment
+      | .PERSEFONIA_ADMIN_ALLOWLISTED_SUBJECTS == "ci-subject-placeholder"
+        and .PERSEFONIA_ADMIN_ALLOWLISTED_EMAILS == ""' >/dev/null
