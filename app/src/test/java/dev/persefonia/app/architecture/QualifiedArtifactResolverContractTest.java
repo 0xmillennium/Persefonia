@@ -54,6 +54,8 @@ class QualifiedArtifactResolverContractTest {
         for (Map<String, String> options : List.of(
                 Map.of("SOURCE_SHA_OVERRIDE", "abc"),
                 Map.of("SOURCE_SHA_OVERRIDE", "A".repeat(40)),
+                Map.of("EXPECTED_DIGEST_OVERRIDE", "sha256:short"),
+                Map.of("EXPECTED_DIGEST_OVERRIDE", "sha256:" + "A".repeat(64)),
                 Map.of("REPOSITORY_OVERRIDE", "another/repository/extra"),
                 Map.of("EXTRA_ARGUMENT", IMAGE))) {
             Resolution result = resolve("valid-index.json", options);
@@ -89,6 +91,19 @@ class QualifiedArtifactResolverContractTest {
             assertThat(result.stdout()).isEmpty();
             assertThat(result.ghArguments()).isEmpty();
         }
+    }
+
+    @Test
+    void rejectsRegistryAliasThatDiffersFromTheDeliveryRunDigestBeforeProvenance() throws Exception {
+        Resolution result = resolve("valid-index.json", Map.of(
+                "EXPECTED_DIGEST_OVERRIDE", "sha256:" + "b".repeat(64)));
+
+        assertThat(result.status()).isNotZero();
+        assertThat(result.stdout()).isEmpty();
+        assertThat(result.stderr()).contains("Delivery digest", "registry-resolved digest");
+        assertThat(result.requests()).contains("HEAD https://ghcr.io/v2/0xmillennium/persefonia/manifests/sha-" + SOURCE_SHA)
+                .doesNotContain("GET https://ghcr.io/v2/0xmillennium/persefonia/manifests/sha256:");
+        assertThat(result.ghArguments()).isEmpty();
     }
 
     @Test
@@ -138,6 +153,7 @@ class QualifiedArtifactResolverContractTest {
         ProcessBuilder command = new ProcessBuilder(
                 RESOLVER.toAbsolutePath().toString(),
                 options.getOrDefault("SOURCE_SHA_OVERRIDE", SOURCE_SHA),
+                options.getOrDefault("EXPECTED_DIGEST_OVERRIDE", digest),
                 options.getOrDefault("REPOSITORY_OVERRIDE", REPOSITORY),
                 Path.of("../docker/supported-platforms.txt").toAbsolutePath().toString());
         if (options.containsKey("EXTRA_ARGUMENT")) {

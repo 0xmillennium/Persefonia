@@ -2,17 +2,22 @@
 
 set -euo pipefail
 
-if [[ "$#" -ne 3 ]]; then
-  echo "Usage: $0 <full-source-sha> <canonical-repository-slug> <supported-platforms-file>" >&2
+if [[ "$#" -ne 4 ]]; then
+  echo "Usage: $0 <full-source-sha> <expected-top-level-digest> <canonical-repository-slug> <supported-platforms-file>" >&2
   exit 2
 fi
 
 source_sha=$1
-repository_slug=$2
-supported_platforms_file=$3
+expected_digest=$2
+repository_slug=$3
+supported_platforms_file=$4
 
 if [[ ! "$source_sha" =~ ^[a-f0-9]{40}$ ]]; then
   echo "Source SHA must be a full lowercase 40-character Git SHA." >&2
+  exit 1
+fi
+if [[ ! "$expected_digest" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+  echo "Expected Delivery digest must be a lowercase SHA-256 digest." >&2
   exit 1
 fi
 if [[ ! "$repository_slug" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
@@ -137,6 +142,10 @@ if [[ ! "$registry_digest" =~ ^sha256:[a-f0-9]{64}$ ]]; then
   exit 1
 fi
 resolved_digest=$registry_digest
+if [[ "$resolved_digest" != "$expected_digest" ]]; then
+  echo "Delivery digest $expected_digest disagrees with registry-resolved digest $resolved_digest." >&2
+  exit 1
+fi
 
 registry_request GET "manifests/${resolved_digest}" "$index_accept"
 if [[ "$registry_status" != 200 ]]; then
