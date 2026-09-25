@@ -3,49 +3,59 @@
 set -euo pipefail
 
 temporary_directory=$(mktemp -d "${TMPDIR:-/tmp}/persefonia-compose.XXXXXX")
-cleanup() {
-  rm -rf "$temporary_directory"
-}
-trap cleanup EXIT
+trap 'rm -rf -- "$temporary_directory"' EXIT
 
 mkdir -p "$temporary_directory/media"
 umask 077
-printf '%s\n' 'ci-postgres-password' > "$temporary_directory/postgres_password"
+printf '%s\n' 'synthetic-postgres-password' > "$temporary_directory/postgres_password"
 printf '%s\n' '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef' > "$temporary_directory/redis_password"
-printf '%s\n' 'ci-contact-rate-limit-secret-with-sufficient-length' > "$temporary_directory/contact_rate_limit_secret"
-printf '%s\n' 'ci-oidc-client-secret' > "$temporary_directory/oidc_client_secret"
-printf '%s\n' 'ci-cloudflare-api-token' > "$temporary_directory/cloudflare_api_token"
+printf '%s\n' 'synthetic-contact-rate-limit-secret-with-sufficient-length' > "$temporary_directory/contact_rate_limit_secret"
 
-export POSTGRES_DB=persefonia
-export POSTGRES_USER=persefonia
-export PERSEFONIA_IMAGE_REF=example.invalid/persefonia:ci
-export PERSEFONIA_MEDIA_HOST_PATH="$temporary_directory/media"
-export PERSEFONIA_POSTGRES_PASSWORD_FILE="$temporary_directory/postgres_password"
-export PERSEFONIA_REDIS_PASSWORD_FILE="$temporary_directory/redis_password"
-export PERSEFONIA_CONTACT_RATE_LIMIT_SECRET_FILE="$temporary_directory/contact_rate_limit_secret"
+local_image=example.invalid/persefonia:local
+production_image="example.invalid/persefonia@sha256:$(printf 'a%.0s' {1..64})"
+redis_helper="$(pwd)/docker/redis-start.sh"
 
-docker compose -f compose.yaml config --quiet
+cat > "$temporary_directory/local.env" <<EOF
+PERSEFONIA_IMAGE_REF=$local_image
+POSTGRES_DB=persefonia
+POSTGRES_USER=persefonia
+PERSEFONIA_POSTGRES_PASSWORD_FILE=$temporary_directory/postgres_password
+PERSEFONIA_REDIS_PASSWORD_FILE=$temporary_directory/redis_password
+PERSEFONIA_CONTACT_RATE_LIMIT_SECRET_FILE=$temporary_directory/contact_rate_limit_secret
+PERSEFONIA_MEDIA_HOST_PATH=$temporary_directory/media
+PERSEFONIA_APP_PORT=18080
+POSTGRES_PORT=15432
+REDIS_PORT=16379
+EOF
 
-export PERSEFONIA_PUBLIC_BASE_URL=https://persefonia.example.invalid
-export PERSEFONIA_TRUSTED_PROXY_CIDRS=10.0.0.0/8
-export PERSEFONIA_OIDC_ISSUER_URI=https://auth.example.invalid
-export PERSEFONIA_OIDC_CLIENT_ID=persefonia-ci
-export PERSEFONIA_ADMIN_ALLOWLISTED_SUBJECTS=ci-subject-placeholder
-export PERSEFONIA_ADMIN_ALLOWLISTED_EMAILS=
-export PERSEFONIA_OIDC_CLIENT_SECRET_FILE="$temporary_directory/oidc_client_secret"
-export PERSEFONIA_SMTP_HOST=smtp.example.invalid
-export PERSEFONIA_SMTP_PORT=587
-export PERSEFONIA_CONTACT_MAIL_ENABLED=false
-export PERSEFONIA_CONTACT_MAIL_OWNER_RECIPIENT=owner@example.invalid
-export PERSEFONIA_CONTACT_MAIL_FROM=noreply@example.invalid
-export PERSEFONIA_CLOUDFLARE_ZONE_ID=0123456789abcdef0123456789abcdef
-export PERSEFONIA_CLOUDFLARE_API_TOKEN_FILE="$temporary_directory/cloudflare_api_token"
-export PERSEFONIA_TRAEFIK_NETWORK=traefik-ci
-export PERSEFONIA_PUBLIC_HOST=persefonia.example.invalid
+cat > "$temporary_directory/production.env" <<'EOF'
+POSTGRES_DB=persefonia
+POSTGRES_USER=persefonia
+PERSEFONIA_PUBLIC_HOST=persefonia.example.invalid
+PERSEFONIA_TRUSTED_PROXY_CIDRS=10.20.0.0/24
+PERSEFONIA_OIDC_ISSUER_URI=https://auth.example.invalid
+PERSEFONIA_ADMIN_ALLOWLISTED_SUBJECTS=synthetic-subject
+PERSEFONIA_ADMIN_ALLOWLISTED_EMAILS=
+PERSEFONIA_CONTACT_MAIL_ENABLED=true
+PERSEFONIA_CONTACT_MAIL_OWNER_RECIPIENT=owner@example.invalid
+PERSEFONIA_CONTACT_MAIL_FROM=persefonia@example.invalid
+PERSEFONIA_CLOUDFLARE_ZONE_ID=synthetic-zone-id
+EOF
 
-docker compose -f compose.yaml -f compose.production.yaml config --quiet
+compose_config=${DOCKER_CONFIG:-$HOME/.docker}
+env -i PATH="$PATH" DOCKER_CONFIG="$compose_config" COMPOSE_DISABLE_ENV_FILE=1 \
+  docker compose --env-file "$temporary_directory/local.env" -f compose.yaml \
+  config --format json > "$temporary_directory/local.json"
+jq -e --arg mode local --arg image "$local_image" \
+  --arg media_source "$temporary_directory/media" --arg redis_helper "$redis_helper" \
+  --arg host '' --arg subjects '' --arg emails '' \
+  -f scripts/ci/compose-runtime-policy.jq "$temporary_directory/local.json" >/dev/null
 
-docker compose -f compose.yaml -f compose.production.yaml config --format json \
-  | jq -e '.services.app.environment
-      | .PERSEFONIA_ADMIN_ALLOWLISTED_SUBJECTS == "ci-subject-placeholder"
-        and .PERSEFONIA_ADMIN_ALLOWLISTED_EMAILS == ""' >/dev/null
+env -i PATH="$PATH" DOCKER_CONFIG="$compose_config" COMPOSE_DISABLE_ENV_FILE=1 \
+  PERSEFONIA_IMAGE_REF="$production_image" \
+  docker compose --env-file "$temporary_directory/production.env" -f compose.production.yaml \
+  config --format json > "$temporary_directory/production.json"
+jq -e --arg mode production --arg image "$production_image" \
+  --arg media_source /var/lib/persefonia/media --arg redis_helper "$redis_helper" \
+  --arg host persefonia.example.invalid --arg subjects synthetic-subject --arg emails '' \
+  -f scripts/ci/compose-runtime-policy.jq "$temporary_directory/production.json" >/dev/null

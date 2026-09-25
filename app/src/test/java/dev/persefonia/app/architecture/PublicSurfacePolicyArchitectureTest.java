@@ -29,6 +29,7 @@ class PublicSurfacePolicyArchitectureTest {
     private static final List<Path> APPROVED_AUTOMATION_SCRIPTS = List.of(
             Path.of("../scripts/ci/verify-bootjar.sh"),
             Path.of("../scripts/ci/verify-compose.sh"),
+            Path.of("../scripts/ci/compose-runtime-policy.jq"),
             Path.of("../scripts/ci/verify-java21-runtime.sh"),
             Path.of("../scripts/deploy/resolve-qualified-artifact.sh"),
             Path.of("../scripts/deploy/verify-ssh-target.sh"),
