@@ -40,8 +40,10 @@ services:
       retries: 12
       start_period: 30s
     networks:
-      persefonia-internal: {}
-      persefonia-egress: {}
+      datanet: {}
+      default: {}
+    ports:
+      - "127.0.0.1:${PERSEFONIA_APP_PORT:?PERSEFONIA_APP_PORT is required}:8080"
 
   postgres:
     image: postgres:17.11-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73
@@ -69,7 +71,9 @@ services:
       retries: 20
       start_period: 5s
     networks:
-      - persefonia-internal
+      - datanet
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:?POSTGRES_PORT is required}:5432"
 
   redis:
     image: redis:8.10-alpine@sha256:becdda6c7f4b3fb42e42fd7f120bbf5c54c4caaaf16f26da24e4563d2c1f0576
@@ -99,17 +103,16 @@ services:
       retries: 20
       start_period: 5s
     networks:
-      - persefonia-internal
+      - datanet
+    ports:
+      - "127.0.0.1:${REDIS_PORT:?REDIS_PORT is required}:6379"
 
 volumes:
   postgres-data:
 
 networks:
-  persefonia-internal:
-    name: persefonia-internal
+  datanet:
     internal: true
-  persefonia-egress:
-    name: persefonia-egress
 
 secrets:
   postgres_password:

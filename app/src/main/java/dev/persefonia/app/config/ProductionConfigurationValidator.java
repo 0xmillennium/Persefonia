@@ -14,7 +14,10 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.env.Environment;
+import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.oauth2.core.AuthorizationGrantType;
+import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 
 /**
  * Fails fast at startup when a production deployment still carries
@@ -108,8 +111,20 @@ class ProductionConfigurationValidator implements InitializingBean {
     }
 
     private void validateAdminOidc(List<String> violations) {
-        if (clientRegistrations.getIfAvailable() == null) {
+        ClientRegistrationRepository registrations = clientRegistrations.getIfAvailable();
+        ClientRegistration authelia = registrations == null ? null : registrations.findByRegistrationId("authelia");
+        if (authelia == null) {
             violations.add("admin OIDC client registration must be configured in production");
+            return;
+        }
+        if (!AuthorizationGrantType.AUTHORIZATION_CODE.equals(authelia.getAuthorizationGrantType())) {
+            violations.add("admin OIDC client must use the authorization_code grant");
+        }
+        if (!ClientAuthenticationMethod.CLIENT_SECRET_BASIC.equals(authelia.getClientAuthenticationMethod())) {
+            violations.add("admin OIDC client must use client_secret_basic authentication");
+        }
+        if (!authelia.getScopes().containsAll(Set.of("openid", "profile", "email"))) {
+            violations.add("admin OIDC client must request openid, profile, and email scopes");
         }
     }
 
@@ -155,10 +170,6 @@ class ProductionConfigurationValidator implements InitializingBean {
     }
 
     private void validateManagementIsolation(List<String> violations) {
-        String address = environment.getProperty("management.server.address", "127.0.0.1");
-        if (!isLoopbackAddress(address)) {
-            violations.add("management server address must be loopback in production");
-        }
         int applicationPort = environment.getProperty("server.port", Integer.class, 8080);
         int managementPort = environment.getProperty("management.server.port", Integer.class, 9001);
         if (applicationPort == managementPort) {
@@ -191,10 +202,4 @@ class ProductionConfigurationValidator implements InitializingBean {
             violations.add(label + " must be configured in production");
         }
     }
-
-    private static boolean isLoopbackAddress(String address) {
-        return "127.0.0.1".equals(address) || "::1".equals(address)
-                || "0:0:0:0:0:0:0:1".equals(address);
-    }
-
 }

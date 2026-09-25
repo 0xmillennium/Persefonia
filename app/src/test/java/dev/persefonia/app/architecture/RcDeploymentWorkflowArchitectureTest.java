@@ -38,7 +38,7 @@ class RcDeploymentWorkflowArchitectureTest {
         assertThat(workflow.substring(permissionStart, permissionEnd).lines()
                 .map(String::trim).filter(line -> !line.isEmpty()).toList())
                 .containsExactlyInAnyOrder("permissions:", "contents: read", "packages: read", "actions: read");
-        assertThat(workflow)
+        assertThat(qualifiedJob(workflow))
                 .contains("permissions: {}")
                 .contains("ref: ${{ github.event.workflow_run.head_sha }}")
                 .contains("persist-credentials: false")
@@ -48,7 +48,7 @@ class RcDeploymentWorkflowArchitectureTest {
                 .contains("password: ${{ github.token }}")
                 .doesNotContain("environment:", "attestations: read", "attestations: write",
                         "id-token: write", "contents: write", "packages: write");
-        assertThat(Pattern.compile("(?m)^        uses: ([^\\s#]+)").matcher(workflow).results()
+        assertThat(Pattern.compile("(?m)^        uses: ([^\\s#]+)").matcher(qualifiedJob(workflow)).results()
                 .map(match -> match.group(1)).toList())
                 .containsExactly(
                         "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
@@ -59,7 +59,8 @@ class RcDeploymentWorkflowArchitectureTest {
     @Test
     void workflowDelegatesArtifactIdentityAndExposesVerifiedOutputs() throws Exception {
         String workflow = Files.readString(WORKFLOW);
-        String resolutionStep = workflow.substring(workflow.indexOf("      - name: Resolve and verify qualified artifact"));
+        String resolutionStep = qualifiedJob(workflow).substring(
+                qualifiedJob(workflow).indexOf("      - name: Resolve and verify qualified artifact"));
         String downloadAndVerification = workflow.substring(
                 workflow.indexOf("      - name: Download triggering Delivery handoff"),
                 workflow.indexOf("      - name: Resolve and verify qualified artifact"));
@@ -87,7 +88,7 @@ class RcDeploymentWorkflowArchitectureTest {
         String jobs = workflow.substring(workflow.indexOf("\njobs:\n") + "\njobs:\n".length());
         assertThat(Pattern.compile("(?m)^  ([a-z][a-z-]+):\\s*$").matcher(jobs).results()
                 .map(match -> match.group(1)).toList())
-                .containsExactly("resolve-qualified-artifact");
+                .containsExactly("resolve-qualified-artifact", "verify-rc-target-trust");
     }
 
     @Test
@@ -98,5 +99,61 @@ class RcDeploymentWorkflowArchitectureTest {
                 "./gradlew", "setup-java", "setup-gradle", "setup-node", "npm", "vite",
                 "docker build", "docker compose", "docker pull", "ssh ", "scp ", "rsync ",
                 "sftp ", "systemctl", "actions/upload-artifact");
+    }
+
+    @Test
+    void targetTrustJobEntersRcEnvironmentAfterQualificationWithOnlyCheckoutPermission() throws Exception {
+        String workflow = Files.readString(WORKFLOW);
+        String trust = trustJob(workflow);
+
+        assertThat(workflow).contains("\npermissions: {}\n");
+        assertThat(trust)
+                .contains("name: Verify RC target trust", "needs: resolve-qualified-artifact",
+                        "runs-on: ubuntu-24.04", "environment:\n      name: rc\n      deployment: false",
+                        "ref: ${{ needs.resolve-qualified-artifact.outputs.source_sha }}",
+                        "EXPECTED_SOURCE_SHA: ${{ needs.resolve-qualified-artifact.outputs.source_sha }}",
+                        "test \"$(git rev-parse HEAD)\" = \"$EXPECTED_SOURCE_SHA\"",
+                        "persist-credentials: false",
+                        "uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1")
+                .doesNotContain("url:", "docker/", "docker ", "compose", "scp ", "rsync ",
+                        "actions/download-artifact", "gh attestation", "resolve-qualified-artifact.sh",
+                        "verify-delivery-handoff.sh", "GITHUB_OUTPUT", "GITHUB_ENV", "sudo ");
+        assertThat(trust.substring(trust.indexOf("    permissions:\n"), trust.indexOf("    steps:\n"))
+                .lines().map(String::trim).filter(line -> !line.isEmpty()).toList())
+                .containsExactly("permissions:", "contents: read");
+    }
+
+    @Test
+    void targetTrustJobScopesSecretToKeyMaterializationAndDelegatesSshPolicy() throws Exception {
+        String trust = trustJob(Files.readString(WORKFLOW));
+        String materialize = step(trust, "Materialize RC SSH private key", "Verify RC SSH target");
+        String verify = step(trust, "Verify RC SSH target", "Remove RC SSH private key");
+        String cleanup = trust.substring(trust.indexOf("      - name: Remove RC SSH private key"));
+
+        assertThat(trust.split(Pattern.quote("${{ secrets.RC_SSH_PRIVATE_KEY }}"), -1)).hasSize(2);
+        assertThat(materialize).contains("RC_SSH_PRIVATE_KEY: ${{ secrets.RC_SSH_PRIVATE_KEY }}",
+                "test -n \"$RC_SSH_PRIVATE_KEY\"", "umask 077",
+                "\"$RUNNER_TEMP/persefonia-rc-ssh-key\"", "chmod 600");
+        assertThat(verify).contains("vars.RC_SSH_HOST", "vars.RC_SSH_PORT", "vars.RC_SSH_USER",
+                "vars.RC_SSH_HOST_KEY_SHA256", "./scripts/deploy/verify-ssh-target.sh",
+                "\"$RC_SSH_HOST\"", "\"$RC_SSH_PORT\"", "\"$RC_SSH_USER\"",
+                "\"$RC_SSH_HOST_KEY_SHA256\"", "\"$RUNNER_TEMP/persefonia-rc-ssh-key\"")
+                .doesNotContain("secrets.", "ssh-keyscan", "ssh-keygen", "known_hosts", "ssh -");
+        assertThat(cleanup).contains("if: always()", "rm -f -- \"$RUNNER_TEMP/persefonia-rc-ssh-key\"")
+                .doesNotContain("secrets.", "rm -rf", "*");
+        assertThat(trust.substring(0, trust.indexOf("      - name: Materialize RC SSH private key")))
+                .doesNotContain("secrets.");
+    }
+
+    private static String qualifiedJob(String workflow) {
+        return workflow.substring(0, workflow.indexOf("\n  verify-rc-target-trust:"));
+    }
+
+    private static String trustJob(String workflow) {
+        return workflow.substring(workflow.indexOf("\n  verify-rc-target-trust:"));
+    }
+
+    private static String step(String job, String start, String next) {
+        return job.substring(job.indexOf("      - name: " + start), job.indexOf("      - name: " + next));
     }
 }

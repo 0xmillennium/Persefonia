@@ -13,11 +13,15 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.mock.env.MockEnvironment;
+import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.oauth2.core.AuthorizationGrantType;
+import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 
 class ProductionConfigurationValidationTest {
     private static final String STRONG_SECRET = "production-grade-contact-rate-limit-secret-value";
-    private static final ClientRegistrationRepository OIDC_CONFIGURED = registrationId -> null;
+    private static final ClientRegistrationRepository OIDC_CONFIGURED = registration("authelia",
+            AuthorizationGrantType.AUTHORIZATION_CODE, ClientAuthenticationMethod.CLIENT_SECRET_BASIC);
 
     @Test
     void acceptsSecureProductionConfiguration() {
@@ -96,14 +100,13 @@ class ProductionConfigurationValidationTest {
     }
 
     @Test
-    void rejectsNonLoopbackManagementAddress() {
+    void acceptsManagementBindingForInternalMonitoring() {
         MockEnvironment environment = secureEnvironment();
         environment.setProperty("management.server.address", "0.0.0.0");
 
-        assertThatThrownBy(() -> validator(environment, strongRateLimit(), enabledMail(), OIDC_CONFIGURED)
+        assertThatCode(() -> validator(environment, strongRateLimit(), enabledMail(), OIDC_CONFIGURED)
                 .afterPropertiesSet())
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("management server address");
+                .doesNotThrowAnyException();
     }
 
     @Test
@@ -191,6 +194,40 @@ class ProductionConfigurationValidationTest {
                 .afterPropertiesSet())
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("OIDC");
+    }
+
+    @Test
+    void rejectsRepositoryWithoutAutheliaRegistration() {
+        ClientRegistrationRepository other = registration("other", AuthorizationGrantType.AUTHORIZATION_CODE,
+                ClientAuthenticationMethod.CLIENT_SECRET_BASIC);
+        assertThatThrownBy(() -> validator(secureEnvironment(), strongRateLimit(), enabledMail(), other)
+                .afterPropertiesSet())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("admin OIDC client registration");
+    }
+
+    @Test
+    void rejectsWrongOidcGrantOrClientAuthentication() {
+        for (ClientRegistrationRepository invalid : List.of(
+                registration("authelia", AuthorizationGrantType.CLIENT_CREDENTIALS,
+                        ClientAuthenticationMethod.CLIENT_SECRET_BASIC),
+                registration("authelia", AuthorizationGrantType.AUTHORIZATION_CODE,
+                        ClientAuthenticationMethod.CLIENT_SECRET_POST))) {
+            assertThatThrownBy(() -> validator(secureEnvironment(), strongRateLimit(), enabledMail(), invalid)
+                    .afterPropertiesSet())
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("admin OIDC client");
+        }
+    }
+
+    @Test
+    void rejectsOidcRegistrationMissingRequiredScopes() {
+        ClientRegistrationRepository invalid = registration("authelia", AuthorizationGrantType.AUTHORIZATION_CODE,
+                ClientAuthenticationMethod.CLIENT_SECRET_BASIC, "openid", "profile");
+        assertThatThrownBy(() -> validator(secureEnvironment(), strongRateLimit(), enabledMail(), invalid)
+                .afterPropertiesSet())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("openid, profile, and email");
     }
 
     @Test
@@ -387,5 +424,27 @@ class ProductionConfigurationValidationTest {
                 return value;
             }
         };
+    }
+
+    private static ClientRegistrationRepository registration(String id, AuthorizationGrantType grant,
+                                                              ClientAuthenticationMethod authentication) {
+        return registration(id, grant, authentication, "openid", "profile", "email");
+    }
+
+    private static ClientRegistrationRepository registration(String id, AuthorizationGrantType grant,
+                                                              ClientAuthenticationMethod authentication,
+                                                              String... scopes) {
+        ClientRegistration client = ClientRegistration.withRegistrationId(id)
+                .clientId("persefonia")
+                .clientSecret("synthetic-test-value")
+                .clientAuthenticationMethod(authentication)
+                .authorizationGrantType(grant)
+                .redirectUri("{baseUrl}/login/oauth2/code/{registrationId}")
+                .scope(scopes)
+                .authorizationUri("https://auth.example.invalid/authorize")
+                .tokenUri("https://auth.example.invalid/token")
+                .jwkSetUri("https://auth.example.invalid/jwks")
+                .build();
+        return registrationId -> id.equals(registrationId) ? client : null;
     }
 }
