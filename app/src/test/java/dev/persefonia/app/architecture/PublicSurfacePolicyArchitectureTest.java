@@ -31,6 +31,7 @@ class PublicSurfacePolicyArchitectureTest {
             Path.of("../scripts/ci/verify-compose.sh"),
             Path.of("../scripts/ci/verify-java21-runtime.sh"),
             Path.of("../scripts/deploy/resolve-qualified-artifact.sh"),
+            Path.of("../scripts/deploy/qualified-index-policy.jq"),
             Path.of("../scripts/release/verify-image-platforms.sh"),
             Path.of("../scripts/release/verify-container-image.sh"),
             Path.of("../scripts/release/smoke-container-image.sh"),

@@ -2,25 +2,24 @@
 
 set -euo pipefail
 
-if [[ "$#" -ne 4 ]]; then
-  echo "Usage: $0 <canonical-image> <full-source-sha> <canonical-repository-slug> <supported-platforms-file>" >&2
+if [[ "$#" -ne 3 ]]; then
+  echo "Usage: $0 <full-source-sha> <canonical-repository-slug> <supported-platforms-file>" >&2
   exit 2
 fi
 
-image_name=$1
-source_sha=$2
-repository_slug=$3
-supported_platforms_file=$4
+source_sha=$1
+repository_slug=$2
+supported_platforms_file=$3
 
 if [[ ! "$source_sha" =~ ^[a-f0-9]{40}$ ]]; then
   echo "Source SHA must be a full lowercase 40-character Git SHA." >&2
   exit 1
 fi
-if [[ ! "$repository_slug" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*$ ]] ||
-    [[ "$image_name" != "ghcr.io/${repository_slug,,}" ]]; then
-  echo "Canonical GHCR image and GitHub repository slug are malformed or inconsistent." >&2
+if [[ ! "$repository_slug" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+  echo "Canonical GitHub repository slug is malformed." >&2
   exit 1
 fi
+image_name="ghcr.io/${repository_slug,,}"
 if [[ ! -f "$supported_platforms_file" || ! -r "$supported_platforms_file" ]]; then
   echo "Supported-platforms file must be a readable regular file." >&2
   exit 1
@@ -48,6 +47,8 @@ supported_platforms_json=$(printf '%s\n' "${supported_platforms[@]}" | jq -Rn '[
 
 registry=ghcr.io
 repository=${image_name#ghcr.io/}
+script_directory=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+index_policy="$script_directory/qualified-index-policy.jq"
 source_alias="sha-${source_sha}"
 alias_reference="${image_name}:${source_alias}"
 index_accept='application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json'
@@ -153,22 +154,13 @@ if [[ "sha256:$actual_hash" != "$resolved_digest" ]]; then
   exit 1
 fi
 
-if ! jq -e --argjson expected "$supported_platforms_json" '
-  (.mediaType == "application/vnd.oci.image.index.v1+json" or
-   .mediaType == "application/vnd.docker.distribution.manifest.list.v2+json") and
-  (.manifests | type == "array") and
-  ([.manifests[] |
-    if .platform.os == "unknown" and .platform.architecture == "unknown" then empty
-    elif (.platform.os | type) != "string" or (.platform.architecture | type) != "string" or
-         (.digest | type) != "string" or
-         (.digest | test("^sha256:[a-f0-9]{64}$") | not) or
-         (.mediaType != "application/vnd.oci.image.manifest.v1+json" and
-          .mediaType != "application/vnd.docker.distribution.manifest.v2+json")
-    then error("invalid runtime manifest descriptor")
-    else "\(.platform.os)/\(.platform.architecture)"
-    end
-  ] | length == ($expected | length) and unique == ($expected | unique))
-' "$registry_body" >/dev/null 2>&1; then
+index_media_type=$(jq -r '.mediaType // empty' "$registry_body")
+case "$index_media_type" in
+  application/vnd.oci.image.index.v1+json|application/vnd.docker.distribution.manifest.list.v2+json) ;;
+  *) echo "Resolved digest is not a top-level OCI image index: $resolved_digest." >&2; exit 1 ;;
+esac
+if ! jq -e --argjson expected "$supported_platforms_json" -f "$index_policy" \
+  "$registry_body" >/dev/null 2>&1; then
   echo "Resolved digest is not an index with exactly the supported runtime platforms." >&2
   exit 1
 fi
@@ -186,4 +178,15 @@ if ! gh attestation verify "oci://${image_name}@${resolved_digest}" \
   exit 1
 fi
 
-printf '%s\n' "$resolved_digest"
+image_reference="${image_name}@${resolved_digest}"
+source_alias_reference="${image_name}:${source_alias}"
+if [[ ! "$source_sha" =~ ^[a-f0-9]{40}$ ||
+      ! "$image_name" =~ ^ghcr\.io/[a-z0-9][a-z0-9._-]*/[a-z0-9][a-z0-9._-]*$ ||
+      ! "$resolved_digest" =~ ^sha256:[a-f0-9]{64}$ ||
+      ! "$image_reference" =~ ^ghcr\.io/[a-z0-9][a-z0-9._-]*/[a-z0-9][a-z0-9._-]*@sha256:[a-f0-9]{64}$ ||
+      ! "$source_alias_reference" =~ ^ghcr\.io/[a-z0-9][a-z0-9._-]*/[a-z0-9][a-z0-9._-]*:sha-[a-f0-9]{40}$ ]]; then
+  echo "Verified artifact identity is malformed or inconsistent." >&2
+  exit 1
+fi
+printf 'source_sha=%s\nimage_name=%s\nimage_digest=%s\nimage_reference=%s\nsource_alias=%s\n' \
+  "$source_sha" "$image_name" "$resolved_digest" "$image_reference" "$source_alias_reference"

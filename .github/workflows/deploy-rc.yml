@@ -65,19 +65,4 @@ jobs:
         env:
           EXPECTED_SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
           GH_TOKEN: ${{ github.token }}
-        run: |
-          image_name="ghcr.io/${GITHUB_REPOSITORY,,}"
-          digest=$(./scripts/deploy/resolve-qualified-artifact.sh \
-            "$image_name" "$EXPECTED_SOURCE_SHA" "$GITHUB_REPOSITORY" docker/supported-platforms.txt)
-          if [[ ! "$GITHUB_REPOSITORY" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*$ ||
-                ! "$EXPECTED_SOURCE_SHA" =~ ^[a-f0-9]{40}$ ||
-                ! "$digest" =~ ^sha256:[a-f0-9]{64}$ ||
-                "$image_name" != "ghcr.io/${GITHUB_REPOSITORY,,}" ]]; then
-            echo "Verified artifact outputs are malformed or inconsistent." >&2
-            exit 1
-          fi
-          printf 'source_sha=%s\n' "$EXPECTED_SOURCE_SHA" >> "$GITHUB_OUTPUT"
-          printf 'image_name=%s\n' "$image_name" >> "$GITHUB_OUTPUT"
-          printf 'image_digest=%s\n' "$digest" >> "$GITHUB_OUTPUT"
-          printf 'image_reference=%s@%s\n' "$image_name" "$digest" >> "$GITHUB_OUTPUT"
-          printf 'source_alias=%s:sha-%s\n' "$image_name" "$EXPECTED_SOURCE_SHA" >> "$GITHUB_OUTPUT"
+        run: ./scripts/deploy/resolve-qualified-artifact.sh "$EXPECTED_SOURCE_SHA" "$GITHUB_REPOSITORY" docker/supported-platforms.txt >> "$GITHUB_OUTPUT"
