@@ -89,3 +89,50 @@ jobs:
           EXPECTED_IMAGE_DIGEST: ${{ steps.handoff.outputs.expected_image_digest }}
           GH_TOKEN: ${{ github.token }}
         run: ./scripts/deploy/resolve-qualified-artifact.sh "$EXPECTED_SOURCE_SHA" "$EXPECTED_IMAGE_DIGEST" "$GITHUB_REPOSITORY" docker/supported-platforms.txt >> "$GITHUB_OUTPUT"
+
+  verify-rc-target-trust:
+    name: Verify RC target trust
+    needs: resolve-qualified-artifact
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment:
+      name: rc
+      deployment: false
+    permissions:
+      contents: read
+    steps:
+      - name: Check out qualified source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.resolve-qualified-artifact.outputs.source_sha }}
+          persist-credentials: false
+
+      - name: Assert checked out qualified source
+        env:
+          EXPECTED_SOURCE_SHA: ${{ needs.resolve-qualified-artifact.outputs.source_sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
+
+      - name: Materialize RC SSH private key
+        env:
+          RC_SSH_PRIVATE_KEY: ${{ secrets.RC_SSH_PRIVATE_KEY }}
+        run: |
+          test -n "$RC_SSH_PRIVATE_KEY"
+          umask 077
+          printf '%s\n' "$RC_SSH_PRIVATE_KEY" > "$RUNNER_TEMP/persefonia-rc-ssh-key"
+          chmod 600 "$RUNNER_TEMP/persefonia-rc-ssh-key"
+
+      - name: Verify RC SSH target
+        env:
+          RC_SSH_HOST: ${{ vars.RC_SSH_HOST }}
+          RC_SSH_PORT: ${{ vars.RC_SSH_PORT }}
+          RC_SSH_USER: ${{ vars.RC_SSH_USER }}
+          RC_SSH_HOST_KEY_SHA256: ${{ vars.RC_SSH_HOST_KEY_SHA256 }}
+        run: |
+          ./scripts/deploy/verify-ssh-target.sh \
+            "$RC_SSH_HOST" "$RC_SSH_PORT" "$RC_SSH_USER" \
+            "$RC_SSH_HOST_KEY_SHA256" "$RUNNER_TEMP/persefonia-rc-ssh-key"
+
+      - name: Remove RC SSH private key
+        if: always()
+        run: rm -f -- "$RUNNER_TEMP/persefonia-rc-ssh-key"
