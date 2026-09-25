@@ -1,6 +1,7 @@
 package dev.persefonia.app.config;
 
 import dev.persefonia.app.communication.mail.ContactMailNotificationProperties;
+import dev.persefonia.app.identityaccess.config.AdminAccessProperties;
 import dev.persefonia.app.platformoperations.ratelimit.ContactRateLimitProperties;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -35,16 +36,19 @@ class ProductionConfigurationValidator implements InitializingBean {
     private final Environment environment;
     private final ContactRateLimitProperties rateLimitProperties;
     private final ContactMailNotificationProperties mailProperties;
+    private final AdminAccessProperties adminAccessProperties;
     private final ObjectProvider<ClientRegistrationRepository> clientRegistrations;
 
     ProductionConfigurationValidator(
             Environment environment,
             ContactRateLimitProperties rateLimitProperties,
             ContactMailNotificationProperties mailProperties,
+            AdminAccessProperties adminAccessProperties,
             ObjectProvider<ClientRegistrationRepository> clientRegistrations) {
         this.environment = environment;
         this.rateLimitProperties = rateLimitProperties;
         this.mailProperties = mailProperties;
+        this.adminAccessProperties = adminAccessProperties;
         this.clientRegistrations = clientRegistrations;
     }
 
@@ -55,6 +59,7 @@ class ProductionConfigurationValidator implements InitializingBean {
         validateRateLimitSecret(violations);
         validatePublicBaseUrl(violations);
         validateAdminOidc(violations);
+        validateAdminAllowlist(violations);
         validateContactMail(violations);
         validateForwardedHeaders(violations);
         validateManagementIsolation(violations);
@@ -105,6 +110,16 @@ class ProductionConfigurationValidator implements InitializingBean {
     private void validateAdminOidc(List<String> violations) {
         if (clientRegistrations.getIfAvailable() == null) {
             violations.add("admin OIDC client registration must be configured in production");
+        }
+    }
+
+    private void validateAdminAllowlist(List<String> violations) {
+        boolean hasSubject = adminAccessProperties.getAllowlistedSubjects().stream()
+                .anyMatch(value -> value != null && !value.isBlank());
+        boolean hasEmail = adminAccessProperties.getAllowlistedEmails().stream()
+                .anyMatch(value -> value != null && !value.isBlank());
+        if (!hasSubject && !hasEmail) {
+            violations.add("production requires at least one admin allowlisted subject or email");
         }
     }
 

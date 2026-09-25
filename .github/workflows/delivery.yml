@@ -284,3 +284,46 @@ jobs:
           DELIVERY_BUILDKIT_VERSION: ${{ env.BUILDKIT_VERSION }}
           DELIVERY_BUILDKIT_IMAGE: ${{ env.BUILDKIT_IMAGE }}
         run: ./scripts/release/write-delivery-summary.sh "$GITHUB_STEP_SUMMARY"
+
+  publish-deployment-handoff:
+    name: Publish deployment handoff
+    needs:
+      - publish-candidate
+      - verify-candidate
+      - publish-source-alias
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Check out Delivery source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.publish-candidate.outputs.source_sha }}
+          persist-credentials: false
+
+      - name: Assert checked out source
+        env:
+          EXPECTED_SOURCE_SHA: ${{ needs.publish-candidate.outputs.source_sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
+
+      - name: Write deployment handoff
+        env:
+          DELIVERY_SOURCE_SHA: ${{ needs.publish-candidate.outputs.source_sha }}
+          DELIVERY_IMAGE_NAME: ${{ needs.publish-candidate.outputs.image_name }}
+          DELIVERY_IMAGE_DIGEST: ${{ needs.publish-candidate.outputs.image_digest }}
+        run: |
+          mkdir delivery-handoff
+          ./scripts/release/write-delivery-handoff.sh \
+            delivery-handoff/delivery-handoff.txt \
+            "$DELIVERY_SOURCE_SHA" "$DELIVERY_IMAGE_NAME" "$DELIVERY_IMAGE_DIGEST" \
+            "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT"
+
+      - name: Upload deployment handoff
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: persefonia-delivery-handoff-${{ github.run_id }}-${{ github.run_attempt }}
+          path: delivery-handoff/delivery-handoff.txt
+          if-no-files-found: error
+          overwrite: false

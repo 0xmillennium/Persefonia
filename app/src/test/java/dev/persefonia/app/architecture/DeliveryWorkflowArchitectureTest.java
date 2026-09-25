@@ -15,6 +15,7 @@ class DeliveryWorkflowArchitectureTest {
     private static final Path IMAGE_VERIFIER = Path.of("../scripts/release/verify-container-image.sh");
     private static final Path ALIAS_PUBLISHER = Path.of("../scripts/release/publish-source-alias.sh");
     private static final Path DELIVERY_SUMMARY = Path.of("../scripts/release/write-delivery-summary.sh");
+    private static final Path HANDOFF_WRITER = Path.of("../scripts/release/write-delivery-handoff.sh");
     private static final Path TOOLCHAIN_VERIFIER = Path.of("../scripts/release/verify-delivery-toolchain.sh");
 
     @Test
@@ -193,6 +194,35 @@ class DeliveryWorkflowArchitectureTest {
         assertThat(Files.readString(ALIAS_PUBLISHER))
                 .contains("docker buildx imagetools create")
                 .doesNotContain("GITHUB_OUTPUT", "write_child_digest_outputs", "imagetools inspect --raw");
+    }
+
+    @Test
+    void finalRequiredJobPublishesOnlyTheRunScopedMachineHandoff() throws Exception {
+        String workflow = Files.readString(DELIVERY_WORKFLOW);
+        int handoffStart = workflow.indexOf("\n  publish-deployment-handoff:");
+        assertThat(handoffStart).isPositive();
+        String handoff = workflow.substring(handoffStart);
+        assertThat(Pattern.compile("(?m)^  ([a-z][a-z-]+):\\s*$")
+                .matcher(workflow.substring(workflow.indexOf("\njobs:\n") + 7)).results()
+                .map(match -> match.group(1)).toList())
+                .containsExactly("publish-candidate", "verify-candidate", "publish-source-alias", "publish-deployment-handoff");
+        assertThat(handoff)
+                .contains("name: Publish deployment handoff")
+                .contains("needs:\n      - publish-candidate\n      - verify-candidate\n      - publish-source-alias")
+                .contains("permissions:\n      contents: read")
+                .contains("ref: ${{ needs.publish-candidate.outputs.source_sha }}")
+                .contains("persist-credentials: false")
+                .contains("test \"$(git rev-parse HEAD)\" = \"$EXPECTED_SOURCE_SHA\"")
+                .contains("DELIVERY_IMAGE_DIGEST: ${{ needs.publish-candidate.outputs.image_digest }}")
+                .contains("./scripts/release/write-delivery-handoff.sh")
+                .contains("\"$GITHUB_RUN_ID\" \"$GITHUB_RUN_ATTEMPT\"")
+                .contains("uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a")
+                .contains("name: persefonia-delivery-handoff-${{ github.run_id }}-${{ github.run_attempt }}")
+                .contains("path: delivery-handoff/delivery-handoff.txt")
+                .contains("if-no-files-found: error")
+                .contains("overwrite: false")
+                .doesNotContain("GITHUB_STEP_SUMMARY", "actions/download-artifact", "packages: write");
+        assertThat(Files.readString(HANDOFF_WRITER)).doesNotContain("GITHUB_STEP_SUMMARY");
     }
 
     @Test
