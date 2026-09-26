@@ -150,7 +150,10 @@ class AdminAccountMigrationTest {
                 "id_token",
                 "oidc_token",
                 "session",
-                "security_context");
+                "security_context",
+                "groups",
+                "oidc_group",
+                "provider_group");
 
         assertThat(queryStrings("""
                 SELECT column_name

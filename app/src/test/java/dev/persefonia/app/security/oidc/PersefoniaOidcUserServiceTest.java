@@ -27,6 +27,7 @@ import dev.persefonia.identityaccess.domain.admin.DisplayName;
 import dev.persefonia.identityaccess.domain.admin.EmailAddress;
 import dev.persefonia.identityaccess.domain.admin.NormalizedEmailAddress;
 import dev.persefonia.identityaccess.domain.admin.OidcSubject;
+import dev.persefonia.identityaccess.domain.admin.OidcGroup;
 import dev.persefonia.identityaccess.domain.admin.access.AdminAccessPolicy;
 
 class PersefoniaOidcUserServiceTest {
@@ -59,14 +60,29 @@ class PersefoniaOidcUserServiceTest {
 
     @Test
     void mapsExistingEditorToRoleAdminAndRoleEditor() {
-        var delegateUser = OidcTestFixtures.user(Map.of(
-                "sub", "editor-subject", "email", "editor@example.com", "name", "Editor"));
+        var claimsUser = OidcTestFixtures.user(Map.of(
+                "sub", "editor-subject", "email", "editor@example.com", "name", "Editor",
+                "groups", java.util.List.of("admin", "owner")));
+        var delegateUser = new org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser(
+                Set.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_OWNER"),
+                        new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_PROVIDER_ADMIN")),
+                claimsUser.getIdToken());
         InMemoryRepository repository = new InMemoryRepository();
         repository.save(account("editor-subject", "editor@example.com", AdminRole.EDITOR));
 
-        assertThat(authorities(service(delegateUser, repository, AdminAccessPolicy.of(Set.of(), Set.of(), true, false))
+        assertThat(authorities(service(delegateUser, repository, AdminAccessPolicy.of(OidcGroup.of("admin"), true, false))
                         .loadUser(null)))
                 .containsExactly("ROLE_ADMIN", "ROLE_EDITOR");
+    }
+
+    @Test
+    void newNonBootstrapIdentityWithProviderOwnerGroupBecomesOnlyLocalEditor() {
+        InMemoryRepository repository = new InMemoryRepository();
+        repository.save(account("first-subject", "first@example.com", AdminRole.OWNER));
+        var delegate = OidcTestFixtures.user(Map.of("sub", "second-subject", "email", "second@example.com",
+                "groups", java.util.List.of("admin", "owner")));
+        assertThat(authorities(service(delegate, repository, AdminAccessPolicy.of(OidcGroup.of("admin"), true, true))
+                .loadUser(null))).containsExactly("ROLE_ADMIN", "ROLE_EDITOR");
     }
 
     @Test
@@ -74,7 +90,7 @@ class PersefoniaOidcUserServiceTest {
         assertThatThrownBy(() -> service(
                         OidcTestFixtures.validUser(),
                         new InMemoryRepository(),
-                        AdminAccessPolicy.of(Set.of(), Set.of(), true, false))
+                        AdminAccessPolicy.of(OidcGroup.of("different-required-group"), true, false))
                 .loadUser(null))
                 .isInstanceOfSatisfying(OAuth2AuthenticationException.class, exception -> {
                     assertThat(exception.getError().getErrorCode()).isEqualTo("persefonia_admin_access_denied");
@@ -90,7 +106,7 @@ class PersefoniaOidcUserServiceTest {
         assertAccessDenied(service(
                 OidcTestFixtures.validUser(),
                 repository,
-                AdminAccessPolicy.of(Set.of(), Set.of(), true, false)));
+                AdminAccessPolicy.of(OidcGroup.of("admin"), true, false)));
     }
 
     @Test
@@ -101,7 +117,7 @@ class PersefoniaOidcUserServiceTest {
         assertAccessDenied(service(
                 OidcTestFixtures.validUser(),
                 repository,
-                AdminAccessPolicy.of(Set.of(OidcSubject.of("opaque-subject")), Set.of(), true, true)));
+                AdminAccessPolicy.of(OidcGroup.of("admin"), true, true)));
     }
 
     @Test
@@ -112,7 +128,7 @@ class PersefoniaOidcUserServiceTest {
         assertThatThrownBy(() -> service(
                         OidcTestFixtures.user(Map.of("sub", subject, "email", email)),
                         new InMemoryRepository(),
-                        AdminAccessPolicy.of(Set.of(), Set.of(), true, false))
+                        AdminAccessPolicy.of(OidcGroup.of("different-required-group"), true, false))
                 .loadUser(null))
                 .isInstanceOf(OAuth2AuthenticationException.class)
                 .hasMessageNotContaining(subject)
@@ -132,7 +148,7 @@ class PersefoniaOidcUserServiceTest {
 
         assertThat(principal.getClass().getDeclaredFields())
                 .extracting(field -> field.getName())
-                .noneMatch(name -> name.toLowerCase().contains("token"));
+                .noneMatch(name -> name.toLowerCase().contains("token") || name.toLowerCase().contains("group"));
     }
 
     private static PersefoniaOidcUserService ownerService(
@@ -140,7 +156,7 @@ class PersefoniaOidcUserServiceTest {
         return service(
                 delegateUser,
                 new InMemoryRepository(),
-                AdminAccessPolicy.of(Set.of(OidcSubject.of("opaque-subject")), Set.of(), true, false));
+                AdminAccessPolicy.of(OidcGroup.of("admin"), true, false));
     }
 
     private static PersefoniaOidcUserService service(

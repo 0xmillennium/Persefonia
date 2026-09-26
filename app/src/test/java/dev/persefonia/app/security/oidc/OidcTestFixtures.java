@@ -19,6 +19,7 @@ final class OidcTestFixtures {
     static OidcUser user(Map<String, Object> claims) {
         Map<String, Object> completeClaims = new LinkedHashMap<>(claims);
         completeClaims.putIfAbsent("sub", "opaque-subject");
+        completeClaims.putIfAbsent("groups", java.util.List.of("admin"));
         OidcIdToken token = new OidcIdToken(
                 "fake-id-token-value",
                 ISSUED_AT,

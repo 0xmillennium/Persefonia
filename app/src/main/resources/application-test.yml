@@ -21,7 +21,6 @@ server:
 persefonia:
   security:
     admin-access:
-      allowlisted-subjects: []
-      allowlisted-emails: []
+      required-oidc-group: admin
       automatic-provisioning-enabled: false
       initial-owner-bootstrap-enabled: true

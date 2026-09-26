@@ -1,74 +1,47 @@
 package dev.persefonia.identityaccess.domain.admin.access;
 
 import java.util.Objects;
-import java.util.Set;
 
-import dev.persefonia.identityaccess.domain.admin.NormalizedEmailAddress;
-import dev.persefonia.identityaccess.domain.admin.OidcSubject;
+import dev.persefonia.identityaccess.domain.admin.OidcGroup;
 
 public final class AdminAccessPolicy {
-    private final Set<OidcSubject> allowlistedSubjects;
-    private final Set<NormalizedEmailAddress> allowlistedEmails;
+    private final OidcGroup requiredOidcGroup;
     private final boolean initialOwnerBootstrapEnabled;
     private final boolean automaticProvisioningEnabled;
 
     private AdminAccessPolicy(
-            Set<OidcSubject> allowlistedSubjects,
-            Set<NormalizedEmailAddress> allowlistedEmails,
+            OidcGroup requiredOidcGroup,
             boolean initialOwnerBootstrapEnabled,
             boolean automaticProvisioningEnabled) {
-        this.allowlistedSubjects = Set.copyOf(Objects.requireNonNull(allowlistedSubjects, "allowlistedSubjects"));
-        this.allowlistedEmails = Set.copyOf(Objects.requireNonNull(allowlistedEmails, "allowlistedEmails"));
+        this.requiredOidcGroup = Objects.requireNonNull(requiredOidcGroup, "requiredOidcGroup");
         this.initialOwnerBootstrapEnabled = initialOwnerBootstrapEnabled;
         this.automaticProvisioningEnabled = automaticProvisioningEnabled;
     }
 
     public static AdminAccessPolicy of(
-            Set<OidcSubject> allowlistedSubjects,
-            Set<NormalizedEmailAddress> allowlistedEmails,
+            OidcGroup requiredOidcGroup,
             boolean initialOwnerBootstrapEnabled,
             boolean automaticProvisioningEnabled) {
-        return new AdminAccessPolicy(
-                allowlistedSubjects,
-                allowlistedEmails,
-                initialOwnerBootstrapEnabled,
-                automaticProvisioningEnabled);
+        return new AdminAccessPolicy(requiredOidcGroup, initialOwnerBootstrapEnabled, automaticProvisioningEnabled);
     }
 
-    public boolean isAllowlisted(AdminIdentityClaims claims) {
+    public AdminAccessDecision evaluateAdmission(AdminIdentityClaims claims) {
         Objects.requireNonNull(claims, "claims");
-        return allowlistedSubjects.contains(claims.oidcSubject())
-                || allowlistedEmails.contains(NormalizedEmailAddress.from(claims.email()));
+        return claims.oidcGroups().contains(requiredOidcGroup)
+                ? AdminAccessDecision.allowed()
+                : AdminAccessDecision.denied(AdminAccessDenialReason.REQUIRED_OIDC_GROUP_MISSING);
     }
 
-    public AdminAccessDecision evaluateInitialOwnerBootstrap(
-            AdminIdentityClaims claims,
-            boolean anyAdminAccountExists) {
-        if (!isAllowlisted(claims)) {
-            return AdminAccessDecision.denied(AdminAccessDenialReason.NOT_ALLOWLISTED);
-        }
-        if (anyAdminAccountExists) {
-            return AdminAccessDecision.denied(AdminAccessDenialReason.AUTOMATIC_PROVISIONING_DISABLED);
-        }
-        if (!initialOwnerBootstrapEnabled) {
-            return AdminAccessDecision.denied(AdminAccessDenialReason.INITIAL_OWNER_BOOTSTRAP_DISABLED);
-        }
-        return AdminAccessDecision.allowed();
+    public AdminAccessDecision evaluateInitialOwnerBootstrap() {
+        return initialOwnerBootstrapEnabled
+                ? AdminAccessDecision.allowed()
+                : AdminAccessDecision.denied(AdminAccessDenialReason.INITIAL_OWNER_BOOTSTRAP_DISABLED);
     }
 
-    public AdminAccessDecision evaluateAutomaticProvisioning(
-            AdminIdentityClaims claims,
-            boolean anyAdminAccountExists) {
-        if (!isAllowlisted(claims)) {
-            return AdminAccessDecision.denied(AdminAccessDenialReason.NOT_ALLOWLISTED);
-        }
-        if (!anyAdminAccountExists) {
-            return evaluateInitialOwnerBootstrap(claims, false);
-        }
-        if (!automaticProvisioningEnabled) {
-            return AdminAccessDecision.denied(AdminAccessDenialReason.AUTOMATIC_PROVISIONING_DISABLED);
-        }
-        return AdminAccessDecision.allowed();
+    public AdminAccessDecision evaluateAutomaticProvisioning() {
+        return automaticProvisioningEnabled
+                ? AdminAccessDecision.allowed()
+                : AdminAccessDecision.denied(AdminAccessDenialReason.AUTOMATIC_PROVISIONING_DISABLED);
     }
 
     public boolean initialOwnerBootstrapEnabled() {

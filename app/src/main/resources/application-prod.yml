@@ -26,7 +26,7 @@ spring:
             client-id: ${PERSEFONIA_OIDC_CLIENT_ID:?PERSEFONIA_OIDC_CLIENT_ID is required}
             client-authentication-method: client_secret_basic
             authorization-grant-type: authorization_code
-            scope: openid,profile,email
+            scope: openid,profile,email,groups,offline_access
             redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
         provider:
           authelia:
@@ -36,6 +36,11 @@ spring:
     port: ${PERSEFONIA_SMTP_PORT:?PERSEFONIA_SMTP_PORT is required}
 
 persefonia:
+  security:
+    admin-access:
+      required-oidc-group: ${PERSEFONIA_ADMIN_REQUIRED_OIDC_GROUP:?PERSEFONIA_ADMIN_REQUIRED_OIDC_GROUP is required}
+      automatic-provisioning-enabled: true
+      initial-owner-bootstrap-enabled: true
   cache-purge:
     provider: CLOUDFLARE
     cloudflare:

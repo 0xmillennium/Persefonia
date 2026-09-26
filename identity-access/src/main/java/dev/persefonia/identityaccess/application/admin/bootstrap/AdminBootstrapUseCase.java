@@ -34,6 +34,7 @@ public final class AdminBootstrapUseCase {
 
     public AdminBootstrapResult resolveOrBootstrap(AdminIdentityClaims claims) {
         Objects.requireNonNull(claims, "claims");
+        accessPolicy.evaluateAdmission(claims).throwIfDenied();
         bootstrapLock.acquire();
 
         return repository.findByOidcSubject(claims.oidcSubject())
@@ -59,11 +60,11 @@ public final class AdminBootstrapUseCase {
 
         boolean anyAdminAccountExists = repository.countAll() > 0;
         if (!anyAdminAccountExists) {
-            accessPolicy.evaluateInitialOwnerBootstrap(claims, false).throwIfDenied();
+            accessPolicy.evaluateInitialOwnerBootstrap().throwIfDenied();
             return createAndRecordLogin(claims, AdminRole.OWNER, AdminBootstrapOutcome.INITIAL_OWNER_BOOTSTRAPPED);
         }
 
-        accessPolicy.evaluateAutomaticProvisioning(claims, true).throwIfDenied();
+        accessPolicy.evaluateAutomaticProvisioning().throwIfDenied();
         return createAndRecordLogin(claims, AdminRole.EDITOR, AdminBootstrapOutcome.AUTOMATICALLY_PROVISIONED);
     }
 

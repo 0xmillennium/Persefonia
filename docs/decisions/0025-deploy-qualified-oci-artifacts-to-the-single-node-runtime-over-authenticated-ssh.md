@@ -8,6 +8,8 @@
 | Supersedes | none |
 | Superseded by | none |
 
+Identity-admission refinement: [ADR 0026](0026-use-oidc-group-admission-with-refresh-backed-admin-session-revalidation.md) replaces the historical OWNER identity allowlist configuration with required OIDC group admission and refresh-backed session revalidation. Deployment and secret ownership remain unchanged.
+
 ## Context
 
 [ADR 0022](0022-use-an-immutable-oci-image-as-the-deployable-release-artifact.md) establishes build-once promotion of a qualified OCI artifact. [ADR 0024](0024-support-amd64-and-arm64-under-one-oci-image-index.md) makes its top-level image-index digest authoritative for both supported platforms. Deployment needs a transport and runtime ownership boundary that preserves those decisions without moving application secrets or Docker authority into CI.

@@ -47,7 +47,7 @@ public final class PersefoniaOidcUserService implements OAuth2UserService<OidcUs
             OidcUser delegateUser = delegate.loadUser(userRequest);
             AdminIdentityClaims claims = claimMapper.toAdminIdentityClaims(delegateUser);
             AdminAccount account = adminBootstrapGateway.resolveOrBootstrap(claims).account();
-            return new PersefoniaOidcUser(delegateUser, principalFrom(account));
+            return new PersefoniaOidcUser(delegateUser, AdminPrincipal.from(account));
         } catch (OAuth2AuthenticationException exception) {
             throw exception;
         } catch (AdminAccessDeniedException exception) {
@@ -55,17 +55,6 @@ public final class PersefoniaOidcUserService implements OAuth2UserService<OidcUs
         } catch (RuntimeException exception) {
             throw authenticationFailure("persefonia_oidc_authentication_failed", "OIDC authentication failed", exception);
         }
-    }
-
-    private static AdminPrincipal principalFrom(AdminAccount account) {
-        return new AdminPrincipal(
-                account.id(),
-                account.oidcSubject(),
-                account.email(),
-                account.normalizedEmail(),
-                account.displayName(),
-                account.roles(),
-                account.status());
     }
 
     private static OAuth2AuthenticationException authenticationFailure(

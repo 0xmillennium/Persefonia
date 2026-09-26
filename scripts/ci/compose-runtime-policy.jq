@@ -84,18 +84,27 @@ def production_policy($doc):
       and .services.app.environment.PERSEFONIA_SMTP_PORT == "25"
       and .services.app.environment.PERSEFONIA_OIDC_CLIENT_ID == "persefonia"
       and .services.app.environment.PERSEFONIA_PUBLIC_BASE_URL == ("https://" + $host)
-      and .services.app.environment.PERSEFONIA_ADMIN_ALLOWLISTED_SUBJECTS == $subjects
-      and .services.app.environment.PERSEFONIA_ADMIN_ALLOWLISTED_EMAILS == $emails;
+      and .services.app.environment.PERSEFONIA_ADMIN_REQUIRED_OIDC_GROUP == $required_admin_group;
       "production application environment changed")
   | check(secret_targets(.services.app) | index("spring.security.oauth2.client.registration.authelia.client-secret") != null
       and index("persefonia.cache-purge.cloudflare.api-token") != null;
       "production application secrets changed")
-  | check(.secrets.postgres_password.file == "/etc/persefonia/secrets/postgres_password"
-      and .secrets.redis_password.file == "/etc/persefonia/secrets/redis_password"
-      and .secrets.contact_rate_limit_secret.file == "/etc/persefonia/secrets/contact_rate_limit_secret"
-      and .secrets.oidc_client_secret.file == "/etc/persefonia/secrets/oidc_client_secret"
-      and .secrets.cloudflare_api_token.file == "/etc/persefonia/secrets/cloudflare_api_token";
+  | check(.secrets.postgres_password.file == ($repository_root + "/secrets/postgres_password")
+      and .secrets.redis_password.file == ($repository_root + "/secrets/redis_password")
+      and .secrets.contact_rate_limit_secret.file == ($repository_root + "/secrets/contact_rate_limit_secret")
+      and .secrets.oidc_client_secret.file == ($repository_root + "/secrets/oidc_client_secret")
+      and .secrets.cloudflare_api_token.file == ($repository_root + "/secrets/cloudflare_api_token");
       "production secret source paths changed")
+  | check(any(.services.postgres.volumes[]?;
+        .source == ($repository_root + "/docker/postgresql/postgresql.conf") and .read_only == true)
+      and any(.services.postgres.volumes[]?;
+        .source == ($repository_root + "/docker/postgresql/pg_hba.conf") and .read_only == true)
+      and any(.services.redis.volumes[]?;
+        .source == ($repository_root + "/docker/redis/redis.conf") and .read_only == true)
+      and .services.redis.environment.PERSEFONIA_REDIS_USERNAME == "persefonia"
+      and .services.redis.environment.PERSEFONIA_REDIS_KEY_PREFIX == "persefonia:rate-limit"
+      and .services.redis.healthcheck.test == ["CMD", "redis-cli", "ping"];
+      "production PostgreSQL/Redis configuration or ACL wiring changed")
   | .services.app.labels as $labels
   | check($labels["traefik.enable"] == "true"
       and $labels["traefik.docker.network"] == "backnet"

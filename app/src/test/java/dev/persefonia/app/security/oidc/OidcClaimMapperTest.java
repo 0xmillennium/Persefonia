@@ -87,6 +87,42 @@ class OidcClaimMapperTest {
                 .hasMessageNotContaining("fake-id-token-value");
     }
 
+    @Test
+    void groupsAreStrictTypedImmutableAndCasePreserving() {
+        var user = OidcTestFixtures.user(Map.of("email", "admin@example.com",
+                "groups", java.util.List.of("admin", "admin", "Admin")));
+        assertThat(mapper.toAdminIdentityClaims(user).oidcGroups())
+                .extracting(group -> group.value()).containsExactlyInAnyOrder("admin", "Admin");
+        assertThat(mapper.toAdminIdentityClaims(OidcTestFixtures.user(Map.of("email", "admin@example.com",
+                "groups", java.util.List.of()))).oidcGroups()).isEmpty();
+        for (Object invalid : java.util.List.of("admin", java.util.List.of("admin", 5),
+                java.util.List.of(" "), java.util.List.of("ad\nmin"))) {
+            assertError(Map.of("email", "admin@example.com", "groups", invalid), "persefonia_oidc_invalid_groups");
+        }
+        assertThatThrownBy(() -> mapper.toAdminIdentityClaims(Map.of("sub", "subject", "email", "admin@example.com")))
+                .isInstanceOfSatisfying(OAuth2AuthenticationException.class, exception ->
+                        assertThat(exception.getError().getErrorCode()).isEqualTo("persefonia_oidc_missing_groups"));
+    }
+
+    @Test
+    void freshUserInfoOverridesIdTokenGroupsAndIdentityFields() {
+        var stale = OidcTestFixtures.validUser();
+        var fresh = new org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser(
+                stale.getAuthorities(), stale.getIdToken(), new org.springframework.security.oauth2.core.oidc.OidcUserInfo(
+                Map.of("sub", "opaque-subject", "email", "fresh@example.com", "groups", java.util.List.of("user"))));
+        var claims = mapper.toAdminIdentityClaims(fresh);
+        assertThat(claims.email().value()).isEqualTo("fresh@example.com");
+        assertThat(claims.oidcGroups()).extracting(group -> group.value()).containsExactly("user");
+    }
+
+    @Test
+    void invalidGroupsDoNotLeakIdentityGroupOrToken() {
+        assertThatThrownBy(() -> mapper.toAdminIdentityClaims(Map.of("sub", "sensitive-subject",
+                "email", "sensitive@example.com", "groups", java.util.List.of("sensitive-group", 1))))
+                .hasMessageNotContaining("sensitive-subject").hasMessageNotContaining("sensitive@example.com")
+                .hasMessageNotContaining("sensitive-group");
+    }
+
     private void assertError(Map<String, Object> claims, String code) {
         Map<String, Object> mutableClaims = new HashMap<>(claims);
         assertThatThrownBy(() -> mapper.toAdminIdentityClaims(OidcTestFixtures.user(mutableClaims)))

@@ -3,6 +3,7 @@ package dev.persefonia.app.security.admin;
 import java.util.Objects;
 import java.util.Set;
 
+import dev.persefonia.identityaccess.domain.admin.AdminAccount;
 import dev.persefonia.identityaccess.domain.admin.AdminAccountId;
 import dev.persefonia.identityaccess.domain.admin.AdminAccountStatus;
 import dev.persefonia.identityaccess.domain.admin.AdminRole;
@@ -34,6 +35,13 @@ public record AdminPrincipal(
         if (roles.isEmpty()) {
             throw new IllegalArgumentException("active admin principal must have at least one role");
         }
+    }
+
+    public static AdminPrincipal from(AdminAccount account) {
+        Objects.requireNonNull(account, "account");
+        return new AdminPrincipal(
+                account.id(), account.oidcSubject(), account.email(), account.normalizedEmail(),
+                account.displayName(), account.roles(), account.status());
     }
 
     public boolean hasRole(AdminRole role) {
