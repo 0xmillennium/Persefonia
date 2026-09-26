@@ -5,6 +5,9 @@ def network_names($service): ($service.networks | keys | sort);
 def secret_targets($service): [$service.secrets[]?.target // .source] | sort;
 def has_mount($service; $source; $target):
   any($service.volumes[]?; .source == $source and .target == $target);
+def has_read_only_bind($service; $source; $target):
+  any($service.volumes[]?; .type == "bind" and .source == $source and .target == $target
+    and .read_only == true and (.bind.create_host_path // false) == false);
 def port_is($service; $target):
   ($service.ports | length) == 1 and
   $service.ports[0].host_ip == "127.0.0.1" and
@@ -59,8 +62,33 @@ def local_policy($doc):
       "local network topology changed")
   | check(port_is(.services.app; 8080) and port_is(.services.postgres; 5432)
       and port_is(.services.redis; 6379); "local ports must bind only to loopback")
+  | check(.services.app.environment.PERSEFONIA_MANAGEMENT_PORT == $management_port
+      and .services.app.healthcheck.test == ["CMD", "curl", "--fail", "--silent", "--show-error",
+        "--output", "/dev/null", ("http://127.0.0.1:" + $management_port + "/actuator/health/readiness")]
+      and .services.postgres.healthcheck.test == ["CMD", "pg_isready", "-U",
+        .services.postgres.environment.POSTGRES_USER, "-d", .services.postgres.environment.POSTGRES_DB]
+      and .services.redis.healthcheck.test == ["CMD", "redis-cli", "ping"];
+      "local healthchecks must use native commands and application readiness only")
+  | check(.services.redis.command == ["/usr/local/bin/redis-start.sh"]
+      and .services.redis.environment.PERSEFONIA_REDIS_USERNAME == $redis_username
+      and .services.app.environment.SPRING_DATA_REDIS_USERNAME == $redis_username
+      and .services.redis.environment.PERSEFONIA_REDIS_KEY_PREFIX == $redis_key_prefix
+      and .services.app.environment.PERSEFONIA_CONTACT_RATE_LIMIT_REDIS_KEY_PREFIX == $redis_key_prefix
+      and has_read_only_bind(.services.redis; $redis_helper; "/usr/local/bin/redis-start.sh")
+      and has_read_only_bind(.services.redis; ($repository_root + "/docker/redis/redis.conf");
+        "/usr/local/etc/redis/redis.conf");
+      "local Redis startup or environment-owned ACL wiring changed")
+  | check(.services.postgres.command == ["postgres", "-c", "config_file=/etc/postgresql/postgresql.conf"]
+      and has_read_only_bind(.services.postgres; ($repository_root + "/docker/postgresql/postgresql.conf");
+        "/etc/postgresql/postgresql.conf")
+      and has_read_only_bind(.services.postgres; ($repository_root + "/docker/postgresql/pg_hba.conf");
+        "/etc/postgresql/pg_hba.conf")
+      and (.services.postgres.tmpfs | index("/tmp") != null)
+      and .services.postgres.environment.POSTGRES_PASSWORD_FILE == "/run/secrets/postgres_password";
+      "local PostgreSQL shared configuration or password-file contract changed")
   | check((.services.app.labels // {}) == {}
       and (.services.app.environment | has("PERSEFONIA_OIDC_ISSUER_URI") | not)
+      and (.services.app.environment | has("PERSEFONIA_ADMIN_REQUIRED_OIDC_GROUP") | not)
       and (.services.app.environment | has("PERSEFONIA_SMTP_HOST") | not)
       and (.services.app.environment | has("PERSEFONIA_CLOUDFLARE_ZONE_ID") | not);
       "local runtime depends on production integration");

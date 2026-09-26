@@ -14,14 +14,22 @@ printf '%s\n' 'synthetic-contact-rate-limit-secret-with-sufficient-length' > "$t
 local_image=example.invalid/persefonia:local
 production_image="example.invalid/persefonia@sha256:$(printf 'a%.0s' {1..64})"
 redis_helper="$(pwd)/docker/redis-start.sh"
+local_redis_username=compose-verifier
+local_redis_key_prefix=compose-verifier:rate-limit
+local_management_port=19001
 
-cat > "$temporary_directory/local.env" <<EOF
+# Start with the tracked standalone contract, then replace host resources with synthetic ones.
+cat .env.example > "$temporary_directory/local.env"
+cat >> "$temporary_directory/local.env" <<EOF
 PERSEFONIA_IMAGE_REF=$local_image
 POSTGRES_DB=persefonia
 POSTGRES_USER=persefonia
 PERSEFONIA_POSTGRES_PASSWORD_FILE=$temporary_directory/postgres_password
 PERSEFONIA_REDIS_PASSWORD_FILE=$temporary_directory/redis_password
 PERSEFONIA_CONTACT_RATE_LIMIT_SECRET_FILE=$temporary_directory/contact_rate_limit_secret
+PERSEFONIA_REDIS_USERNAME=$local_redis_username
+PERSEFONIA_REDIS_KEY_PREFIX=$local_redis_key_prefix
+PERSEFONIA_MANAGEMENT_PORT=$local_management_port
 PERSEFONIA_MEDIA_HOST_PATH=$temporary_directory/media
 PERSEFONIA_APP_PORT=18080
 POSTGRES_PORT=15432
@@ -56,6 +64,8 @@ env -i PATH="$PATH" DOCKER_CONFIG="$compose_config" COMPOSE_DISABLE_ENV_FILE=1 \
 jq -e --arg repository_root "$(pwd)" --arg mode local --arg image "$local_image" \
   --arg media_source "$temporary_directory/media" --arg redis_helper "$redis_helper" \
   --arg host '' --arg required_admin_group '' \
+  --arg redis_username "$local_redis_username" --arg redis_key_prefix "$local_redis_key_prefix" \
+  --arg management_port "$local_management_port" \
   -f scripts/ci/compose-runtime-policy.jq "$temporary_directory/local.json" >/dev/null
 
 env -i PATH="$PATH" DOCKER_CONFIG="$compose_config" COMPOSE_DISABLE_ENV_FILE=1 \
@@ -65,6 +75,7 @@ env -i PATH="$PATH" DOCKER_CONFIG="$compose_config" COMPOSE_DISABLE_ENV_FILE=1 \
 jq -e --arg repository_root "$(pwd)" --arg mode production --arg image "$production_image" \
   --arg media_source /var/lib/persefonia/media --arg redis_helper "$redis_helper" \
   --arg host persefonia.example.invalid --arg required_admin_group admin \
+  --arg redis_username persefonia --arg redis_key_prefix persefonia:rate-limit --arg management_port 9001 \
   -f scripts/ci/compose-runtime-policy.jq "$temporary_directory/production.json" >/dev/null
 
 # Repository source must never require live secret contents.

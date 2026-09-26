@@ -58,8 +58,28 @@ require_env_value() {
 
 require_command docker
 
-docker compose version >/dev/null 2>&1 ||
+compose_version="$(docker compose version --short 2>/dev/null)" ||
     fail "Docker Compose plugin is unavailable"
+
+# gw_priority in the production descriptor requires Compose 2.33.1.
+if PERSEFONIA_PREFLIGHT_COMPOSE_VERSION="$compose_version" awk 'BEGIN {
+    version = ENVIRON["PERSEFONIA_PREFLIGHT_COMPOSE_VERSION"]
+    sub(/^v/, "", version)
+    if (version !~ /^[0-9]+\.[0-9]+\.[0-9]+$/) exit 2
+    split(version, parts, /[.]/)
+    if (parts[1] + 0 > 2 ||
+        (parts[1] + 0 == 2 && parts[2] + 0 > 33) ||
+        (parts[1] + 0 == 2 && parts[2] + 0 == 33 && parts[3] + 0 >= 1)) exit 0
+    exit 1
+}'; then
+    :
+else
+    version_status=$?
+    if [ "$version_status" -eq 2 ]; then
+        fail "cannot parse Docker Compose version: $compose_version (expected major.minor.patch, optionally prefixed with v)"
+    fi
+    fail "Docker Compose 2.33.1 or newer is required by the production runtime (found $compose_version)"
+fi
 
 require_readable_file "$compose_file"
 require_readable_file "$env_file"

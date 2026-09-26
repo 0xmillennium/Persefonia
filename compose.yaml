@@ -9,7 +9,9 @@ services:
       - no-new-privileges:true
     environment:
       SPRING_PROFILES_ACTIVE: docker
-      SPRING_DATA_REDIS_USERNAME: persefonia
+      SPRING_DATA_REDIS_USERNAME: "${PERSEFONIA_REDIS_USERNAME:?}"
+      PERSEFONIA_CONTACT_RATE_LIMIT_REDIS_KEY_PREFIX: "${PERSEFONIA_REDIS_KEY_PREFIX:?}"
+      PERSEFONIA_MANAGEMENT_PORT: "${PERSEFONIA_MANAGEMENT_PORT:?}"
       POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
       POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
     secrets:
@@ -35,7 +37,7 @@ services:
         required: false
     healthcheck:
       test:
-        ["CMD-SHELL", "curl --fail --silent --show-error http://127.0.0.1:9001/actuator/health/readiness >/dev/null && curl --fail --silent --show-error http://127.0.0.1:8080/robots.txt >/dev/null"]
+        ["CMD", "curl", "--fail", "--silent", "--show-error", "--output", "/dev/null", "http://127.0.0.1:${PERSEFONIA_MANAGEMENT_PORT:?}/actuator/health/readiness"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -54,6 +56,7 @@ services:
       - ALL
     security_opt:
       - no-new-privileges:true
+    command: ["postgres", "-c", "config_file=/etc/postgresql/postgresql.conf"]
     environment:
       POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
       POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
@@ -62,11 +65,23 @@ services:
       - postgres_password
     volumes:
       - postgres-data:/var/lib/postgresql/data
+      - type: bind
+        source: ./docker/postgresql/postgresql.conf
+        target: /etc/postgresql/postgresql.conf
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./docker/postgresql/pg_hba.conf
+        target: /etc/postgresql/pg_hba.conf
+        read_only: true
+        bind:
+          create_host_path: false
     tmpfs:
       - /tmp
       - /var/run/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER:?POSTGRES_USER is required}", "-d", "${POSTGRES_DB:?POSTGRES_DB is required}"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -84,10 +99,10 @@ services:
       - ALL
     security_opt:
       - no-new-privileges:true
-    command: ["/bin/sh", "/usr/local/bin/redis-start.sh"]
+    command: ["/usr/local/bin/redis-start.sh"]
     environment:
-      PERSEFONIA_REDIS_USERNAME: persefonia
-      PERSEFONIA_REDIS_KEY_PREFIX: persefonia:rate-limit
+      PERSEFONIA_REDIS_USERNAME: "${PERSEFONIA_REDIS_USERNAME:?}"
+      PERSEFONIA_REDIS_KEY_PREFIX: "${PERSEFONIA_REDIS_KEY_PREFIX:?}"
     secrets:
       - redis_password
     volumes:
