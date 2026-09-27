@@ -6,6 +6,8 @@ import java.util.Arrays;
 import java.util.Comparator;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.MigrationInfo;
+import org.flywaydb.core.api.MigrationState;
+import org.flywaydb.core.api.MigrationVersion;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 
@@ -24,20 +26,31 @@ public final class FlywayMigrationStatusAdapter {
             var info = available.info();
             MigrationInfo current = info.current();
             MigrationInfo[] pending = info.pending();
-            boolean failed = Arrays.stream(info.all()).anyMatch(item -> item.getState().isFailed());
-            String latest = Arrays.stream(info.all())
+            MigrationInfo[] all = info.all();
+            MigrationVersion currentVersion = current == null ? null : current.getVersion();
+            boolean failed = Arrays.stream(all).anyMatch(item -> item.getState().isFailed());
+            MigrationVersion latest = Arrays.stream(all)
                     .filter(item -> item.getVersion() != null && item.getState().isResolved())
                     .max(Comparator.comparing(MigrationInfo::getVersion))
-                    .map(item -> item.getVersion().getVersion())
+                    .map(MigrationInfo::getVersion)
                     .orElse(null);
+            boolean upToDate = latest != null && latest.equals(currentVersion)
+                    && Arrays.stream(all).allMatch(FlywayMigrationStatusAdapter::isHealthyHistoryEntry);
             MigrationStatus status = failed ? MigrationStatus.FAILED
-                    : pending.length > 0 ? MigrationStatus.PENDING : MigrationStatus.UP_TO_DATE;
+                    : pending.length > 0 ? MigrationStatus.PENDING
+                    : upToDate ? MigrationStatus.UP_TO_DATE : MigrationStatus.UNKNOWN;
             return new MigrationStatusSummary(
-                    current == null || current.getVersion() == null ? null : current.getVersion().getVersion(),
-                    latest, pending.length, status);
+                    currentVersion == null ? null : currentVersion.getVersion(),
+                    latest == null ? null : latest.getVersion(), pending.length, status);
         } catch (RuntimeException exception) {
             return unknown();
         }
+    }
+
+    private static boolean isHealthyHistoryEntry(MigrationInfo migration) {
+        MigrationState state = migration.getState();
+        // Superseded repeatable runs are normal history once a newer run has succeeded.
+        return state == MigrationState.SUCCESS || state == MigrationState.SUPERSEDED;
     }
 
     private static MigrationStatusSummary unknown() {

@@ -3,6 +3,9 @@ package dev.persefonia.app.infrastructure;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.persefonia.app.testsupport.SharedPostgresTestServer;
+import dev.persefonia.app.platformoperations.operations.DatabaseMigrationsHealthIndicator;
+import dev.persefonia.app.platformoperations.operations.FlywayMigrationStatusAdapter;
+import dev.persefonia.platformoperations.application.operations.MigrationStatus;
 import dev.persefonia.webpublic.content.PublicContentResponseHeaders;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -16,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.boot.health.contributor.Status;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.DirtiesContext;
@@ -49,6 +53,12 @@ class SpringBootFlywayRuntimeIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbc;
+
+    @Autowired
+    private FlywayMigrationStatusAdapter migrations;
+
+    @Autowired
+    private DatabaseMigrationsHealthIndicator migrationHealth;
 
     @LocalServerPort
     private int port;
@@ -102,6 +112,13 @@ class SpringBootFlywayRuntimeIntegrationTest {
                 .filter(migration -> migration.getVersion() != null && migration.getState().isResolved())
                 .max(Comparator.comparing(MigrationInfo::getVersion)).orElseThrow();
         assertThat(info.current().getVersion()).isEqualTo(latest.getVersion());
+        assertThat(migrations.status()).satisfies(status -> {
+            assertThat(status.currentAppliedVersion()).isEqualTo(latest.getVersion().getVersion());
+            assertThat(status.latestResolvedVersion()).isEqualTo(latest.getVersion().getVersion());
+            assertThat(status.pendingCount()).isZero();
+            assertThat(status.status()).isEqualTo(MigrationStatus.UP_TO_DATE);
+        });
+        assertThat(migrationHealth.health().getStatus()).isEqualTo(Status.UP);
 
         try (HttpClient client = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER).build()) {
             var response = client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/"))
