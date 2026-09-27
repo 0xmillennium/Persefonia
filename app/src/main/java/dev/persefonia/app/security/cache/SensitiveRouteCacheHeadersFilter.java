@@ -2,6 +2,7 @@ package dev.persefonia.app.security.cache;
 
 import java.io.IOException;
 
+import jakarta.servlet.DispatcherType;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -13,11 +14,16 @@ public final class SensitiveRouteCacheHeadersFilter extends OncePerRequestFilter
     static final String CACHE_CONTROL = "no-store, no-cache, max-age=0, must-revalidate, private";
 
     @Override
+    protected boolean shouldNotFilterErrorDispatch() {
+        return false;
+    }
+
+    @Override
     protected void doFilterInternal(
             HttpServletRequest request,
             HttpServletResponse response,
             FilterChain filterChain) throws ServletException, IOException {
-        if (isSensitivePath(pathWithinApplication(request))) {
+        if (request.getDispatcherType() == DispatcherType.ERROR || isSensitivePath(pathWithinApplication(request))) {
             response.setHeader("Cache-Control", CACHE_CONTROL);
             response.setHeader("Pragma", "no-cache");
             response.setDateHeader("Expires", 0);

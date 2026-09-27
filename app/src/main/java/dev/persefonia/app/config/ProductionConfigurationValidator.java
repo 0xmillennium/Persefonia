@@ -89,6 +89,10 @@ class ProductionConfigurationValidator implements InitializingBean {
         if (!secure) {
             violations.add("session cookie must be marked secure in production");
         }
+        String trackingModes = environment.getProperty("server.servlet.session.tracking-modes");
+        if (trackingModes == null || !"cookie".equalsIgnoreCase(trackingModes.trim())) {
+            violations.add("session tracking modes must be cookie-only in production");
+        }
     }
 
     private void validateFlyway(List<String> violations) {

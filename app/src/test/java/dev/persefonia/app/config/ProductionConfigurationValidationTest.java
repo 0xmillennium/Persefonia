@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.mock.env.MockEnvironment;
+import org.springframework.mock.env.MockPropertySource;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
@@ -31,6 +32,30 @@ class ProductionConfigurationValidationTest {
         assertThatCode(() -> validator(secureEnvironment(), strongRateLimit(), enabledMail(), OIDC_CONFIGURED)
                 .afterPropertiesSet())
                 .doesNotThrowAnyException();
+    }
+
+    @Test
+    void acceptsCaseInsensitiveCookieOnlySessionTracking() {
+        MockEnvironment environment = secureEnvironment();
+        environment.setProperty("server.servlet.session.tracking-modes", "COOKIE");
+        assertThatCode(() -> validator(environment, strongRateLimit(), enabledMail(), OIDC_CONFIGURED)
+                .afterPropertiesSet()).doesNotThrowAnyException();
+    }
+
+    @Test
+    void rejectsNonCookieOrMissingSessionTrackingModes() {
+        for (String modes : new String[] {"url", "cookie,url", "url,cookie", "ssl", "", "  ", null}) {
+            MockEnvironment environment = secureEnvironment();
+            if (modes == null) {
+                ((MockPropertySource) environment.getPropertySources().get("mockProperties")).getSource()
+                        .remove("server.servlet.session.tracking-modes");
+            } else {
+                environment.setProperty("server.servlet.session.tracking-modes", modes);
+            }
+            assertThatThrownBy(() -> validator(environment, strongRateLimit(), enabledMail(), OIDC_CONFIGURED)
+                    .afterPropertiesSet()).as("tracking modes: %s", modes)
+                    .hasMessageContaining("session tracking modes must be cookie-only");
+        }
     }
 
     @Test

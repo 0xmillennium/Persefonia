@@ -1,6 +1,7 @@
 package dev.persefonia.app.security;
 
 import java.time.Clock;
+import jakarta.servlet.DispatcherType;
 
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -83,6 +84,7 @@ public class SecurityConfiguration {
         http
                 .securityMatcher(new NegatedRequestMatcher(EndpointRequest.toAnyEndpoint()))
                 .authorizeHttpRequests(authorize -> authorize
+                        .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         .requestMatchers(HttpMethod.GET, "/").permitAll()
                         .requestMatchers(HttpMethod.GET, "/sitemap.xml", "/robots.txt").permitAll()
                         .requestMatchers(HttpMethod.GET, "/feed.xml").permitAll()
