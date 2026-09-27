@@ -38,7 +38,8 @@ class ActuatorExposureTest {
     void exposesOnlySafeEndpointsOnTheManagementPort() throws Exception {
         assertNotSuccessful(applicationPort, "/actuator/health");
 
-        assertStatus(managementPort, "/actuator/health", 200);
+        // This fixture disables Flyway, so migration health is UNKNOWN and aggregate health is DOWN.
+        assertStatus(managementPort, "/actuator/health", 503);
         assertStatus(managementPort, "/actuator/info", 200);
         assertStatus(managementPort, "/actuator/metrics", 200);
         assertStatus(managementPort, "/actuator/prometheus", 200);

@@ -19,7 +19,7 @@ class DockerHealthGroupConfigurationTest {
         assertThat(health.getGroup().get("liveness").getInclude())
                 .containsExactly("livenessState");
         assertThat(health.getGroup().get("readiness").getInclude())
-                .containsExactlyInAnyOrder("readinessState", "db", "mediaStorage")
+                .containsExactlyInAnyOrder("readinessState", "db", "mediaStorage", "databaseMigrations")
                 .doesNotContain("redis");
     }
 

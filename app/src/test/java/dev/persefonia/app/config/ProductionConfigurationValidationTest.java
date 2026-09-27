@@ -3,12 +3,15 @@ package dev.persefonia.app.config;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import dev.persefonia.app.communication.mail.ContactMailNotificationProperties;
 import dev.persefonia.app.identityaccess.config.AdminAccessProperties;
 import dev.persefonia.app.platformoperations.ratelimit.ContactRateLimitProperties;
 import java.time.Duration;
 import java.util.List;
+import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -350,20 +353,52 @@ class ProductionConfigurationValidationTest {
                 .run(context -> assertThat(context).hasNotFailed());
     }
 
+    @Test
+    void rejectsDisabledFlyway() {
+        MockEnvironment environment = secureEnvironment();
+        environment.setProperty("spring.flyway.enabled", "false");
+        assertThatThrownBy(() -> validator(environment, strongRateLimit(), enabledMail(), OIDC_CONFIGURED)
+                .afterPropertiesSet()).hasMessageContaining("Flyway must be enabled");
+    }
+
+    @Test
+    void rejectsUnavailableFlywayIntegration() {
+        var validator = validator(secureEnvironment(), strongRateLimit(), enabledMail(), OIDC_CONFIGURED,
+                flywayProvider(null));
+        assertThatThrownBy(validator::afterPropertiesSet)
+                .hasMessageContaining("Boot-managed Flyway integration must be available");
+    }
+
+    @SuppressWarnings("unchecked")
+    private static ObjectProvider<Flyway> flywayProvider(Flyway value) {
+        ObjectProvider<Flyway> provider = mock(ObjectProvider.class);
+        when(provider.getIfAvailable()).thenReturn(value);
+        return provider;
+    }
+
     private static ProductionConfigurationValidator validator(
             MockEnvironment environment,
             ContactRateLimitProperties rateLimit,
             ContactMailNotificationProperties mail,
             ClientRegistrationRepository clientRegistration) {
+        return validator(environment, rateLimit, mail, clientRegistration, flywayProvider(mock(Flyway.class)));
+    }
+
+    private static ProductionConfigurationValidator validator(
+            MockEnvironment environment,
+            ContactRateLimitProperties rateLimit,
+            ContactMailNotificationProperties mail,
+            ClientRegistrationRepository clientRegistration,
+            ObjectProvider<Flyway> flyway) {
         return new ProductionConfigurationValidator(
                 environment, rateLimit, mail, productionAdminAccess(),
-                registrations(clientRegistration));
+                registrations(clientRegistration), flyway);
     }
 
     private static ProductionConfigurationValidator validator(AdminAccessProperties adminAccess) {
         return new ProductionConfigurationValidator(
                 secureEnvironment(), strongRateLimit(), enabledMail(), adminAccess,
-                registrations(OIDC_CONFIGURED));
+                registrations(OIDC_CONFIGURED), flywayProvider(mock(Flyway.class)));
     }
 
     private static AdminAccessProperties productionAdminAccess() {
@@ -380,6 +415,8 @@ class ProductionConfigurationValidationTest {
 
     private static MockEnvironment secureEnvironment() {
         MockEnvironment environment = new MockEnvironment();
+        environment.setProperty("spring.flyway.enabled", "true");
+        environment.setProperty("server.servlet.session.tracking-modes", "cookie");
         environment.setProperty("server.servlet.session.cookie.secure", "true");
         environment.setProperty("site.public-base-url", "https://example.test");
         environment.setProperty("server.forward-headers-strategy", "NATIVE");

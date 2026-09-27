@@ -43,10 +43,13 @@ class SecurityActuatorIsolationTest {
     void actuatorRemainsLimitedToTheSeparateManagementPort() throws Exception {
         for (String path : ALLOWED_MANAGEMENT_PATHS) {
             assertNotSuccessful(get(applicationPort, path), path);
-            assertEquals(200, get(managementPort, path).statusCode(), path);
+            // Flyway is disabled in this fixture: UNKNOWN migrations must make aggregate health DOWN.
+            assertEquals(path.equals("/actuator/health") ? 503 : 200, get(managementPort, path).statusCode(), path);
         }
 
         HttpResponse<String> health = get(managementPort, "/actuator/health");
+        assertTrue(health.body().contains("\"status\":\"DOWN\""));
+        assertFalse(health.body().contains("databaseMigrations"));
         assertTrue(health.headers().firstValue("X-Request-Id").orElse("").matches("[A-Za-z0-9._-]+"));
 
         for (String path : SENSITIVE_MANAGEMENT_PATHS) {

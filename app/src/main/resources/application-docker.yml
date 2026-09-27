@@ -24,7 +24,7 @@ management:
         liveness:
           include: livenessState
         readiness:
-          include: readinessState,db,mediaStorage
+          include: readinessState,db,mediaStorage,databaseMigrations
 
 persefonia:
   media:

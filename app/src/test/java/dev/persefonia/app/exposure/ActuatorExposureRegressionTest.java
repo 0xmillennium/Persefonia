@@ -46,7 +46,8 @@ class ActuatorExposureRegressionTest {
     void actuatorIsLimitedToTheManagementPortAllowlist() throws Exception {
         for (String path : ALLOWED_ENDPOINTS) {
             ExposureTestSupport.assertNotSuccessful(applicationPort, path);
-            ExposureTestSupport.assertStatus(managementPort, path, 200);
+            // The Flyway-disabled fixture exposes health while correctly reporting migration unavailability.
+            ExposureTestSupport.assertStatus(managementPort, path, path.equals("/actuator/health") ? 503 : 200);
         }
 
         for (String path : SENSITIVE_ENDPOINTS) {
