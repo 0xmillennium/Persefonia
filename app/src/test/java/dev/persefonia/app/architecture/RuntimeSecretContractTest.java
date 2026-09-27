@@ -16,6 +16,24 @@ class RuntimeSecretContractTest {
             "contact_rate_limit_secret", "oidc_client_secret", "cloudflare_api_token");
 
     @Test
+    void productionFileSecretsDoNotRelyOnIgnoredUidGidOrModeRemapping() throws Exception {
+        Map<?, ?> compose = new Yaml().load(Files.readString(Path.of("../compose.production.yaml")));
+        Map<?, ?> services = (Map<?, ?>) compose.get("services");
+        for (Object service : services.values()) {
+            List<?> secrets = (List<?>) ((Map<?, ?>) service).get("secrets");
+            for (Object secret : secrets) {
+                if (secret instanceof Map<?, ?> entry) {
+                    for (String permission : List.of("uid", "gid", "mode")) {
+                        assertThat(entry.containsKey(permission)).as("file-secret %s remapping", permission).isFalse();
+                    }
+                } else {
+                    assertThat(secret).isInstanceOf(String.class);
+                }
+            }
+        }
+    }
+
+    @Test
     void flatExamplesAreSourceAndComposeUsesOnlyRealSecretNames() throws Exception {
         String compose = Files.readString(Path.of("../compose.production.yaml"));
         Map<?, ?> secrets = (Map<?, ?>) ((Map<?, ?>) new Yaml().load(compose)).get("secrets");
