@@ -88,47 +88,52 @@ class RcDeploymentWorkflowArchitectureTest {
         String jobs = workflow.substring(workflow.indexOf("\njobs:\n") + "\njobs:\n".length());
         assertThat(Pattern.compile("(?m)^  ([a-z][a-z-]+):\\s*$").matcher(jobs).results()
                 .map(match -> match.group(1)).toList())
-                .containsExactly("resolve-qualified-artifact", "verify-rc-target-trust");
+                .containsExactly("resolve-qualified-artifact", "deploy-rc");
     }
 
     @Test
-    void workflowHasNoBuildOrRuntimeMutation() throws Exception {
+    void workflowDelegatesDeploymentPolicyToRepositoryScripts() throws Exception {
         String workflow = Files.readString(WORKFLOW);
 
         assertThat(workflow).doesNotContain(
                 "./gradlew", "setup-java", "setup-gradle", "setup-node", "npm", "vite",
-                "docker build", "docker compose", "docker pull", "ssh ", "scp ", "rsync ",
-                "sftp ", "systemctl", "actions/upload-artifact");
+                "docker build", "docker compose", "docker pull", "docker run", "docker restart",
+                "ssh ", "scp ", "rsync ", "sftp ", "sudo ", "systemctl",
+                "git pull", "actions/upload-artifact", "POSTGRES_PASSWORD", "REDIS_PASSWORD",
+                "OIDC_CLIENT_SECRET", "CLOUDFLARE_API_TOKEN");
     }
 
     @Test
-    void targetTrustJobEntersRcEnvironmentAfterQualificationWithOnlyCheckoutPermission() throws Exception {
+    void deploymentJobEntersRcEnvironmentAfterQualificationWithOnlyCheckoutPermission() throws Exception {
         String workflow = Files.readString(WORKFLOW);
-        String trust = trustJob(workflow);
+        String trust = deployJob(workflow);
 
         assertThat(workflow).contains("\npermissions: {}\n");
         assertThat(trust)
-                .contains("name: Verify RC target trust", "needs: resolve-qualified-artifact",
-                        "runs-on: ubuntu-24.04", "environment:\n      name: rc\n      deployment: false",
+                .contains("name: Deploy RC", "needs: resolve-qualified-artifact",
+                        "runs-on: ubuntu-24.04", "environment:\n      name: rc\n",
                         "ref: ${{ needs.resolve-qualified-artifact.outputs.source_sha }}",
                         "EXPECTED_SOURCE_SHA: ${{ needs.resolve-qualified-artifact.outputs.source_sha }}",
                         "test \"$(git rev-parse HEAD)\" = \"$EXPECTED_SOURCE_SHA\"",
                         "persist-credentials: false",
                         "uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1")
-                .doesNotContain("url:", "docker/", "docker ", "compose", "scp ", "rsync ",
+                .doesNotContain("deployment: false", "url:", "docker/", "docker ", "compose", "scp ", "rsync ",
                         "actions/download-artifact", "gh attestation", "resolve-qualified-artifact.sh",
-                        "verify-delivery-handoff.sh", "GITHUB_OUTPUT", "GITHUB_ENV", "sudo ");
+                        "verify-delivery-handoff.sh", "GITHUB_ENV", "sudo ");
         assertThat(trust.substring(trust.indexOf("    permissions:\n"), trust.indexOf("    steps:\n"))
                 .lines().map(String::trim).filter(line -> !line.isEmpty()).toList())
                 .containsExactly("permissions:", "contents: read");
     }
 
     @Test
-    void targetTrustJobScopesSecretToKeyMaterializationAndDelegatesSshPolicy() throws Exception {
-        String trust = trustJob(Files.readString(WORKFLOW));
+    void deploymentJobOrdersTrustMutationIngressSummaryAndCleanup() throws Exception {
+        String trust = deployJob(Files.readString(WORKFLOW));
         String materialize = step(trust, "Materialize RC SSH private key", "Verify RC SSH target");
-        String verify = step(trust, "Verify RC SSH target", "Remove RC SSH private key");
-        String cleanup = trust.substring(trust.indexOf("      - name: Remove RC SSH private key"));
+        String verify = step(trust, "Verify RC SSH target", "Deploy qualified artifact");
+        String deploy = step(trust, "Deploy qualified artifact", "Verify RC public ingress");
+        String ingress = step(trust, "Verify RC public ingress", "Write RC deployment summary");
+        String summary = step(trust, "Write RC deployment summary", "Remove RC SSH material");
+        String cleanup = trust.substring(trust.indexOf("      - name: Remove RC SSH material"));
 
         assertThat(trust.split(Pattern.quote("${{ secrets.RC_SSH_PRIVATE_KEY }}"), -1)).hasSize(2);
         assertThat(materialize).contains("RC_SSH_PRIVATE_KEY: ${{ secrets.RC_SSH_PRIVATE_KEY }}",
@@ -137,20 +142,30 @@ class RcDeploymentWorkflowArchitectureTest {
         assertThat(verify).contains("vars.RC_SSH_HOST", "vars.RC_SSH_PORT", "vars.RC_SSH_USER",
                 "vars.RC_SSH_HOST_KEY_SHA256", "./scripts/deploy/verify-ssh-target.sh",
                 "\"$RC_SSH_HOST\"", "\"$RC_SSH_PORT\"", "\"$RC_SSH_USER\"",
-                "\"$RC_SSH_HOST_KEY_SHA256\"", "\"$RUNNER_TEMP/persefonia-rc-ssh-key\"")
-                .doesNotContain("secrets.", "ssh-keyscan", "ssh-keygen", "known_hosts", "ssh -");
-        assertThat(cleanup).contains("if: always()", "rm -f -- \"$RUNNER_TEMP/persefonia-rc-ssh-key\"")
+                "\"$RC_SSH_HOST_KEY_SHA256\"", "\"$RUNNER_TEMP/persefonia-rc-ssh-key\"",
+                "\"$RUNNER_TEMP/persefonia-rc-known-hosts\"")
+                .doesNotContain("secrets.", "ssh-keyscan", "ssh-keygen", "ssh -");
+        assertThat(deploy).contains("id: deployment", "./scripts/deploy/run-rc-deployment.sh",
+                "needs.resolve-qualified-artifact.outputs.source_sha",
+                "needs.resolve-qualified-artifact.outputs.image_reference",
+                "\"$RUNNER_TEMP/persefonia-rc-known-hosts\"",
+                "\"$QUALIFIED_SOURCE_SHA\" \"$QUALIFIED_IMAGE_REFERENCE\" >> \"$GITHUB_OUTPUT\"")
+                .doesNotContain("source_alias", "secrets.");
+        assertThat(ingress).contains("./scripts/deploy/verify-rc-ingress.sh");
+        assertThat(summary).contains("steps.deployment.outputs.app_health", "GITHUB_STEP_SUMMARY")
+                .doesNotContain("secrets.");
+        assertThat(cleanup).contains("if: always()", "rm -f -- \"$RUNNER_TEMP/persefonia-rc-ssh-key\" \"$RUNNER_TEMP/persefonia-rc-known-hosts\"")
                 .doesNotContain("secrets.", "rm -rf", "*");
         assertThat(trust.substring(0, trust.indexOf("      - name: Materialize RC SSH private key")))
                 .doesNotContain("secrets.");
     }
 
     private static String qualifiedJob(String workflow) {
-        return workflow.substring(0, workflow.indexOf("\n  verify-rc-target-trust:"));
+        return workflow.substring(0, workflow.indexOf("\n  deploy-rc:"));
     }
 
-    private static String trustJob(String workflow) {
-        return workflow.substring(workflow.indexOf("\n  verify-rc-target-trust:"));
+    private static String deployJob(String workflow) {
+        return workflow.substring(workflow.indexOf("\n  deploy-rc:"));
     }
 
     private static String step(String job, String start, String next) {
