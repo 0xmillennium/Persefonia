@@ -8,7 +8,9 @@
 | Supersedes | none |
 | Superseded by | none |
 
-Identity-admission refinement: [ADR 0026](0026-use-oidc-group-admission-with-refresh-backed-admin-session-revalidation.md) replaces the historical OWNER identity allowlist configuration with required OIDC group admission and refresh-backed session revalidation. Deployment and secret ownership remain unchanged.
+Identity-admission refinement: [ADR 0026](0026-use-oidc-group-admission-with-refresh-backed-admin-session-revalidation.md) replaces the historical OWNER identity allowlist configuration with required OIDC group admission and refresh-backed session revalidation. That identity refinement did not alter deployment or secret ownership; the later ownership refinement below governs those portions.
+
+Runtime-ownership refinement: [ADR 0028](0028-separate-application-delivery-from-host-runtime-topology.md) supersedes the repository-owned production Compose, preflight, and runtime-topology ownership portions below. Exact OCI digest authority, the GitHub-hosted runner boundary, authenticated SSH, mandatory SSH host identity verification, host-owned application secrets, and no blind automatic rollback remain in force. This refinement does not implement D5 host mutation.
 
 ## Context
 

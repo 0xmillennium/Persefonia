@@ -91,7 +91,7 @@ nb-configuration.xml
 .env.production
 *.log
 
-# Host-owned runtime secrets; examples remain repository source.
+# Application-consumed runtime secrets; examples remain repository source.
 /secrets/postgres_password
 /secrets/redis_password
 /secrets/contact_rate_limit_secret

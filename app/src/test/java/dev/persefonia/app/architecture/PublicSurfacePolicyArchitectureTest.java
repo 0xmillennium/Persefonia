@@ -32,7 +32,6 @@ class PublicSurfacePolicyArchitectureTest {
             Path.of("../scripts/ci/compose-runtime-policy.jq"),
             Path.of("../scripts/ci/verify-java21-runtime.sh"),
             Path.of("../scripts/deploy/resolve-qualified-artifact.sh"),
-            Path.of("../scripts/deploy/preflight.sh"),
             Path.of("../scripts/deploy/verify-ssh-target.sh"),
             Path.of("../scripts/deploy/verify-delivery-handoff.sh"),
             Path.of("../scripts/deploy/qualified-index-policy.jq"),

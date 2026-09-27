@@ -8,6 +8,8 @@
 | Supersedes | none; refines ADR 0007 and ADR 0025 identity admission |
 | Superseded by | none |
 
+Runtime-ownership refinement: [ADR 0028](0028-separate-application-delivery-from-host-runtime-topology.md) supersedes the historical tracked-runtime-source paragraph below referencing `compose.production.yaml`, `.env.production.example`, `docker/postgresql/`, `docker/redis/`, and `docker/redis-start.sh`. Production topology, server configuration, and host preflight are externally owned. OIDC admission and revalidation semantics remain unchanged.
+
 ## Context
 
 [ADR 0007](0007-use-oidc-for-admin-authentication.md) keeps authentication external and authorization local. Authelia remains the authentication provider and owns its two-factor policy. Subject/email admission lists do not express the intended provider eligibility, and checking local account existence first lets a provisioned identity bypass later admission changes. Login-time claims alone also leave long-lived admin sessions authorized after external eligibility or local account state changes.
