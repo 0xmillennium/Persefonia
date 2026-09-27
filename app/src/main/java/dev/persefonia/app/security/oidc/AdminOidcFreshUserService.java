@@ -1,6 +1,7 @@
 package dev.persefonia.app.security.oidc;
 
 import java.net.http.HttpClient;
+import java.util.Map;
 import java.util.Objects;
 
 import org.springframework.http.client.JdkClientHttpRequestFactory;
@@ -33,8 +34,14 @@ public class AdminOidcFreshUserService {
         Objects.requireNonNull(existingIdToken, "existingIdToken");
         try {
             OidcUser user = delegate.loadUser(new OidcUserRequest(registration, accessToken, existingIdToken));
-            // A stale ID-token group must never fill in an omitted fresh groups claim.
-            if (user == null || user.getUserInfo() == null || !user.getUserInfo().getClaims().containsKey("groups")) {
+            if (user == null || user.getUserInfo() == null) {
+                throw new AdminOidcSessionRevalidationException(AdminOidcSessionFailureReason.INVALID_PROVIDER_RESPONSE);
+            }
+            // Validate fresh identity directly before downstream ID-token/profile claim merging.
+            Map<String, Object> freshClaims = user.getUserInfo().getClaims();
+            if (!freshClaims.containsKey("sub") || !(freshClaims.get("sub") instanceof String freshSubject)
+                    || freshSubject.isBlank() || !freshSubject.equals(existingIdToken.getSubject())
+                    || !freshClaims.containsKey("groups")) {
                 throw new AdminOidcSessionRevalidationException(AdminOidcSessionFailureReason.INVALID_PROVIDER_RESPONSE);
             }
             return user;

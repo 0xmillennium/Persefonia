@@ -8,6 +8,9 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 import com.sun.net.httpserver.HttpServer;
@@ -15,6 +18,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
+import org.springframework.security.oauth2.core.oidc.OidcUserInfo;
+import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 
 class AdminOidcFreshUserServiceTest {
     private HttpServer server;
@@ -38,6 +44,56 @@ class AdminOidcFreshUserServiceTest {
         assertThat(user.getUserInfo()).isNotNull();
         assertThat(new OidcClaimMapper().toAdminIdentityClaims(user).oidcGroups())
                 .extracting(group -> group.value()).containsExactly("user");
+    }
+
+    @Test
+    void matchingFreshSubjectAndAdminGroupAreAcceptedWithOptionalIdTokenProfileFallback() throws Exception {
+        body.set("{\"sub\":\"opaque-subject\",\"groups\":[\"admin\"]}");
+
+        var user = load(new AdminOidcSessionProperties());
+        var claims = new OidcClaimMapper().toAdminIdentityClaims(user);
+
+        assertThat(user.getUserInfo().getClaims()).containsEntry("sub", "opaque-subject")
+                .doesNotContainKey("email");
+        assertThat(claims.oidcSubject().value()).isEqualTo("opaque-subject");
+        assertThat(claims.oidcGroups()).extracting(group -> group.value()).containsExactly("admin");
+        assertThat(claims.email().value()).isEqualTo("admin@example.com");
+    }
+
+    @Test
+    void missingFreshSubjectCannotBeSatisfiedByTheMergedIdTokenSubject() {
+        var user = freshUser(Map.of("groups", List.of("admin")));
+        assertThat(user.getIdToken().getSubject()).isEqualTo("opaque-subject");
+        assertThat(new OidcClaimMapper().toAdminIdentityClaims(user).oidcSubject().value())
+                .isEqualTo("opaque-subject");
+
+        assertInvalidFreshUser(user);
+    }
+
+    @Test
+    void rejectsNullEmptyBlankNonStringDifferentAndNormalizedFreshSubjects() {
+        for (Object subject : new Object[] {null, "", " \t\n", 123, true, "different-subject",
+                "OPAQUE-SUBJECT", " opaque-subject", "opaque-subject "}) {
+            Map<String, Object> claims = new HashMap<>();
+            claims.put("sub", subject);
+            claims.put("groups", List.of("admin"));
+
+            assertInvalidFreshUser(freshUser(claims));
+        }
+    }
+
+    @Test
+    void missingFreshGroupsCannotBeSatisfiedByIdTokenGroups() {
+        assertInvalidFreshUser(freshUser(Map.of("sub", "opaque-subject")));
+    }
+
+    @Test
+    void matchingFreshSubjectAndEmptyGroupsRemainStructurallyValid() throws Exception {
+        body.set("{\"sub\":\"opaque-subject\",\"groups\":[]}");
+
+        var user = load(new AdminOidcSessionProperties());
+
+        assertThat(new OidcClaimMapper().toAdminIdentityClaims(user).oidcGroups()).isEmpty();
     }
 
     @Test
@@ -88,6 +144,20 @@ class AdminOidcFreshUserServiceTest {
                         exception -> assertThat(exception.reason()).isEqualTo(reason))
                 .hasMessageNotContaining("fake-current-access-token").hasMessageNotContaining("opaque-subject")
                 .hasMessageNotContaining("admin@example.com");
+    }
+
+    private static OidcUser freshUser(Map<String, Object> claims) {
+        var stale = OidcTestFixtures.validUser();
+        return new DefaultOidcUser(stale.getAuthorities(), stale.getIdToken(), new OidcUserInfo(claims));
+    }
+
+    private static void assertInvalidFreshUser(OidcUser user) {
+        assertThatThrownBy(() -> new AdminOidcFreshUserService(request -> user).loadFreshUser(
+                AdminOidcSessionRevalidationServiceTest.registration(), token(), OidcTestFixtures.validUser().getIdToken()))
+                .isInstanceOfSatisfying(AdminOidcSessionRevalidationException.class, exception ->
+                        assertThat(exception.reason()).isEqualTo(AdminOidcSessionFailureReason.INVALID_PROVIDER_RESPONSE))
+                .hasMessageNotContaining("opaque-subject").hasMessageNotContaining("admin@example.com")
+                .hasMessageNotContaining("fake-id-token-value");
     }
 
     private org.springframework.security.oauth2.core.oidc.user.OidcUser load(AdminOidcSessionProperties properties) throws IOException {

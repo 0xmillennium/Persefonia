@@ -101,6 +101,23 @@ class AdminOidcSessionRevalidationServiceTest {
     }
 
     @Test
+    void structurallyValidFreshEmptyGroupsAreDeniedByRequiredGroupAdmission() {
+        arrangeClient(true);
+        var freshUser = fresh("opaque-subject", List.of());
+        var validatingService = new AdminOidcSessionRevalidationService(manager,
+                new AdminOidcFreshUserService(ignored -> freshUser), new OidcClaimMapper(),
+                new TransactionalAdminSessionRevalidationGateway(new AdminSessionRevalidationUseCase(repository,
+                        AdminAccessPolicy.of(OidcGroup.of("admin"), true, true))));
+        var current = new PersefoniaOidcUser(OidcTestFixtures.validUser(), AdminPrincipal.from(account(AdminRole.OWNER)));
+
+        assertThatThrownBy(() -> validatingService.revalidate(
+                new OAuth2AuthenticationToken(current, current.getAuthorities(), "authelia"), current, request, response))
+                .isInstanceOfSatisfying(AdminOidcSessionRevalidationException.class, exception ->
+                        assertThat(exception.reason()).isEqualTo(AdminOidcSessionFailureReason.ACCESS_REVOKED));
+        verifyNoInteractions(repository);
+    }
+
+    @Test
     void identityMismatchOrMalformedClaimsAreInvalidProviderResponse() {
         arrangeClient(true);
         when(freshUsers.loadFreshUser(any(), any(), any())).thenReturn(fresh("different-subject", List.of("admin")));

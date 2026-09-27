@@ -3,19 +3,31 @@ package dev.persefonia.app.security.oidc;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 
+import jakarta.servlet.FilterChain;
+
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.mock.web.MockHttpSession;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientManager;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
@@ -23,6 +35,9 @@ import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.core.OAuth2RefreshToken;
 import org.springframework.security.oauth2.core.oidc.OidcUserInfo;
 import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
+import org.springframework.security.web.context.DelegatingSecurityContextRepository;
+import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
+import org.springframework.security.web.context.RequestAttributeSecurityContextRepository;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -63,6 +78,11 @@ class OidcAdminSessionRevalidationIntegrationTest {
         registry.add("spring.datasource.password", POSTGRES::getPassword);
     }
 
+    @AfterEach
+    void clearSecurityContext() {
+        SecurityContextHolder.clearContext();
+    }
+
     @Test
     void databaseRoleChangesAreReloadedWithoutMutationLoginUpdateOrAudit() {
         var user = provision();
@@ -93,6 +113,64 @@ class OidcAdminSessionRevalidationIntegrationTest {
         jdbc.update("DELETE FROM iam.admin_accounts WHERE oidc_subject = ?", "opaque-subject");
         assertRevoked(user, List.of("admin"));
         assertThat(repository.countAll()).isZero();
+    }
+
+    @Test
+    void missingFreshSubjectWithAdminGroupBlocksSessionDespiteValidStaleIdToken() throws Exception {
+        assertInvalidFreshIdentityBlocksSession(Map.of("groups", List.of("admin")));
+    }
+
+    @Test
+    void differentFreshSubjectWithAdminGroupBlocksTheOriginalAuthenticatedSession() throws Exception {
+        assertInvalidFreshIdentityBlocksSession(Map.of("sub", "different-subject", "groups", List.of("admin")));
+    }
+
+    private void assertInvalidFreshIdentityBlocksSession(Map<String, Object> freshClaims) throws Exception {
+        var user = provision();
+        Map<String, Object> before = row();
+        Long auditBefore = jdbc.queryForObject("SELECT count(*) FROM audit.audit_records", Long.class);
+        var manager = mock(OAuth2AuthorizedClientManager.class);
+        Instant now = Instant.parse("2026-09-26T12:00:00Z");
+        var authentication = new OAuth2AuthenticationToken(user, user.getAuthorities(), "authelia");
+        when(manager.authorize(any())).thenReturn(new OAuth2AuthorizedClient(
+                AdminOidcSessionRevalidationServiceTest.registration(), user.getName(),
+                new OAuth2AccessToken(OAuth2AccessToken.TokenType.BEARER, "fake-access-token", now, now.plusSeconds(3600)),
+                new OAuth2RefreshToken("fake-refresh-token", now)));
+        // The external boundary returns UserInfo; the real freshness guard, mapper, gateway and filter run below.
+        var freshUser = new DefaultOidcUser(user.getAuthorities(), user.getIdToken(), new OidcUserInfo(freshClaims));
+        var service = new AdminOidcSessionRevalidationService(manager,
+                new AdminOidcFreshUserService(ignored -> freshUser), mapper, gateway);
+        var request = new MockHttpServletRequest("GET", "/admin");
+        var response = new MockHttpServletResponse();
+        var session = spy(new MockHttpSession());
+        request.setSession(session);
+        var contexts = new DelegatingSecurityContextRepository(new RequestAttributeSecurityContextRepository(),
+                new HttpSessionSecurityContextRepository());
+        var context = SecurityContextHolder.createEmptyContext();
+        context.setAuthentication(authentication);
+        SecurityContextHolder.setContext(context);
+        contexts.saveContext(context, request, response);
+        Instant previous = now.minusSeconds(301);
+        AdminOidcSessionState.markSuccessfulRevalidation(request, previous);
+        var chain = mock(FilterChain.class);
+
+        assertThat(user.getIdToken().getSubject()).isEqualTo("opaque-subject");
+        assertThatThrownBy(() -> service.revalidate(authentication, user, request, response))
+                .isInstanceOfSatisfying(AdminOidcSessionRevalidationException.class, exception ->
+                        assertThat(exception.reason()).isEqualTo(AdminOidcSessionFailureReason.INVALID_PROVIDER_RESPONSE));
+        new AdminOidcSessionRevalidationFilter(new AdminOidcSessionProperties(), service,
+                Clock.fixed(now, ZoneOffset.UTC), contexts).doFilter(request, response, chain);
+
+        assertThat(response.getStatus()).isEqualTo(403);
+        assertThat(session.isInvalid()).isTrue();
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+        assertThat(contexts.loadDeferredContext(request).get().getAuthentication()).isNull();
+        verifyNoInteractions(chain);
+        var timestamp = ArgumentCaptor.forClass(Object.class);
+        verify(session).setAttribute(eq("dev.persefonia.security.oidc.last-successful-revalidation"), timestamp.capture());
+        assertThat(timestamp.getValue()).isEqualTo(previous);
+        assertThat(row()).isEqualTo(before);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM audit.audit_records", Long.class)).isEqualTo(auditBefore);
     }
 
     private void assertRevoked(PersefoniaOidcUser user, List<String> groups) {
