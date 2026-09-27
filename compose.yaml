@@ -12,6 +12,10 @@ services:
       SPRING_DATA_REDIS_USERNAME: "${PERSEFONIA_REDIS_USERNAME:?}"
       PERSEFONIA_CONTACT_RATE_LIMIT_REDIS_KEY_PREFIX: "${PERSEFONIA_REDIS_KEY_PREFIX:?}"
       PERSEFONIA_MANAGEMENT_PORT: "${PERSEFONIA_MANAGEMENT_PORT:?}"
+      PERSEFONIA_POSTGRES_HOST: "${PERSEFONIA_POSTGRES_HOST:?}"
+      PERSEFONIA_POSTGRES_PORT: "${PERSEFONIA_POSTGRES_PORT:?}"
+      PERSEFONIA_REDIS_HOST: "${PERSEFONIA_REDIS_HOST:?}"
+      PERSEFONIA_REDIS_PORT: "${PERSEFONIA_REDIS_PORT:?}"
       POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
       POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
     secrets:
@@ -21,6 +25,10 @@ services:
         target: spring.data.redis.password
       - source: contact_rate_limit_secret
         target: persefonia.contact.rate-limit.secret
+      - source: oidc_client_secret
+        target: spring.security.oauth2.client.registration.authelia.client-secret
+      - source: cloudflare_api_token
+        target: persefonia.cache-purge.cloudflare.api-token
     volumes:
       - type: bind
         source: ${PERSEFONIA_MEDIA_HOST_PATH:?PERSEFONIA_MEDIA_HOST_PATH is required}
@@ -29,12 +37,6 @@ services:
           create_host_path: false
     tmpfs:
       - /tmp
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_started
-        required: false
     healthcheck:
       test:
         ["CMD", "curl", "--fail", "--silent", "--show-error", "--output", "/dev/null", "http://127.0.0.1:${PERSEFONIA_MANAGEMENT_PORT:?}/actuator/health/readiness"]
@@ -42,102 +44,8 @@ services:
       timeout: 5s
       retries: 12
       start_period: 30s
-    networks:
-      datanet: {}
-      default: {}
     ports:
       - "127.0.0.1:${PERSEFONIA_APP_PORT:?PERSEFONIA_APP_PORT is required}:8080"
-
-  postgres:
-    image: postgres:17.11-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73
-    user: "postgres"
-    read_only: true
-    cap_drop:
-      - ALL
-    security_opt:
-      - no-new-privileges:true
-    command: ["postgres", "-c", "config_file=/etc/postgresql/postgresql.conf"]
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
-      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
-      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
-    secrets:
-      - postgres_password
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-      - type: bind
-        source: ./docker/postgresql/postgresql.conf
-        target: /etc/postgresql/postgresql.conf
-        read_only: true
-        bind:
-          create_host_path: false
-      - type: bind
-        source: ./docker/postgresql/pg_hba.conf
-        target: /etc/postgresql/pg_hba.conf
-        read_only: true
-        bind:
-          create_host_path: false
-    tmpfs:
-      - /tmp
-      - /var/run/postgresql
-    healthcheck:
-      test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER:?POSTGRES_USER is required}", "-d", "${POSTGRES_DB:?POSTGRES_DB is required}"]
-      interval: 5s
-      timeout: 5s
-      retries: 20
-      start_period: 5s
-    networks:
-      - datanet
-    ports:
-      - "127.0.0.1:${POSTGRES_PORT:?POSTGRES_PORT is required}:5432"
-
-  redis:
-    image: redis:8.10-alpine@sha256:becdda6c7f4b3fb42e42fd7f120bbf5c54c4caaaf16f26da24e4563d2c1f0576
-    user: "redis"
-    read_only: true
-    cap_drop:
-      - ALL
-    security_opt:
-      - no-new-privileges:true
-    command: ["/usr/local/bin/redis-start.sh"]
-    environment:
-      PERSEFONIA_REDIS_USERNAME: "${PERSEFONIA_REDIS_USERNAME:?}"
-      PERSEFONIA_REDIS_KEY_PREFIX: "${PERSEFONIA_REDIS_KEY_PREFIX:?}"
-    secrets:
-      - redis_password
-    volumes:
-      - type: bind
-        source: ./docker/redis/redis.conf
-        target: /usr/local/etc/redis/redis.conf
-        read_only: true
-        bind:
-          create_host_path: false
-      - type: bind
-        source: ./docker/redis-start.sh
-        target: /usr/local/bin/redis-start.sh
-        read_only: true
-        bind:
-          create_host_path: false
-    tmpfs:
-      - /tmp
-      - /data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 20
-      start_period: 5s
-    networks:
-      - datanet
-    ports:
-      - "127.0.0.1:${REDIS_PORT:?REDIS_PORT is required}:6379"
-
-volumes:
-  postgres-data:
-
-networks:
-  datanet:
-    internal: true
 
 secrets:
   postgres_password:
@@ -146,3 +54,7 @@ secrets:
     file: ${PERSEFONIA_REDIS_PASSWORD_FILE:?PERSEFONIA_REDIS_PASSWORD_FILE is required}
   contact_rate_limit_secret:
     file: ${PERSEFONIA_CONTACT_RATE_LIMIT_SECRET_FILE:?PERSEFONIA_CONTACT_RATE_LIMIT_SECRET_FILE is required}
+  oidc_client_secret:
+    file: ${PERSEFONIA_OIDC_CLIENT_SECRET_FILE:?PERSEFONIA_OIDC_CLIENT_SECRET_FILE is required}
+  cloudflare_api_token:
+    file: ${PERSEFONIA_CLOUDFLARE_API_TOKEN_FILE:?PERSEFONIA_CLOUDFLARE_API_TOKEN_FILE is required}

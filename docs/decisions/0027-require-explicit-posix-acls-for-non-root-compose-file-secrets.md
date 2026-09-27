@@ -8,6 +8,8 @@
 | Supersedes | none |
 | Superseded by | none |
 
+Runtime-ownership refinement: [ADR 0028](0028-separate-application-delivery-from-host-runtime-topology.md) moves implementation and preflight enforcement to the external production runtime. The exact POSIX ACL matrix, operator ownership, non-root access, and fail-closed enforcement remain required. References below to repository preflight describe the historical implementation, not current repository ownership.
+
 ## Context
 
 Persefonia runs as UID 10001. The pinned PostgreSQL and Redis images use non-root runtime identities with UIDs 70 and 999 respectively. Production Compose secrets are backed by host files. During D5 real-host qualification, nonempty secret files passed preflight but runtime reads failed with `Permission denied`.

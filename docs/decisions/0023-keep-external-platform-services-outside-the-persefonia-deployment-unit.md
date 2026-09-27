@@ -2,11 +2,13 @@
 
 | Field | Value |
 |---|---|
-| Status | Accepted |
+| Status | Superseded |
 | Date | 2026-09-05 |
 | Scope | architecture / operations / deployment / security |
 | Supersedes | none |
-| Superseded by | none |
+| Superseded by | ADR 0028 |
+
+Ownership supersession: [ADR 0028](0028-separate-application-delivery-from-host-runtime-topology.md) replaces this repository-owned runtime boundary. The Decision below records the historical architecture.
 
 ## Context
 

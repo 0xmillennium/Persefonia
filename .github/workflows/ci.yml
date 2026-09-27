@@ -82,9 +82,8 @@ jobs:
           docker version
           docker compose version
 
-      - name: Validate deployment configuration
+      - name: Validate application Compose contract
         run: |
-          ./docker/redis-start-test.sh
           ./scripts/ci/verify-compose.sh
 
       - name: Build and test
