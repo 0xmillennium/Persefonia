@@ -75,3 +75,4 @@ Use [TEMPLATE.md](TEMPLATE.md) for new decision records.
 - [ADR 0025: Deploy Qualified OCI Artifacts to the Single-Node Runtime over Authenticated SSH](0025-deploy-qualified-oci-artifacts-to-the-single-node-runtime-over-authenticated-ssh.md) — defines the authenticated deployment trust boundary and preserves host-owned runtime configuration and exact-digest artifact authority.
 
 - [ADR 0026: Use OIDC Group Admission with Refresh-Backed Admin Session Revalidation](0026-use-oidc-group-admission-with-refresh-backed-admin-session-revalidation.md) — requires group admission and five-minute fresh UserInfo/local authorization revalidation while keeping OAuth credentials session-scoped.
+- [ADR 0027: Require Explicit POSIX ACLs for Non-Root Compose File Secrets](0027-require-explicit-posix-acls-for-non-root-compose-file-secrets.md) — requires exact numeric UID read grants for file-backed secrets while preserving operator ownership and non-root containers.

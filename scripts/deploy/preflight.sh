@@ -15,6 +15,10 @@ compose_file="$stack_dir/compose.production.yaml"
 env_file="${PERSEFONIA_ENV_FILE:-$stack_dir/.env.production}"
 media_dir="/var/lib/persefonia/media"
 expected_image_repository='ghcr.io/0xmillennium/persefonia'
+# Locked to the qualified runtime identities; image/user changes require ADR 0027 review.
+app_uid=10001
+postgres_uid=70
+redis_uid=999
 
 fail() {
     printf 'preflight: %s\n' "$*" >&2
@@ -31,9 +35,41 @@ require_readable_file() {
         fail "required file is missing or unreadable: $1"
 }
 
-require_nonempty_file() {
-    [ -s "$1" ] ||
-        fail "required file is missing or empty: $1"
+require_operator_ownership() {
+    [ "$(stat -c '%u' -- "$1")" = "$operator_uid" ] ||
+        fail "secret path must be owned by deployment operator UID $operator_uid: $1"
+    [ "$(stat -c '%g' -- "$1")" = "$operator_gid" ] ||
+        fail "secret path must use deployment operator primary GID $operator_gid: $1"
+}
+
+require_exact_acl() {
+    acl_path="$1"
+    expected_acl="$2"
+    actual_acl="$(getfacl -cpn -- "$acl_path")" ||
+        fail "cannot inspect secret ACL: $acl_path"
+    if ! printf '%s\n' "$actual_acl" | awk -v expected="$expected_acl" '
+        BEGIN {
+            count = split(expected, entries, / /)
+            for (index_number = 1; index_number <= count; index_number++) allowed[entries[index_number]] = 1
+        }
+        /^[[:space:]]*$/ { next }
+        {
+            if (!($0 in allowed) || seen[$0]++) exit 1
+            actual_count++
+        }
+        END { if (actual_count != count) exit 1 }
+    '; then
+        fail "secret ACL does not match the required numeric UID access contract: $acl_path"
+    fi
+}
+
+require_secret() {
+    secret_path="$stack_dir/secrets/$1"
+    [ ! -L "$secret_path" ] || fail "secret must not be a symlink: $secret_path"
+    [ -f "$secret_path" ] || fail "secret must be a regular file: $secret_path"
+    [ -s "$secret_path" ] || fail "secret must be nonempty: $secret_path"
+    require_operator_ownership "$secret_path"
+    require_exact_acl "$secret_path" "user::rw- group::--- mask::r-- other::--- $2"
 }
 
 env_value() {
@@ -145,11 +181,24 @@ require_readable_file "$stack_dir/docker/redis/redis.conf"
 require_readable_file "$stack_dir/docker/redis-start.sh"
 [ -x "$stack_dir/docker/redis-start.sh" ] || fail "Redis startup helper must be executable"
 
-require_nonempty_file "$stack_dir/secrets/postgres_password"
-require_nonempty_file "$stack_dir/secrets/redis_password"
-require_nonempty_file "$stack_dir/secrets/contact_rate_limit_secret"
-require_nonempty_file "$stack_dir/secrets/oidc_client_secret"
-require_nonempty_file "$stack_dir/secrets/cloudflare_api_token"
+require_command id
+require_command stat
+require_command getfacl
+operator_uid="$(id -u)"
+operator_gid="$(id -g)"
+secrets_dir="$stack_dir/secrets"
+[ ! -L "$secrets_dir" ] || fail "secrets directory must not be a symlink: $secrets_dir"
+[ -d "$secrets_dir" ] || fail "secrets directory does not exist: $secrets_dir"
+require_operator_ownership "$secrets_dir"
+[ "$(stat -c '%a' -- "$secrets_dir")" = 700 ] ||
+    fail "secrets directory mode must be 0700: $secrets_dir"
+require_exact_acl "$secrets_dir" 'user::rwx group::--- other::---'
+
+require_secret postgres_password "user:$postgres_uid:r-- user:$app_uid:r--"
+require_secret redis_password "user:$redis_uid:r-- user:$app_uid:r--"
+require_secret contact_rate_limit_secret "user:$app_uid:r--"
+require_secret oidc_client_secret "user:$app_uid:r--"
+require_secret cloudflare_api_token "user:$app_uid:r--"
 
 require_env_value PERSEFONIA_PUBLIC_HOST
 require_env_value PERSEFONIA_TRUSTED_PROXY_CIDRS

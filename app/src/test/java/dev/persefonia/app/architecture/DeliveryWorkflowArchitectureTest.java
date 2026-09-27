@@ -19,6 +19,14 @@ class DeliveryWorkflowArchitectureTest {
     private static final Path TOOLCHAIN_VERIFIER = Path.of("../scripts/release/verify-delivery-toolchain.sh");
 
     @Test
+    void bootJarVerifierRequiresFlywayIntegrationAndEverySourceMigration() throws Exception {
+        assertThat(Files.readString(BOOTJAR_VERIFIER))
+                .contains("unzip -Z1", "spring-boot-flyway-", "flyway-core-", "flyway-database-postgresql-",
+                        "db/migration", "for migration in \"$migration_directory\"/*.sql",
+                        "${migration##*/}", "migration_count", "\"$jar_entries\"");
+    }
+
+    @Test
     void deliveryConsumesTheVerifiedArtifactWithoutApplicationBuildTooling() throws Exception {
         String workflow = Files.readString(DELIVERY_WORKFLOW);
 

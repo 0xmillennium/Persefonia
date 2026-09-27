@@ -11,6 +11,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import org.flywaydb.core.Flyway;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Configuration;
@@ -43,24 +44,28 @@ class ProductionConfigurationValidator implements InitializingBean {
     private final ContactMailNotificationProperties mailProperties;
     private final AdminAccessProperties adminAccessProperties;
     private final ObjectProvider<ClientRegistrationRepository> clientRegistrations;
+    private final ObjectProvider<Flyway> flyway;
 
     ProductionConfigurationValidator(
             Environment environment,
             ContactRateLimitProperties rateLimitProperties,
             ContactMailNotificationProperties mailProperties,
             AdminAccessProperties adminAccessProperties,
-            ObjectProvider<ClientRegistrationRepository> clientRegistrations) {
+            ObjectProvider<ClientRegistrationRepository> clientRegistrations,
+            ObjectProvider<Flyway> flyway) {
         this.environment = environment;
         this.rateLimitProperties = rateLimitProperties;
         this.mailProperties = mailProperties;
         this.adminAccessProperties = adminAccessProperties;
         this.clientRegistrations = clientRegistrations;
+        this.flyway = flyway;
     }
 
     @Override
     public void afterPropertiesSet() {
         List<String> violations = new ArrayList<>();
         validateSessionCookie(violations);
+        validateFlyway(violations);
         validateRateLimitSecret(violations);
         validatePublicBaseUrl(violations);
         validateAdminOidc(violations);
@@ -83,6 +88,19 @@ class ProductionConfigurationValidator implements InitializingBean {
                 "server.servlet.session.cookie.secure", Boolean.class, false);
         if (!secure) {
             violations.add("session cookie must be marked secure in production");
+        }
+        String trackingModes = environment.getProperty("server.servlet.session.tracking-modes");
+        if (trackingModes == null || !"cookie".equalsIgnoreCase(trackingModes.trim())) {
+            violations.add("session tracking modes must be cookie-only in production");
+        }
+    }
+
+    private void validateFlyway(List<String> violations) {
+        if (!environment.getProperty("spring.flyway.enabled", Boolean.class, true)) {
+            violations.add("Flyway must be enabled in production");
+        }
+        if (flyway.getIfAvailable() == null) {
+            violations.add("Boot-managed Flyway integration must be available in production");
         }
     }
 

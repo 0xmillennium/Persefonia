@@ -28,10 +28,39 @@ if [[ "$artifact_directory" == / || "$artifact_directory" == . ]]; then
 fi
 
 build_info=$(mktemp)
+jar_entries=$(mktemp)
 cleanup() {
-  rm -f "$build_info"
+  rm -f "$build_info" "$jar_entries"
 }
 trap cleanup EXIT
+
+if ! unzip -Z1 "$source_bootjar" > "$jar_entries"; then
+  echo "Cannot inventory BootJar entries: $source_bootjar" >&2
+  exit 1
+fi
+for runtime_library in spring-boot-flyway- flyway-core- flyway-database-postgresql-; do
+  if ! grep -Eq "^BOOT-INF/lib/${runtime_library}[^/]+\\.jar$" "$jar_entries"; then
+    echo "BootJar is missing runtime library: ${runtime_library}*.jar" >&2
+    exit 1
+  fi
+done
+
+script_directory=$(cd -- "$(dirname -- "$0")" && pwd)
+migration_directory="$script_directory/../../app/src/main/resources/db/migration"
+migration_count=0
+for migration in "$migration_directory"/*.sql; do
+  [[ -f "$migration" ]] || continue
+  migration_count=$((migration_count + 1))
+  migration_entry="BOOT-INF/classes/db/migration/${migration##*/}"
+  if ! grep -Fx "$migration_entry" "$jar_entries" >/dev/null; then
+    echo "BootJar is missing migration resource: $migration_entry" >&2
+    exit 1
+  fi
+done
+if [[ "$migration_count" -eq 0 ]]; then
+  echo "Source migration directory is empty: $migration_directory" >&2
+  exit 1
+fi
 
 if ! unzip -p "$source_bootjar" META-INF/build-info.properties > "$build_info"; then
   echo "BootJar does not contain META-INF/build-info.properties: $source_bootjar" >&2

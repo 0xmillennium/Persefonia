@@ -1,5 +1,6 @@
 package dev.persefonia.app.security.cache;
 
+import jakarta.servlet.DispatcherType;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -13,6 +14,7 @@ public class SensitiveRouteCacheHeadersConfiguration {
                 new FilterRegistrationBean<>(new SensitiveRouteCacheHeadersFilter());
         registration.setName("sensitiveRouteCacheHeadersFilter");
         registration.setOrder(Ordered.HIGHEST_PRECEDENCE + 1);
+        registration.setDispatcherTypes(DispatcherType.REQUEST, DispatcherType.ERROR);
         return registration;
     }
 }
