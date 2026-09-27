@@ -23,10 +23,12 @@ class SshTargetTrustContractTest {
     Path temporaryDirectory;
 
     @Test
-    void requiresExactlyFiveArguments() throws Exception {
+    void rejectsInvalidArgumentCounts() throws Exception {
         Process process = new ProcessBuilder(VERIFIER.toString()).start();
         assertThat(process.waitFor()).isNotZero();
         assertThat(new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8)).isEmpty();
+        Process extra = new ProcessBuilder(VERIFIER.toString(), "a", "b", "c", "d", "e", "f", "g").start();
+        assertThat(extra.waitFor()).isNotZero();
     }
 
     @Test
@@ -134,8 +136,50 @@ class SshTargetTrustContractTest {
         }
     }
 
+    @Test
+    void createsOnlyTheVerifiedRecordAfterSuccessfulProbe() throws Exception {
+        Path output = temporaryDirectory.resolve("verified-known-hosts");
+        Result result = verify("rc.example.test", "2222", "deploy_user", FINGERPRINT, "valid", Map.of(), output);
+        assertThat(result.status()).isZero();
+        assertThat(result.stdout()).isEmpty();
+        assertThat(output).isRegularFile();
+        assertThat(Files.isSymbolicLink(output)).isFalse();
+        assertThat(Files.readString(output)).isEqualTo(RECORD).isEqualTo(result.knownHosts());
+        assertThat(PosixFilePermissions.toString(Files.getPosixFilePermissions(output))).isEqualTo("rw-------");
+    }
+
+    @Test
+    void neverCreatesOutputBeforeSuccessfulTrustAndPrincipalVerification() throws Exception {
+        Path existing = temporaryDirectory.resolve("existing");
+        Files.writeString(existing, "keep");
+        Result rejected = verify("rc.example.test", "2222", "deploy_user", FINGERPRINT, "valid", Map.of(), existing);
+        assertThat(rejected.status()).isNotZero();
+        assertThat(rejected.scanArgs()).isEmpty();
+        assertThat(Files.readString(existing)).isEqualTo("keep");
+        Path symlink = temporaryDirectory.resolve("symlink");
+        Files.createSymbolicLink(symlink, existing);
+        rejected = verify("rc.example.test", "2222", "deploy_user", FINGERPRINT, "valid", Map.of(), symlink);
+        assertThat(rejected.status()).isNotZero();
+        assertThat(rejected.scanArgs()).isEmpty();
+        for (Map<String, String> failure : List.of(
+                Map.of("FAKE_KEYSCAN_STATUS", "1"),
+                Map.of("FAKE_PRESENTED_FINGERPRINT", "SHA256:" + "B".repeat(43)),
+                Map.of("FAKE_SSH_STATUS", "255"),
+                Map.of("FAKE_SSH_STDOUT", "PERSEFONIA_SSH_TARGET_V1\n1001\nwrong\n"))) {
+            Path output = temporaryDirectory.resolve("failed-" + System.nanoTime());
+            Result result = verify("rc.example.test", "2222", "deploy_user", FINGERPRINT, "valid", failure, output);
+            assertThat(result.status()).as(failure.toString()).isNotZero();
+            assertThat(output).doesNotExist();
+        }
+    }
+
     private Result verify(String host, String port, String user, String fingerprint, String keyKind,
                           Map<String, String> overrides) throws Exception {
+        return verify(host, port, user, fingerprint, keyKind, overrides, null);
+    }
+
+    private Result verify(String host, String port, String user, String fingerprint, String keyKind,
+                          Map<String, String> overrides, Path output) throws Exception {
         Path fixture = Files.createTempDirectory(temporaryDirectory, "ssh-");
         Path bin = Files.createDirectory(fixture.resolve("bin"));
         for (String command : List.of("ssh-keyscan", "ssh-keygen", "ssh")) {
@@ -163,8 +207,12 @@ class SshTargetTrustContractTest {
         Path sshArgs = fixture.resolve("ssh-args");
         Path knownHosts = fixture.resolve("known-hosts");
         Path fingerprintedRecord = fixture.resolve("fingerprinted-record");
-        ProcessBuilder processBuilder = new ProcessBuilder(VERIFIER.toString(), host, port, user,
-                fingerprint, key.toString());
+        var arguments = new java.util.ArrayList<>(List.of(VERIFIER.toString(), host, port, user,
+                fingerprint, key.toString()));
+        if (output != null) {
+            arguments.add(output.toString());
+        }
+        ProcessBuilder processBuilder = new ProcessBuilder(arguments);
         Map<String, String> environment = processBuilder.environment();
         environment.put("PATH", bin + ":" + environment.get("PATH"));
         environment.put("FAKE_KEYSCAN_ARGS", scanArgs.toString());

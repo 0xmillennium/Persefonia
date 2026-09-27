@@ -90,14 +90,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: ./scripts/deploy/resolve-qualified-artifact.sh "$EXPECTED_SOURCE_SHA" "$EXPECTED_IMAGE_DIGEST" "$GITHUB_REPOSITORY" docker/supported-platforms.txt >> "$GITHUB_OUTPUT"
 
-  verify-rc-target-trust:
-    name: Verify RC target trust
+  deploy-rc:
+    name: Deploy RC
     needs: resolve-qualified-artifact
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     environment:
       name: rc
-      deployment: false
     permissions:
       contents: read
     steps:
@@ -131,8 +130,49 @@ jobs:
         run: |
           ./scripts/deploy/verify-ssh-target.sh \
             "$RC_SSH_HOST" "$RC_SSH_PORT" "$RC_SSH_USER" \
-            "$RC_SSH_HOST_KEY_SHA256" "$RUNNER_TEMP/persefonia-rc-ssh-key"
+            "$RC_SSH_HOST_KEY_SHA256" "$RUNNER_TEMP/persefonia-rc-ssh-key" \
+            "$RUNNER_TEMP/persefonia-rc-known-hosts"
 
-      - name: Remove RC SSH private key
+      - name: Deploy qualified artifact
+        id: deployment
+        env:
+          RC_SSH_HOST: ${{ vars.RC_SSH_HOST }}
+          RC_SSH_PORT: ${{ vars.RC_SSH_PORT }}
+          RC_SSH_USER: ${{ vars.RC_SSH_USER }}
+          QUALIFIED_SOURCE_SHA: ${{ needs.resolve-qualified-artifact.outputs.source_sha }}
+          QUALIFIED_IMAGE_REFERENCE: ${{ needs.resolve-qualified-artifact.outputs.image_reference }}
+        run: |
+          ./scripts/deploy/run-rc-deployment.sh \
+            "$RC_SSH_HOST" "$RC_SSH_PORT" "$RC_SSH_USER" \
+            "$RUNNER_TEMP/persefonia-rc-ssh-key" \
+            "$RUNNER_TEMP/persefonia-rc-known-hosts" \
+            "$QUALIFIED_SOURCE_SHA" "$QUALIFIED_IMAGE_REFERENCE" >> "$GITHUB_OUTPUT"
+
+      - name: Verify RC public ingress
+        run: ./scripts/deploy/verify-rc-ingress.sh
+
+      - name: Write RC deployment summary
+        env:
+          DEPLOYED_SOURCE_SHA: ${{ steps.deployment.outputs.source_sha }}
+          DEPLOYED_IMAGE_REFERENCE: ${{ steps.deployment.outputs.image_reference }}
+          POSTGRES_CONTAINER_ID: ${{ steps.deployment.outputs.postgres_container_id }}
+          REDIS_CONTAINER_ID: ${{ steps.deployment.outputs.redis_container_id }}
+          APP_CONTAINER_ID: ${{ steps.deployment.outputs.app_container_id }}
+          APP_IMAGE_ID: ${{ steps.deployment.outputs.app_image_id }}
+          APP_HEALTH: ${{ steps.deployment.outputs.app_health }}
+        run: |
+          {
+            printf '## RC deployment\n\n'
+            printf 'Source: `%s`\n\n' "$DEPLOYED_SOURCE_SHA"
+            printf 'Qualified image: `%s`\n\n' "$DEPLOYED_IMAGE_REFERENCE"
+            printf 'PostgreSQL container: `%s`\n\n' "$POSTGRES_CONTAINER_ID"
+            printf 'Redis container: `%s`\n\n' "$REDIS_CONTAINER_ID"
+            printf 'Application container: `%s`\n\n' "$APP_CONTAINER_ID"
+            printf 'Application image ID: `%s`\n\n' "$APP_IMAGE_ID"
+            printf 'Application health: `%s`\n\n' "$APP_HEALTH"
+            printf 'Public ingress: https://0xmillennium.dev — verified\n'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove RC SSH material
         if: always()
-        run: rm -f -- "$RUNNER_TEMP/persefonia-rc-ssh-key"
+        run: rm -f -- "$RUNNER_TEMP/persefonia-rc-ssh-key" "$RUNNER_TEMP/persefonia-rc-known-hosts"

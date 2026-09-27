@@ -24,7 +24,8 @@ class ApplicationEnvironmentContractTest {
                 "PERSEFONIA_POSTGRES_HOST", "PERSEFONIA_POSTGRES_PORT",
                 "PERSEFONIA_REDIS_HOST", "PERSEFONIA_REDIS_PORT",
                 "PERSEFONIA_POSTGRES_PASSWORD_FILE", "PERSEFONIA_REDIS_PASSWORD_FILE",
-                "PERSEFONIA_CONTACT_RATE_LIMIT_SECRET_FILE", "PERSEFONIA_REDIS_USERNAME",
+                "PERSEFONIA_CONTACT_RATE_LIMIT_SECRET_FILE", "PERSEFONIA_OIDC_CLIENT_SECRET_FILE",
+                "PERSEFONIA_CLOUDFLARE_API_TOKEN_FILE", "PERSEFONIA_REDIS_USERNAME",
                 "PERSEFONIA_REDIS_KEY_PREFIX", "PERSEFONIA_APP_PORT",
                 "PERSEFONIA_MANAGEMENT_PORT", "PERSEFONIA_MEDIA_HOST_PATH")
                 .doesNotContain("POSTGRES_PORT", "REDIS_PORT");
@@ -34,6 +35,10 @@ class ApplicationEnvironmentContractTest {
         assertThat(inputs.getProperty("PERSEFONIA_REDIS_PORT")).isEqualTo("6379");
         assertThat(inputs.getProperty("PERSEFONIA_REDIS_USERNAME")).isEqualTo("persefonia");
         assertThat(inputs.getProperty("PERSEFONIA_REDIS_KEY_PREFIX")).isEqualTo("persefonia:rate-limit");
+        assertThat(inputs.getProperty("PERSEFONIA_OIDC_CLIENT_SECRET_FILE"))
+                .isEqualTo("./secrets/oidc_client_secret");
+        assertThat(inputs.getProperty("PERSEFONIA_CLOUDFLARE_API_TOKEN_FILE"))
+                .isEqualTo("./secrets/cloudflare_api_token");
         assertThat(Path.of("../.env.production.example")).doesNotExist();
     }
 

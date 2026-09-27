@@ -7,8 +7,8 @@ fail() {
   exit 1
 }
 
-if [[ "$#" -ne 5 ]]; then
-  echo "Usage: $0 <host> <port> <user> <expected-host-key-sha256> <private-key-file>" >&2
+if [[ "$#" -ne 5 && "$#" -ne 6 ]]; then
+  echo "Usage: $0 <host> <port> <user> <expected-host-key-sha256> <private-key-file> [verified-known-hosts-output]" >&2
   exit 2
 fi
 
@@ -17,6 +17,13 @@ port=$2
 user=$3
 expected_fingerprint=$4
 private_key=$5
+output=${6:-}
+
+if [[ "$#" -eq 6 ]]; then
+  if [[ -z "$output" || -e "$output" || -L "$output" || ! -d "$(dirname -- "$output")" ]]; then
+    fail "Verified known_hosts output must be a new path in an existing directory."
+  fi
+fi
 
 if [[ ! "$host" =~ ^[A-Za-z0-9][A-Za-z0-9.-]*$ &&
       ! "$host" =~ ^[0-9A-Fa-f:.]+$ ]]; then
@@ -111,4 +118,22 @@ if [[ ${#probe_lines[@]} -ne 3 || ${probe_lines[0]} != PERSEFONIA_SSH_TARGET_V1 
       ${probe_lines[2]} != "$user" ]] ||
    ! printf 'PERSEFONIA_SSH_TARGET_V1\n%s\n%s\n' "${probe_lines[1]:-}" "$user" | cmp -s - "$probe_output"; then
   fail "Remote SSH principal protocol or identity is invalid."
+fi
+
+if [[ "$#" -eq 6 ]]; then
+  if [[ -e "$output" || -L "$output" ]]; then
+    fail "Verified known_hosts output already exists."
+  fi
+  if ! (set -C; umask 077; cat -- "$record_file" > "$output"); then
+    fail "Could not create verified known_hosts output."
+  fi
+  if ! chmod 600 -- "$output"; then
+    rm -f -- "$output"
+    fail "Could not set verified known_hosts permissions."
+  fi
+  if [[ ! -f "$output" || -L "$output" || $(stat -c %u -- "$output") != "$(id -u)" ||
+        $(stat -c %a -- "$output") != 600 ]] || ! cmp -s -- "$record_file" "$output"; then
+    rm -f -- "$output"
+    fail "Verified known_hosts output is invalid."
+  fi
 fi

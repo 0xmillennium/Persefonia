@@ -8,6 +8,8 @@
 | Supersedes | ADR 0023 |
 | Superseded by | none |
 
+Implementation refinement: [ADR 0029](0029-execute-repository-owned-rc-deployment-orchestration-ephemerally-over-authenticated-ssh.md) implements this division with repository-owned deployment orchestration streamed over authenticated SSH. The external runtime still owns production topology, preflight, secrets, and state; streaming orchestration does not transfer those responsibilities to Persefonia.
+
 ## Context
 
 Persefonia delivery qualifies an immutable application OCI artifact under [ADR 0022](0022-use-an-immutable-oci-image-as-the-deployable-release-artifact.md) and [ADR 0024](0024-support-amd64-and-arm64-under-one-oci-image-index.md). The production runtime has a separately owned repository and delivery lifecycle. Keeping production Compose, dependency-server configuration, and host preflight in Persefonia creates competing authorities and couples application delivery to infrastructure changes.

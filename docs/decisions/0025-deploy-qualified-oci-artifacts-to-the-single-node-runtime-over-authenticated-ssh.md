@@ -12,6 +12,8 @@ Identity-admission refinement: [ADR 0026](0026-use-oidc-group-admission-with-ref
 
 Runtime-ownership refinement: [ADR 0028](0028-separate-application-delivery-from-host-runtime-topology.md) supersedes the repository-owned production Compose, preflight, and runtime-topology ownership portions below. Exact OCI digest authority, the GitHub-hosted runner boundary, authenticated SSH, mandatory SSH host identity verification, host-owned application secrets, and no blind automatic rollback remain in force. This refinement does not implement D5 host mutation.
 
+Deployment-mechanism refinement: [ADR 0029](0029-execute-repository-owned-rc-deployment-orchestration-ephemerally-over-authenticated-ssh.md) replaces the historical persistent/external host deployment entrypoint requirement with repository-owned orchestration executed ephemerally over authenticated SSH. Exact OCI digest authority, the GitHub-hosted runner boundary, authenticated SSH, mandatory SSH host identity verification, host-owned application secrets, mandatory host preflight, and no blind automatic rollback remain in force. The historical description of a tracked Deploy RC that performs no mutation describes the pre-ADR-0029 implementation.
+
 ## Context
 
 [ADR 0022](0022-use-an-immutable-oci-image-as-the-deployable-release-artifact.md) establishes build-once promotion of a qualified OCI artifact. [ADR 0024](0024-support-amd64-and-arm64-under-one-oci-image-index.md) makes its top-level image-index digest authoritative for both supported platforms. Deployment needs a transport and runtime ownership boundary that preserves those decisions without moving application secrets or Docker authority into CI.
