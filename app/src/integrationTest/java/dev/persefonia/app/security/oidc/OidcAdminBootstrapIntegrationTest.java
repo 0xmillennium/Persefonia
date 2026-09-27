@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Instant;
 import java.util.Map;
+import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,9 +25,9 @@ import dev.persefonia.identityaccess.domain.admin.OidcSubject;
 @SpringBootTest(properties = {
         "management.server.port=0",
         "management.health.redis.enabled=false",
-        "persefonia.security.admin-access.allowlisted-subjects[0]=owner-subject",
-        "persefonia.security.admin-access.allowlisted-subjects[1]=second-subject",
-        "persefonia.security.admin-access.automatic-provisioning-enabled=false"
+        "persefonia.security.admin-access.required-oidc-group=admin",
+        "persefonia.security.admin-access.initial-owner-bootstrap-enabled=true",
+        "persefonia.security.admin-access.automatic-provisioning-enabled=true"
 })
 class OidcAdminBootstrapIntegrationTest {
     private static final SharedPostgresTestServer.Database POSTGRES = SharedPostgresTestServer.integrationDatabase();
@@ -54,7 +55,7 @@ class OidcAdminBootstrapIntegrationTest {
     }
 
     @Test
-    void firstAllowlistedOidcUserBootstrapsActiveOwnerThroughRealRepository() {
+    void firstGroupAdmittedOidcUserBootstrapsActiveOwnerThroughRealRepository() {
         PersefoniaOidcUser user = loadUser("owner-subject", "owner@example.com");
 
         assertThat(user.adminPrincipal().status().name()).isEqualTo("ACTIVE");
@@ -86,20 +87,46 @@ class OidcAdminBootstrapIntegrationTest {
     }
 
     @Test
-    void unallowlistedOidcUserFailsAndCreatesNoAccount() {
-        assertThatThrownBy(() -> loadUser("unallowlisted-subject", "outsider@example.com"))
+    void nonAdminGroupOidcUserFailsAndCreatesNoAccount() {
+        assertThatThrownBy(() -> loadUser("outsider-subject", "outsider@example.com", List.of("user")))
                 .isInstanceOf(OAuth2AuthenticationException.class);
 
         assertThat(countAccounts()).isZero();
     }
 
     @Test
-    void secondAllowlistedUserIsRejectedWhenAutomaticProvisioningDisabled() {
+    void secondEligibleIdentityIsPersistedAsEditorWithProvisioningAudit() {
         loadUser("owner-subject", "owner@example.com");
+        var editor = loadUser("second-subject", "second@example.com", List.of("admin", "owner"));
+        assertThat(editor.adminPrincipal().roles()).extracting(role -> role.name()).containsExactly("EDITOR");
+        assertThat(countAccounts()).isEqualTo(2);
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM audit.audit_record_metadata "
+                + "WHERE metadata_key = 'bootstrap_outcome' AND metadata_value = 'AUTOMATICALLY_PROVISIONED'",
+                Long.class)).isEqualTo(1);
+    }
 
-        assertThatThrownBy(() -> loadUser("second-subject", "second@example.com"))
+    @Test
+    void existingOwnerLosingRequiredGroupCannotLoginOrMutateLoginState() {
+        loadUser("owner-subject", "owner@example.com");
+        Instant previousLogin = lastLoginAt("owner-subject");
+        Long previousVersion = version("owner-subject");
+        assertThatThrownBy(() -> loadUser("owner-subject", "owner@example.com", List.of("user")))
                 .isInstanceOf(OAuth2AuthenticationException.class);
+        assertThat(lastLoginAt("owner-subject")).isEqualTo(previousLogin);
+        assertThat(version("owner-subject")).isEqualTo(previousVersion);
+    }
 
+    @Test
+    void disabledEligibleAccountAndNormalizedEmailCollisionRemainDenied() {
+        loadUser("owner-subject", "owner@example.com");
+        assertThatThrownBy(() -> loadUser("different-subject", "OWNER@example.com"))
+                .isInstanceOf(OAuth2AuthenticationException.class);
+        transactions.executeWithoutResult(status -> {
+            var account = repository.findByOidcSubject(OidcSubject.of("owner-subject")).orElseThrow();
+            repository.save(account.disable(Instant.now()));
+        });
+        assertThatThrownBy(() -> loadUser("owner-subject", "owner@example.com"))
+                .isInstanceOf(OAuth2AuthenticationException.class);
         assertThat(countAccounts()).isEqualTo(1);
     }
 
@@ -138,11 +165,16 @@ class OidcAdminBootstrapIntegrationTest {
     }
 
     private PersefoniaOidcUser loadUser(String subject, String email) {
+        return loadUser(subject, email, List.of("admin"));
+    }
+
+    private PersefoniaOidcUser loadUser(String subject, String email, List<String> groups) {
         PersefoniaOidcUserService service = new PersefoniaOidcUserService(
                 claimMapper,
                 bootstrapGateway,
                 request -> OidcTestFixtures.user(Map.of(
                         "sub", subject,
+                        "groups", groups,
                         "email", email,
                         "name", "Admin",
                         "email_verified", true)));

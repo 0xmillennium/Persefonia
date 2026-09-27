@@ -23,6 +23,7 @@ import dev.persefonia.identityaccess.domain.admin.DisplayName;
 import dev.persefonia.identityaccess.domain.admin.EmailAddress;
 import dev.persefonia.identityaccess.domain.admin.NormalizedEmailAddress;
 import dev.persefonia.identityaccess.domain.admin.OidcSubject;
+import dev.persefonia.identityaccess.domain.admin.OidcGroup;
 import dev.persefonia.identityaccess.domain.admin.access.AdminAccessDeniedException;
 import dev.persefonia.identityaccess.domain.admin.access.AdminAccessDenialReason;
 import dev.persefonia.identityaccess.domain.admin.access.AdminAccessPolicy;
@@ -34,7 +35,7 @@ class AdminBootstrapUseCaseTest {
     private static final AdminIdentityClaims OWNER_CLAIMS = claims("owner-subject", "Owner@Example.COM", "Owner");
 
     @Test
-    void firstAllowlistedSubjectBootstrapsActiveOwner() {
+    void firstGroupIdentityBootstrapsActiveOwner() {
         AdminBootstrapResult result = service(subjectPolicy(OWNER_CLAIMS, true, false), new InMemoryRepository())
                 .resolveOrBootstrap(OWNER_CLAIMS);
 
@@ -42,26 +43,33 @@ class AdminBootstrapUseCaseTest {
     }
 
     @Test
-    void firstAllowlistedEmailBootstrapsActiveOwner() {
-        AdminAccessPolicy policy = AdminAccessPolicy.of(
-                Set.of(),
-                Set.of(NormalizedEmailAddress.from(OWNER_CLAIMS.email())),
-                true,
-                false);
-
-        assertInitialOwner(service(policy, new InMemoryRepository()).resolveOrBootstrap(OWNER_CLAIMS));
+    void missingGroupDeniesBeforeLockOrRepositoryAccess() {
+        List<String> operations = new ArrayList<>();
+        AdminIdentityClaims denied = withoutGroups(OWNER_CLAIMS);
+        assertDenied(() -> service(emptyPolicy(), new InMemoryRepository(operations), new RecordingLock(operations))
+                .resolveOrBootstrap(denied), AdminAccessDenialReason.REQUIRED_OIDC_GROUP_MISSING, denied);
+        assertThat(operations).isEmpty();
     }
 
     @Test
-    void unallowlistedIdentityCannotBootstrap() {
-        assertDenied(
-                () -> service(emptyPolicy(), new InMemoryRepository()).resolveOrBootstrap(OWNER_CLAIMS),
-                AdminAccessDenialReason.NOT_ALLOWLISTED,
-                OWNER_CLAIMS);
+    void existingOwnerAndEditorCannotBypassAdmission() {
+        for (AdminRole role : AdminRole.values()) {
+            List<String> operations = new ArrayList<>();
+            InMemoryRepository repository = new InMemoryRepository(operations);
+            AdminAccount existing = account(OWNER_CLAIMS, role);
+            repository.save(existing);
+            operations.clear();
+            assertDenied(() -> service(emptyPolicy(), repository).resolveOrBootstrap(withoutGroups(OWNER_CLAIMS)),
+                    AdminAccessDenialReason.REQUIRED_OIDC_GROUP_MISSING, OWNER_CLAIMS);
+            assertThat(operations).isEmpty();
+            assertThat(repository.accounts.get(existing.id()).lastLoginAt()).isEmpty();
+            assertThat(service(emptyPolicy(), repository).resolveOrBootstrap(OWNER_CLAIMS).account().roles())
+                    .containsExactly(role);
+        }
     }
 
     @Test
-    void bootstrapDisabledRejectsFirstAllowlistedIdentity() {
+    void bootstrapDisabledRejectsFirstGroupIdentity() {
         assertDenied(
                 () -> service(subjectPolicy(OWNER_CLAIMS, false, false), new InMemoryRepository())
                         .resolveOrBootstrap(OWNER_CLAIMS),
@@ -105,7 +113,7 @@ class AdminBootstrapUseCaseTest {
     }
 
     @Test
-    void secondAllowlistedIdentityIsRejectedByDefaultAfterBootstrap() {
+    void secondGroupIdentityIsRejectedByDefaultAfterBootstrap() {
         InMemoryRepository repository = new InMemoryRepository();
         repository.save(account(OWNER_CLAIMS, AdminRole.OWNER));
         AdminIdentityClaims second = claims("editor-subject", "editor@example.com", "Editor");
@@ -131,12 +139,12 @@ class AdminBootstrapUseCaseTest {
     }
 
     @Test
-    void publicSelfRegistrationIsImpossibleWithoutAllowlist() {
-        AdminIdentityClaims publicIdentity = claims("public-subject", "public@example.com", "Public");
+    void publicSelfRegistrationIsImpossibleWithoutRequiredGroup() {
+        AdminIdentityClaims publicIdentity = withoutGroups(claims("public-subject", "public@example.com", "Public"));
 
         assertDenied(
                 () -> service(emptyPolicy(), new InMemoryRepository()).resolveOrBootstrap(publicIdentity),
-                AdminAccessDenialReason.NOT_ALLOWLISTED,
+                AdminAccessDenialReason.REQUIRED_OIDC_GROUP_MISSING,
                 publicIdentity);
     }
 
@@ -178,18 +186,22 @@ class AdminBootstrapUseCaseTest {
     }
 
     private static AdminAccessPolicy subjectPolicy(AdminIdentityClaims claims, boolean bootstrap, boolean provisioning) {
-        return AdminAccessPolicy.of(Set.of(claims.oidcSubject()), Set.of(), bootstrap, provisioning);
+        return AdminAccessPolicy.of(OidcGroup.of("admin"), bootstrap, provisioning);
     }
 
     private static AdminAccessPolicy emptyPolicy() {
-        return AdminAccessPolicy.of(Set.of(), Set.of(), true, false);
+        return AdminAccessPolicy.of(OidcGroup.of("admin"), true, false);
     }
 
     private static AdminIdentityClaims claims(String subject, String email, String displayName) {
         return AdminIdentityClaims.of(
                 OidcSubject.of(subject),
                 EmailAddress.of(email),
-                DisplayName.of(displayName));
+                DisplayName.of(displayName), Set.of(OidcGroup.of("admin"), OidcGroup.of("owner")));
+    }
+
+    private static AdminIdentityClaims withoutGroups(AdminIdentityClaims claims) {
+        return AdminIdentityClaims.of(claims.oidcSubject(), claims.email(), claims.displayName(), Set.of());
     }
 
     private static AdminAccount account(AdminIdentityClaims claims, AdminRole role) {

@@ -23,13 +23,13 @@ class ProductionComposeArchitectureTest {
                         "  backnet:\n    external: true\n    name: backnet",
                         "  frontnet:\n    external: true\n    name: frontnet")
                 .doesNotContain("ports:", "build:", "persefonia-internal", "persefonia-egress");
-        assertThat(app).contains("image: ${PERSEFONIA_IMAGE_REF:", "SPRING_PROFILES_ACTIVE: docker,prod",
-                "PERSEFONIA_ADMIN_ALLOWLISTED_SUBJECTS:", "PERSEFONIA_ADMIN_ALLOWLISTED_EMAILS:",
-                "PERSEFONIA_MANAGEMENT_ADDRESS: 0.0.0.0", "PERSEFONIA_MANAGEMENT_PORT: \"9001\"",
-                "PERSEFONIA_SMTP_HOST: postfix-internal", "PERSEFONIA_SMTP_PORT: \"25\"",
-                "PERSEFONIA_OIDC_CLIENT_ID: persefonia", "source: /var/lib/persefonia/media",
+        assertThat(app).contains("image: ${PERSEFONIA_IMAGE_REF:", "SPRING_PROFILES_ACTIVE: \"${SPRING_PROFILES_ACTIVE:?}\"",
+                "PERSEFONIA_ADMIN_REQUIRED_OIDC_GROUP:",
+                "PERSEFONIA_MANAGEMENT_ADDRESS: \"${PERSEFONIA_MANAGEMENT_ADDRESS:?}\"", "PERSEFONIA_MANAGEMENT_PORT: \"${PERSEFONIA_MANAGEMENT_PORT:?}\"",
+                "PERSEFONIA_SMTP_HOST: \"${PERSEFONIA_SMTP_HOST:?}\"", "PERSEFONIA_SMTP_PORT: \"${PERSEFONIA_SMTP_PORT:?}\"",
+                "PERSEFONIA_OIDC_CLIENT_ID: \"${PERSEFONIA_OIDC_CLIENT_ID:?}\"", "source: /var/lib/persefonia/media",
                 "target: /var/lib/persefonia/media", "create_host_path: false",
-                "gw_priority: 1", "- persefonia-app");
+                "gw_priority: 1", "- persefonia-app").doesNotContain("ALLOWLISTED");
         assertThat(postgres).contains("image: postgres:", "- postgres-data:/var/lib/postgresql/data",
                 "networks:\n      - datanet").doesNotContain("backnet", "frontnet");
         assertThat(redis).contains("image: redis:", "source: ./docker/redis-start.sh",
@@ -41,9 +41,9 @@ class ProductionComposeArchitectureTest {
         String descriptor = Files.readString(PRODUCTION_COMPOSE);
         String labels = block(block(descriptor, "  app:", 2), "    labels:", 4);
 
-        assertThat(labels).contains("traefik.docker.network: backnet",
-                "traefik.http.routers.persefonia.middlewares: profile-persefonia-public@file",
-                "traefik.http.routers.persefonia-admin.middlewares: profile-persefonia-admin@file",
+        assertThat(labels).contains("traefik.docker.network: \"backnet\"",
+                "traefik.http.routers.persefonia.middlewares: \"profile-persefonia-public@file\"",
+                "traefik.http.routers.persefonia-admin.middlewares: \"profile-persefonia-admin@file\"",
                 "Path(`/admin`)", "PathPrefix(`/admin/`)",
                 "traefik.http.services.persefonia.loadbalancer.server.port: \"8080\"")
                 .doesNotContain("traefik.http.middlewares.", "forwardAuth", "ForwardAuth",

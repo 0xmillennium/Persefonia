@@ -88,14 +88,15 @@ nb-configuration.xml
 ## Miscellaneous
 ##############################
 .env
+.env.production
 *.log
 
-# Local Docker secret files
-secrets/*
-!secrets/README.md
-!secrets/.gitkeep
-!secrets/examples/
-!secrets/examples/**
+# Host-owned runtime secrets; examples remain repository source.
+/secrets/postgres_password
+/secrets/redis_password
+/secrets/contact_rate_limit_secret
+/secrets/oidc_client_secret
+/secrets/cloudflare_api_token
 
 # Node / frontend
 frontend/node_modules/

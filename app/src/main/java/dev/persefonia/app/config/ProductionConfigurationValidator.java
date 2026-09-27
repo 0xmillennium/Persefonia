@@ -3,6 +3,8 @@ package dev.persefonia.app.config;
 import dev.persefonia.app.communication.mail.ContactMailNotificationProperties;
 import dev.persefonia.app.identityaccess.config.AdminAccessProperties;
 import dev.persefonia.app.platformoperations.ratelimit.ContactRateLimitProperties;
+import dev.persefonia.identityaccess.domain.admin.OidcGroup;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
@@ -62,7 +64,7 @@ class ProductionConfigurationValidator implements InitializingBean {
         validateRateLimitSecret(violations);
         validatePublicBaseUrl(violations);
         validateAdminOidc(violations);
-        validateAdminAllowlist(violations);
+        validateAdminAdmission(violations);
         validateContactMail(violations);
         validateForwardedHeaders(violations);
         validateManagementIsolation(violations);
@@ -123,18 +125,36 @@ class ProductionConfigurationValidator implements InitializingBean {
         if (!ClientAuthenticationMethod.CLIENT_SECRET_BASIC.equals(authelia.getClientAuthenticationMethod())) {
             violations.add("admin OIDC client must use client_secret_basic authentication");
         }
-        if (!authelia.getScopes().containsAll(Set.of("openid", "profile", "email"))) {
-            violations.add("admin OIDC client must request openid, profile, and email scopes");
+        if (!authelia.getScopes().containsAll(Set.of("openid", "profile", "email", "groups", "offline_access"))) {
+            violations.add("admin OIDC client must request openid, profile, email, groups, and offline_access scopes");
+        }
+        String userInfoUri = authelia.getProviderDetails().getUserInfoEndpoint().getUri();
+        try {
+            URI endpoint = userInfoUri == null ? null : URI.create(userInfoUri);
+            if (endpoint == null || !"https".equalsIgnoreCase(endpoint.getScheme()) || endpoint.getHost() == null) {
+                violations.add("admin OIDC UserInfo endpoint must exist and use HTTPS");
+            }
+        } catch (IllegalArgumentException exception) {
+            violations.add("admin OIDC UserInfo endpoint must exist and use HTTPS");
         }
     }
 
-    private void validateAdminAllowlist(List<String> violations) {
-        boolean hasSubject = adminAccessProperties.getAllowlistedSubjects().stream()
-                .anyMatch(value -> value != null && !value.isBlank());
-        boolean hasEmail = adminAccessProperties.getAllowlistedEmails().stream()
-                .anyMatch(value -> value != null && !value.isBlank());
-        if (!hasSubject && !hasEmail) {
-            violations.add("production requires at least one admin allowlisted subject or email");
+    private void validateAdminAdmission(List<String> violations) {
+        try {
+            String requiredGroup = adminAccessProperties.getRequiredOidcGroup();
+            // Spring treats the production :? marker as a default string, unlike Compose.
+            if ("?PERSEFONIA_ADMIN_REQUIRED_OIDC_GROUP is required".equals(requiredGroup)) {
+                throw new IllegalArgumentException("required OIDC group is not configured");
+            }
+            OidcGroup.of(requiredGroup);
+        } catch (IllegalArgumentException | NullPointerException exception) {
+            violations.add("required OIDC group must be configured and valid in production");
+        }
+        if (!adminAccessProperties.isAutomaticProvisioningEnabled()) {
+            violations.add("automatic admin provisioning must be enabled in production");
+        }
+        if (!adminAccessProperties.isInitialOwnerBootstrapEnabled()) {
+            violations.add("initial owner bootstrap must be enabled in production");
         }
     }
 

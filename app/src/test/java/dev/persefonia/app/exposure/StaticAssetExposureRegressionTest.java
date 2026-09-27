@@ -28,7 +28,16 @@ class StaticAssetExposureRegressionTest {
             "/db/migration/V1__create_schemas.sql",
             "/META-INF/MANIFEST.MF",
             "/META-INF/spring/org.springframework.boot.actuate.autoconfigure.web.ManagementContextConfiguration.imports",
-            "/secrets/postgres_password.txt",
+            "/secrets/postgres_password",
+            "/secrets/redis_password",
+            "/secrets/contact_rate_limit_secret",
+            "/secrets/oidc_client_secret",
+            "/secrets/cloudflare_api_token",
+            "/secrets/postgres_password.examples",
+            "/secrets/redis_password.examples",
+            "/secrets/contact_rate_limit_secret.examples",
+            "/secrets/oidc_client_secret.examples",
+            "/secrets/cloudflare_api_token.examples",
             "/secrets/redis.conf");
 
     @LocalServerPort

@@ -227,42 +227,59 @@ class ProductionConfigurationValidationTest {
         assertThatThrownBy(() -> validator(secureEnvironment(), strongRateLimit(), enabledMail(), invalid)
                 .afterPropertiesSet())
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("openid, profile, and email");
+                .hasMessageContaining("openid, profile, email, groups, and offline_access");
     }
 
     @Test
-    void acceptsProductionAdminSubjectAllowlist() {
-        assertThatCode(() -> validator(adminAccess(List.of("subject-placeholder"), List.of()))
-                .afterPropertiesSet()).doesNotThrowAnyException();
+    void rejectsMissingOrInvalidRequiredGroup() {
+        for (String group : new String[] {null, "", "  ", "ad\nmin", "a".repeat(129)}) {
+            AdminAccessProperties access = productionAdminAccess();
+            access.setRequiredOidcGroup(group);
+            assertThatThrownBy(() -> validator(access).afterPropertiesSet())
+                    .hasMessageContaining("required OIDC group");
+        }
     }
 
     @Test
-    void acceptsProductionAdminEmailAllowlist() {
-        assertThatCode(() -> validator(adminAccess(List.of(), List.of("owner@example.invalid")))
-                .afterPropertiesSet()).doesNotThrowAnyException();
+    void missingProductionEnvironmentGroupFailsEvenWithSpringPlaceholderDefault() throws Exception {
+        var source = new org.springframework.boot.env.YamlPropertySourceLoader().load("prod",
+                new org.springframework.core.io.ClassPathResource("application-prod.yml")).getFirst();
+        String placeholder = (String) source.getProperty("persefonia.security.admin-access.required-oidc-group");
+        AdminAccessProperties access = productionAdminAccess();
+        access.setRequiredOidcGroup(secureEnvironment().resolveRequiredPlaceholders(placeholder));
+        assertThatThrownBy(() -> validator(access).afterPropertiesSet()).hasMessageContaining("required OIDC group");
     }
 
     @Test
-    void acceptsProductionAdminSubjectAndEmailAllowlists() {
-        assertThatCode(() -> validator(adminAccess(
-                List.of("subject-placeholder"), List.of("owner@example.invalid")))
-                .afterPropertiesSet()).doesNotThrowAnyException();
+    void rejectsDisabledProductionProvisioningSwitches() {
+        AdminAccessProperties access = productionAdminAccess();
+        access.setAutomaticProvisioningEnabled(false);
+        assertThatThrownBy(() -> validator(access).afterPropertiesSet()).hasMessageContaining("automatic admin provisioning");
+        access.setAutomaticProvisioningEnabled(true);
+        access.setInitialOwnerBootstrapEnabled(false);
+        assertThatThrownBy(() -> validator(access).afterPropertiesSet()).hasMessageContaining("initial owner bootstrap");
     }
 
     @Test
-    void rejectsProductionWithoutAnAdminAllowlist() {
-        assertThatThrownBy(() -> validator(adminAccess(List.of(), List.of()))
-                .afterPropertiesSet())
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("production requires at least one admin allowlisted subject or email");
+    void rejectsMissingGroupsOrOfflineAccessScope() {
+        for (String omitted : List.of("groups", "offline_access")) {
+            String[] scopes = List.of("openid", "profile", "email", "groups", "offline_access").stream()
+                    .filter(scope -> !scope.equals(omitted)).toArray(String[]::new);
+            ClientRegistrationRepository registration = registration("authelia", AuthorizationGrantType.AUTHORIZATION_CODE,
+                    ClientAuthenticationMethod.CLIENT_SECRET_BASIC, scopes);
+            assertThatThrownBy(() -> validator(secureEnvironment(), strongRateLimit(), enabledMail(), registration)
+                    .afterPropertiesSet()).hasMessageContaining("scopes");
+        }
     }
 
     @Test
-    void rejectsProductionWithOnlyBlankAdminAllowlistEntries() {
-        assertThatThrownBy(() -> validator(adminAccess(
-                List.of("", "  "), List.of(" ", "\t"))).afterPropertiesSet())
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("production requires at least one admin allowlisted subject or email");
+    void rejectsMissingOrInsecureUserInfoEndpoint() {
+        for (String uri : List.of("", "http://auth.example/userinfo")) {
+            ClientRegistration client = ClientRegistration.withClientRegistration(
+                    OIDC_CONFIGURED.findByRegistrationId("authelia")).userInfoUri(uri).build();
+            assertThatThrownBy(() -> validator(secureEnvironment(), strongRateLimit(), enabledMail(), id -> client)
+                    .afterPropertiesSet()).hasMessageContaining("UserInfo endpoint");
+        }
     }
 
     @Test
@@ -339,7 +356,7 @@ class ProductionConfigurationValidationTest {
             ContactMailNotificationProperties mail,
             ClientRegistrationRepository clientRegistration) {
         return new ProductionConfigurationValidator(
-                environment, rateLimit, mail, adminAccess(List.of("subject-placeholder"), List.of()),
+                environment, rateLimit, mail, productionAdminAccess(),
                 registrations(clientRegistration));
     }
 
@@ -349,10 +366,11 @@ class ProductionConfigurationValidationTest {
                 registrations(OIDC_CONFIGURED));
     }
 
-    private static AdminAccessProperties adminAccess(List<String> subjects, List<String> emails) {
+    private static AdminAccessProperties productionAdminAccess() {
         AdminAccessProperties properties = new AdminAccessProperties();
-        properties.setAllowlistedSubjects(subjects);
-        properties.setAllowlistedEmails(emails);
+        properties.setRequiredOidcGroup("admin");
+        properties.setAutomaticProvisioningEnabled(true);
+        properties.setInitialOwnerBootstrapEnabled(true);
         return properties;
     }
 
@@ -428,7 +446,7 @@ class ProductionConfigurationValidationTest {
 
     private static ClientRegistrationRepository registration(String id, AuthorizationGrantType grant,
                                                               ClientAuthenticationMethod authentication) {
-        return registration(id, grant, authentication, "openid", "profile", "email");
+        return registration(id, grant, authentication, "openid", "profile", "email", "groups", "offline_access");
     }
 
     private static ClientRegistrationRepository registration(String id, AuthorizationGrantType grant,
@@ -444,6 +462,8 @@ class ProductionConfigurationValidationTest {
                 .authorizationUri("https://auth.example.invalid/authorize")
                 .tokenUri("https://auth.example.invalid/token")
                 .jwkSetUri("https://auth.example.invalid/jwks")
+                .userInfoUri("https://auth.example.invalid/userinfo")
+                .userNameAttributeName("sub")
                 .build();
         return registrationId -> id.equals(registrationId) ? client : null;
     }

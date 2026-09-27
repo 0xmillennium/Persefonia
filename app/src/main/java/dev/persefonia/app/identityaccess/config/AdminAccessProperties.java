@@ -1,30 +1,19 @@
 package dev.persefonia.app.identityaccess.config;
 
-import java.util.List;
-
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "persefonia.security.admin-access")
 public class AdminAccessProperties {
-    private List<String> allowlistedSubjects = List.of();
-    private List<String> allowlistedEmails = List.of();
+    private String requiredOidcGroup = "admin";
     private boolean automaticProvisioningEnabled;
     private boolean initialOwnerBootstrapEnabled = true;
 
-    public List<String> getAllowlistedSubjects() {
-        return allowlistedSubjects;
+    public String getRequiredOidcGroup() {
+        return requiredOidcGroup;
     }
 
-    public void setAllowlistedSubjects(List<String> allowlistedSubjects) {
-        this.allowlistedSubjects = allowlistedSubjects;
-    }
-
-    public List<String> getAllowlistedEmails() {
-        return allowlistedEmails;
-    }
-
-    public void setAllowlistedEmails(List<String> allowlistedEmails) {
-        this.allowlistedEmails = allowlistedEmails;
+    public void setRequiredOidcGroup(String requiredOidcGroup) {
+        this.requiredOidcGroup = requiredOidcGroup;
     }
 
     public boolean isAutomaticProvisioningEnabled() {
