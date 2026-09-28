@@ -24,8 +24,12 @@ class DeployRcWorkflowContractTest {
                 "head_repository.full_name == github.repository", "head_repository.fork == false",
                 "github.sha == github.event.workflow_run.head_sha");
         assertThat(workflow.job("resolve-qualified-artifact")).doesNotContainKey("environment");
+        assertThat(WorkflowDocument.map(workflow.job("resolve-qualified-artifact").get("permissions")))
+                .containsExactlyInAnyOrderEntriesOf(Map.of("contents", "read", "packages", "read", "actions", "read"));
         assertThat(workflow.job("deploy-rc").get("needs")).isEqualTo("resolve-qualified-artifact");
         assertThat(WorkflowDocument.map(workflow.job("deploy-rc").get("environment"))).containsEntry("name", "rc");
+        assertThat(WorkflowDocument.map(workflow.job("deploy-rc").get("permissions")))
+                .containsExactlyInAnyOrderEntriesOf(Map.of("contents", "read"));
         assertThat(WorkflowDocument.map(workflow.step("deploy-rc", "Check out qualified source").get("with")))
                 .containsEntry("ref", "${{ needs.resolve-qualified-artifact.outputs.source_sha }}");
         assertThat((String) workflow.step("resolve-qualified-artifact", "Resolve and verify qualified artifact").get("run"))
@@ -34,6 +38,7 @@ class DeployRcWorkflowContractTest {
 
     @Test
     void sshTrustAndDeploymentRemainNarrowlyScoped() {
+        assertThat(workflow.job("deploy-rc")).doesNotContainKey("env");
         List<String> names = workflow.steps("deploy-rc").stream().map(WorkflowDocument::map)
                 .map(step -> (String) step.get("name")).toList();
         assertThat(names).containsSubsequence("Materialize RC SSH private key", "Verify RC SSH target",
@@ -51,6 +56,9 @@ class DeployRcWorkflowContractTest {
         }
         for (Object value : workflow.steps("deploy-rc")) {
             Map<String, Object> step = WorkflowDocument.map(value);
+            if (!"Materialize RC SSH private key".equals(step.get("name"))) {
+                assertThat(step.toString()).doesNotContain("secrets.");
+            }
             if (step.get("run") instanceof String run) {
                 assertThat(run).doesNotContain("docker ", "docker compose", "sudo ");
             }
