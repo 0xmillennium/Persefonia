@@ -55,6 +55,7 @@ if ! jq -e '
     type == "object" and (.platform | type) == "object" and
     (.platform.os | type) == "string" and (.platform.os | length) > 0 and
     (.platform.architecture | type) == "string" and (.platform.architecture | length) > 0 and
+    (if .platform | has("variant") then (.platform.variant | type) == "string" and (.platform.variant | length) > 0 else true end) and
     (metadata or runtime) and
     (.digest | type) == "string" and (.digest | test("^sha256:[a-f0-9]{64}$")) and
     (.mediaType == "application/vnd.oci.image.manifest.v1+json" or
@@ -72,7 +73,12 @@ if [[ "${#listed_platforms[@]}" -eq 0 ]]; then
   echo "Registry index contains no runnable platform descriptors: $image_reference" >&2
   exit 1
 fi
-if [[ "$(printf '%s\n' "${listed_platforms[@]}" | sort -u | wc -l)" -ne "${#listed_platforms[@]}" ]]; then
+mapfile -t full_platforms < <(
+  jq -c '.manifests[]? | select(.platform.os != "unknown" and .platform.architecture != "unknown") |
+    [.platform.os, .platform.architecture, .platform.variant // null]' <<<"$manifest")
+if [[ "$(printf '%s\n' "${full_platforms[@]}" | sort -u | wc -l)" -ne "${#full_platforms[@]}" ]] ||
+   { [[ "$verification_mode" == exact ]] &&
+     [[ "$(printf '%s\n' "${listed_platforms[@]}" | sort -u | wc -l)" -ne "${#listed_platforms[@]}" ]]; }; then
   echo "Registry index contains duplicate runtime platform descriptors: $image_reference" >&2
   exit 1
 fi
