@@ -35,4 +35,14 @@ class RuntimeOwnershipBoundaryArchitectureTest {
         assertThat(output.lines().filter(file -> Files.exists(Path.of("../" + file))).toList())
                 .containsExactlyInAnyOrderElementsOf(expected);
     }
+
+    @Test
+    void remotePayloadUsesOnlyTheNarrowExternalRuntimeGateway() throws Exception {
+        String payload = Files.readString(Path.of("../scripts/deploy/rc-host-deploy.sh"));
+        assertThat(payload).contains("sudo -n -- /usr/local/libexec/persefonia-runtimectl \"$@\"");
+        assertThat(payload).doesNotContain("Projects/Homie-Lab", "Website-Stack", "docker-compose.yml",
+                "PERSEFONIA_ENV_FILE", "scripts/preflight.sh", "/home/", "runuser",
+                "docker compose", "docker inspect", "docker image inspect", "sudo docker",
+                "sudo bash", "sudo sh", "sudo -u", "sudo -S", "\"$HOME\"");
+    }
 }

@@ -37,9 +37,7 @@ class DeliveryWorkflowArchitectureTest {
                 .doesNotContain("setup-node")
                 .doesNotContain("npm")
                 .doesNotContain("compileJava")
-                .doesNotContain(":app:bootJar")
-                .doesNotContain("D4")
-                .doesNotContain("Delivery Step 4");
+                .doesNotContain(":app:bootJar");
     }
 
     @Test

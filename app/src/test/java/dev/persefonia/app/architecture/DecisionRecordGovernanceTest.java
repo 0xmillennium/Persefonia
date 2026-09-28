@@ -18,6 +18,7 @@ class DecisionRecordGovernanceTest {
     private static final Path INDEX = DECISION_DIR.resolve("INDEX.md");
     private static final Pattern ADR_FILE_NAME = Pattern.compile("\\d{4}-[a-z0-9]+(?:-[a-z0-9]+)*\\.md");
     private static final Pattern INDEX_LINK = Pattern.compile("\\((\\d{4}-[a-z0-9]+(?:-[a-z0-9]+)*\\.md)\\)");
+    private static final Pattern INTERNAL_MILESTONE = Pattern.compile("\\b(?:D[0-9]+|Sprint\\s+[0-9]+)\\b");
     private static final List<String> REQUIRED_SECTIONS = List.of(
             "## Context",
             "## Decision",
@@ -71,6 +72,14 @@ class DecisionRecordGovernanceTest {
                     .as(decision.toString())
                     .contains(REQUIRED_SECTIONS.toArray(String[]::new))
                     .contains(REQUIRED_METADATA_MARKERS.toArray(String[]::new));
+        }
+    }
+
+    @Test
+    void publicDecisionRecordsAndIndexDoNotExposeInternalMilestones() throws Exception {
+        for (Path document : java.util.stream.Stream.concat(decisionRecords().stream(), java.util.stream.Stream.of(INDEX)).toList()) {
+            assertThat(INTERNAL_MILESTONE.matcher(Files.readString(document)).find())
+                    .as(document.toString()).isFalse();
         }
     }
 

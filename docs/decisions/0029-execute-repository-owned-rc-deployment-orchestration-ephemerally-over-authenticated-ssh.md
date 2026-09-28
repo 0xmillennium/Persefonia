@@ -2,11 +2,13 @@
 
 | Field | Value |
 |---|---|
-| Status | Accepted |
+| Status | Superseded |
 | Date | 2026-09-28 |
 | Scope | architecture / operations / deployment / security |
 | Supersedes | none |
-| Superseded by | none |
+| Superseded by | ADR 0030 |
+
+Supersession note: [ADR 0030](0030-route-deployment-runtime-operations-through-a-narrow-host-privilege-gateway.md) replaces direct production-runtime access from the streamed repository payload with a narrow externally owned privilege gateway. Repository-owned orchestration over authenticated SSH remains in force.
 
 ## Context
 
