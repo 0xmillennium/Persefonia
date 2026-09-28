@@ -28,9 +28,9 @@ A different OCI digest is a different release candidate. If source or artifact c
 
 Temporary CI publication may use a non-release alias equivalent to `ci-<run-id>-<attempt>`. After registry-backed qualification, the digest may receive `sha-<full-git-sha>`, meaning that the digest is the delivery-eligible candidate produced for that exact commit. The same digest may then receive `v0.1.0-rc.1` and, after all required qualification, `v0.1.0`. A fix after an RC produces a new source commit, a new digest, and the next RC, such as `v0.1.0-rc.2`; the final release must not rebuild the RC artifact.
 
-Application/build version and release/qualification alias are distinct. For the first release train, the future release-candidate artifact should report application version `0.1.0`, while `v0.1.0-rc.N` remains an external release/qualification identity. The current `0.1.0-SNAPSHOT` project version is unchanged by this decision; the version transition belongs to D1.
+Application/build version and release/qualification alias are distinct. For the first release train, the future release-candidate artifact should report application version `0.1.0`, while `v0.1.0-rc.N` remains an external release/qualification identity. The current `0.1.0-SNAPSHOT` project version is unchanged by this decision; the version transition is governed separately.
 
-The OCI image must be environment-neutral. It must not contain database or Redis passwords, OIDC client secrets, SMTP credentials, Cloudflare tokens, deployment hostnames, `.env` content, or deployment-host secrets. Runtime configuration and secrets are external to the image; the exact configuration injection mechanism belongs to D2.
+The OCI image must be environment-neutral. It must not contain database or Redis passwords, OIDC client secrets, SMTP credentials, Cloudflare tokens, deployment hostnames, `.env` content, or deployment-host secrets. Runtime configuration and secrets are external to the image; the configuration injection mechanism is governed by deployment and runtime configuration decisions.
 
 The architectural requirement is an OCI-compatible registry with immutable digest semantics. GHCR is the currently intended implementation provider, but changing to another OCI-compatible registry does not supersede this decision unless artifact identity or promotion semantics change.
 

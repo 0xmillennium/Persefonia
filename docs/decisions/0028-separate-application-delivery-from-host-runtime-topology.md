@@ -8,7 +8,7 @@
 | Supersedes | ADR 0023 |
 | Superseded by | none |
 
-Implementation refinement: [ADR 0029](0029-execute-repository-owned-rc-deployment-orchestration-ephemerally-over-authenticated-ssh.md) implements this division with repository-owned deployment orchestration streamed over authenticated SSH. The external runtime still owns production topology, preflight, secrets, and state; streaming orchestration does not transfer those responsibilities to Persefonia.
+Implementation refinement: [ADR 0030](0030-route-deployment-runtime-operations-through-a-narrow-host-privilege-gateway.md) is the active implementation decision. Persefonia owns deployment orchestration. The external runtime owns the privileged runtime gateway, physical topology, runtime operator, Docker authority, secrets, durable state, and preflight implementation. Routing operations through the gateway does not transfer runtime ownership to Persefonia. [ADR 0029](0029-execute-repository-owned-rc-deployment-orchestration-ephemerally-over-authenticated-ssh.md) records the preceding streamed-payload mechanism.
 
 ## Context
 
@@ -34,7 +34,7 @@ Application dependency endpoints must be configurable. The Docker profile consum
 
 [ADR 0025](0025-deploy-qualified-oci-artifacts-to-the-single-node-runtime-over-authenticated-ssh.md) remains accepted for exact OCI digest authority, the GitHub-hosted runner boundary, authenticated SSH, mandatory SSH host identity verification, host-owned application secrets, and no blind automatic rollback. Its historical repository-owned production Compose/preflight/topology portions are superseded by this boundary. [ADR 0026](0026-use-oidc-group-admission-with-refresh-backed-admin-session-revalidation.md) retains its OIDC admission/revalidation semantics; its historical tracked-runtime-source paragraph is superseded.
 
-Later D5 deployment automation may invoke the externally owned runtime over authenticated SSH using the qualified immutable artifact. This decision does not implement that mutation, install host helpers, synchronize host files, or change the current Deploy RC workflow. The external runtime is an already-provisioned contract; repository checks cannot establish its live state.
+Later deployment automation may invoke the externally owned runtime over authenticated SSH using the qualified immutable artifact. This decision does not implement that mutation, install host helpers, synchronize host files, or change the current Deploy RC workflow. The external runtime is an already-provisioned contract; repository checks cannot establish its live state.
 
 ## Consequences
 

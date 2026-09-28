@@ -28,7 +28,7 @@ Persefonia production Compose must not provision Cloudflare, Traefik, Authelia, 
 
 As required by [ADR 0020](0020-treat-database-and-asset-storage-as-one-recovery-unit.md), PostgreSQL plus durable Media is the Persefonia recovery unit. Redis rate-limit state, session state, application cache, CDN cache, Traefik runtime state, Authelia session state, and Postfix runtime queue/state are not part of the durable recovery set. Per [ADR 0009](0009-keep-redis-auxiliary-only.md), Redis remains auxiliary: it may be inside the Persefonia-managed runtime deployment unit while remaining outside durable recovery correctness. Ownership and durability are separate dimensions. Operational recovery retains the boundary established by [ADR 0021](0021-keep-operational-recovery-commands-outside-a-single-use-case-transaction.md).
 
-Runtime secrets must not be stored in the OCI image, Git repository, or domain database. External-platform credentials are environment and deployment concerns. The exact mounted-secret implementation belongs to D2. Deployment connectivity credentials and runtime application credentials are distinct concerns; runtime application secrets remain on the deployment environment or host.
+Runtime secrets must not be stored in the OCI image, Git repository, or domain database. External-platform credentials are environment and deployment concerns. The exact mounted-secret implementation is governed by runtime configuration decisions. Deployment connectivity credentials and runtime application credentials are distinct concerns; runtime application secrets remain on the deployment environment or host.
 
 ## Consequences
 

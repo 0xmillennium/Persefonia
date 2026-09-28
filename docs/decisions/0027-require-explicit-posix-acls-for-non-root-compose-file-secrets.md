@@ -12,7 +12,7 @@ Runtime-ownership refinement: [ADR 0028](0028-separate-application-delivery-from
 
 ## Context
 
-Persefonia runs as UID 10001. The pinned PostgreSQL and Redis images use non-root runtime identities with UIDs 70 and 999 respectively. Production Compose secrets are backed by host files. During D5 real-host qualification, nonempty secret files passed preflight but runtime reads failed with `Permission denied`.
+Persefonia runs as UID 10001. The pinned PostgreSQL and Redis images use non-root runtime identities with UIDs 70 and 999 respectively. Production Compose secrets are backed by host files. During real-host qualification, nonempty secret files passed preflight but runtime reads failed with `Permission denied`.
 
 PostgreSQL and Redis passwords are shared with the application, so assigning each file to a single service owner cannot satisfy all consumers. Docker Compose does not implement `uid`, `gid`, or `mode` remapping for file-backed secrets because their sources are bind-mounted. See the [Docker Compose secrets reference](https://docs.docker.com/reference/compose-file/services/#secrets).
 

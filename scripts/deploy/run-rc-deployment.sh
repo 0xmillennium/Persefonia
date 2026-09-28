@@ -47,7 +47,7 @@ if ! ssh -F /dev/null -p "$port" -i "$private_key" \
     -o ClearAllForwardings=yes -o ForwardAgent=no -o RequestTTY=no \
     -o PermitLocalCommand=no -o ConnectTimeout=10 -o ConnectionAttempts=1 \
     -o IdentityAgent=none -o ProxyCommand=none -o ProxyJump=none \
-    "$user@$host" "bash -s -- $source_sha $image_reference" < "$payload" > "$protocol"; then
+    "$user@$host" "/usr/bin/env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin /usr/bin/bash --noprofile --norc -s -- $source_sha $image_reference" < "$payload" > "$protocol"; then
   fail "Remote RC deployment failed."
 fi
 LC_ALL=C tr -d '\000' < "$protocol" | cmp -s - "$protocol" || fail "Remote protocol contains NUL."

@@ -34,7 +34,9 @@ class RcDeploymentInvocationContractTest {
                 "StrictHostKeyChecking=yes", "HostKeyAlgorithms=ssh-ed25519", "PasswordAuthentication=no",
                 "KbdInteractiveAuthentication=no", "ForwardAgent=no", "RequestTTY=no",
                 "ProxyCommand=none", "ProxyJump=none", "ConnectionAttempts=1", "ConnectTimeout=10",
-                "UserKnownHostsFile=", "deploy_user@rc.example.test", "bash -s -- " + SOURCE + " " + IMAGE);
+                "UserKnownHostsFile=", "deploy_user@rc.example.test", remoteCommand());
+        assertThat(result.sshArgs().lines().toList().getLast()).isEqualTo(remoteCommand());
+        assertThat(remoteCommand()).doesNotContain("$HOME", "sudo", "-S", "-c", "source ");
         assertThat(result.sshArgs()).doesNotContain("ssh-keyscan", "scp", "rsync");
     }
 
@@ -138,5 +140,9 @@ class RcDeploymentInvocationContractTest {
     }
 
     private static String read(Path file) throws Exception { return Files.exists(file) ? Files.readString(file) : ""; }
+    private static String remoteCommand() {
+        return "/usr/bin/env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin "
+                + "/usr/bin/bash --noprofile --norc -s -- " + SOURCE + " " + IMAGE;
+    }
     private record Result(int status, String stdout, String sshArgs, String stdin) {}
 }
