@@ -23,14 +23,19 @@ class QualifiedIndexPolicyContractTest {
 
     @Test
     void rejectsMissingDuplicateUnexpectedOrMalformedRuntimeDescriptors() throws Exception {
-        Map<String, String> invalid = Map.of(
-                "not-array", ".manifests = {}",
-                "missing", "del(.manifests[1])",
-                "duplicate", ".manifests[1].platform.architecture = \"amd64\"",
-                "unexpected", ".manifests[1].platform.architecture = \"riscv64\"",
-                "invalid-digest", ".manifests[1].digest = \"sha256:bad\"",
-                "invalid-media", ".manifests[1].mediaType = \"other\"",
-                "missing-platform", "del(.manifests[1].platform)");
+        Map<String, String> invalid = Map.ofEntries(
+                Map.entry("not-array", ".manifests = {}"),
+                Map.entry("missing", "del(.manifests[1])"),
+                Map.entry("duplicate", ".manifests[1].platform.architecture = \"amd64\""),
+                Map.entry("unexpected", ".manifests[1].platform.architecture = \"riscv64\""),
+                Map.entry("invalid-digest", ".manifests[1].digest = \"sha256:bad\""),
+                Map.entry("invalid-media", ".manifests[1].mediaType = \"other\""),
+                Map.entry("partial-os", ".manifests[2].platform.architecture = \"amd64\""),
+                Map.entry("partial-architecture", ".manifests[2].platform.os = \"linux\""),
+                Map.entry("missing-os", "del(.manifests[2].platform.os)"),
+                Map.entry("missing-architecture", "del(.manifests[2].platform.architecture)"),
+                Map.entry("malformed-platform", ".manifests[2].platform = []"),
+                Map.entry("missing-platform", "del(.manifests[1].platform)"));
         for (var entry : invalid.entrySet()) {
             Path variant = temporary.resolve(entry.getKey() + ".json");
             CommandResult mutation = runner().run("jq", entry.getValue(), valid.toString());

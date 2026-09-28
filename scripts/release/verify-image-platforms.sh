@@ -49,15 +49,17 @@ case "$media_type" in
 esac
 
 if ! jq -e '
-  (.manifests | type == "array") and
-  ([.manifests[] | select(.platform.os != "unknown" and .platform.architecture != "unknown")] |
-    all(.[];
-      (.platform.os | type) == "string" and
-      (.platform.architecture | type) == "string" and
-      (.digest | type) == "string" and
-      (.digest | test("^sha256:[a-f0-9]{64}$")) and
-      (.mediaType == "application/vnd.oci.image.manifest.v1+json" or
-       .mediaType == "application/vnd.docker.distribution.manifest.v2+json")))
+  def metadata: .platform.os == "unknown" and .platform.architecture == "unknown";
+  def runtime: .platform.os != "unknown" and .platform.architecture != "unknown";
+  def valid_descriptor:
+    type == "object" and (.platform | type) == "object" and
+    (.platform.os | type) == "string" and (.platform.os | length) > 0 and
+    (.platform.architecture | type) == "string" and (.platform.architecture | length) > 0 and
+    (metadata or runtime) and
+    (.digest | type) == "string" and (.digest | test("^sha256:[a-f0-9]{64}$")) and
+    (.mediaType == "application/vnd.oci.image.manifest.v1+json" or
+     .mediaType == "application/vnd.docker.distribution.manifest.v2+json");
+  (.manifests | type) == "array" and all(.manifests[]; valid_descriptor)
 ' <<<"$manifest" >/dev/null; then
   echo "Registry index contains a malformed runtime descriptor: $image_reference" >&2
   exit 1

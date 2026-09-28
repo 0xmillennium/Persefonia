@@ -36,8 +36,44 @@ class ImagePlatformsContractTest {
                 ".manifests[1].platform.architecture = \"amd64\"",
                 ".manifests[1].digest = \"sha256:bad\"",
                 ".manifests[1].mediaType = \"unexpected\"",
+                ".manifests[1].platform = \"linux/arm64\"",
                 ".manifests = {}"}) {
             assertThat(run(bin, mutate(change), "exact", false).status()).as(change).isNotZero();
+        }
+    }
+
+    @Test
+    void rejectsPartialPlatformIdentitiesInBothModes() throws Exception {
+        Path bin = fakeDocker();
+        for (String change : new String[] {
+                ".manifests[2].platform.architecture = \"amd64\"",
+                ".manifests[2].platform.os = \"linux\"",
+                "del(.manifests[2].platform.os)",
+                "del(.manifests[2].platform.architecture)"}) {
+            Path index = mutate(change);
+            for (String mode : new String[] {"exact", "contains"}) {
+                assertThat(run(bin, index, mode, false).status()).as(change + " " + mode).isNotZero();
+            }
+        }
+    }
+
+    @Test
+    void releaseAndDeploymentAgreeOnDescriptorClassification() throws Exception {
+        Path bin = fakeDocker();
+        for (Path index : new Path[] {valid,
+                mutate(".manifests[2].platform.architecture = \"amd64\""),
+                mutate(".manifests[2].platform.os = \"linux\""),
+                mutate("del(.manifests[2].platform.os)"),
+                mutate("del(.manifests[2].platform.architecture)"),
+                mutate(".manifests[2].mediaType = \"invalid\""),
+                mutate(".manifests[2].digest = \"sha256:bad\""),
+                mutate(".manifests[2].platform = []")}) {
+            boolean releaseAccepted = run(bin, index, "exact", false).status() == 0;
+            boolean deploymentAccepted = new CommandRunner(repository, temporary.resolve("home"), Duration.ofSeconds(10), Map.of())
+                    .run("jq", "-e", "--argjson", "expected", "[\"linux/amd64\",\"linux/arm64\"]",
+                            "-f", repository.resolve("scripts/deploy/qualified-index-policy.jq").toString(), index.toString())
+                    .status() == 0;
+            assertThat(releaseAccepted).as(index.toString()).isEqualTo(deploymentAccepted);
         }
     }
 
