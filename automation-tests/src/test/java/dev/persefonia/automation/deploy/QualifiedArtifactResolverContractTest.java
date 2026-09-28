@@ -153,25 +153,20 @@ class QualifiedArtifactResolverContractTest {
         byte[] expectedBody = resourceBytes(fixtureName);
         String digest = "sha256:" + HexFormat.of().formatHex(
                 MessageDigest.getInstance("SHA-256").digest(expectedBody));
-        ProcessBuilder command = new ProcessBuilder(
-                RESOLVER.toAbsolutePath().toString(),
-                options.getOrDefault("SOURCE_SHA_OVERRIDE", SOURCE_SHA),
-                options.getOrDefault("EXPECTED_DIGEST_OVERRIDE", digest),
-                options.getOrDefault("REPOSITORY_OVERRIDE", REPOSITORY),
-                Path.of("../docker/supported-platforms.txt").toAbsolutePath().toString());
-        if (options.containsKey("EXTRA_ARGUMENT")) {
-            command.command().add(options.get("EXTRA_ARGUMENT"));
-        }
-        command.directory(fixture.toFile());
-        Map<String, String> environment = command.environment();
-        environment.put("PATH", binaryDirectory + ":" + environment.get("PATH"));
-        environment.put("DOCKER_CONFIG", dockerDirectory.toString());
-        environment.put("FAKE_INDEX_FILE", indexFile.toString());
-        environment.put("FAKE_DIGEST", digest);
-        environment.put("FAKE_REQUESTS", requests.toString());
-        environment.put("FAKE_GH_ARGS", ghArguments.toString());
-        environment.putAll(options);
-        var result = CommandRunner.execute(command);
+        var command = CommandRunner.command(RESOLVER.toAbsolutePath().toString())
+                .args(options.getOrDefault("SOURCE_SHA_OVERRIDE", SOURCE_SHA),
+                        options.getOrDefault("EXPECTED_DIGEST_OVERRIDE", digest),
+                        options.getOrDefault("REPOSITORY_OVERRIDE", REPOSITORY),
+                        Path.of("../docker/supported-platforms.txt").toAbsolutePath().toString())
+                .directory(fixture).pathPrepend(binaryDirectory)
+                .env("DOCKER_CONFIG", dockerDirectory.toString())
+                .env("FAKE_INDEX_FILE", indexFile.toString())
+                .env("FAKE_DIGEST", digest)
+                .env("FAKE_REQUESTS", requests.toString())
+                .env("FAKE_GH_ARGS", ghArguments.toString())
+                .env(options);
+        if (options.containsKey("EXTRA_ARGUMENT")) command.args(options.get("EXTRA_ARGUMENT"));
+        var result = command.run();
         return new Resolution(result.status(), result.stdout(), result.stderr(), digest,
                 InvocationLog.callsAsLines(requests),
                 InvocationLog.argumentsAsLines(ghArguments));

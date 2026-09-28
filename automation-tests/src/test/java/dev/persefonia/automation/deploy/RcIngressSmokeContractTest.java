@@ -53,11 +53,8 @@ class RcIngressSmokeContractTest {
         Files.writeString(sleep, "#!/usr/bin/env bash\nexit 0\n");
         sleep.toFile().setExecutable(true);
         Path log = dir.resolve("calls");
-        ProcessBuilder builder = new ProcessBuilder(SCRIPT.toString());
-        builder.environment().put("PATH", bin + ":" + builder.environment().get("PATH"));
-        builder.environment().put("INGRESS_CURL_LOG", log.toString());
-        builder.environment().putAll(overrides);
-        var result = CommandRunner.execute(builder);
+        var result = CommandRunner.command(SCRIPT.toString()).pathPrepend(bin)
+                .env("INGRESS_CURL_LOG", log.toString()).env(overrides).run();
         return new Result(result.status(), result.stdout(), InvocationLog.argumentsAsLines(log));
     }
 

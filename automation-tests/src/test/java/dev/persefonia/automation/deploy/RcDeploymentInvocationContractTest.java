@@ -49,7 +49,7 @@ class RcDeploymentInvocationContractTest {
             var args = new ArrayList<String>();
             args.add(SCRIPT.toString());
             for (int i = 0; i < count; i++) args.add("x");
-            assertThat(CommandRunner.execute(new ProcessBuilder(args)).status()).as(marker.toString()).isNotZero();
+            assertThat(CommandRunner.command(args.getFirst()).args(args.subList(1, args.size())).run().status()).as(marker.toString()).isNotZero();
         }
         for (String[] change : List.of(
                 new String[] {"0", "bad host"}, new String[] {"0", "user@host"},
@@ -124,15 +124,14 @@ class RcDeploymentInvocationContractTest {
                 key.toString(), hosts.toString(), SOURCE, IMAGE));
         for (String[] change : changes) arguments.set(Integer.parseInt(change[0]), change[1]);
         arguments.add(0, SCRIPT.toString());
-        ProcessBuilder builder = new ProcessBuilder(arguments);
         Path args = dir.resolve("ssh-args"), stdin = dir.resolve("stdin"), output = dir.resolve("remote-stdout");
         Files.write(output, protocol.getBytes(StandardCharsets.UTF_8));
-        builder.environment().put("PATH", bin + ":" + builder.environment().get("PATH"));
-        builder.environment().put("FAKE_RC_SSH_ARGS", args.toString());
-        builder.environment().put("FAKE_RC_SSH_STDIN", stdin.toString());
-        builder.environment().put("FAKE_RC_SSH_STDOUT_FILE", output.toString());
-        builder.environment().putAll(overrides);
-        var result = CommandRunner.execute(builder);
+        var result = CommandRunner.command(arguments.getFirst()).args(arguments.subList(1, arguments.size()))
+                .pathPrepend(bin)
+                .env("FAKE_RC_SSH_ARGS", args.toString())
+                .env("FAKE_RC_SSH_STDIN", stdin.toString())
+                .env("FAKE_RC_SSH_STDOUT_FILE", output.toString())
+                .env(overrides).run();
         return new Result(result.status(), result.stdout(), InvocationLog.argumentsAsLines(args), read(stdin));
     }
 

@@ -155,17 +155,17 @@ class RcHostDeploymentContractTest {
         }
         Path sudoLog = dir.resolve("sudo-calls"), gatewayLog = dir.resolve("gateway-calls");
         Path tmp = Files.createDirectory(dir.resolve("tmp"));
-        ProcessBuilder builder = new ProcessBuilder(SCRIPT.toString(), overrides.getOrDefault("SOURCE", SOURCE),
-                overrides.getOrDefault("IMAGE", IMAGE));
-        builder.environment().put("PATH", overrides.containsKey("NO_SUDO") ? bin.toString()
-                : bin + ":" + builder.environment().get("PATH"));
-        builder.environment().put("RC_SUDO_LOG", sudoLog.toString());
-        builder.environment().put("RC_GATEWAY_LOG", gatewayLog.toString());
-        builder.environment().put("RC_FAKE_GATEWAY", gateway.toString());
-        builder.environment().put("RC_IMAGE_REF", IMAGE);
-        builder.environment().put("TMPDIR", tmp.toString());
-        builder.environment().putAll(overrides);
-        var result = CommandRunner.execute(builder);
+        var command = CommandRunner.command(SCRIPT.toString())
+                .args(overrides.getOrDefault("SOURCE", SOURCE), overrides.getOrDefault("IMAGE", IMAGE))
+                .env("RC_SUDO_LOG", sudoLog.toString())
+                .env("RC_GATEWAY_LOG", gatewayLog.toString())
+                .env("RC_FAKE_GATEWAY", gateway.toString())
+                .env("RC_IMAGE_REF", IMAGE)
+                .env("TMPDIR", tmp.toString())
+                .env(overrides);
+        if (overrides.containsKey("NO_SUDO")) command.path(bin.toString());
+        else command.pathPrepend(bin);
+        var result = command.run();
         try (var paths = Files.list(tmp)) {
             assertThat(paths.toList()).as("gateway output files must be removed").isEmpty();
         }

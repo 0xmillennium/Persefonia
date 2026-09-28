@@ -126,7 +126,7 @@ class DeliveryHandoffContractTest {
     }
 
     private static Result run(String... command) throws Exception {
-        var result = CommandRunner.execute(new ProcessBuilder(command));
+        var result = CommandRunner.command(command[0]).args(java.util.Arrays.copyOfRange(command, 1, command.length)).run();
         return new Result(result.status(), result.stdout(), result.stderr());
     }
 

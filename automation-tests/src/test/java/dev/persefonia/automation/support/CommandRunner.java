@@ -26,21 +26,38 @@ public final class CommandRunner {
         this.variables = Map.copyOf(variables);
     }
 
-    public static CommandResult execute(ProcessBuilder builder) throws Exception {
-        Path directory = builder.directory() == null ? Path.of("").toAbsolutePath() : builder.directory().toPath();
-        Map<String, String> overrides = new HashMap<>();
-        for (var entry : builder.environment().entrySet()) {
-            if (!entry.getValue().equals(System.getenv(entry.getKey()))) {
-                overrides.put(entry.getKey(), entry.getValue());
-            }
-        }
-        Path home = Files.createTempDirectory("persefonia-command-home-");
-        try {
-            return new CommandRunner(directory, home, Duration.ofSeconds(30), overrides).run(builder.command());
-        } finally {
-            try (var paths = Files.walk(home)) {
-                for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) {
-                    Files.deleteIfExists(path);
+    public static Command command(String executable) {
+        return new Command(executable);
+    }
+
+    public static final class Command {
+        private final List<String> arguments = new ArrayList<>();
+        private final Map<String, String> variables = new HashMap<>();
+        private Path directory = Path.of("").toAbsolutePath();
+        private Duration timeout = Duration.ofSeconds(30);
+        private String path = "/usr/bin:/bin";
+
+        private Command(String executable) { arguments.add(executable); }
+        public Command args(String... values) { arguments.addAll(List.of(values)); return this; }
+        public Command args(List<String> values) { arguments.addAll(values); return this; }
+        public Command env(String key, String value) { variables.put(key, value); return this; }
+        public Command env(Map<String, String> values) { variables.putAll(values); return this; }
+        public Command pathPrepend(Path bin) { path = bin + ":" + path; return this; }
+        public Command path(String value) { path = value; return this; }
+        public Command directory(Path value) { directory = value; return this; }
+        public Command timeout(Duration value) { timeout = value; return this; }
+
+        public CommandResult run() throws Exception {
+            Path home = Files.createTempDirectory("persefonia-command-home-");
+            try {
+                Map<String, String> environment = new HashMap<>(variables);
+                environment.put("PATH", path);
+                return new CommandRunner(directory, home, timeout, environment).run(arguments);
+            } finally {
+                try (var paths = Files.walk(home)) {
+                    for (Path item : paths.sorted(Comparator.reverseOrder()).toList()) {
+                        Files.deleteIfExists(item);
+                    }
                 }
             }
         }

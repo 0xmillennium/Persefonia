@@ -26,10 +26,10 @@ class SshTargetTrustContractTest {
 
     @Test
     void rejectsInvalidArgumentCounts() throws Exception {
-        var missing = CommandRunner.execute(new ProcessBuilder(VERIFIER.toString()));
+        var missing = CommandRunner.command(VERIFIER.toString()).run();
         assertThat(missing.status()).isNotZero();
         assertThat(missing.stdout()).isEmpty();
-        assertThat(CommandRunner.execute(new ProcessBuilder(VERIFIER.toString(), "a", "b", "c", "d", "e", "f", "g")).status()).isNotZero();
+        assertThat(CommandRunner.command(VERIFIER.toString()).args("a", "b", "c", "d", "e", "f", "g").run().status()).isNotZero();
     }
 
     @Test
@@ -213,19 +213,18 @@ class SshTargetTrustContractTest {
         if (output != null) {
             arguments.add(output.toString());
         }
-        ProcessBuilder processBuilder = new ProcessBuilder(arguments);
-        Map<String, String> environment = processBuilder.environment();
-        environment.put("PATH", bin + ":" + environment.get("PATH"));
-        environment.put("FAKE_KEYSCAN_ARGS", scanArgs.toString());
-        environment.put("FAKE_KEYGEN_ARGS", keygenArgs.toString());
-        environment.put("FAKE_KEYGEN_RECORD", fingerprintedRecord.toString());
-        environment.put("FAKE_SSH_ARGS", sshArgs.toString());
-        environment.put("FAKE_SSH_KNOWN_HOSTS", knownHosts.toString());
-        environment.put("FAKE_SCAN_RECORD", RECORD);
-        environment.put("FAKE_PRESENTED_FINGERPRINT", FINGERPRINT);
-        environment.put("FAKE_SSH_STDOUT", PROBE);
-        environment.putAll(overrides);
-        var result = CommandRunner.execute(processBuilder);
+        var command = CommandRunner.command(arguments.getFirst()).args(arguments.subList(1, arguments.size()))
+                .pathPrepend(bin)
+                .env("FAKE_KEYSCAN_ARGS", scanArgs.toString())
+                .env("FAKE_KEYGEN_ARGS", keygenArgs.toString())
+                .env("FAKE_KEYGEN_RECORD", fingerprintedRecord.toString())
+                .env("FAKE_SSH_ARGS", sshArgs.toString())
+                .env("FAKE_SSH_KNOWN_HOSTS", knownHosts.toString())
+                .env("FAKE_SCAN_RECORD", RECORD)
+                .env("FAKE_PRESENTED_FINGERPRINT", FINGERPRINT)
+                .env("FAKE_SSH_STDOUT", PROBE)
+                .env(overrides);
+        var result = command.run();
         return new Result(result.status(), result.stdout(), result.stderr(),
                 InvocationLog.argumentsAsLines(scanArgs), InvocationLog.argumentsAsLines(keygenArgs),
                 InvocationLog.argumentsAsLines(sshArgs),
