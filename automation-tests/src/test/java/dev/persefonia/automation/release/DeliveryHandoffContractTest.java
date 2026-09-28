@@ -2,6 +2,7 @@ package dev.persefonia.automation.release;
 
 import dev.persefonia.automation.support.CommandRunner;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import dev.persefonia.automation.support.KeyValueProtocol;
 
 import java.nio.charset.StandardCharsets;
@@ -12,6 +13,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class DeliveryHandoffContractTest {
+    private static final List<String> KEYS = List.of("format_version", "delivery_run_id", "delivery_run_attempt",
+            "source_sha", "image_name", "image_digest", "image_reference", "source_alias");
     private static final Path WRITER = Path.of("../scripts/release/write-delivery-handoff.sh").toAbsolutePath();
     private static final Path VERIFIER = Path.of("../scripts/deploy/verify-delivery-handoff.sh").toAbsolutePath();
     private static final String SOURCE_SHA = "a".repeat(40);
@@ -32,14 +35,33 @@ class DeliveryHandoffContractTest {
         assertThat(written.status()).isZero();
         assertThat(written.stdout()).isEmpty();
         assertThat(Files.readString(file)).isEqualTo(validHandoff());
-        assertThat(KeyValueProtocol.parse(Files.readString(file), List.of(
-                "format_version", "delivery_run_id", "delivery_run_attempt", "source_sha",
-                "image_name", "image_digest", "image_reference", "source_alias")))
+        assertThat(KeyValueProtocol.parse(Files.readString(file), KEYS))
                 .containsEntry("source_sha", SOURCE_SHA).containsEntry("image_digest", DIGEST);
 
         Result verified = verify(file, SOURCE_SHA, RUN_ID, RUN_ATTEMPT, REPOSITORY);
         assertThat(verified.status()).isZero();
         assertThat(verified.stdout()).isEqualTo("expected_image_digest=" + DIGEST + "\n");
+    }
+
+    @Test
+    void verifierAndProtocolRejectReorderedWriterRecords() throws Exception {
+        Path file = temporaryDirectory.resolve("writer-handoff.txt");
+        assertThat(write(file, SOURCE_SHA, IMAGE, DIGEST, RUN_ID, RUN_ATTEMPT).status()).isZero();
+        String[] records = Files.readString(file).split("\n");
+        for (int[] order : List.of(
+                new int[] {0, 2, 1, 3, 4, 5, 6, 7},
+                new int[] {0, 5, 2, 3, 4, 1, 6, 7},
+                new int[] {1, 2, 0, 3, 4, 5, 6, 7},
+                new int[] {7, 6, 5, 4, 3, 2, 1, 0})) {
+            StringBuilder reordered = new StringBuilder();
+            for (int index : order) reordered.append(records[index]).append('\n');
+            Files.writeString(file, reordered);
+            assertThatThrownBy(() -> KeyValueProtocol.parse(reordered.toString(), KEYS))
+                    .isInstanceOf(IllegalArgumentException.class);
+            Result result = verify(file, SOURCE_SHA, RUN_ID, RUN_ATTEMPT, REPOSITORY);
+            assertThat(result.status()).as("order %s", java.util.Arrays.toString(order)).isNotZero();
+            assertThat(result.stdout()).isEmpty();
+        }
     }
 
     @Test

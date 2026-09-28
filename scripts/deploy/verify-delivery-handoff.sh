@@ -36,6 +36,7 @@ if [[ $(tail -c 1 -- "$handoff_file" | od -An -tu1 | tr -d '[:space:]') != 10 ]]
 fi
 
 declare -A fields=()
+expected_keys=(format_version delivery_run_id delivery_run_attempt source_sha image_name image_digest image_reference source_alias)
 record_count=0
 while IFS= read -r line; do
   if [[ "$line" == *$'\r'* || ! "$line" =~ ^([a-z_]+)=(.*)$ ]]; then
@@ -52,20 +53,18 @@ while IFS= read -r line; do
     echo "Delivery handoff contains a duplicate key." >&2
     exit 1
   fi
+  if [[ "$record_count" -ge "${#expected_keys[@]}" || "$key" != "${expected_keys[$record_count]}" ]]; then
+    echo "Delivery handoff records are out of order." >&2
+    exit 1
+  fi
   fields[$key]=$value
   ((record_count += 1))
 done < "$handoff_file"
 
-if [[ "$record_count" -ne 8 ]]; then
+if [[ "$record_count" -ne "${#expected_keys[@]}" ]]; then
   echo "Delivery handoff must contain exactly eight records." >&2
   exit 1
 fi
-for key in format_version delivery_run_id delivery_run_attempt source_sha image_name image_digest image_reference source_alias; do
-  if [[ ! -v "fields[$key]" ]]; then
-    echo "Delivery handoff is missing a required key." >&2
-    exit 1
-  fi
-done
 if [[ "${fields[format_version]}" != 1 ||
       ! "${fields[delivery_run_id]}" =~ ^[1-9][0-9]*$ ||
       ! "${fields[delivery_run_attempt]}" =~ ^[1-9][0-9]*$ ||
