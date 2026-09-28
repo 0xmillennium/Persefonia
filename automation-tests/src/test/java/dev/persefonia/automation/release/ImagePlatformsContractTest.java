@@ -40,6 +40,27 @@ class ImagePlatformsContractTest {
                 ".manifests = {}"}) {
             assertThat(run(bin, mutate(change), "exact", false).status()).as(change).isNotZero();
         }
+        assertThat(run(bin, mutate(".manifests[1].platform.architecture = \"amd64\""), "contains", false)
+                .status()).isNotZero();
+    }
+
+    @Test
+    void containsModeAcceptsDistinctVariantsButRejectsDuplicateVariant() throws Exception {
+        Path bin = fakeDocker();
+        Path variants = mutate(".manifests += [" +
+                "{mediaType: \"application/vnd.oci.image.manifest.v1+json\", digest: \"sha256:" + "c".repeat(64) +
+                "\", platform: {os: \"linux\", architecture: \"arm\", variant: \"v6\"}}," +
+                "{mediaType: \"application/vnd.oci.image.manifest.v1+json\", digest: \"sha256:" + "d".repeat(64) +
+                "\", platform: {os: \"linux\", architecture: \"arm\", variant: \"v7\"}}]");
+        assertThat(run(bin, variants, "contains", false).status()).isZero();
+        assertThat(run(bin, variants, "exact", false).status()).isNotZero();
+        Path duplicateVariant = mutate(".manifests[0].platform.variant = \"v6\" | " +
+                ".manifests += [{mediaType: \"application/vnd.oci.image.manifest.v1+json\", " +
+                "digest: \"sha256:" + "c".repeat(64) +
+                "\", platform: {os: \"linux\", architecture: \"amd64\", variant: \"v6\"}}]");
+        assertThat(run(bin, duplicateVariant, "contains", false).status()).isNotZero();
+        assertThat(run(bin, mutate(".manifests[0].platform.variant = 6"), "contains", false)
+                .status()).isNotZero();
     }
 
     @Test
