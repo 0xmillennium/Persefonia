@@ -1,6 +1,7 @@
 package dev.persefonia.automation.workflow;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dev.persefonia.automation.support.WorkflowDocument;
 import java.io.IOException;
@@ -12,6 +13,70 @@ class CiWorkflowContractTest {
     private final WorkflowDocument workflow = WorkflowDocument.open("ci.yml");
 
     CiWorkflowContractTest() throws IOException {}
+
+    @Test
+    void acceptsOnlyMasterPullRequestsPushesAndManualDispatch() {
+        assertCiTriggers(workflow);
+        for (String unexpected : List.of("schedule", "pull_request_target", "repository_dispatch", "workflow_call")) {
+            WorkflowDocument changed = openCi();
+            changed.triggers().put(unexpected, Map.of());
+            assertThatThrownBy(() -> assertCiTriggers(changed)).as(unexpected).isInstanceOf(AssertionError.class);
+        }
+        WorkflowDocument broadened = openCi();
+        WorkflowDocument.map(broadened.triggers().get("push")).put("branches", List.of("master", "feature"));
+        assertThatThrownBy(() -> assertCiTriggers(broadened)).isInstanceOf(AssertionError.class);
+        WorkflowDocument tags = openCi();
+        WorkflowDocument.map(tags.triggers().get("push")).put("tags", List.of("*"));
+        assertThatThrownBy(() -> assertCiTriggers(tags)).isInstanceOf(AssertionError.class);
+    }
+
+    @Test
+    void ciServicesRemainDigestPinned() {
+        assertDigestPinnedServices(workflow);
+        for (String mutable : List.of("postgres:17", "redis:latest", "redis@sha256:short")) {
+            WorkflowDocument changed = openCi();
+            WorkflowDocument.map(WorkflowDocument.map(changed.job("verify").get("services")).get("redis"))
+                    .put("image", mutable);
+            assertThatThrownBy(() -> assertDigestPinnedServices(changed)).as(mutable)
+                    .isInstanceOf(AssertionError.class);
+        }
+    }
+
+    @Test
+    void ciConcurrencyAndRootPermissionsMatchAcceptedScope() {
+        assertThat(WorkflowDocument.map(workflow.root().get("concurrency")))
+                .containsEntry("group", "ci-${{ github.event.pull_request.number || github.sha }}")
+                .containsEntry("cancel-in-progress", "${{ github.event_name == 'pull_request' }}");
+        assertThat(WorkflowDocument.map(workflow.root().get("permissions")))
+                .containsExactlyInAnyOrderEntriesOf(Map.of("contents", "read"));
+    }
+
+    private static WorkflowDocument openCi() {
+        try {
+            return WorkflowDocument.open("ci.yml");
+        } catch (IOException exception) {
+            throw new IllegalStateException(exception);
+        }
+    }
+
+    private static void assertCiTriggers(WorkflowDocument ci) {
+        assertThat(ci.triggers()).containsOnlyKeys("pull_request", "push", "workflow_dispatch");
+        for (String event : List.of("pull_request", "push")) {
+            assertThat(WorkflowDocument.map(ci.triggers().get(event)))
+                    .containsExactlyInAnyOrderEntriesOf(Map.of("branches", List.of("master")));
+        }
+        assertThat(ci.triggers().get("workflow_dispatch")).isNull();
+    }
+
+    private static void assertDigestPinnedServices(WorkflowDocument ci) {
+        Map<String, Object> services = WorkflowDocument.map(ci.job("verify").get("services"));
+        assertThat(services).containsOnlyKeys("postgres", "redis");
+        for (var service : services.entrySet()) {
+            assertThat((String) WorkflowDocument.map(service.getValue()).get("image"))
+                    .as("verify/services/" + service.getKey() + "/image")
+                    .matches("[^\\s@]+@sha256:[0-9a-f]{64}");
+        }
+    }
 
     @Test
     void automationFailsBeforeApplicationInfrastructureStarts() {

@@ -1,6 +1,7 @@
 package dev.persefonia.automation.policy;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dev.persefonia.automation.support.WorkflowDocument;
 import java.io.IOException;
@@ -16,7 +17,7 @@ import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
 class WorkflowSecurityPolicyTest {
-    private static final Pattern SECRET = Pattern.compile("\\$\\{\\{[^}]*\\bsecrets\\s*(?:\\.|\\[)");
+    private static final Pattern EXPRESSION = Pattern.compile("\\$\\{\\{(.*?)}}", Pattern.DOTALL);
     private static final Map<String, String> ALLOWED_SECRETS = Map.of(
             "deploy-rc.yml/jobs/deploy-rc/steps/Materialize RC SSH private key/env/RC_SSH_PRIVATE_KEY",
             "${{ secrets.RC_SSH_PRIVATE_KEY }}");
@@ -41,6 +42,7 @@ class WorkflowSecurityPolicyTest {
                 for (var entry : workflow.jobs().entrySet()) {
                     String jobId = entry.getKey();
                     var job = WorkflowDocument.map(entry.getValue());
+                    assertNoJobLevelUses(path.getFileName().toString(), jobId, job);
                     assertThat(job).containsKeys("timeout-minutes", "permissions");
                     assertThat(((Number) job.get("timeout-minutes")).intValue()).isBetween(1, 30);
                     var permissions = WorkflowDocument.map(job.get("permissions"));
@@ -58,16 +60,7 @@ class WorkflowSecurityPolicyTest {
                     }
                     for (Object stepValue : workflow.steps(jobId)) {
                         var step = WorkflowDocument.map(stepValue);
-                        Object uses = step.get("uses");
-                        if (uses != null) {
-                            Matcher matcher = ACTION.matcher((String) uses);
-                            assertThat(matcher.matches()).as(path + " " + jobId + " " + step.get("name")).isTrue();
-                            assertThat(matcher.group(1)).isIn(TRUSTED_ACTIONS);
-                            if (matcher.group(1).equals("actions/checkout")) {
-                                assertThat(WorkflowDocument.map(step.get("with")))
-                                        .containsEntry("persist-credentials", false);
-                            }
-                        }
+                        assertPinnedTrustedStepAction(path.getFileName().toString(), jobId, step);
                         if (step.containsKey("shell")) {
                             assertThat(step.get("shell")).isIn("bash", "sh");
                         }
@@ -98,6 +91,61 @@ class WorkflowSecurityPolicyTest {
         }
     }
 
+    @Test
+    void detectsWholeAndIndexedSecretContextsOnlyInsideExpressions() throws IOException {
+        for (String expression : List.of("${{ secrets.FOO }}", "${{ secrets[\"FOO\"] }}",
+                "${{ secrets['FOO'] }}", "${{ secrets }}", "${{ toJSON(secrets) }}",
+                "prefix-${{ secrets.FOO }}-suffix", "${{ condition && secrets.FOO }}",
+                "${{ condition && toJSON(secrets) }}")) {
+            WorkflowDocument workflow = WorkflowDocument.open("deploy-rc.yml");
+            workflow.root().put("env", Map.of("EXPOSED", expression));
+            assertThat(unauthorizedSecrets("deploy-rc.yml", workflow.root()))
+                    .as(expression).containsKey("deploy-rc.yml/env/EXPOSED");
+        }
+        for (String text : List.of("ordinary prose about secrets", "${{ github.token }}", "${{ 'secrets' }}")) {
+            WorkflowDocument workflow = WorkflowDocument.open("deploy-rc.yml");
+            workflow.root().put("env", Map.of("SAFE", text));
+            assertThat(unauthorizedSecrets("deploy-rc.yml", workflow.root())).as(text).isEmpty();
+        }
+    }
+
+    @Test
+    void rejectsJobLevelReusableWorkflowsRegardlessOfPin() throws IOException {
+        for (String reference : List.of("owner/repo/.github/workflows/example.yml@main",
+                "owner/repo/.github/workflows/example.yml@" + "a".repeat(40))) {
+            WorkflowDocument workflow = WorkflowDocument.open("ci.yml");
+            workflow.jobs().put("unexpected", Map.of("uses", reference));
+            assertThatThrownBy(() -> assertNoJobLevelUses("ci.yml", "unexpected", workflow.job("unexpected")))
+                    .as(reference).isInstanceOf(AssertionError.class).hasMessageContaining("ci.yml/jobs/unexpected/uses");
+        }
+    }
+
+    @Test
+    void rejectsMutableStepActionReference() throws IOException {
+        WorkflowDocument workflow = WorkflowDocument.open("ci.yml");
+        Map<String, Object> checkout = workflow.step("automation", "Check out repository");
+        assertPinnedTrustedStepAction("ci.yml", "automation", checkout);
+        checkout.put("uses", "actions/checkout@v7");
+        assertThatThrownBy(() -> assertPinnedTrustedStepAction("ci.yml", "automation", checkout))
+                .isInstanceOf(AssertionError.class);
+    }
+
+    private static void assertPinnedTrustedStepAction(String file, String jobId, Map<String, Object> step) {
+        Object uses = step.get("uses");
+        if (uses == null) return;
+        Matcher matcher = ACTION.matcher((String) uses);
+        assertThat(matcher.matches()).as(file + "/jobs/" + jobId + "/steps/" + step.get("name") + "/uses")
+                .isTrue();
+        assertThat(matcher.group(1)).isIn(TRUSTED_ACTIONS);
+        if (matcher.group(1).equals("actions/checkout")) {
+            assertThat(WorkflowDocument.map(step.get("with"))).containsEntry("persist-credentials", false);
+        }
+    }
+
+    private static void assertNoJobLevelUses(String file, String jobId, Map<String, Object> job) {
+        assertThat(job).as(file + "/jobs/" + jobId + "/uses").doesNotContainKey("uses");
+    }
+
     private static void assertSecretsAllowed(String file, Map<String, Object> root) {
         assertThat(unauthorizedSecrets(file, root)).as("unauthorized secrets in " + file).isEmpty();
         if (file.equals("deploy-rc.yml")) {
@@ -124,7 +172,7 @@ class WorkflowSecurityPolicyTest {
         if (node instanceof Map<?, ?> map) {
             map.forEach((key, value) -> {
                 String child = path + "/" + key;
-                if (key instanceof String text && SECRET.matcher(text).find()) {
+                if (key instanceof String text && referencesSecrets(text)) {
                     locations.computeIfAbsent(child, ignored -> new ArrayList<>()).add(text);
                 }
                 visit(value, child, locations);
@@ -135,8 +183,40 @@ class WorkflowSecurityPolicyTest {
                 Object name = item instanceof Map<?, ?> map ? map.get("name") : null;
                 visit(item, path + "/" + (name instanceof String ? name : i), locations);
             }
-        } else if (node instanceof String value && SECRET.matcher(value).find()) {
+        } else if (node instanceof String value && referencesSecrets(value)) {
             locations.computeIfAbsent(path, ignored -> new ArrayList<>()).add(value);
         }
+    }
+
+    private static boolean referencesSecrets(String text) {
+        Matcher expressions = EXPRESSION.matcher(text);
+        while (expressions.find()) {
+            String expression = expressions.group(1);
+            char quote = 0;
+            for (int index = 0; index < expression.length();) {
+                char current = expression.charAt(index);
+                if (quote != 0) {
+                    if (current == '\\') index++;
+                    else if (current == quote) quote = 0;
+                    index++;
+                } else if (current == '\'' || current == '"') {
+                    quote = current;
+                    index++;
+                } else if (Character.isLetter(current) || current == '_') {
+                    int start = index++;
+                    while (index < expression.length()
+                            && (Character.isLetterOrDigit(expression.charAt(index))
+                            || expression.charAt(index) == '_')) index++;
+                    if (expression.substring(start, index).equals("secrets")) {
+                        int previous = start - 1;
+                        while (previous >= 0 && Character.isWhitespace(expression.charAt(previous))) previous--;
+                        if (previous < 0 || expression.charAt(previous) != '.') return true;
+                    }
+                } else {
+                    index++;
+                }
+            }
+        }
+        return false;
     }
 }

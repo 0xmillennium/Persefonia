@@ -1,13 +1,16 @@
 package dev.persefonia.automation.workflow;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dev.persefonia.automation.support.WorkflowDocument;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class DeliveryWorkflowContractTest {
@@ -74,8 +77,7 @@ class DeliveryWorkflowContractTest {
 
     @Test
     void handoffWaitsForAllQualificationAndAliasMutation() {
-        assertThat(WorkflowDocument.list(workflow.job("publish-deployment-handoff").get("needs")))
-                .contains("publish-candidate", "verify-candidate", "publish-source-alias");
+        assertCompleteHandoffNeeds(workflow);
         assertThat(WorkflowDocument.list(workflow.job("publish-source-alias").get("needs")))
                 .contains("publish-candidate", "verify-candidate");
         assertThat((String) workflow.step("publish-source-alias", "Publish write-once source alias").get("run"))
@@ -88,6 +90,24 @@ class DeliveryWorkflowContractTest {
                 .containsEntry("if-no-files-found", "error");
         assertThat(WorkflowDocument.map(workflow.step("publish-deployment-handoff", "Check out Delivery source").get("with")))
                 .containsEntry("ref", "${{ needs.publish-candidate.outputs.source_sha }}");
+    }
+
+    @Test
+    void newlyAddedQualificationJobMustBlockHandoff() throws IOException {
+        WorkflowDocument changed = WorkflowDocument.open("delivery.yml");
+        changed.jobs().put("extra-qualification", Map.of("runs-on", "ubuntu-24.04"));
+        assertThatThrownBy(() -> assertCompleteHandoffNeeds(changed))
+                .isInstanceOf(AssertionError.class);
+        WorkflowDocument.list(changed.job("publish-deployment-handoff").get("needs"))
+                .add("extra-qualification");
+        assertCompleteHandoffNeeds(changed);
+    }
+
+    private static void assertCompleteHandoffNeeds(WorkflowDocument delivery) {
+        Set<String> predecessors = new HashSet<>(delivery.jobs().keySet());
+        predecessors.remove("publish-deployment-handoff");
+        assertThat(WorkflowDocument.list(delivery.job("publish-deployment-handoff").get("needs")))
+                .containsExactlyInAnyOrderElementsOf(predecessors);
     }
 
     @Test
