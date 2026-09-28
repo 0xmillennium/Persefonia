@@ -80,8 +80,13 @@ class CiWorkflowContractTest {
 
     @Test
     void automationFailsBeforeApplicationInfrastructureStarts() {
+        assertThat(workflow.jobs()).containsOnlyKeys("automation", "verify", "gate");
         Map<String, Object> automation = workflow.job("automation");
         Map<String, Object> verify = workflow.job("verify");
+        assertThat(WorkflowDocument.map(automation.get("permissions")))
+                .containsExactlyInAnyOrderEntriesOf(Map.of("contents", "read"));
+        assertThat(WorkflowDocument.map(verify.get("permissions")))
+                .containsExactlyInAnyOrderEntriesOf(Map.of("contents", "read"));
         assertThat(automation).doesNotContainKeys("services");
         assertThat(automation.get("needs")).isNull();
         assertThat(verify.get("needs")).isEqualTo("automation");

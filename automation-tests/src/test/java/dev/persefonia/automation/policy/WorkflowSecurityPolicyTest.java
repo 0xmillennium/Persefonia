@@ -17,7 +17,6 @@ import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
 class WorkflowSecurityPolicyTest {
-    private static final Pattern EXPRESSION = Pattern.compile("\\$\\{\\{(.*?)}}", Pattern.DOTALL);
     private static final Map<String, String> ALLOWED_SECRETS = Map.of(
             "deploy-rc.yml/jobs/deploy-rc/steps/Materialize RC SSH private key/env/RC_SSH_PRIVATE_KEY",
             "${{ secrets.RC_SSH_PRIVATE_KEY }}");
@@ -96,13 +95,16 @@ class WorkflowSecurityPolicyTest {
         for (String expression : List.of("${{ secrets.FOO }}", "${{ secrets[\"FOO\"] }}",
                 "${{ secrets['FOO'] }}", "${{ secrets }}", "${{ toJSON(secrets) }}",
                 "prefix-${{ secrets.FOO }}-suffix", "${{ condition && secrets.FOO }}",
-                "${{ condition && toJSON(secrets) }}")) {
+                "${{ condition && toJSON(secrets) }}",
+                "${{ format('{{Hello {0}!}}', secrets.FOO) }}",
+                "${{ format('it''s {{literal}} {0}', secrets.FOO) }}")) {
             WorkflowDocument workflow = WorkflowDocument.open("deploy-rc.yml");
             workflow.root().put("env", Map.of("EXPOSED", expression));
             assertThat(unauthorizedSecrets("deploy-rc.yml", workflow.root()))
                     .as(expression).containsKey("deploy-rc.yml/env/EXPOSED");
         }
-        for (String text : List.of("ordinary prose about secrets", "${{ github.token }}", "${{ 'secrets' }}")) {
+        for (String text : List.of("ordinary prose about secrets", "${{ github.token }}", "${{ 'secrets' }}",
+                "${{ format('{{secrets}}', github.token) }}")) {
             WorkflowDocument workflow = WorkflowDocument.open("deploy-rc.yml");
             workflow.root().put("env", Map.of("SAFE", text));
             assertThat(unauthorizedSecrets("deploy-rc.yml", workflow.root())).as(text).isEmpty();
@@ -189,33 +191,44 @@ class WorkflowSecurityPolicyTest {
     }
 
     private static boolean referencesSecrets(String text) {
-        Matcher expressions = EXPRESSION.matcher(text);
-        while (expressions.find()) {
-            String expression = expressions.group(1);
+        int start = 0;
+        while ((start = text.indexOf("${{", start)) >= 0) {
             char quote = 0;
-            for (int index = 0; index < expression.length();) {
-                char current = expression.charAt(index);
+            int index = start + 3;
+            for (; index < text.length();) {
+                char current = text.charAt(index);
                 if (quote != 0) {
-                    if (current == '\\') index++;
-                    else if (current == quote) quote = 0;
+                    if (current == quote) {
+                        if (quote == '\'' && index + 1 < text.length() && text.charAt(index + 1) == '\'') {
+                            index += 2;
+                            continue;
+                        }
+                        quote = 0;
+                    } else if (quote == '"' && current == '\\') {
+                        index++;
+                    }
                     index++;
                 } else if (current == '\'' || current == '"') {
                     quote = current;
                     index++;
+                } else if (current == '}' && index + 1 < text.length() && text.charAt(index + 1) == '}') {
+                    index += 2;
+                    break;
                 } else if (Character.isLetter(current) || current == '_') {
-                    int start = index++;
-                    while (index < expression.length()
-                            && (Character.isLetterOrDigit(expression.charAt(index))
-                            || expression.charAt(index) == '_')) index++;
-                    if (expression.substring(start, index).equals("secrets")) {
-                        int previous = start - 1;
-                        while (previous >= 0 && Character.isWhitespace(expression.charAt(previous))) previous--;
-                        if (previous < 0 || expression.charAt(previous) != '.') return true;
+                    int tokenStart = index++;
+                    while (index < text.length()
+                            && (Character.isLetterOrDigit(text.charAt(index))
+                            || text.charAt(index) == '_')) index++;
+                    if (text.substring(tokenStart, index).equals("secrets")) {
+                        int previous = tokenStart - 1;
+                        while (previous >= 0 && Character.isWhitespace(text.charAt(previous))) previous--;
+                        if (previous < 0 || text.charAt(previous) != '.') return true;
                     }
                 } else {
                     index++;
                 }
             }
+            start = index;
         }
         return false;
     }

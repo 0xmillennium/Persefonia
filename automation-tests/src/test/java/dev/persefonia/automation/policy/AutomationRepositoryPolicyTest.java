@@ -50,7 +50,8 @@ class AutomationRepositoryPolicyTest {
         writeFixture(owned, valid);
         assertThatThrownBy(() -> assertProductionShell(temporary, owned, "100644"))
                 .isInstanceOf(AssertionError.class);
-        for (String invalid : List.of("#!/bin/bash\nset -euo pipefail\n", "#!/usr/bin/env bash\necho unsafe\n")) {
+        for (String invalid : List.of("#!/bin/bash\nset -euo pipefail\n", "#!/usr/bin/env bash\necho unsafe\n",
+                "#!/usr/bin/env bash\n# set -euo pipefail\necho unsafe\n")) {
             writeFixture(owned, invalid);
             assertThatThrownBy(() -> assertProductionShell(temporary, owned, "100755"))
                     .isInstanceOf(AssertionError.class);
@@ -83,7 +84,8 @@ class AutomationRepositoryPolicyTest {
         assertThat(mode).as(file).isEqualTo("100755");
         String source = Files.readString(current);
         assertThat(source).as(file).startsWith("#!/usr/bin/env bash\n");
-        assertThat(source).as(file).contains("set -euo pipefail");
+        assertThat(source.lines().anyMatch(line -> line.matches("\\s*set -euo pipefail(?:\\s+#.*)?\\s*")))
+                .as(file + " strict mode").isTrue();
         assertThat(source).as(file).doesNotContain("TEST_MODE", "SKIP_SECURITY_CHECK_FOR_TESTS");
     }
 }

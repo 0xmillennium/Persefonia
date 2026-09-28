@@ -20,6 +20,8 @@ class DeliveryWorkflowContractTest {
 
     @Test
     void acceptsOnlyTheSuccessfulTrustedCiSource() {
+        assertThat(workflow.jobs()).containsOnlyKeys("publish-candidate", "verify-candidate",
+                "publish-source-alias", "publish-deployment-handoff");
         Map<String, Object> trigger = WorkflowDocument.map(workflow.triggers().get("workflow_run"));
         assertThat(workflow.triggers()).containsOnlyKeys("workflow_run");
         assertThat(WorkflowDocument.list(trigger.get("workflows"))).containsExactly("CI");
@@ -34,6 +36,20 @@ class DeliveryWorkflowContractTest {
         Map<String, Object> concurrency = WorkflowDocument.map(workflow.root().get("concurrency"));
         assertThat(concurrency).containsEntry("group", "delivery-${{ github.event.workflow_run.head_sha }}")
                 .containsEntry("cancel-in-progress", false);
+    }
+
+    @Test
+    void eachDeliveryJobHasOnlyItsRequiredPermissions() {
+        assertThat(WorkflowDocument.map(workflow.root().get("permissions"))).isEmpty();
+        assertThat(WorkflowDocument.map(workflow.job("publish-candidate").get("permissions")))
+                .containsExactlyInAnyOrderEntriesOf(Map.of("contents", "read", "actions", "read",
+                        "packages", "write", "attestations", "write", "id-token", "write"));
+        assertThat(WorkflowDocument.map(workflow.job("verify-candidate").get("permissions")))
+                .containsExactlyInAnyOrderEntriesOf(Map.of("contents", "read", "packages", "read"));
+        assertThat(WorkflowDocument.map(workflow.job("publish-source-alias").get("permissions")))
+                .containsExactlyInAnyOrderEntriesOf(Map.of("contents", "read", "packages", "write"));
+        assertThat(WorkflowDocument.map(workflow.job("publish-deployment-handoff").get("permissions")))
+                .containsExactlyInAnyOrderEntriesOf(Map.of("contents", "read"));
     }
 
     @Test
@@ -73,6 +89,8 @@ class DeliveryWorkflowContractTest {
                 .contains("verify-container-image.sh");
         assertThat((String) workflow.step("verify-candidate", "Run native candidate smoke").get("run"))
                 .contains("smoke-container-image.sh");
+        assertThat(workflow.step("publish-source-alias", "Write delivery summary").get("run"))
+                .isEqualTo("./scripts/release/write-delivery-summary.sh \"$GITHUB_STEP_SUMMARY\"");
     }
 
     @Test

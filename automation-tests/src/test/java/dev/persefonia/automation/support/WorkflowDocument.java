@@ -3,8 +3,10 @@ package dev.persefonia.automation.support;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.snakeyaml.engine.v2.api.Load;
 import org.snakeyaml.engine.v2.api.LoadSettings;
 
@@ -18,7 +20,9 @@ public final class WorkflowDocument {
     public static WorkflowDocument open(String file) throws IOException {
         Path path = Path.of("../.github/workflows", file);
         Object yaml = new Load(LoadSettings.builder().build()).loadFromString(Files.readString(path));
-        return new WorkflowDocument(map(yaml));
+        WorkflowDocument workflow = new WorkflowDocument(map(yaml));
+        workflow.jobs().keySet().forEach(workflow::steps);
+        return workflow;
     }
 
     @SuppressWarnings("unchecked")
@@ -41,10 +45,23 @@ public final class WorkflowDocument {
     public Map<String, Object> triggers() { return map(root.get("on")); }
     public Map<String, Object> jobs() { return map(root.get("jobs")); }
     public Map<String, Object> job(String id) { return map(jobs().get(id)); }
-    public List<Object> steps(String id) { return list(job(id).get("steps")); }
+    public List<Object> steps(String id) {
+        List<Object> steps = list(job(id).get("steps"));
+        Set<String> names = new HashSet<>();
+        for (Object value : steps) {
+            Object name = map(value).get("name");
+            if (!(name instanceof String text) || text.isBlank() || !names.add(text)) {
+                throw new IllegalArgumentException("Missing or duplicate step name in job " + id + ": " + name);
+            }
+        }
+        return steps;
+    }
     public Map<String, Object> step(String jobId, String name) {
-        return steps(jobId).stream().map(WorkflowDocument::map)
-                .filter(step -> name.equals(step.get("name")))
-                .findFirst().orElseThrow(() -> new IllegalArgumentException("Missing step: " + jobId + "/" + name));
+        List<Map<String, Object>> matches = steps(jobId).stream().map(WorkflowDocument::map)
+                .filter(step -> name.equals(step.get("name"))).toList();
+        if (matches.size() != 1) {
+            throw new IllegalArgumentException("Expected exactly one step: " + jobId + "/" + name);
+        }
+        return matches.getFirst();
     }
 }
