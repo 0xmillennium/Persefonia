@@ -68,7 +68,25 @@ class ContainerImageContractTest {
         assertThat(unsigned.stdout()).doesNotContain("GitHub signed provenance verified");
     }
 
+    @Test
+    void rejectsWrongSpdxPredicateAndDuplicateExpectedLayers() throws Exception {
+        for (Fixture fixture : List.of(
+                fixture(source, true, "https://spdx.dev/Document-EVIL", false, false),
+                fixture(source, true, "https://spdx.dev/Document", true, false),
+                fixture(source, true, "https://spdx.dev/Document", false, true))) {
+            CommandResult result = run(fixture, true);
+            assertThat(result.status()).isNotZero();
+            assertThat(result.stdout()).doesNotContain("GitHub signed provenance verified");
+            assertThat(InvocationLog.read(temporary.resolve("gh.log"))).isEmpty();
+        }
+    }
+
     private Fixture fixture(String revision, boolean validProvenance) throws Exception {
+        return fixture(revision, validProvenance, "https://spdx.dev/Document", false, false);
+    }
+
+    private Fixture fixture(String revision, boolean validProvenance, String sbomType,
+                            boolean duplicateSbom, boolean duplicateProvenance) throws Exception {
         Path artifacts = temporary.resolve("registry");
         Files.createDirectories(artifacts);
         String config = """
@@ -76,13 +94,21 @@ class ContainerImageContractTest {
                 """.formatted(sourceUrl, revision).trim();
         String configDigest = store(artifacts, config);
         String childDigest = store(artifacts, "{\"config\":{\"digest\":\"" + configDigest + "\"}}");
-        String sbomDigest = store(artifacts, "{\"predicateType\":\"https://spdx.dev/Document\",\"predicate\":{\"spdxVersion\":\"SPDX-2.3\",\"packages\":[{\"name\":\"runtime\"}]}}");
+        String sbomDigest = store(artifacts, "{\"predicateType\":\"" + sbomType
+                + "\",\"predicate\":{\"spdxVersion\":\"SPDX-2.3\",\"packages\":[{\"name\":\"runtime\"}]}}");
         String buildType = validProvenance
                 ? "https://github.com/moby/buildkit/blob/master/docs/attestations/slsa-definitions.md" : "wrong";
         String provenanceDigest = store(artifacts, "{\"predicateType\":\"https://slsa.dev/provenance/v1\",\"predicate\":{\"buildDefinition\":{\"buildType\":\"" + buildType + "\"}}}");
-        String attestation = """
-                {"layers":[{"mediaType":"application/vnd.in-toto+json","annotations":{"in-toto.io/predicate-type":"https://spdx.dev/Document"},"digest":"%s"},{"mediaType":"application/vnd.in-toto+json","annotations":{"in-toto.io/predicate-type":"https://slsa.dev/provenance/v1"},"digest":"%s"}]}
-                """.formatted(sbomDigest, provenanceDigest).trim();
+        String sbomLayer = """
+                {"mediaType":"application/vnd.in-toto+json","annotations":{"in-toto.io/predicate-type":"https://spdx.dev/Document"},"digest":"%s"}
+                """.formatted(sbomDigest).trim();
+        String provenanceLayer = """
+                {"mediaType":"application/vnd.in-toto+json","annotations":{"in-toto.io/predicate-type":"https://slsa.dev/provenance/v1"},"digest":"%s"}
+                """.formatted(provenanceDigest).trim();
+        List<String> layers = new java.util.ArrayList<>(List.of(sbomLayer, provenanceLayer));
+        if (duplicateSbom) layers.add(sbomLayer);
+        if (duplicateProvenance) layers.add(provenanceLayer);
+        String attestation = "{\"layers\":[" + String.join(",", layers) + "]}";
         String attestationDigest = store(artifacts, attestation);
         String index = """
                 {"mediaType":"application/vnd.oci.image.index.v1+json","manifests":[{"mediaType":"application/vnd.oci.image.manifest.v1+json","digest":"%s","platform":{"os":"linux","architecture":"amd64"}},{"mediaType":"application/vnd.oci.image.manifest.v1+json","digest":"%s","platform":{"os":"linux","architecture":"arm64"}},{"mediaType":"application/vnd.oci.image.manifest.v1+json","digest":"%s","platform":{"os":"unknown","architecture":"unknown"},"annotations":{"vnd.docker.reference.type":"attestation-manifest","vnd.docker.reference.digest":"%s"}}]}
