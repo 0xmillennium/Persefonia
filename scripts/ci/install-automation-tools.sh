@@ -7,9 +7,19 @@ if [[ $# -ne 1 || -z $1 ]]; then
 fi
 
 repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
-target=$1
-mkdir -p -- "$target"
-target=$(cd -- "$target" && pwd)
+target_parent=$(dirname -- "$1")
+target_name=$(basename -- "$1")
+if [[ $target_name == . || $target_name == .. || $target_name == / ]]; then
+  echo "Target must name a dedicated directory: $1" >&2
+  exit 2
+fi
+mkdir -p -- "$target_parent"
+target_parent=$(cd -- "$target_parent" && pwd -P)
+target=$target_parent/$target_name
+if [[ -L $target || ( -e $target && ! -d $target ) ]]; then
+  echo "Target must be a directory, not a symlink or file: $target" >&2
+  exit 1
+fi
 lock=$repo_root/scripts/ci/automation-toolchain.json
 
 read_lock() {
@@ -41,24 +51,34 @@ print(version, artifact, url, digest, sep='\n')
 PY
 }
 
-install_tool() {
-  local name=$1 version artifact url digest archive staging actual
-  mapfile -t fields < <(read_lock "$name")
-  [[ ${#fields[@]} -eq 4 ]] || { echo "Invalid $name lock" >&2; return 1; }
-  version=${fields[0]}
-  artifact=${fields[1]}
-  url=${fields[2]}
-  digest=${fields[3]}
-  staging=$(mktemp -d -- "$target/.${name}.XXXXXXXX")
-  archive=$staging/$artifact
-  if ! curl --fail --location --silent --show-error --retry 2 --output "$archive" "$url"; then
-    rm -rf -- "$staging"
-    return 1
+staging=
+backup=
+published=false
+cleanup() {
+  local status=$?
+  if [[ $published == false && -n $backup && -e $backup && ! -e $target ]]; then
+    mv -- "$backup" "$target" || status=1
   fi
+  [[ -z $staging ]] || rm -rf -- "$staging"
+  exit "$status"
+}
+trap cleanup EXIT
+
+mapfile -t action_fields < <(read_lock actionlint)
+mapfile -t shell_fields < <(read_lock shellcheck)
+if [[ ${#action_fields[@]} -ne 4 || ${#shell_fields[@]} -ne 4 ]]; then
+  echo 'Invalid automation tool lock' >&2
+  exit 1
+fi
+staging=$(mktemp -d -- "$target_parent/.${target_name}.stage.XXXXXXXX")
+
+install_tool() {
+  local name=$1 version=$2 artifact=$3 url=$4 digest=$5 archive actual
+  archive=$staging/$artifact
+  curl --fail --location --silent --show-error --retry 2 --output "$archive" "$url"
   actual=$(sha256sum -- "$archive")
   if [[ ${actual%% *} != "$digest" ]]; then
     echo "$name artifact checksum mismatch" >&2
-    rm -rf -- "$staging"
     return 1
   fi
   if [[ $name == actionlint ]]; then
@@ -66,16 +86,27 @@ install_tool() {
   else
     tar -xJf "$archive" -C "$staging" "shellcheck-v${version}/shellcheck"
     mv -- "$staging/shellcheck-v${version}/shellcheck" "$staging/shellcheck"
+    rmdir -- "$staging/shellcheck-v${version}"
   fi
+  rm -- "$archive"
   chmod 755 "$staging/$name"
   if [[ $name == actionlint ]]; then
-    [[ $("$staging/$name" -version) == "$version"$'\n'* ]] || { echo 'Wrong actionlint version' >&2; rm -rf -- "$staging"; return 1; }
+    [[ $("$staging/$name" -version) == "$version"$'\n'* ]] || { echo 'Wrong actionlint version' >&2; return 1; }
   else
-    [[ $("$staging/$name" --version) == *"version: $version"* ]] || { echo 'Wrong ShellCheck version' >&2; rm -rf -- "$staging"; return 1; }
+    [[ $("$staging/$name" --version) == *"version: $version"* ]] || { echo 'Wrong ShellCheck version' >&2; return 1; }
   fi
-  mv -f -- "$staging/$name" "$target/$name"
-  rm -rf -- "$staging"
 }
 
-install_tool actionlint
-install_tool shellcheck
+install_tool actionlint "${action_fields[@]}"
+install_tool shellcheck "${shell_fields[@]}"
+[[ -x $staging/actionlint && -x $staging/shellcheck ]] || { echo 'Incomplete staged toolset' >&2; exit 1; }
+if [[ -e $target ]]; then
+  backup=$target_parent/.${target_name}.backup.$$
+  [[ ! -e $backup ]] || { echo "Backup path already exists: $backup" >&2; exit 1; }
+  mv -- "$target" "$backup"
+fi
+mv -- "$staging" "$target"
+staging=
+published=true
+[[ -z $backup ]] || rm -rf -- "$backup"
+backup=
