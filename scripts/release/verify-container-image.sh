@@ -206,7 +206,7 @@ config=$(registry_get "blobs/${config_digest}" 'application/vnd.oci.image.config
 
 require_config_value() {
   local label=$1 expected=$2 actual
-  actual=$(jq -r --arg label "$label" '.config.Labels[$label] // empty' <<<"$config")
+  actual=$(jq -r --arg label_name "$label" '.config.Labels[$label_name] // empty' <<<"$config")
   if [[ "$actual" != "$expected" ]]; then
     echo "OCI label $label did not match for $platform (expected '$expected', got '$actual')." >&2
     exit 1

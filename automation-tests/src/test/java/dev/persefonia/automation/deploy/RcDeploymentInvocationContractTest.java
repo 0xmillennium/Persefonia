@@ -1,5 +1,6 @@
-package dev.persefonia.app.architecture;
+package dev.persefonia.automation.deploy;
 
+import dev.persefonia.automation.support.CommandRunner;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.charset.StandardCharsets;
@@ -47,10 +48,7 @@ class RcDeploymentInvocationContractTest {
             var args = new ArrayList<String>();
             args.add(SCRIPT.toString());
             for (int i = 0; i < count; i++) args.add("x");
-            Process process = new ProcessBuilder(args).start();
-            process.getInputStream().readAllBytes();
-            process.getErrorStream().readAllBytes();
-            assertThat(process.waitFor()).as(marker.toString()).isNotZero();
+            assertThat(CommandRunner.execute(new ProcessBuilder(args)).status()).as(marker.toString()).isNotZero();
         }
         for (String[] change : List.of(
                 new String[] {"0", "bad host"}, new String[] {"0", "user@host"},
@@ -100,7 +98,7 @@ class RcDeploymentInvocationContractTest {
         Path dir = Files.createTempDirectory(temp, "invocation-");
         Path bin = Files.createDirectory(dir.resolve("bin"));
         Path ssh = bin.resolve("ssh");
-        Files.copy(Path.of("src/test/resources/architecture/rc-deployment/fake-rc-deployment-ssh.sh"), ssh);
+        Files.copy(Path.of("src/test/resources/fakes/fake-rc-deployment-ssh.sh"), ssh);
         ssh.toFile().setExecutable(true);
         Path key = dir.resolve("key");
         Path hosts = dir.resolve("hosts");
@@ -133,10 +131,8 @@ class RcDeploymentInvocationContractTest {
         builder.environment().put("FAKE_RC_SSH_STDIN", stdin.toString());
         builder.environment().put("FAKE_RC_SSH_STDOUT_FILE", output.toString());
         builder.environment().putAll(overrides);
-        Process process = builder.start();
-        String stdout = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-        process.getErrorStream().readAllBytes();
-        return new Result(process.waitFor(), stdout, read(args), read(stdin));
+        var result = CommandRunner.execute(builder);
+        return new Result(result.status(), result.stdout(), read(args), read(stdin));
     }
 
     private static String read(Path file) throws Exception { return Files.exists(file) ? Files.readString(file) : ""; }

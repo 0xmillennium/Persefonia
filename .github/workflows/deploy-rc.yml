@@ -163,13 +163,13 @@ jobs:
         run: |
           {
             printf '## RC deployment\n\n'
-            printf 'Source: `%s`\n\n' "$DEPLOYED_SOURCE_SHA"
-            printf 'Qualified image: `%s`\n\n' "$DEPLOYED_IMAGE_REFERENCE"
-            printf 'PostgreSQL container: `%s`\n\n' "$POSTGRES_CONTAINER_ID"
-            printf 'Redis container: `%s`\n\n' "$REDIS_CONTAINER_ID"
-            printf 'Application container: `%s`\n\n' "$APP_CONTAINER_ID"
-            printf 'Application image ID: `%s`\n\n' "$APP_IMAGE_ID"
-            printf 'Application health: `%s`\n\n' "$APP_HEALTH"
+            printf "Source: \`%s\`\n\n" "$DEPLOYED_SOURCE_SHA"
+            printf "Qualified image: \`%s\`\n\n" "$DEPLOYED_IMAGE_REFERENCE"
+            printf "PostgreSQL container: \`%s\`\n\n" "$POSTGRES_CONTAINER_ID"
+            printf "Redis container: \`%s\`\n\n" "$REDIS_CONTAINER_ID"
+            printf "Application container: \`%s\`\n\n" "$APP_CONTAINER_ID"
+            printf "Application image ID: \`%s\`\n\n" "$APP_IMAGE_ID"
+            printf "Application health: \`%s\`\n\n" "$APP_HEALTH"
             printf 'Public ingress: https://0xmillennium.dev — verified\n'
           } >> "$GITHUB_STEP_SUMMARY"
 

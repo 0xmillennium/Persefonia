@@ -1,6 +1,8 @@
-package dev.persefonia.app.architecture;
+package dev.persefonia.automation.release;
 
+import dev.persefonia.automation.support.CommandRunner;
 import static org.assertj.core.api.Assertions.assertThat;
+import dev.persefonia.automation.support.KeyValueProtocol;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -30,6 +32,10 @@ class DeliveryHandoffContractTest {
         assertThat(written.status()).isZero();
         assertThat(written.stdout()).isEmpty();
         assertThat(Files.readString(file)).isEqualTo(validHandoff());
+        assertThat(KeyValueProtocol.parse(Files.readString(file), List.of(
+                "format_version", "delivery_run_id", "delivery_run_attempt", "source_sha",
+                "image_name", "image_digest", "image_reference", "source_alias")))
+                .containsEntry("source_sha", SOURCE_SHA).containsEntry("image_digest", DIGEST);
 
         Result verified = verify(file, SOURCE_SHA, RUN_ID, RUN_ATTEMPT, REPOSITORY);
         assertThat(verified.status()).isZero();
@@ -120,10 +126,8 @@ class DeliveryHandoffContractTest {
     }
 
     private static Result run(String... command) throws Exception {
-        Process process = new ProcessBuilder(command).start();
-        String stdout = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-        String stderr = new String(process.getErrorStream().readAllBytes(), StandardCharsets.UTF_8);
-        return new Result(process.waitFor(), stdout, stderr);
+        var result = CommandRunner.execute(new ProcessBuilder(command));
+        return new Result(result.status(), result.stdout(), result.stderr());
     }
 
     private static String validHandoff() {

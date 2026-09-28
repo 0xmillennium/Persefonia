@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
-printf '%s' "${1:-}" >> "$RC_GATEWAY_LOG"
-printf ' %s' "${@:2}" >> "$RC_GATEWAY_LOG"
-printf '\n' >> "$RC_GATEWAY_LOG"
+{
+  printf '%s' "${1:-}"
+  printf ' %s' "${@:2}"
+  printf '\n'
+} >> "$RC_GATEWAY_LOG"
 
 operation=${1:-}
 image=${2:-}

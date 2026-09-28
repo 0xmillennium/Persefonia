@@ -1,5 +1,6 @@
-package dev.persefonia.app.architecture;
+package dev.persefonia.automation.deploy;
 
+import dev.persefonia.automation.support.CommandRunner;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.file.Files;
@@ -12,7 +13,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 class RcHostDeploymentContractTest {
     private static final Path SCRIPT = Path.of("../scripts/deploy/rc-host-deploy.sh").toAbsolutePath();
-    private static final Path FIXTURES = Path.of("src/test/resources/architecture/rc-deployment");
+    private static final Path FIXTURES = Path.of("src/test/resources/fakes");
     private static final String SOURCE = "a".repeat(40);
     private static final String IMAGE = "ghcr.io/0xmillennium/persefonia@sha256:" + "b".repeat(64);
     private static final String POSTGRES = "0".repeat(63) + "1";
@@ -163,14 +164,11 @@ class RcHostDeploymentContractTest {
         builder.environment().put("RC_IMAGE_REF", IMAGE);
         builder.environment().put("TMPDIR", tmp.toString());
         builder.environment().putAll(overrides);
-        Process process = builder.start();
-        String stdout = new String(process.getInputStream().readAllBytes());
-        String stderr = new String(process.getErrorStream().readAllBytes());
-        int status = process.waitFor();
+        var result = CommandRunner.execute(builder);
         try (var paths = Files.list(tmp)) {
             assertThat(paths.toList()).as("gateway output files must be removed").isEmpty();
         }
-        return new Result(status, stdout, stderr, lines(gatewayLog), lines(sudoLog));
+        return new Result(result.status(), result.stdout(), result.stderr(), lines(gatewayLog), lines(sudoLog));
     }
 
     private static List<String> lines(Path file) throws Exception {

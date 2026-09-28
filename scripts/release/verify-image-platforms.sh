@@ -48,9 +48,33 @@ case "$media_type" in
     ;;
 esac
 
-mapfile -t actual_platforms < <(
+if ! jq -e '
+  (.manifests | type == "array") and
+  ([.manifests[] | select(.platform.os != "unknown" and .platform.architecture != "unknown")] |
+    all(.[];
+      (.platform.os | type) == "string" and
+      (.platform.architecture | type) == "string" and
+      (.digest | type) == "string" and
+      (.digest | test("^sha256:[a-f0-9]{64}$")) and
+      (.mediaType == "application/vnd.oci.image.manifest.v1+json" or
+       .mediaType == "application/vnd.docker.distribution.manifest.v2+json")))
+' <<<"$manifest" >/dev/null; then
+  echo "Registry index contains a malformed runtime descriptor: $image_reference" >&2
+  exit 1
+fi
+
+mapfile -t listed_platforms < <(
   jq -r '.manifests[]? | select(.platform.os != "unknown" and .platform.architecture != "unknown") | "\(.platform.os)/\(.platform.architecture)"' \
-    <<<"$manifest" | sort -u)
+    <<<"$manifest")
+if [[ "${#listed_platforms[@]}" -eq 0 ]]; then
+  echo "Registry index contains no runnable platform descriptors: $image_reference" >&2
+  exit 1
+fi
+if [[ "$(printf '%s\n' "${listed_platforms[@]}" | sort -u | wc -l)" -ne "${#listed_platforms[@]}" ]]; then
+  echo "Registry index contains duplicate runtime platform descriptors: $image_reference" >&2
+  exit 1
+fi
+mapfile -t actual_platforms < <(printf '%s\n' "${listed_platforms[@]}" | sort -u)
 if [[ "${#actual_platforms[@]}" -eq 0 ]]; then
   echo "Registry index contains no runnable platform descriptors: $image_reference" >&2
   exit 1

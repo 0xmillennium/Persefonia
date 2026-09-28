@@ -83,6 +83,14 @@ if ! curl --fail --silent \
   echo "Application did not become ready within ${startup_timeout_seconds} seconds." >&2
   exit 1
 fi
+if ! kill -0 "$java_pid" 2>/dev/null; then
+  echo "Java 21 application exited before readiness verification completed." >&2
+  exit 1
+fi
 echo "Readiness endpoint verified."
 curl --fail --silent --show-error "http://127.0.0.1:${SERVER_PORT}/robots.txt" >/dev/null
+if ! kill -0 "$java_pid" 2>/dev/null; then
+  echo "Java 21 application exited before public smoke completed." >&2
+  exit 1
+fi
 echo "Public /robots.txt smoke verified."

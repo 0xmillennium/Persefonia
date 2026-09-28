@@ -1,0 +1,104 @@
+{
+  "services": {
+    "app": {
+      "image": "example.invalid/persefonia:application",
+      "user": "10001:10001",
+      "read_only": true,
+      "cap_drop": [
+        "ALL"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "tmpfs": [
+        "/tmp"
+      ],
+      "environment": {
+        "SPRING_PROFILES_ACTIVE": "docker",
+        "PERSEFONIA_MANAGEMENT_PORT": "19001",
+        "PERSEFONIA_POSTGRES_HOST": "postgres.example.invalid",
+        "PERSEFONIA_POSTGRES_PORT": "15432",
+        "PERSEFONIA_REDIS_HOST": "redis.example.invalid",
+        "PERSEFONIA_REDIS_PORT": "16379",
+        "POSTGRES_DB": "persefonia",
+        "POSTGRES_USER": "persefonia",
+        "SPRING_DATA_REDIS_USERNAME": "compose-verifier",
+        "PERSEFONIA_CONTACT_RATE_LIMIT_REDIS_KEY_PREFIX": "compose-verifier:rate-limit"
+      },
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "curl",
+          "--fail",
+          "--silent",
+          "--show-error",
+          "--output",
+          "/dev/null",
+          "http://127.0.0.1:19001/actuator/health/readiness"
+        ]
+      },
+      "secrets": [
+        {
+          "source": "cloudflare_api_token",
+          "target": "persefonia.cache-purge.cloudflare.api-token"
+        },
+        {
+          "source": "contact_rate_limit_secret",
+          "target": "persefonia.contact.rate-limit.secret"
+        },
+        {
+          "source": "oidc_client_secret",
+          "target": "spring.security.oauth2.client.registration.authelia.client-secret"
+        },
+        {
+          "source": "postgres_password",
+          "target": "spring.datasource.password"
+        },
+        {
+          "source": "redis_password",
+          "target": "spring.data.redis.password"
+        }
+      ],
+      "volumes": [
+        {
+          "source": "/synthetic/media",
+          "target": "/var/lib/persefonia/media",
+          "type": "bind",
+          "bind": {
+            "create_host_path": false
+          }
+        }
+      ],
+      "ports": [
+        {
+          "host_ip": "127.0.0.1",
+          "target": 8080,
+          "published": "18080"
+        }
+      ]
+    }
+  },
+  "secrets": {
+    "cloudflare_api_token": {
+      "file": "/synthetic/secrets/cloudflare_api_token"
+    },
+    "contact_rate_limit_secret": {
+      "file": "/synthetic/secrets/contact_rate_limit_secret"
+    },
+    "oidc_client_secret": {
+      "file": "/synthetic/secrets/oidc_client_secret"
+    },
+    "postgres_password": {
+      "file": "/synthetic/secrets/postgres_password"
+    },
+    "redis_password": {
+      "file": "/synthetic/secrets/redis_password"
+    }
+  },
+  "volumes": {},
+  "networks": {
+    "default": {
+      "external": false
+    }
+  }
+}

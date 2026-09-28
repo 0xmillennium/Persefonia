@@ -1,5 +1,6 @@
-package dev.persefonia.app.architecture;
+package dev.persefonia.automation.deploy;
 
+import dev.persefonia.automation.support.CommandRunner;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.file.Files;
@@ -45,7 +46,7 @@ class RcIngressSmokeContractTest {
         Path dir = Files.createTempDirectory(temp, "ingress-");
         Path bin = Files.createDirectory(dir.resolve("bin"));
         Path curl = bin.resolve("curl");
-        Files.copy(Path.of("src/test/resources/architecture/rc-deployment/fake-ingress-curl.sh"), curl);
+        Files.copy(Path.of("src/test/resources/fakes/fake-ingress-curl.sh"), curl);
         curl.toFile().setExecutable(true);
         Path sleep = bin.resolve("sleep");
         Files.writeString(sleep, "#!/usr/bin/env bash\nexit 0\n");
@@ -55,10 +56,8 @@ class RcIngressSmokeContractTest {
         builder.environment().put("PATH", bin + ":" + builder.environment().get("PATH"));
         builder.environment().put("INGRESS_CURL_LOG", log.toString());
         builder.environment().putAll(overrides);
-        Process process = builder.start();
-        String stdout = new String(process.getInputStream().readAllBytes());
-        process.getErrorStream().readAllBytes();
-        return new Result(process.waitFor(), stdout, Files.exists(log) ? Files.readString(log) : "");
+        var result = CommandRunner.execute(builder);
+        return new Result(result.status(), result.stdout(), Files.exists(log) ? Files.readString(log) : "");
     }
 
     private record Result(int status, String stdout, String calls) {}

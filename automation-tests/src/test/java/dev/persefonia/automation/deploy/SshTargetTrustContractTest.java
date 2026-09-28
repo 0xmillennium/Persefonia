@@ -1,5 +1,6 @@
-package dev.persefonia.app.architecture;
+package dev.persefonia.automation.deploy;
 
+import dev.persefonia.automation.support.CommandRunner;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.InputStream;
@@ -14,7 +15,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 class SshTargetTrustContractTest {
     private static final Path VERIFIER = Path.of("../scripts/deploy/verify-ssh-target.sh").toAbsolutePath();
-    private static final String RESOURCE_ROOT = "/architecture/rc-deployment/";
+    private static final String RESOURCE_ROOT = "/fakes/";
     private static final String FINGERPRINT = "SHA256:" + "A".repeat(43);
     private static final String RECORD = "[rc.example.test]:2222 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFakeKey\n";
     private static final String PROBE = "PERSEFONIA_SSH_TARGET_V1\n1001\ndeploy_user\n";
@@ -24,11 +25,10 @@ class SshTargetTrustContractTest {
 
     @Test
     void rejectsInvalidArgumentCounts() throws Exception {
-        Process process = new ProcessBuilder(VERIFIER.toString()).start();
-        assertThat(process.waitFor()).isNotZero();
-        assertThat(new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8)).isEmpty();
-        Process extra = new ProcessBuilder(VERIFIER.toString(), "a", "b", "c", "d", "e", "f", "g").start();
-        assertThat(extra.waitFor()).isNotZero();
+        var missing = CommandRunner.execute(new ProcessBuilder(VERIFIER.toString()));
+        assertThat(missing.status()).isNotZero();
+        assertThat(missing.stdout()).isEmpty();
+        assertThat(CommandRunner.execute(new ProcessBuilder(VERIFIER.toString(), "a", "b", "c", "d", "e", "f", "g")).status()).isNotZero();
     }
 
     @Test
@@ -224,11 +224,8 @@ class SshTargetTrustContractTest {
         environment.put("FAKE_PRESENTED_FINGERPRINT", FINGERPRINT);
         environment.put("FAKE_SSH_STDOUT", PROBE);
         environment.putAll(overrides);
-        Process process = processBuilder.start();
-        String stdout = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-        String stderr = new String(process.getErrorStream().readAllBytes(), StandardCharsets.UTF_8);
-        int status = process.waitFor();
-        return new Result(status, stdout, stderr, read(scanArgs), read(keygenArgs), read(sshArgs),
+        var result = CommandRunner.execute(processBuilder);
+        return new Result(result.status(), result.stdout(), result.stderr(), read(scanArgs), read(keygenArgs), read(sshArgs),
                 read(knownHosts), read(fingerprintedRecord));
     }
 

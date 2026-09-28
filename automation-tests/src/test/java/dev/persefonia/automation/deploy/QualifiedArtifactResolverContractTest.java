@@ -1,5 +1,6 @@
-package dev.persefonia.app.architecture;
+package dev.persefonia.automation.deploy;
 
+import dev.persefonia.automation.support.CommandRunner;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
@@ -16,7 +17,8 @@ import org.junit.jupiter.api.io.TempDir;
 
 class QualifiedArtifactResolverContractTest {
     private static final Path RESOLVER = Path.of("../scripts/deploy/resolve-qualified-artifact.sh");
-    private static final String RESOURCE_ROOT = "/architecture/rc-deployment/";
+    private static final String FAKE_ROOT = "/fakes/";
+    private static final String REGISTRY_ROOT = "/registry/";
     private static final String SOURCE_SHA = "a".repeat(40);
     private static final String REPOSITORY = "0xmillennium/Persefonia";
     private static final String IMAGE = "ghcr.io/0xmillennium/persefonia";
@@ -168,10 +170,8 @@ class QualifiedArtifactResolverContractTest {
         environment.put("FAKE_REQUESTS", requests.toString());
         environment.put("FAKE_GH_ARGS", ghArguments.toString());
         environment.putAll(options);
-        Process process = command.start();
-        String stdout = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-        String stderr = new String(process.getErrorStream().readAllBytes(), StandardCharsets.UTF_8);
-        return new Resolution(process.waitFor(), stdout, stderr, digest,
+        var result = CommandRunner.execute(command);
+        return new Resolution(result.status(), result.stdout(), result.stderr(), digest,
                 Files.exists(requests) ? Files.readString(requests) : "",
                 Files.exists(ghArguments) ? Files.readString(ghArguments) : "");
     }
@@ -189,7 +189,7 @@ class QualifiedArtifactResolverContractTest {
     }
 
     private static InputStream resource(String name) {
-        InputStream source = QualifiedArtifactResolverContractTest.class.getResourceAsStream(RESOURCE_ROOT + name);
+        InputStream source = QualifiedArtifactResolverContractTest.class.getResourceAsStream((name.endsWith(".sh") ? FAKE_ROOT : REGISTRY_ROOT) + name);
         if (source == null) {
             throw new IllegalStateException("Missing test resource: " + name);
         }
