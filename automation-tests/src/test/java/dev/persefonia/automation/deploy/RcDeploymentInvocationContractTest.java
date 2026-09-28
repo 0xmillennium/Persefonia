@@ -1,6 +1,7 @@
 package dev.persefonia.automation.deploy;
 
 import dev.persefonia.automation.support.CommandRunner;
+import dev.persefonia.automation.support.InvocationLog;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.charset.StandardCharsets;
@@ -132,7 +133,7 @@ class RcDeploymentInvocationContractTest {
         builder.environment().put("FAKE_RC_SSH_STDOUT_FILE", output.toString());
         builder.environment().putAll(overrides);
         var result = CommandRunner.execute(builder);
-        return new Result(result.status(), result.stdout(), read(args), read(stdin));
+        return new Result(result.status(), result.stdout(), InvocationLog.argumentsAsLines(args), read(stdin));
     }
 
     private static String read(Path file) throws Exception { return Files.exists(file) ? Files.readString(file) : ""; }

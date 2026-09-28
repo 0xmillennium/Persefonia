@@ -134,8 +134,7 @@ class ContainerImageContractTest {
         Files.writeString(gh, """
                 #!/usr/bin/env bash
                 set -euo pipefail
-                printf '%s\\0' "$@" >> "$FAKE_GH_LOG"
-                printf '\\0' >> "$FAKE_GH_LOG"
+                printf '%s\\0' "$#" "$@" >> "$FAKE_GH_LOG"
                 [[ $FAKE_GH_SIGNED == 1 ]]
                 """);
         gh.toFile().setExecutable(true);

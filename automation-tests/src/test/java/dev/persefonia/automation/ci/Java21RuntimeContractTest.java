@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.persefonia.automation.support.CommandResult;
 import dev.persefonia.automation.support.CommandRunner;
+import dev.persefonia.automation.support.InvocationLog;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -22,7 +23,8 @@ class Java21RuntimeContractTest {
         CommandResult good = run(bin, jar, "21", "running");
         good.requireSuccess();
         assertThat(good.stdout()).contains("Readiness endpoint verified", "Public /robots.txt smoke verified");
-        assertThat(Files.readString(temporary.resolve("curl.log"))).contains("/actuator/health/readiness", "/robots.txt");
+        assertThat(InvocationLog.read(temporary.resolve("curl.log")).toString())
+                .contains("/actuator/health/readiness", "/robots.txt");
     }
 
     @Test
@@ -67,7 +69,7 @@ class Java21RuntimeContractTest {
                 #!/usr/bin/env bash
                 set -euo pipefail
                 if [[ ${FAKE_JAVA_MODE:-} == exit ]]; then sleep 0.1; fi
-                printf '%s\\n' "${@: -1}" >> "$FAKE_CURL_LOG"
+                printf '%s\\0' "$#" "$@" >> "$FAKE_CURL_LOG"
                 if [[ ${FAKE_CURL_FAIL:-} == robots && ${@: -1} == */robots.txt ]]; then exit 22; fi
                 """);
         curl.toFile().setExecutable(true);

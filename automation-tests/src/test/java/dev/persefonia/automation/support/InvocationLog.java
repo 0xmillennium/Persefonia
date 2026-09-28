@@ -6,6 +6,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public final class InvocationLog {
     private InvocationLog() {}
@@ -17,17 +18,32 @@ public final class InvocationLog {
             throw new IllegalArgumentException("Invocation log must end with NUL");
         }
         List<List<String>> calls = new ArrayList<>();
-        List<String> arguments = new ArrayList<>();
-        for (String field : data.split("\0", -1)) {
-            if (field.isEmpty()) {
-                if (!arguments.isEmpty()) {
-                    calls.add(List.copyOf(arguments));
-                    arguments.clear();
-                }
-            } else {
-                arguments.add(field);
+        String[] fields = data.split("\0", -1);
+        int position = 0;
+        while (position < fields.length - 1) {
+            int count;
+            try {
+                count = Integer.parseInt(fields[position++]);
+            } catch (NumberFormatException exception) {
+                throw new IllegalArgumentException("Invocation argument count is malformed", exception);
             }
+            if (count < 0 || count > 1000 || position + count > fields.length - 1) {
+                throw new IllegalArgumentException("Invocation argument count is out of range");
+            }
+            List<String> arguments = new ArrayList<>();
+            for (int index = 0; index < count; index++) arguments.add(fields[position++]);
+            calls.add(List.copyOf(arguments));
         }
         return calls;
+    }
+
+    public static String argumentsAsLines(Path file) throws IOException {
+        List<String> arguments = read(file).stream().flatMap(List::stream).toList();
+        return arguments.isEmpty() ? "" : String.join("\n", arguments) + "\n";
+    }
+
+    public static String callsAsLines(Path file) throws IOException {
+        List<String> calls = read(file).stream().map(arguments -> String.join(" ", arguments)).toList();
+        return calls.isEmpty() ? "" : calls.stream().collect(Collectors.joining("\n", "", "\n"));
     }
 }

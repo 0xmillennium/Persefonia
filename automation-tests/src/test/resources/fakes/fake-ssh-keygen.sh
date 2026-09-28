@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
-printf '%s\n' "$@" >> "$FAKE_KEYGEN_ARGS"
+{
+  printf '%s\0' "$#" "$@"
+} >> "$FAKE_KEYGEN_ARGS"
 if [[ "$1" == -y ]]; then
   if [[ ${FAKE_KEY_PARSE_STATUS:-0} != 0 ]]; then
     exit "$FAKE_KEY_PARSE_STATUS"

@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
-printf '%s\n' "$@" > "$FAKE_SSH_ARGS"
+{
+  printf '%s\0' "$#" "$@"
+} > "$FAKE_SSH_ARGS"
 for argument in "$@"; do
   if [[ "$argument" == UserKnownHostsFile=* ]]; then
     cp -- "${argument#UserKnownHostsFile=}" "$FAKE_SSH_KNOWN_HOSTS"

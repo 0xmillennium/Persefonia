@@ -30,7 +30,8 @@ class NativeSmokeContractTest {
         assertThat(calls.stream().filter(call -> call.getFirst().equals("run"))).hasSize(3);
         assertThat(calls.stream().filter(call -> call.getFirst().equals("rm"))).hasSize(3);
         assertThat(calls).anySatisfy(call -> assertThat(call).startsWith("network", "rm"));
-        assertThat(Files.readString(temporary.resolve("curl.log"))).contains("/actuator/health/readiness", "/robots.txt");
+        assertThat(InvocationLog.read(temporary.resolve("curl.log")).toString())
+                .contains("/actuator/health/readiness", "/robots.txt");
     }
 
     @Test
@@ -52,8 +53,7 @@ class NativeSmokeContractTest {
         Files.writeString(docker, """
                 #!/usr/bin/env bash
                 set -euo pipefail
-                printf '%s\\0' "$@" >> "$FAKE_DOCKER_LOG"
-                printf '\\0' >> "$FAKE_DOCKER_LOG"
+                printf '%s\\0' "$#" "$@" >> "$FAKE_DOCKER_LOG"
                 case "$1 $2" in
                   'image inspect') printf 'amd64\\n' ;;
                   'exec '*) if [[ $* == *redis-cli* ]]; then printf 'PONG\\n'; fi ;;
@@ -67,7 +67,7 @@ class NativeSmokeContractTest {
         Files.writeString(curl, """
                 #!/usr/bin/env bash
                 set -euo pipefail
-                printf '%s\\n' "${@: -1}" >> "$FAKE_CURL_LOG"
+                printf '%s\\0' "$#" "$@" >> "$FAKE_CURL_LOG"
                 if [[ $FAKE_CURL_FAIL == robots && ${@: -1} == */robots.txt ]]; then exit 22; fi
                 """);
         curl.toFile().setExecutable(true);

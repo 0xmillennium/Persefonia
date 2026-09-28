@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 {
-  printf 'sudo'
-  printf ' <%s>' "$@"
-  printf '\n'
+  printf '%s\0' "$(($# + 1))" sudo "$@"
 } >> "$RC_SUDO_LOG"
 [[ ${1:-} == -n ]] || { echo 'non-interactive sudo required' >&2; exit 90; }
 shift

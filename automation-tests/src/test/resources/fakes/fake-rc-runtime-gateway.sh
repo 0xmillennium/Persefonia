@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 {
-  printf '%s' "${1:-}"
-  printf ' %s' "${@:2}"
-  printf '\n'
+  printf '%s\0' "$#" "$@"
 } >> "$RC_GATEWAY_LOG"
 
 operation=${1:-}
@@ -17,7 +15,7 @@ esac
 [[ $image == "$RC_IMAGE_REF" ]] || exit 93
 if [[ $operation == service-id ]]; then
   stage=before
-  if grep -q '^up-app ' "$RC_GATEWAY_LOG"; then stage=after; fi
+  if LC_ALL=C tr '\0' '\n' < "$RC_GATEWAY_LOG" | grep -qx 'up-app'; then stage=after; fi
   case "$3:$stage" in
     postgres:before) key=RC_POSTGRES_BEFORE; default=$(printf '%063d1' 0) ;;
     postgres:after) key=RC_POSTGRES_AFTER; default=$(printf '%063d1' 0) ;;

@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
-printf '%s\n' "$@" >> "$INGRESS_CURL_LOG"
+{
+  printf '%s\0' "$#" "$@"
+} >> "$INGRESS_CURL_LOG"
 headers=
 url=
 while (( $# )); do

@@ -1,6 +1,7 @@
 package dev.persefonia.automation.deploy;
 
 import dev.persefonia.automation.support.CommandRunner;
+import dev.persefonia.automation.support.InvocationLog;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.file.Files;
@@ -168,11 +169,18 @@ class RcHostDeploymentContractTest {
         try (var paths = Files.list(tmp)) {
             assertThat(paths.toList()).as("gateway output files must be removed").isEmpty();
         }
-        return new Result(result.status(), result.stdout(), result.stderr(), lines(gatewayLog), lines(sudoLog));
+        return new Result(result.status(), result.stdout(), result.stderr(), gatewayCalls(gatewayLog), sudoCalls(sudoLog));
     }
 
-    private static List<String> lines(Path file) throws Exception {
-        return Files.exists(file) ? Files.readAllLines(file) : new ArrayList<>();
+    private static List<String> gatewayCalls(Path file) throws Exception {
+        return InvocationLog.read(file).stream().map(arguments -> String.join(" ", arguments)).toList();
+    }
+
+    private static List<String> sudoCalls(Path file) throws Exception {
+        return InvocationLog.read(file).stream().map(arguments -> arguments.getFirst()
+                + arguments.subList(1, arguments.size()).stream()
+                        .map(argument -> " <" + argument + ">")
+                        .reduce("", String::concat)).toList();
     }
 
     private record Result(int status, String stdout, String stderr, List<String> calls, List<String> sudoCalls) {}

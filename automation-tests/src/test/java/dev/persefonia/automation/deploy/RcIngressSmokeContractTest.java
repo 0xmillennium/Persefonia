@@ -1,6 +1,7 @@
 package dev.persefonia.automation.deploy;
 
 import dev.persefonia.automation.support.CommandRunner;
+import dev.persefonia.automation.support.InvocationLog;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.file.Files;
@@ -57,7 +58,7 @@ class RcIngressSmokeContractTest {
         builder.environment().put("INGRESS_CURL_LOG", log.toString());
         builder.environment().putAll(overrides);
         var result = CommandRunner.execute(builder);
-        return new Result(result.status(), result.stdout(), Files.exists(log) ? Files.readString(log) : "");
+        return new Result(result.status(), result.stdout(), InvocationLog.argumentsAsLines(log));
     }
 
     private record Result(int status, String stdout, String calls) {}

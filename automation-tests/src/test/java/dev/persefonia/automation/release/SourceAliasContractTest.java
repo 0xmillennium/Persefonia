@@ -64,8 +64,7 @@ class SourceAliasContractTest {
         Files.writeString(docker, """
                 #!/usr/bin/env bash
                 set -euo pipefail
-                printf '%s\\0' "$@" >> "$FAKE_DOCKER_LOG"
-                printf '\\0' >> "$FAKE_DOCKER_LOG"
+                printf '%s\\0' "$#" "$@" >> "$FAKE_DOCKER_LOG"
                 : > "$FAKE_ALIAS_MARKER"
                 """);
         docker.toFile().setExecutable(true);
@@ -73,8 +72,7 @@ class SourceAliasContractTest {
         Files.writeString(curl, """
                 #!/usr/bin/env bash
                 set -euo pipefail
-                printf '%s\\0' "$@" >> "$FAKE_CURL_LOG"
-                printf '\\0' >> "$FAKE_CURL_LOG"
+                printf '%s\\0' "$#" "$@" >> "$FAKE_CURL_LOG"
                 headers=
                 url=
                 method=GET

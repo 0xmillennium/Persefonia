@@ -1,6 +1,7 @@
 package dev.persefonia.automation.deploy;
 
 import dev.persefonia.automation.support.CommandRunner;
+import dev.persefonia.automation.support.InvocationLog;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.InputStream;
@@ -225,7 +226,9 @@ class SshTargetTrustContractTest {
         environment.put("FAKE_SSH_STDOUT", PROBE);
         environment.putAll(overrides);
         var result = CommandRunner.execute(processBuilder);
-        return new Result(result.status(), result.stdout(), result.stderr(), read(scanArgs), read(keygenArgs), read(sshArgs),
+        return new Result(result.status(), result.stdout(), result.stderr(),
+                InvocationLog.argumentsAsLines(scanArgs), InvocationLog.argumentsAsLines(keygenArgs),
+                InvocationLog.argumentsAsLines(sshArgs),
                 read(knownHosts), read(fingerprintedRecord));
     }
 

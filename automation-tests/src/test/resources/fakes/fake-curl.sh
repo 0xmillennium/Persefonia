@@ -14,7 +14,9 @@ while [[ "$#" -gt 0 ]]; do
     *) shift ;;
   esac
 done
-printf '%s %s\n' "$method" "$url" >> "$FAKE_REQUESTS"
+{
+  printf '%s\0' 2 "$method" "$url"
+} >> "$FAKE_REQUESTS"
 case "$url" in
   https://ghcr.io/v2/)
     printf 'WWW-Authenticate: Bearer realm="https://ghcr.io/token",service="ghcr.io"\n' > "$headers"

@@ -1,6 +1,7 @@
 package dev.persefonia.automation.deploy;
 
 import dev.persefonia.automation.support.CommandRunner;
+import dev.persefonia.automation.support.InvocationLog;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
@@ -172,8 +173,8 @@ class QualifiedArtifactResolverContractTest {
         environment.putAll(options);
         var result = CommandRunner.execute(command);
         return new Resolution(result.status(), result.stdout(), result.stderr(), digest,
-                Files.exists(requests) ? Files.readString(requests) : "",
-                Files.exists(ghArguments) ? Files.readString(ghArguments) : "");
+                InvocationLog.callsAsLines(requests),
+                InvocationLog.argumentsAsLines(ghArguments));
     }
 
     private static void copyResource(String name, Path destination) throws IOException {
