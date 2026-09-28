@@ -1,6 +1,7 @@
 rootProject.name = "persefonia"
 
 include(":app")
+include(":automation-tests")
 
 include(":shared-kernel")
 

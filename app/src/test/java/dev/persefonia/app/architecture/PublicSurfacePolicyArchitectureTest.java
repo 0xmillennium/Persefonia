@@ -26,26 +26,6 @@ class PublicSurfacePolicyArchitectureTest {
     private static final Pattern ROUTE_ANNOTATION = Pattern.compile(
             "@(?:GetMapping|PostMapping|RequestMapping)\\s*\\(([^)]*)\\)", Pattern.DOTALL);
     private static final Pattern ROUTE_LITERAL = Pattern.compile("\"([^\"]+)\"");
-    private static final List<Path> APPROVED_AUTOMATION_SCRIPTS = List.of(
-            Path.of("../scripts/ci/verify-bootjar.sh"),
-            Path.of("../scripts/ci/verify-compose.sh"),
-            Path.of("../scripts/ci/compose-runtime-policy.jq"),
-            Path.of("../scripts/ci/verify-java21-runtime.sh"),
-            Path.of("../scripts/deploy/resolve-qualified-artifact.sh"),
-            Path.of("../scripts/deploy/verify-ssh-target.sh"),
-            Path.of("../scripts/deploy/run-rc-deployment.sh"),
-            Path.of("../scripts/deploy/rc-host-deploy.sh"),
-            Path.of("../scripts/deploy/verify-rc-ingress.sh"),
-            Path.of("../scripts/deploy/verify-delivery-handoff.sh"),
-            Path.of("../scripts/deploy/qualified-index-policy.jq"),
-            Path.of("../scripts/release/verify-image-platforms.sh"),
-            Path.of("../scripts/release/verify-container-image.sh"),
-            Path.of("../scripts/release/smoke-container-image.sh"),
-            Path.of("../scripts/release/publish-source-alias.sh"),
-            Path.of("../scripts/release/write-delivery-summary.sh"),
-            Path.of("../scripts/release/write-delivery-handoff.sh"),
-            Path.of("../scripts/release/verify-delivery-toolchain.sh"));
-
     @Test
     void exposesExactCrawlerRoutesAndNoRssAtomOrWildcardRoutes() throws Exception {
         List<String> routeLiterals = routeLiterals(joinedJavaSources(Path.of("../web-public/src/main/java")));
@@ -83,24 +63,6 @@ class PublicSurfacePolicyArchitectureTest {
                 .doesNotContain("search_terms")
                 .doesNotContain("Elasticsearch")
                 .doesNotContain("OpenSearch");
-    }
-
-    @Test
-    void allowsOnlyApprovedCommittedAutomationScripts() throws Exception {
-        assertThat(Path.of("../docs/architecture")).doesNotExist();
-        assertThat(Path.of("../docs/verification")).doesNotExist();
-        assertThat(Path.of("../docs/testing")).doesNotExist();
-        assertThat(Path.of("../docs/release")).doesNotExist();
-        assertThat(Path.of("../docs/checklists")).doesNotExist();
-        assertThat(Path.of("../docs/process")).doesNotExist();
-
-        Path scripts = Path.of("../scripts");
-        if (Files.exists(scripts)) {
-            try (Stream<Path> paths = Files.walk(scripts, 2)) {
-                assertThat(paths.filter(Files::isRegularFile).toList())
-                        .containsExactlyInAnyOrderElementsOf(APPROVED_AUTOMATION_SCRIPTS);
-            }
-        }
     }
 
     private static String routeAnnotations(String source) {

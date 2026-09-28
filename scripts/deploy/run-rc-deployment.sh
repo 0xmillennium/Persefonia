@@ -28,7 +28,7 @@ read -r -a fields <<< "${records[0]}"
 [[ ${#fields[@]} == 3 && ${fields[0]} == "$expected_host" && ${fields[1]} == ssh-ed25519 &&
    ${fields[2]} =~ ^[A-Za-z0-9+/]+={0,2}$ ]] || fail "Verified known_hosts record is invalid."
 [[ $(wc -l < "$known_hosts") == 1 ]] || fail "Verified known_hosts record must end with newline."
-LC_ALL=C tr -d '\000' < "$known_hosts" | cmp -s - "$known_hosts" || fail "Verified known_hosts contains NUL."
+cmp -s "$known_hosts" <(LC_ALL=C tr -d '\000' < "$known_hosts") || fail "Verified known_hosts contains NUL."
 printf '%s %s %s\n' "${fields[@]}" | cmp -s - "$known_hosts" || fail "Verified known_hosts record is not canonical."
 
 script_directory=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
@@ -50,7 +50,7 @@ if ! ssh -F /dev/null -p "$port" -i "$private_key" \
     "$user@$host" "/usr/bin/env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin /usr/bin/bash --noprofile --norc -s -- $source_sha $image_reference" < "$payload" > "$protocol"; then
   fail "Remote RC deployment failed."
 fi
-LC_ALL=C tr -d '\000' < "$protocol" | cmp -s - "$protocol" || fail "Remote protocol contains NUL."
+cmp -s "$protocol" <(LC_ALL=C tr -d '\000' < "$protocol") || fail "Remote protocol contains NUL."
 [[ $(tail -c 1 -- "$protocol" | od -An -tu1 | tr -d ' ') == 10 ]] || fail "Remote protocol lacks final newline."
 if LC_ALL=C grep -q $'\r' "$protocol"; then fail "Remote protocol contains CR."; fi
 mapfile -t lines < "$protocol"

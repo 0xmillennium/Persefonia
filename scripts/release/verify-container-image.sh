@@ -206,7 +206,7 @@ config=$(registry_get "blobs/${config_digest}" 'application/vnd.oci.image.config
 
 require_config_value() {
   local label=$1 expected=$2 actual
-  actual=$(jq -r --arg label "$label" '.config.Labels[$label] // empty' <<<"$config")
+  actual=$(jq -r --arg label_name "$label" '.config.Labels[$label_name] // empty' <<<"$config")
   if [[ "$actual" != "$expected" ]]; then
     echo "OCI label $label did not match for $platform (expected '$expected', got '$actual')." >&2
     exit 1
@@ -237,17 +237,18 @@ fi
 attestation_manifest=$(registry_get "manifests/${attestation_digests[0]}")
 
 verify_attestation_predicate() {
-  local predicate_type=$1 layer_digest
-  layer_digest=$(jq -r --arg predicate_type "$predicate_type" '.layers[] | select(.mediaType == "application/vnd.in-toto+json") | select(.annotations["in-toto.io/predicate-type"] == $predicate_type) | .digest' <<<"$attestation_manifest" | head -n 1)
-  if [[ ! "$layer_digest" =~ ^sha256:[a-f0-9]{64}$ ]]; then
-    echo "BuildKit attestation lacks a $predicate_type predicate for $platform." >&2
+  local predicate_type=$1
+  local -a layer_digests=()
+  mapfile -t layer_digests < <(jq -r --arg predicate_type "$predicate_type" '.layers[] | select(.mediaType == "application/vnd.in-toto+json") | select(.annotations["in-toto.io/predicate-type"] == $predicate_type) | .digest' <<<"$attestation_manifest")
+  if [[ "${#layer_digests[@]}" -ne 1 || ! "${layer_digests[0]}" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+    echo "BuildKit attestation must contain exactly one valid $predicate_type predicate for $platform." >&2
     exit 1
   fi
-  registry_get "blobs/${layer_digest}" 'application/vnd.in-toto+json'
+  registry_get "blobs/${layer_digests[0]}" 'application/vnd.in-toto+json'
 }
 
 sbom=$(verify_attestation_predicate https://spdx.dev/Document)
-if ! jq -e '(.predicateType | contains("spdx.dev")) and (.predicate.spdxVersion? // .predicate.SPDXID? // empty) != "" and ((.predicate.packages? // []) | length > 0)' <<<"$sbom" >/dev/null; then
+if ! jq -e '.predicateType == "https://spdx.dev/Document" and (.predicate.spdxVersion? // .predicate.SPDXID? // empty) != "" and ((.predicate.packages? // []) | length > 0)' <<<"$sbom" >/dev/null; then
   echo "BuildKit SPDX SBOM is missing, unparsable, or has no package inventory for $platform." >&2
   exit 1
 fi

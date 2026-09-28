@@ -83,6 +83,15 @@ class DecisionRecordGovernanceTest {
         }
     }
 
+    @Test
+    void longLivedDocumentationRemainsLimitedToDecisionRecords() {
+        Path docs = DECISION_DIR.getParent();
+        for (String directory : List.of("architecture", "verification", "testing", "release",
+                "checklists", "process")) {
+            assertThat(docs.resolve(directory)).doesNotExist();
+        }
+    }
+
     private static List<Path> decisionRecords() throws IOException {
         try (var paths = Files.list(DECISION_DIR)) {
             return paths

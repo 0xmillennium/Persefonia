@@ -20,7 +20,7 @@ gateway_value() (
   output=$(mktemp) || fail "Could not create private gateway output file."
   trap 'rm -f -- "$output"' EXIT
   runtime_gateway "$@" > "$output" || fail "Runtime gateway $1 failed."
-  LC_ALL=C tr -d '\000' < "$output" | cmp -s - "$output" || fail "Runtime gateway $1 returned NUL."
+  cmp -s "$output" <(LC_ALL=C tr -d '\000' < "$output") || fail "Runtime gateway $1 returned NUL."
   value=$(cat -- "$output" && printf '\036') || fail "Could not read gateway output."
   [[ $value == *$'\036' ]] || fail "Runtime gateway $1 returned incomplete output."
   value=${value%$'\036'}
