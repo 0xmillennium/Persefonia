@@ -1,0 +1,157 @@
+name: Redeploy RC
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Qualified source commit SHA (40 lowercase hex characters)
+        required: true
+        type: string
+      image_digest:
+        description: Qualified OCI index digest (sha256 and 64 lowercase hex characters)
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: rc-deployment
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  resolve-qualified-artifact:
+    name: Resolve qualified artifact
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: read
+    outputs:
+      source_sha: ${{ steps.artifact.outputs.source_sha }}
+      image_reference: ${{ steps.artifact.outputs.image_reference }}
+    steps:
+      - name: Validate redeployment inputs
+        env:
+          REQUESTED_SOURCE_SHA: ${{ inputs.source_sha }}
+          REQUESTED_IMAGE_DIGEST: ${{ inputs.image_digest }}
+        run: |
+          [[ "$GITHUB_REF" == refs/heads/master ]] || { echo 'Redeployment requires the master workflow.' >&2; exit 1; }
+          [[ "$REQUESTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo 'source_sha must be 40 lowercase hexadecimal characters.' >&2; exit 1; }
+          [[ "$REQUESTED_IMAGE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo 'image_digest must be a lowercase sha256 OCI digest.' >&2; exit 1; }
+
+      - name: Check out trusted deployment source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Assert checked out deployment source
+        env:
+          EXPECTED_WORKFLOW_SHA: ${{ github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_WORKFLOW_SHA"
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Resolve and verify qualified artifact
+        id: artifact
+        env:
+          EXPECTED_SOURCE_SHA: ${{ inputs.source_sha }}
+          EXPECTED_IMAGE_DIGEST: ${{ inputs.image_digest }}
+          GH_TOKEN: ${{ github.token }}
+        run: ./scripts/deploy/resolve-qualified-artifact.sh "$EXPECTED_SOURCE_SHA" "$EXPECTED_IMAGE_DIGEST" "$GITHUB_REPOSITORY" docker/supported-platforms.txt >> "$GITHUB_OUTPUT"
+
+  deploy-rc:
+    name: Deploy RC
+    needs: resolve-qualified-artifact
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment:
+      name: rc
+    permissions:
+      contents: read
+    steps:
+      - name: Check out trusted deployment source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Assert checked out deployment source
+        env:
+          EXPECTED_WORKFLOW_SHA: ${{ github.sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_WORKFLOW_SHA"
+
+      - name: Materialize RC SSH private key
+        env:
+          RC_SSH_PRIVATE_KEY: ${{ secrets.RC_SSH_PRIVATE_KEY }}
+        run: |
+          test -n "$RC_SSH_PRIVATE_KEY"
+          umask 077
+          printf '%s\n' "$RC_SSH_PRIVATE_KEY" > "$RUNNER_TEMP/persefonia-rc-ssh-key"
+          chmod 600 "$RUNNER_TEMP/persefonia-rc-ssh-key"
+
+      - name: Verify RC SSH target
+        env:
+          RC_SSH_HOST: ${{ vars.RC_SSH_HOST }}
+          RC_SSH_PORT: ${{ vars.RC_SSH_PORT }}
+          RC_SSH_USER: ${{ vars.RC_SSH_USER }}
+          RC_SSH_HOST_KEY_SHA256: ${{ vars.RC_SSH_HOST_KEY_SHA256 }}
+        run: |
+          ./scripts/deploy/verify-ssh-target.sh \
+            "$RC_SSH_HOST" "$RC_SSH_PORT" "$RC_SSH_USER" \
+            "$RC_SSH_HOST_KEY_SHA256" "$RUNNER_TEMP/persefonia-rc-ssh-key" \
+            "$RUNNER_TEMP/persefonia-rc-known-hosts"
+
+      - name: Deploy qualified artifact
+        id: deployment
+        env:
+          RC_SSH_HOST: ${{ vars.RC_SSH_HOST }}
+          RC_SSH_PORT: ${{ vars.RC_SSH_PORT }}
+          RC_SSH_USER: ${{ vars.RC_SSH_USER }}
+          QUALIFIED_SOURCE_SHA: ${{ needs.resolve-qualified-artifact.outputs.source_sha }}
+          QUALIFIED_IMAGE_REFERENCE: ${{ needs.resolve-qualified-artifact.outputs.image_reference }}
+        run: |
+          ./scripts/deploy/run-rc-deployment.sh \
+            "$RC_SSH_HOST" "$RC_SSH_PORT" "$RC_SSH_USER" \
+            "$RUNNER_TEMP/persefonia-rc-ssh-key" \
+            "$RUNNER_TEMP/persefonia-rc-known-hosts" \
+            "$QUALIFIED_SOURCE_SHA" "$QUALIFIED_IMAGE_REFERENCE" >> "$GITHUB_OUTPUT"
+
+      - name: Verify RC public ingress
+        run: ./scripts/deploy/verify-rc-ingress.sh
+
+      - name: Write RC deployment summary
+        env:
+          DEPLOYED_SOURCE_SHA: ${{ steps.deployment.outputs.source_sha }}
+          DEPLOYED_IMAGE_REFERENCE: ${{ steps.deployment.outputs.image_reference }}
+          POSTGRES_CONTAINER_ID: ${{ steps.deployment.outputs.postgres_container_id }}
+          REDIS_CONTAINER_ID: ${{ steps.deployment.outputs.redis_container_id }}
+          APP_CONTAINER_ID: ${{ steps.deployment.outputs.app_container_id }}
+          APP_IMAGE_ID: ${{ steps.deployment.outputs.app_image_id }}
+          APP_HEALTH: ${{ steps.deployment.outputs.app_health }}
+        run: |
+          {
+            printf '## RC redeployment\n\n'
+            printf "Source: \`%s\`\n\n" "$DEPLOYED_SOURCE_SHA"
+            printf "Qualified image: \`%s\`\n\n" "$DEPLOYED_IMAGE_REFERENCE"
+            printf "PostgreSQL container: \`%s\`\n\n" "$POSTGRES_CONTAINER_ID"
+            printf "Redis container: \`%s\`\n\n" "$REDIS_CONTAINER_ID"
+            printf "Application container: \`%s\`\n\n" "$APP_CONTAINER_ID"
+            printf "Application image ID: \`%s\`\n\n" "$APP_IMAGE_ID"
+            printf "Application health: \`%s\`\n\n" "$APP_HEALTH"
+            printf 'Public ingress: https://0xmillennium.dev — verified\n'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove RC SSH material
+        if: always()
+        run: rm -f -- "$RUNNER_TEMP/persefonia-rc-ssh-key" "$RUNNER_TEMP/persefonia-rc-known-hosts"
