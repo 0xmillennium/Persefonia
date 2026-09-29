@@ -19,6 +19,8 @@ import org.junit.jupiter.api.Test;
 class WorkflowSecurityPolicyTest {
     private static final Map<String, String> ALLOWED_SECRETS = Map.of(
             "deploy-rc.yml/jobs/deploy-rc/steps/Materialize RC SSH private key/env/RC_SSH_PRIVATE_KEY",
+            "${{ secrets.RC_SSH_PRIVATE_KEY }}",
+            "redeploy-rc.yml/jobs/deploy-rc/steps/Materialize RC SSH private key/env/RC_SSH_PRIVATE_KEY",
             "${{ secrets.RC_SSH_PRIVATE_KEY }}");
     private static final Pattern ACTION = Pattern.compile("([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)?)@([0-9a-f]{40})");
     private static final Set<String> TRUSTED_ACTIONS = Set.of(
@@ -150,9 +152,9 @@ class WorkflowSecurityPolicyTest {
 
     private static void assertSecretsAllowed(String file, Map<String, Object> root) {
         assertThat(unauthorizedSecrets(file, root)).as("unauthorized secrets in " + file).isEmpty();
-        if (file.equals("deploy-rc.yml")) {
+        if (file.equals("deploy-rc.yml") || file.equals("redeploy-rc.yml")) {
             assertThat(secretLocations(file, root)).containsEntry(
-                    "deploy-rc.yml/jobs/deploy-rc/steps/Materialize RC SSH private key/env/RC_SSH_PRIVATE_KEY",
+                    file + "/jobs/deploy-rc/steps/Materialize RC SSH private key/env/RC_SSH_PRIVATE_KEY",
                     List.of("${{ secrets.RC_SSH_PRIVATE_KEY }}"));
         }
     }
