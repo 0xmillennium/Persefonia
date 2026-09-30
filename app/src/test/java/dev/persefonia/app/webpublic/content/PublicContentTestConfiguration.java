@@ -1,6 +1,9 @@
 package dev.persefonia.app.webpublic.content;
 
 import dev.persefonia.app.contentpublishing.application.InMemoryContentReadModelAdapter;
+import dev.persefonia.discovery.application.contract.DiscoveryLanguage;
+import dev.persefonia.discovery.application.index.PublicHomepageContentEntry;
+import dev.persefonia.discovery.application.index.PublicHomepageContentQueryService;
 import dev.persefonia.contentpublishing.domain.model.series.port.SeriesRepository;
 import dev.persefonia.contentpublishing.domain.translation.port.TranslationGroupRepository;
 import dev.persefonia.webpublic.FrontendAssetResolver;
@@ -65,6 +68,22 @@ public class PublicContentTestConfiguration {
             @Override
             public List<String> stylesheetPaths(String entry) {
                 return List.of("/assets/main-test.css");
+            }
+        };
+    }
+
+    @Bean
+    @Primary
+    PublicHomepageContentQueryService publicContentTestHomepageQueryService() {
+        return new PublicHomepageContentQueryService() {
+            @Override
+            public List<PublicHomepageContentEntry> latestWriting(DiscoveryLanguage language, int limit) {
+                return List.of();
+            }
+
+            @Override
+            public List<PublicHomepageContentEntry> latestResearch(DiscoveryLanguage language, int limit) {
+                return List.of();
             }
         };
     }

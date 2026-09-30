@@ -71,7 +71,7 @@ class PublicHomeProfileSummaryTest {
                 .andExpect(content().string(not(containsString("Long profile bio"))))
                 .andExpect(content().string(not(containsString("CV"))))
                 .andExpect(content().string(not(containsString("Media"))))
-                .andExpect(content().string(not(containsString("Project"))));
+                .andExpect(content().string(not(containsString("Fake project"))));
     }
 
     @Test

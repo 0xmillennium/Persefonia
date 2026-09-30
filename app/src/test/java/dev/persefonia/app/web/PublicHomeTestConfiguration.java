@@ -1,6 +1,9 @@
 package dev.persefonia.app.web;
 
 import dev.persefonia.profileportfolio.application.port.ProjectPublicReadModel;
+import dev.persefonia.discovery.application.contract.DiscoveryLanguage;
+import dev.persefonia.discovery.application.index.PublicHomepageContentEntry;
+import dev.persefonia.discovery.application.index.PublicHomepageContentQueryService;
 import dev.persefonia.profileportfolio.domain.common.ContentLanguage;
 import dev.persefonia.profileportfolio.domain.project.ProjectId;
 import dev.persefonia.profileportfolio.domain.project.ProjectSlug;
@@ -17,6 +20,7 @@ import dev.persefonia.profileportfolio.domain.settings.SitePresentationSettingsR
 import dev.persefonia.profileportfolio.domain.settings.ThemePreference;
 import dev.persefonia.profileportfolio.domain.settings.TitleSuffix;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -90,6 +94,32 @@ class PublicHomeTestConfiguration {
                 return java.util.List.of();
             }
         };
+    }
+
+    @Bean
+    @Primary
+    StubHomepageContentQueryService publicHomeContentQueryService() {
+        return new StubHomepageContentQueryService();
+    }
+
+    static final class StubHomepageContentQueryService implements PublicHomepageContentQueryService {
+        private List<PublicHomepageContentEntry> writing = List.of();
+        private List<PublicHomepageContentEntry> research = List.of();
+
+        void setContent(List<PublicHomepageContentEntry> writing, List<PublicHomepageContentEntry> research) {
+            this.writing = List.copyOf(writing);
+            this.research = List.copyOf(research);
+        }
+
+        @Override
+        public List<PublicHomepageContentEntry> latestWriting(DiscoveryLanguage language, int limit) {
+            return language == DiscoveryLanguage.EN ? writing.stream().limit(limit).toList() : List.of();
+        }
+
+        @Override
+        public List<PublicHomepageContentEntry> latestResearch(DiscoveryLanguage language, int limit) {
+            return language == DiscoveryLanguage.EN ? research.stream().limit(limit).toList() : List.of();
+        }
     }
 
     static final class PublicHomeProfileRepository implements PersonalProfileRepository {

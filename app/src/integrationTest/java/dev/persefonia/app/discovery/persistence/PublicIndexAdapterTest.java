@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dev.persefonia.discovery.application.index.PublicFeedIndexQueryService;
+import dev.persefonia.discovery.application.contract.DiscoveryLanguage;
+import dev.persefonia.discovery.application.index.PublicHomepageContentQueryService;
 import dev.persefonia.discovery.application.index.PublicSearchIndexQueryService;
 import dev.persefonia.discovery.application.index.PublicSearchRequest;
 import dev.persefonia.discovery.application.index.PublicSitemapIndexQueryService;
@@ -21,6 +23,28 @@ class PublicIndexAdapterTest extends DiscoveryRepositoryTestDatabase {
     @Autowired PublicSearchIndexQueryService search;
     @Autowired PublicSitemapIndexQueryService sitemap;
     @Autowired PublicFeedIndexQueryService feed;
+    @Autowired PublicHomepageContentQueryService homepage;
+
+    @Test
+    void homepageUsesOnlyListedPublishedContentInTheRequestedLanguage() {
+        seedPublicIndexRows();
+        insertResource("CONTENT_PUBLISHING", "CONTENT_ITEM", "RESEARCH", "DETAIL",
+                "/en/research/aurora-study", "INDEX", "ELIGIBLE", "ELIGIBLE", "ELIGIBLE",
+                PUBLISHED_NEW, UPDATED, "research public discovery");
+        insertResource("CONTENT_PUBLISHING", "CONTENT_ITEM", "RESEARCH", "DETAIL",
+                "/en/research/private-study", "NO_INDEX", "NOT_ELIGIBLE", "NOT_ELIGIBLE", "NOT_ELIGIBLE",
+                PUBLISHED_NEW, UPDATED, "private research");
+
+        assertThat(homepage.latestWriting(DiscoveryLanguage.EN, 3))
+                .extracting(entry -> entry.publicUrl())
+                .containsExactly("/en/articles/aurora-article", "/en/notes/aurora-note");
+        assertThat(homepage.latestResearch(DiscoveryLanguage.EN, 3))
+                .extracting(entry -> entry.publicUrl())
+                .containsExactly("/en/research/aurora-study");
+        assertThat(homepage.latestWriting(DiscoveryLanguage.TR, 3)).isEmpty();
+        assertThatThrownBy(() -> homepage.latestResearch(DiscoveryLanguage.EN, 0))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
 
     @Test
     void publicSearchReturnsOnlyIndexAndSearchEligibleMatchingResources() {

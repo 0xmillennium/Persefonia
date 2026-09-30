@@ -118,3 +118,6 @@ app/jte-classes/
 
 # Disposable local Compose runtime state
 .runtime/
+
+## Documentation
+AGENTS.md

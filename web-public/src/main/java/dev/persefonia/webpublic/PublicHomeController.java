@@ -1,6 +1,9 @@
 package dev.persefonia.webpublic;
 
 import dev.persefonia.profileportfolio.application.query.PublicHomepageSettingsView;
+import dev.persefonia.discovery.application.contract.DiscoveryLanguage;
+import dev.persefonia.discovery.application.index.PublicHomepageContentEntry;
+import dev.persefonia.discovery.application.index.PublicHomepageContentQueryService;
 import dev.persefonia.profileportfolio.application.query.PublicProfileSummaryView;
 import dev.persefonia.profileportfolio.application.service.PublicFeaturedProjectQueryService;
 import dev.persefonia.profileportfolio.application.service.PublicHomepageSettingsQueryService;
@@ -27,6 +30,7 @@ public class PublicHomeController {
     private final PublicHomepageSettingsQueryService settings;
     private final PublicProfileSummaryQueryService profiles;
     private final PublicFeaturedProjectQueryService featuredProjects;
+    private final PublicHomepageContentQueryService homepageContent;
     private final PublicCanonicalUrlFactory canonicalUrlFactory;
     private final PublicInsightsObservationGateway insights;
     private final PublicContentResponseHeaders responseHeaders;
@@ -38,6 +42,7 @@ public class PublicHomeController {
             PublicHomepageSettingsQueryService settings,
             PublicProfileSummaryQueryService profiles,
             PublicFeaturedProjectQueryService featuredProjects,
+            PublicHomepageContentQueryService homepageContent,
             PublicCanonicalUrlFactory canonicalUrlFactory,
             PublicInsightsObservationGateway insights,
             PublicContentResponseHeaders responseHeaders,
@@ -47,6 +52,7 @@ public class PublicHomeController {
         this.settings = Objects.requireNonNull(settings, "settings");
         this.profiles = Objects.requireNonNull(profiles, "profiles");
         this.featuredProjects = Objects.requireNonNull(featuredProjects, "featuredProjects");
+        this.homepageContent = Objects.requireNonNull(homepageContent, "homepageContent");
         this.canonicalUrlFactory = Objects.requireNonNull(canonicalUrlFactory, "canonicalUrlFactory");
         this.insights = Objects.requireNonNull(insights, "insights");
         this.responseHeaders = Objects.requireNonNull(responseHeaders, "responseHeaders");
@@ -63,6 +69,13 @@ public class PublicHomeController {
         var homepageFeaturedProjects = homepage.showFeaturedProjects()
                 ? featuredProjects.list(homepage.defaultLanguage(), homepage.featuredProjectLimit())
                 : List.<dev.persefonia.profileportfolio.application.query.PublicFeaturedProjectView>of();
+        DiscoveryLanguage language = DiscoveryLanguage.valueOf(homepage.defaultLanguage());
+        List<PublicHomepageContentEntry> latestWriting = homepage.showLatestWriting()
+                ? homepageContent.latestWriting(language, Math.min(homepage.latestWritingLimit(), 20))
+                : List.of();
+        List<PublicHomepageContentEntry> researchHighlights = homepage.showResearchHighlights()
+                ? homepageContent.latestResearch(language, 3)
+                : List.of();
         model.addAttribute("page", new PublicHomeViewModel(
                 homepage.siteName(),
                 pageTitle(homepage),
@@ -79,6 +92,8 @@ public class PublicHomeController {
                 PublicProjectPageCopy.forLanguage(homepage.defaultLanguage()).featuredProjectsTitle(),
                 homepage.showLatestWriting(),
                 homepage.showResearchHighlights(),
+                latestWriting,
+                researchHighlights,
                 homepage.featuredProjectLimit(),
                 homepage.latestWritingLimit(),
                 assetResolver.scriptPath(FRONTEND_ENTRY),
