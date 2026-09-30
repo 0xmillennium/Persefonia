@@ -18,13 +18,14 @@ class LocalComposeArchitectureTest {
         try (Stream<Path> paths = Files.list(Path.of(".."))) {
             assertThat(paths.filter(path -> path.getFileName().toString().startsWith("compose")
                     && path.getFileName().toString().endsWith(".yaml")).toList())
-                    .containsExactly(LOCAL_COMPOSE);
+                    .containsExactlyInAnyOrder(LOCAL_COMPOSE, Path.of("../compose.override.example.yaml"));
         }
         Map<String, Object> descriptor = descriptor();
         assertThat(descriptor.get("name")).isEqualTo("persefonia-local");
         assertThat(mapping(descriptor.get("services")).keySet()).containsExactlyInAnyOrder("app", "postgres", "redis");
         assertThat(descriptor.containsKey("networks")).isFalse();
-        assertThat(descriptor.containsKey("secrets")).isFalse();
+        assertThat(mapping(descriptor.get("secrets")).keySet())
+                .containsExactlyInAnyOrder("postgres_password", "redis_password", "contact_rate_limit_secret");
         assertThat(Files.readString(LOCAL_COMPOSE)).doesNotContain(
                 "PERSEFONIA_IMAGE_REF", "ghcr.io/0xmillennium/persefonia", "traefik.", "Authelia", "SMTP");
     }
@@ -32,7 +33,7 @@ class LocalComposeArchitectureTest {
     @Test
     void appBuildsCurrentSourceWithNonRootReadOnlyRuntimeAndReadiness() throws Exception {
         Map<String, Object> app = service("app");
-        assertThat(app).doesNotContainKeys("build", "secrets", "env_file", "labels", "privileged", "networks");
+        assertThat(app).doesNotContainKeys("build", "env_file", "labels", "privileged", "networks");
         assertThat(app.get("image").toString()).startsWith("ghcr.io/ringcentral-docker/node:22.22.2-jdk25@sha256:");
         assertThat(app.get("user")).isEqualTo("${PERSEFONIA_LOCAL_UID:-1000}:${PERSEFONIA_LOCAL_GID:-1000}");
         assertThat(app.get("working_dir")).isEqualTo("/workspace");
@@ -59,14 +60,15 @@ class LocalComposeArchitectureTest {
     }
 
     @Test
-    void localApplicationInputsAreExplicitAndUseSharedDependencyCredentials() throws Exception {
+    void localApplicationInputsAreExplicitAndCredentialsUseFileSecrets() throws Exception {
         Map<String, Object> environment = mapping(service("app").get("environment"));
         assertThat(environment.get("SPRING_PROFILES_ACTIVE")).isEqualTo("local");
         assertThat(environment.get("PERSEFONIA_DATASOURCE_URL"))
                 .isEqualTo("jdbc:postgresql://postgres:5432/${POSTGRES_DB}");
         assertThat(environment.get("PERSEFONIA_DATASOURCE_USERNAME")).isEqualTo("${POSTGRES_USER}");
-        assertThat(environment.get("PERSEFONIA_DATASOURCE_PASSWORD")).isEqualTo("${POSTGRES_PASSWORD}");
-        assertThat(environment.get("SPRING_DATA_REDIS_PASSWORD")).isEqualTo("${REDIS_PASSWORD}");
+        assertThat(environment).doesNotContainKeys("PERSEFONIA_DATASOURCE_PASSWORD", "SPRING_DATA_REDIS_PASSWORD",
+                "PERSEFONIA_CONTACT_RATE_LIMIT_SECRET");
+        assertThat(environment.get("SPRING_DATA_REDIS_USERNAME")).isEqualTo("${PERSEFONIA_REDIS_USERNAME}");
         assertThat(environment.get("PERSEFONIA_PUBLIC_BASE_URL")).isEqualTo("${PERSEFONIA_PUBLIC_BASE_URL}");
         assertThat(environment.get("PERSEFONIA_MEDIA_STORAGE_ROOT")).isEqualTo("/workspace/.runtime/media");
         assertThat(environment.get("PERSEFONIA_MEDIA_STORAGE_REQUIRED")).isEqualTo("true");
@@ -84,8 +86,11 @@ class LocalComposeArchitectureTest {
         Map<String, Object> redis = service("redis");
         assertThat(postgres.get("volumes")).isEqualTo(List.of("postgres-data:/var/lib/postgresql/data"));
         assertThat(mapping(descriptor().get("volumes")).keySet()).containsExactly("postgres-data");
-        assertThat(redis).doesNotContainKey("volumes");
-        assertThat(redis.get("command").toString()).contains("--requirepass", "--save");
+        assertThat(((List<?>) redis.get("volumes"))).hasSize(1);
+        assertThat(mapping(((List<?>) redis.get("volumes")).getFirst()))
+                .containsEntry("type", "bind").containsEntry("read_only", true);
+        assertThat(redis.get("entrypoint")).isEqualTo(List.of("sh", "/usr/local/bin/persefonia-local-redis-entrypoint.sh"));
+        assertThat(redis).doesNotContainKey("command");
         assertThat(postgres.get("ports")).isEqualTo(List.of("127.0.0.1:${PERSEFONIA_POSTGRES_PORT:-5432}:5432"));
         assertThat(redis.get("ports")).isEqualTo(List.of("127.0.0.1:${PERSEFONIA_REDIS_HOST_PORT:-6379}:6379"));
         assertThat(postgres).containsKey("healthcheck");

@@ -23,7 +23,7 @@ trap cleanup EXIT
 docker run --detach --rm --name "$container_name" --publish 127.0.0.1::5432 \
   --env POSTGRES_DB=persefonia_browser --env POSTGRES_USER=persefonia_browser \
   --env POSTGRES_PASSWORD=browser_test_only "$postgres_image" > "$artifact_dir/postgres-container.txt"
-for attempt in $(seq 1 60); do
+for _ in $(seq 1 60); do
   if docker exec "$container_name" pg_isready -h 127.0.0.1 -U persefonia_browser -d persefonia_browser >/dev/null 2>&1; then
     break
   fi
@@ -47,7 +47,7 @@ java -jar "$project_root/app/build/libs/persefonia.jar" \
   "--persefonia.media.storage-root=$media_dir" \
   --management.health.redis.enabled=false > "$artifact_dir/application.log" 2>&1 &
 app_pid=$!
-for attempt in $(seq 1 90); do
+for _ in $(seq 1 90); do
   if curl --fail --silent "$PERSEFONIA_BROWSER_URL/robots.txt" > /dev/null; then
     break
   fi

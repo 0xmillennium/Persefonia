@@ -6,6 +6,11 @@ def loopback($port):
   any(.services.app.ports[]?; .host_ip == "127.0.0.1" and .target == $port);
 def service_loopback($service; $port):
   any(.services[$service].ports[]?; .host_ip == "127.0.0.1" and .target == $port);
+def no_sensitive_values:
+  all(.environment | keys[];
+    (test("(PASSWORD|SECRET|TOKEN|API_KEY)$") | not));
+def grant($service; $source; $target):
+  any(.services[$service].secrets[]?; .source == $source and .target == $target);
 
 check(.name == "persefonia-local"; "local Compose project name changed")
 | check((.services | keys) == ["app", "postgres", "redis"]; "local Compose must contain exactly app, postgres, redis")
@@ -45,15 +50,31 @@ check(.name == "persefonia-local"; "local Compose project name changed")
 | check(.services.app.environment.PERSEFONIA_DATASOURCE_URL ==
       ("jdbc:postgresql://postgres:5432/" + .services.postgres.environment.POSTGRES_DB)
     and .services.app.environment.PERSEFONIA_DATASOURCE_USERNAME == .services.postgres.environment.POSTGRES_USER
-    and .services.app.environment.PERSEFONIA_DATASOURCE_PASSWORD == .services.postgres.environment.POSTGRES_PASSWORD
     and .services.app.environment.PERSEFONIA_REDIS_HOST == "redis"
     and .services.app.environment.PERSEFONIA_REDIS_PORT == "6379"
-    and .services.app.environment.SPRING_DATA_REDIS_USERNAME == "default"
-    and .services.app.environment.SPRING_DATA_REDIS_PASSWORD == .services.redis.environment.REDIS_PASSWORD
+    and .services.app.environment.SPRING_DATA_REDIS_USERNAME == .services.redis.environment.PERSEFONIA_REDIS_USERNAME
+    and .services.app.environment.SPRING_DATA_REDIS_USERNAME != "default"
     and (.services.app.environment.PERSEFONIA_PUBLIC_BASE_URL | length) > 0
-    and (.services.app.environment.PERSEFONIA_CONTACT_RATE_LIMIT_SECRET | length) >= 32
-    and (.services.app.environment.PERSEFONIA_CONTACT_RATE_LIMIT_REDIS_KEY_PREFIX | length) > 0;
+    and .services.app.environment.PERSEFONIA_CONTACT_RATE_LIMIT_REDIS_KEY_PREFIX == .services.redis.environment.PERSEFONIA_REDIS_KEY_PREFIX;
     "local application environment must match dependencies and required inputs")
+| check(all(.services[]; no_sensitive_values)
+    and (.services.postgres.environment | keys) == ["POSTGRES_DB", "POSTGRES_PASSWORD_FILE", "POSTGRES_USER"]
+    and .services.postgres.environment.POSTGRES_PASSWORD_FILE == "/run/secrets/postgres_password"
+    and (.services.redis.environment | keys) == ["PERSEFONIA_REDIS_KEY_PREFIX", "PERSEFONIA_REDIS_USERNAME"];
+    "sensitive values must not appear in service environments")
+| check((.secrets | keys) == ["contact_rate_limit_secret", "postgres_password", "redis_password"]
+    and (grant("app"; "postgres_password"; "spring.datasource.password"))
+    and (grant("app"; "redis_password"; "spring.data.redis.password"))
+    and (grant("app"; "contact_rate_limit_secret"; "persefonia.contact.rate-limit.secret"))
+    and (.services.app.secrets | length) == 3
+    and (grant("postgres"; "postgres_password"; "postgres_password"))
+    and (.services.postgres.secrets | length) == 1
+    and (grant("redis"; "redis_password"; "redis_password"))
+    and (.services.redis.secrets | length) == 1
+    and .secrets.postgres_password.file == ($workspace + "/secrets/postgres_password.examples")
+    and .secrets.redis_password.file == ($workspace + "/secrets/redis_password.examples")
+    and .secrets.contact_rate_limit_secret.file == ($workspace + "/secrets/contact_rate_limit_secret.examples");
+    "baseline credentials must use only tracked local Compose secret examples")
 | check((.services.app.depends_on | keys) == ["postgres", "redis"]
     and all(.services.app.depends_on[]; .condition == "service_healthy")
     and .services.app.healthcheck.test == ["CMD", "curl", "--fail", "--silent", "--show-error",
@@ -71,11 +92,22 @@ check(.name == "persefonia-local"; "local Compose project name changed")
     and (.volumes | keys) == ["postgres-data"]
     and (.services.postgres.healthcheck.test[1] | contains("pg_isready"));
     "PostgreSQL must have health and one durable data volume")
-| check((.services.redis.volumes // []) == []
-    and .services.redis.command == ["sh", "-ec", "exec redis-server --requirepass \"$$REDIS_PASSWORD\" --appendonly no --save ''"]
-    and (.services.redis.healthcheck.test[1] | contains("redis-cli -a"));
-    "Redis must be authenticated, healthy, and disposable")
+| check(.services.redis.user == "999:1000" and .services.redis.read_only == true
+    and .services.redis.cap_drop == ["ALL"]
+    and (.services.redis.security_opt | index("no-new-privileges:true") != null)
+    and (.services.redis.tmpfs | index("/tmp") != null)
+    and (.services.redis.volumes | length) == 1
+    and .services.redis.volumes[0].type == "bind"
+    and .services.redis.volumes[0].source == ($workspace + "/scripts/local-redis-entrypoint.sh")
+    and .services.redis.volumes[0].target == "/usr/local/bin/persefonia-local-redis-entrypoint.sh"
+    and .services.redis.volumes[0].read_only == true
+    and .services.redis.entrypoint == ["sh", "/usr/local/bin/persefonia-local-redis-entrypoint.sh"]
+    and .services.redis.command == null
+    and .services.redis.healthcheck.test[0] == "CMD-SHELL"
+    and (.services.redis.healthcheck.test[1] | contains("--user") and contains("/run/secrets/redis_password")
+        and (contains("requirepass") | not));
+    "Redis must use a non-root ACL bootstrap, authenticated health, and no durable state")
 | check((.networks | keys) == ["default"] and (.networks.default.external // false) == false
-    and (.services.app.labels // {}) == {} and (.secrets // {}) == {};
-    "local Compose must not own production networks, routing, or required secret files")
+    and (.services.app.labels // {}) == {};
+    "local Compose must not own production networks or routing")
 | true

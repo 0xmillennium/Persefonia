@@ -14,7 +14,7 @@ import org.springframework.core.io.ClassPathResource;
 
 class ApplicationEnvironmentContractTest {
     @Test
-    void templateContainsUsableFakeLocalInputsWithoutProductionArtifactOrSecretFiles() throws Exception {
+    void templateContainsNonSecretLocalInputsAndUsableSecretExamplePaths() throws Exception {
         Properties inputs = new Properties();
         try (var reader = Files.newBufferedReader(Path.of("../.env.example"))) {
             inputs.load(reader);
@@ -22,23 +22,27 @@ class ApplicationEnvironmentContractTest {
         assertThat(inputs.stringPropertyNames()).containsExactlyInAnyOrder(
                 "PERSEFONIA_LOCAL_UID", "PERSEFONIA_LOCAL_GID", "PERSEFONIA_APP_PORT",
                 "PERSEFONIA_MANAGEMENT_PORT", "PERSEFONIA_POSTGRES_PORT", "PERSEFONIA_REDIS_HOST_PORT",
-                "PERSEFONIA_PUBLIC_BASE_URL", "POSTGRES_DB", "POSTGRES_USER", "POSTGRES_PASSWORD",
-                "REDIS_PASSWORD", "PERSEFONIA_REDIS_KEY_PREFIX", "PERSEFONIA_CONTACT_RATE_LIMIT_SECRET")
+                "PERSEFONIA_PUBLIC_BASE_URL", "POSTGRES_DB", "POSTGRES_USER",
+                "PERSEFONIA_REDIS_USERNAME", "PERSEFONIA_REDIS_KEY_PREFIX",
+                "PERSEFONIA_POSTGRES_PASSWORD_FILE", "PERSEFONIA_REDIS_PASSWORD_FILE",
+                "PERSEFONIA_CONTACT_RATE_LIMIT_SECRET_FILE")
                 .doesNotContain("PERSEFONIA_IMAGE_REF", "PERSEFONIA_MEDIA_HOST_PATH");
         assertThat(inputs.getProperty("PERSEFONIA_LOCAL_UID")).isEqualTo("1000");
         assertThat(inputs.getProperty("PERSEFONIA_LOCAL_GID")).isEqualTo("1000");
         assertThat(inputs.getProperty("PERSEFONIA_PUBLIC_BASE_URL")).isEqualTo("http://localhost:8080");
-        assertThat(inputs.getProperty("POSTGRES_PASSWORD")).startsWith("local-only-");
-        assertThat(inputs.getProperty("REDIS_PASSWORD")).startsWith("local-only-");
-        assertThat(inputs.getProperty("PERSEFONIA_CONTACT_RATE_LIMIT_SECRET")).startsWith("local-only-");
+        assertThat(inputs.getProperty("PERSEFONIA_REDIS_USERNAME")).isEqualTo("persefonia");
+        for (String name : new String[] {"PERSEFONIA_POSTGRES_PASSWORD_FILE", "PERSEFONIA_REDIS_PASSWORD_FILE",
+                "PERSEFONIA_CONTACT_RATE_LIMIT_SECRET_FILE"}) {
+            assertThat(Path.of("../" + inputs.getProperty(name))).isRegularFile();
+        }
         assertThat(Path.of("../.env.production.example")).doesNotExist();
     }
 
     @Test
     void localProfileRetainsOptionalFileSecrets() throws Exception {
         String profile = Files.readString(Path.of("src/main/resources/application-local.yml"));
-        assertThat(profile).contains("optional:configtree:/run/secrets/", "${PERSEFONIA_DATASOURCE_URL}", "${PERSEFONIA_DATASOURCE_USERNAME}",
-                "${PERSEFONIA_DATASOURCE_PASSWORD}");
+        assertThat(profile).contains("optional:configtree:/run/secrets/", "${PERSEFONIA_DATASOURCE_URL}",
+                "${PERSEFONIA_DATASOURCE_USERNAME}").doesNotContain("PERSEFONIA_DATASOURCE_PASSWORD");
     }
 
     @Test

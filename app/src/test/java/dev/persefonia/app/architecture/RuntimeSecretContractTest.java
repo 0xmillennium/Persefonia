@@ -21,6 +21,8 @@ class RuntimeSecretContractTest {
             String real = "secrets/" + name;
             String example = real + ".examples";
             assertThat(Path.of("../" + example)).isRegularFile();
+            String exampleValue = Files.readString(Path.of("../" + example)).trim();
+            assertThat(exampleValue).isNotBlank().startsWith("fake").doesNotContain("<", ">", "REQUIRED", "TODO");
             assertThat(git("ls-files", "--", example).output()).isEqualTo(example + "\n");
             assertThat(git("check-ignore", "-q", real).status()).isZero();
             assertThat(git("check-ignore", "-q", example).status()).isEqualTo(1);
@@ -33,11 +35,26 @@ class RuntimeSecretContractTest {
     }
 
     @Test
-    void defaultLocalComposeRequiresNoSecretFilesAndLocalProfileKeepsConfigtreeOptional() throws Exception {
+    void defaultLocalComposeUsesTrackedFileSecretsAndLocalProfileKeepsConfigtreeOptional() throws Exception {
         Map<?, ?> compose = new Yaml().load(Files.readString(Path.of("../compose.yaml")));
-        Map<?, ?> app = (Map<?, ?>) ((Map<?, ?>) compose.get("services")).get("app");
-        assertThat(compose.containsKey("secrets")).isFalse();
-        assertThat(app.containsKey("secrets")).isFalse();
+        Map<?, ?> services = (Map<?, ?>) compose.get("services");
+        Map<?, ?> app = (Map<?, ?>) services.get("app");
+        Map<?, ?> postgres = (Map<?, ?>) services.get("postgres");
+        Map<?, ?> redis = (Map<?, ?>) services.get("redis");
+        assertThat(((Map<?, ?>) compose.get("secrets")).keySet().stream().map(Object::toString).toList())
+                .containsExactlyInAnyOrder("postgres_password", "redis_password", "contact_rate_limit_secret");
+        assertThat(app.get("secrets").toString())
+                .contains("spring.datasource.password", "spring.data.redis.password",
+                        "persefonia.contact.rate-limit.secret");
+        assertThat(postgres.get("secrets").toString()).contains("postgres_password");
+        assertThat(redis.get("secrets").toString()).contains("redis_password");
+        assertThat(((Map<?, ?>) postgres.get("environment")).get("POSTGRES_PASSWORD_FILE"))
+                .isEqualTo("/run/secrets/postgres_password");
+        for (Map<?, ?> service : List.of(app, postgres, redis)) {
+            Map<?, ?> environment = (Map<?, ?>) service.get("environment");
+            assertThat(environment.keySet().stream().map(Object::toString))
+                    .noneMatch(key -> key.matches(".*(?:PASSWORD|SECRET|TOKEN)$"));
+        }
         assertThat(app.containsKey("env_file")).isFalse();
         assertThat(Files.readString(Path.of("src/main/resources/application-local.yml")))
                 .contains("optional:configtree:/run/secrets/");
@@ -46,8 +63,26 @@ class RuntimeSecretContractTest {
     }
 
     @Test
-    void activeApplicationDescriptorsNeverUseExamplesOrObsoleteSecretFilenames() throws Exception {
-        for (String file : List.of("../compose.yaml", "../.env.example",
+    void exampleEnvironmentContainsOnlySecretPathsAndNoRuntimeCredentialValues() throws Exception {
+        String environment = Files.readString(Path.of("../.env.example"));
+        for (String name : List.of("POSTGRES_PASSWORD", "REDIS_PASSWORD", "PERSEFONIA_CONTACT_RATE_LIMIT_SECRET")) {
+            assertThat(environment).doesNotContainPattern("(?m)^" + name + "=");
+        }
+        for (String name : List.of("PERSEFONIA_POSTGRES_PASSWORD_FILE", "PERSEFONIA_REDIS_PASSWORD_FILE",
+                "PERSEFONIA_CONTACT_RATE_LIMIT_SECRET_FILE")) {
+            assertThat(environment).containsPattern("(?m)^" + name + "=./secrets/[^\\n]+\\.examples$");
+        }
+        assertThat(environment).doesNotContain("PERSEFONIA_IMAGE_REF", "/var/lib/persefonia");
+        for (String name : List.of("postgres_password", "redis_password", "contact_rate_limit_secret")) {
+            String value = Files.readString(Path.of("../secrets/" + name + ".examples")).trim();
+            assertThat(value).isNotBlank().doesNotContain("<", ">", "REQUIRED", "TODO");
+            assertThat(environment).doesNotContain(value);
+        }
+    }
+
+    @Test
+    void productionApplicationDescriptorsNeverUseExamplesOrObsoleteSecretFilenames() throws Exception {
+        for (String file : List.of(
                 "src/main/resources/application-local.yml", "src/main/resources/application-docker.yml",
                 "src/main/resources/application-prod.yml")) {
             String contents = Files.readString(Path.of(file));

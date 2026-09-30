@@ -57,6 +57,14 @@ class AutomationRepositoryPolicyTest {
             assertThatThrownBy(() -> assertProductionShell(temporary, file, "100755"))
                     .as(file).isInstanceOf(AssertionError.class);
         }
+        String localRedis = "scripts/local-redis-entrypoint.sh";
+        writeFixture(localRedis, "#!/bin/sh\nset -eu\n");
+        assertProductionShell(temporary, localRedis, "100644");
+        assertThatThrownBy(() -> assertProductionShell(temporary, localRedis, "100755"))
+                .isInstanceOf(AssertionError.class);
+        writeFixture(localRedis, "#!/bin/sh\necho unsafe\n");
+        assertThatThrownBy(() -> assertProductionShell(temporary, localRedis, "100644"))
+                .isInstanceOf(AssertionError.class);
         String owned = "scripts/deploy/example.sh";
         writeFixture(owned, valid);
         assertThatThrownBy(() -> assertProductionShell(temporary, owned, "100644"))
@@ -85,6 +93,15 @@ class AutomationRepositoryPolicyTest {
         assertThat(relative.isAbsolute()).as(file).isFalse();
         assertThat(relative).as(file).isEqualTo(relative.normalize());
         assertThat(relative.toString()).as(file).endsWith(".sh");
+        if (relative.equals(Path.of("scripts/local-redis-entrypoint.sh"))) {
+            Path source = repository.resolve(relative);
+            assertThat(Files.isSymbolicLink(source)).as(file).isFalse();
+            assertThat(Files.isRegularFile(source)).as(file).isTrue();
+            assertThat(mode).as(file).isEqualTo("100644");
+            assertThat(Files.readString(source)).as(file).startsWith("#!/bin/sh\nset -eu\n")
+                    .doesNotContain("TEST_MODE", "SKIP_SECURITY_CHECK_FOR_TESTS");
+            return;
+        }
         assertThat(PRODUCTION_ROOTS.stream().anyMatch(relative::startsWith)).as(file).isTrue();
         Path current = repository;
         for (Path component : relative) {

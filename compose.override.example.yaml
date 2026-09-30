@@ -1,0 +1,35 @@
+# Optional connections to services that already exist outside this Compose project.
+# Copy to ignored compose.override.yaml, then keep only the integrations you use.
+# Replace example endpoints/identifiers and point secret file paths at ignored files.
+# This example is renderable but its example OIDC endpoint cannot serve logins.
+services:
+  app:
+    environment:
+      # External OIDC provider. These names match Spring's current client properties.
+      SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_AUTHELIA_CLIENT_ID: ${PERSEFONIA_OIDC_CLIENT_ID:-persefonia-local-example}
+      SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_AUTHELIA_CLIENT_AUTHENTICATION_METHOD: client_secret_basic
+      SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_AUTHELIA_AUTHORIZATION_GRANT_TYPE: authorization_code
+      SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_AUTHELIA_SCOPE: openid,profile,email,groups,offline_access
+      SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_AUTHELIA_REDIRECT_URI: "{baseUrl}/login/oauth2/code/{registrationId}"
+      SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_AUTHELIA_ISSUER_URI: ${PERSEFONIA_OIDC_ISSUER_URI:-https://id.example.invalid}
+      PERSEFONIA_ADMIN_REQUIRED_OIDC_GROUP: ${PERSEFONIA_ADMIN_REQUIRED_OIDC_GROUP:-admin}
+
+      # External Cloudflare account; the token is supplied below as a file.
+      PERSEFONIA_CACHE_PURGE_PROVIDER: CLOUDFLARE
+      PERSEFONIA_CLOUDFLARE_ZONE_ID: ${PERSEFONIA_CLOUDFLARE_ZONE_ID:-local-example-zone}
+
+      # Set these only when an external reverse proxy is actually in use.
+      # SERVER_FORWARD_HEADERS_STRATEGY: NATIVE
+      # SERVER_TOMCAT_REMOTEIP_INTERNAL_PROXIES: ${PERSEFONIA_TRUSTED_PROXY_CIDRS:-127.0.0.1/32}
+      # PERSEFONIA_SESSION_COOKIE_SECURE: "true"
+    secrets:
+      - source: oidc_client_secret
+        target: spring.security.oauth2.client.registration.authelia.client-secret
+      - source: cloudflare_api_token
+        target: persefonia.cache-purge.cloudflare.api-token
+
+secrets:
+  oidc_client_secret:
+    file: ${PERSEFONIA_OIDC_CLIENT_SECRET_FILE:-./secrets/oidc_client_secret.examples}
+  cloudflare_api_token:
+    file: ${PERSEFONIA_CLOUDFLARE_API_TOKEN_FILE:-./secrets/cloudflare_api_token.examples}

@@ -1,0 +1,265 @@
+{
+  "name": "persefonia-local",
+  "networks": {
+    "default": {
+      "name": "persefonia-local_default",
+      "ipam": {}
+    }
+  },
+  "secrets": {
+    "cloudflare_api_token": {
+      "name": "persefonia-local_cloudflare_api_token",
+      "file": "/synthetic/workspace/secrets/cloudflare_api_token.examples"
+    },
+    "contact_rate_limit_secret": {
+      "name": "persefonia-local_contact_rate_limit_secret",
+      "file": "/synthetic/workspace/secrets/contact_rate_limit_secret.examples"
+    },
+    "oidc_client_secret": {
+      "name": "persefonia-local_oidc_client_secret",
+      "file": "/synthetic/workspace/secrets/oidc_client_secret.examples"
+    },
+    "postgres_password": {
+      "name": "persefonia-local_postgres_password",
+      "file": "/synthetic/workspace/secrets/postgres_password.examples"
+    },
+    "redis_password": {
+      "name": "persefonia-local_redis_password",
+      "file": "/synthetic/workspace/secrets/redis_password.examples"
+    }
+  },
+  "services": {
+    "app": {
+      "cap_drop": [
+        "ALL"
+      ],
+      "command": [
+        "./gradlew",
+        "--no-daemon",
+        "--console=plain",
+        ":app:bootRun"
+      ],
+      "depends_on": {
+        "postgres": {
+          "condition": "service_healthy",
+          "required": true
+        },
+        "redis": {
+          "condition": "service_healthy",
+          "required": true
+        }
+      },
+      "entrypoint": null,
+      "environment": {
+        "GRADLE_USER_HOME": "/workspace/.runtime/gradle",
+        "HOME": "/workspace/.runtime/home",
+        "MANAGEMENT_ENDPOINT_HEALTH_GROUP_READINESS_INCLUDE": "readinessState,db,mediaStorage,databaseMigrations",
+        "NPM_CONFIG_CACHE": "/workspace/.runtime/npm",
+        "PERSEFONIA_ADMIN_REQUIRED_OIDC_GROUP": "admin",
+        "PERSEFONIA_CACHE_PURGE_PROVIDER": "CLOUDFLARE",
+        "PERSEFONIA_CLOUDFLARE_ZONE_ID": "local-example-zone",
+        "PERSEFONIA_CONTACT_RATE_LIMIT_REDIS_KEY_PREFIX": "persefonia:local:rate-limit",
+        "PERSEFONIA_DATASOURCE_URL": "jdbc:postgresql://postgres:5432/persefonia",
+        "PERSEFONIA_DATASOURCE_USERNAME": "persefonia",
+        "PERSEFONIA_MANAGEMENT_ADDRESS": "0.0.0.0",
+        "PERSEFONIA_MANAGEMENT_PORT": "9001",
+        "PERSEFONIA_MEDIA_STORAGE_REQUIRED": "true",
+        "PERSEFONIA_MEDIA_STORAGE_ROOT": "/workspace/.runtime/media",
+        "PERSEFONIA_PUBLIC_BASE_URL": "http://localhost:8080",
+        "PERSEFONIA_REDIS_HOST": "redis",
+        "PERSEFONIA_REDIS_PORT": "6379",
+        "SPRING_DATA_REDIS_USERNAME": "persefonia",
+        "SPRING_PROFILES_ACTIVE": "local",
+        "SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_AUTHELIA_ISSUER_URI": "https://id.example.invalid",
+        "SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_AUTHELIA_AUTHORIZATION_GRANT_TYPE": "authorization_code",
+        "SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_AUTHELIA_CLIENT_AUTHENTICATION_METHOD": "client_secret_basic",
+        "SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_AUTHELIA_CLIENT_ID": "persefonia-local-example",
+        "SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_AUTHELIA_REDIRECT_URI": "{baseUrl}/login/oauth2/code/{registrationId}",
+        "SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_AUTHELIA_SCOPE": "openid,profile,email,groups,offline_access"
+      },
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "curl",
+          "--fail",
+          "--silent",
+          "--show-error",
+          "--output",
+          "/dev/null",
+          "http://127.0.0.1:9001/actuator/health/readiness"
+        ],
+        "timeout": "5s",
+        "interval": "15s",
+        "retries": 20,
+        "start_period": "15m0s"
+      },
+      "image": "ghcr.io/ringcentral-docker/node:22.22.2-jdk25@sha256:d8b709dbd229236715fa16403e68c6e310fde38e285cd0bfc788f049a3cab535",
+      "init": true,
+      "networks": {
+        "default": null
+      },
+      "ports": [
+        {
+          "mode": "ingress",
+          "host_ip": "127.0.0.1",
+          "target": 8080,
+          "published": "8080",
+          "protocol": "tcp"
+        },
+        {
+          "mode": "ingress",
+          "host_ip": "127.0.0.1",
+          "target": 9001,
+          "published": "9001",
+          "protocol": "tcp"
+        }
+      ],
+      "read_only": true,
+      "secrets": [
+        {
+          "source": "postgres_password",
+          "target": "spring.datasource.password"
+        },
+        {
+          "source": "redis_password",
+          "target": "spring.data.redis.password"
+        },
+        {
+          "source": "contact_rate_limit_secret",
+          "target": "persefonia.contact.rate-limit.secret"
+        },
+        {
+          "source": "oidc_client_secret",
+          "target": "spring.security.oauth2.client.registration.authelia.client-secret"
+        },
+        {
+          "source": "cloudflare_api_token",
+          "target": "persefonia.cache-purge.cloudflare.api-token"
+        }
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "tmpfs": [
+        "/tmp"
+      ],
+      "user": "1000:1000",
+      "volumes": [
+        {
+          "type": "bind",
+          "source": "/synthetic/workspace",
+          "target": "/workspace"
+        }
+      ],
+      "working_dir": "/workspace"
+    },
+    "postgres": {
+      "command": null,
+      "entrypoint": null,
+      "environment": {
+        "POSTGRES_DB": "persefonia",
+        "POSTGRES_PASSWORD_FILE": "/run/secrets/postgres_password",
+        "POSTGRES_USER": "persefonia"
+      },
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""
+        ],
+        "timeout": "5s",
+        "interval": "5s",
+        "retries": 20
+      },
+      "image": "postgres:17.11-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73",
+      "networks": {
+        "default": null
+      },
+      "ports": [
+        {
+          "mode": "ingress",
+          "host_ip": "127.0.0.1",
+          "target": 5432,
+          "published": "5432",
+          "protocol": "tcp"
+        }
+      ],
+      "secrets": [
+        {
+          "source": "postgres_password",
+          "target": "postgres_password"
+        }
+      ],
+      "volumes": [
+        {
+          "type": "volume",
+          "source": "postgres-data",
+          "target": "/var/lib/postgresql/data",
+          "volume": {}
+        }
+      ]
+    },
+    "redis": {
+      "cap_drop": [
+        "ALL"
+      ],
+      "command": null,
+      "entrypoint": [
+        "sh",
+        "/usr/local/bin/persefonia-local-redis-entrypoint.sh"
+      ],
+      "environment": {
+        "PERSEFONIA_REDIS_KEY_PREFIX": "persefonia:local:rate-limit",
+        "PERSEFONIA_REDIS_USERNAME": "persefonia"
+      },
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "REDISCLI_AUTH=\"$$(cat /run/secrets/redis_password)\" redis-cli --user \"$$PERSEFONIA_REDIS_USERNAME\" ping 2>/dev/null | grep -qx PONG"
+        ],
+        "timeout": "5s",
+        "interval": "5s",
+        "retries": 20
+      },
+      "image": "redis:8.10-alpine@sha256:becdda6c7f4b3fb42e42fd7f120bbf5c54c4caaaf16f26da24e4563d2c1f0576",
+      "networks": {
+        "default": null
+      },
+      "ports": [
+        {
+          "mode": "ingress",
+          "host_ip": "127.0.0.1",
+          "target": 6379,
+          "published": "6379",
+          "protocol": "tcp"
+        }
+      ],
+      "read_only": true,
+      "secrets": [
+        {
+          "source": "redis_password",
+          "target": "redis_password"
+        }
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "tmpfs": [
+        "/tmp"
+      ],
+      "user": "999:1000",
+      "volumes": [
+        {
+          "type": "bind",
+          "source": "/synthetic/workspace/scripts/local-redis-entrypoint.sh",
+          "target": "/usr/local/bin/persefonia-local-redis-entrypoint.sh",
+          "read_only": true
+        }
+      ]
+    }
+  },
+  "volumes": {
+    "postgres-data": {
+      "name": "persefonia-local_postgres-data"
+    }
+  }
+}

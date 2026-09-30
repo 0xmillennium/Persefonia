@@ -33,8 +33,9 @@ class RuntimeOwnershipBoundaryTest {
         Path repository = Path.of("..").toAbsolutePath().normalize();
         for (String workflow : List.of("delivery.yml", "deploy-rc.yml", "redeploy-rc.yml")) {
             String source = Files.readString(repository.resolve(".github/workflows/" + workflow));
-            assertThat(source).as(workflow).doesNotContain("compose.yaml", ".env.example", "docker compose",
-                    "docker-compose", "--no-deps app");
+            assertThat(source).as(workflow).doesNotContain("compose.yaml", ".env.example",
+                    "compose.override.example.yaml", "secrets/*.examples", "local-redis-entrypoint.sh",
+                    "docker compose", "docker-compose", "--no-deps app");
         }
     }
 
@@ -65,7 +66,7 @@ class RuntimeOwnershipBoundaryTest {
     @Test
     void semanticOwnershipPolicyAllowsNestedBuildSupportAndRejectsHostArtifacts() {
         for (String file : List.of("Dockerfile", "supported-platforms.txt",
-                "compose.yaml", ".env.example",
+                "compose.yaml", "compose.override.example.yaml", ".env.example",
                 "secrets/postgres_password.examples")) {
             assertThat(prohibitedRuntimeArtifact(file)).as(file).isFalse();
         }

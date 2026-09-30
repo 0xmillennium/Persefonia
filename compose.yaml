@@ -24,19 +24,23 @@ services:
       SPRING_PROFILES_ACTIVE: local
       PERSEFONIA_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
       PERSEFONIA_DATASOURCE_USERNAME: ${POSTGRES_USER}
-      PERSEFONIA_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       PERSEFONIA_REDIS_HOST: redis
       PERSEFONIA_REDIS_PORT: "6379"
-      SPRING_DATA_REDIS_USERNAME: default
-      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD}
+      SPRING_DATA_REDIS_USERNAME: ${PERSEFONIA_REDIS_USERNAME}
       PERSEFONIA_PUBLIC_BASE_URL: ${PERSEFONIA_PUBLIC_BASE_URL}
       PERSEFONIA_MEDIA_STORAGE_ROOT: /workspace/.runtime/media
       PERSEFONIA_MEDIA_STORAGE_REQUIRED: "true"
       MANAGEMENT_ENDPOINT_HEALTH_GROUP_READINESS_INCLUDE: readinessState,db,mediaStorage,databaseMigrations
       PERSEFONIA_MANAGEMENT_ADDRESS: 0.0.0.0
       PERSEFONIA_MANAGEMENT_PORT: "9001"
-      PERSEFONIA_CONTACT_RATE_LIMIT_SECRET: ${PERSEFONIA_CONTACT_RATE_LIMIT_SECRET}
       PERSEFONIA_CONTACT_RATE_LIMIT_REDIS_KEY_PREFIX: ${PERSEFONIA_REDIS_KEY_PREFIX}
+    secrets:
+      - source: postgres_password
+        target: spring.datasource.password
+      - source: redis_password
+        target: spring.data.redis.password
+      - source: contact_rate_limit_secret
+        target: persefonia.contact.rate-limit.secret
     command:
       - ./gradlew
       - --no-daemon
@@ -62,7 +66,10 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - source: postgres_password
+        target: postgres_password
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -75,11 +82,28 @@ services:
 
   redis:
     image: redis:8.10-alpine@sha256:becdda6c7f4b3fb42e42fd7f120bbf5c54c4caaaf16f26da24e4563d2c1f0576
+    user: "999:1000"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+    volumes:
+      - type: bind
+        source: ./scripts/local-redis-entrypoint.sh
+        target: /usr/local/bin/persefonia-local-redis-entrypoint.sh
+        read_only: true
     environment:
-      REDIS_PASSWORD: ${REDIS_PASSWORD}
-    command: ["sh", "-ec", "exec redis-server --requirepass \"$$REDIS_PASSWORD\" --appendonly no --save ''"]
+      PERSEFONIA_REDIS_USERNAME: ${PERSEFONIA_REDIS_USERNAME}
+      PERSEFONIA_REDIS_KEY_PREFIX: ${PERSEFONIA_REDIS_KEY_PREFIX}
+    secrets:
+      - source: redis_password
+        target: redis_password
+    entrypoint: ["sh", "/usr/local/bin/persefonia-local-redis-entrypoint.sh"]
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping 2>/dev/null | grep -qx PONG"]
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$(cat /run/secrets/redis_password)\" redis-cli --user \"$$PERSEFONIA_REDIS_USERNAME\" ping 2>/dev/null | grep -qx PONG"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -88,3 +112,11 @@ services:
 
 volumes:
   postgres-data:
+
+secrets:
+  postgres_password:
+    file: ${PERSEFONIA_POSTGRES_PASSWORD_FILE}
+  redis_password:
+    file: ${PERSEFONIA_REDIS_PASSWORD_FILE}
+  contact_rate_limit_secret:
+    file: ${PERSEFONIA_CONTACT_RATE_LIMIT_SECRET_FILE}

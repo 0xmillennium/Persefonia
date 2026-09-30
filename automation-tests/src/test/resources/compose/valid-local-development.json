@@ -6,6 +6,20 @@
       "ipam": {}
     }
   },
+  "secrets": {
+    "contact_rate_limit_secret": {
+      "name": "persefonia-local_contact_rate_limit_secret",
+      "file": "/synthetic/workspace/secrets/contact_rate_limit_secret.examples"
+    },
+    "postgres_password": {
+      "name": "persefonia-local_postgres_password",
+      "file": "/synthetic/workspace/secrets/postgres_password.examples"
+    },
+    "redis_password": {
+      "name": "persefonia-local_redis_password",
+      "file": "/synthetic/workspace/secrets/redis_password.examples"
+    }
+  },
   "services": {
     "app": {
       "cap_drop": [
@@ -34,8 +48,6 @@
         "MANAGEMENT_ENDPOINT_HEALTH_GROUP_READINESS_INCLUDE": "readinessState,db,mediaStorage,databaseMigrations",
         "NPM_CONFIG_CACHE": "/workspace/.runtime/npm",
         "PERSEFONIA_CONTACT_RATE_LIMIT_REDIS_KEY_PREFIX": "persefonia:local:rate-limit",
-        "PERSEFONIA_CONTACT_RATE_LIMIT_SECRET": "local-only-contact-rate-limit-secret-32-characters",
-        "PERSEFONIA_DATASOURCE_PASSWORD": "local-only-postgres-password",
         "PERSEFONIA_DATASOURCE_URL": "jdbc:postgresql://postgres:5432/persefonia",
         "PERSEFONIA_DATASOURCE_USERNAME": "persefonia",
         "PERSEFONIA_MANAGEMENT_ADDRESS": "0.0.0.0",
@@ -45,8 +57,7 @@
         "PERSEFONIA_PUBLIC_BASE_URL": "http://localhost:8080",
         "PERSEFONIA_REDIS_HOST": "redis",
         "PERSEFONIA_REDIS_PORT": "6379",
-        "SPRING_DATA_REDIS_PASSWORD": "local-only-redis-password",
-        "SPRING_DATA_REDIS_USERNAME": "default",
+        "SPRING_DATA_REDIS_USERNAME": "persefonia",
         "SPRING_PROFILES_ACTIVE": "local"
       },
       "healthcheck": {
@@ -87,6 +98,20 @@
         }
       ],
       "read_only": true,
+      "secrets": [
+        {
+          "source": "postgres_password",
+          "target": "spring.datasource.password"
+        },
+        {
+          "source": "redis_password",
+          "target": "spring.data.redis.password"
+        },
+        {
+          "source": "contact_rate_limit_secret",
+          "target": "persefonia.contact.rate-limit.secret"
+        }
+      ],
       "security_opt": [
         "no-new-privileges:true"
       ],
@@ -108,7 +133,7 @@
       "entrypoint": null,
       "environment": {
         "POSTGRES_DB": "persefonia",
-        "POSTGRES_PASSWORD": "local-only-postgres-password",
+        "POSTGRES_PASSWORD_FILE": "/run/secrets/postgres_password",
         "POSTGRES_USER": "persefonia"
       },
       "healthcheck": {
@@ -133,6 +158,12 @@
           "protocol": "tcp"
         }
       ],
+      "secrets": [
+        {
+          "source": "postgres_password",
+          "target": "postgres_password"
+        }
+      ],
       "volumes": [
         {
           "type": "volume",
@@ -143,19 +174,22 @@
       ]
     },
     "redis": {
-      "command": [
-        "sh",
-        "-ec",
-        "exec redis-server --requirepass \"$$REDIS_PASSWORD\" --appendonly no --save ''"
+      "cap_drop": [
+        "ALL"
       ],
-      "entrypoint": null,
+      "command": null,
+      "entrypoint": [
+        "sh",
+        "/usr/local/bin/persefonia-local-redis-entrypoint.sh"
+      ],
       "environment": {
-        "REDIS_PASSWORD": "local-only-redis-password"
+        "PERSEFONIA_REDIS_KEY_PREFIX": "persefonia:local:rate-limit",
+        "PERSEFONIA_REDIS_USERNAME": "persefonia"
       },
       "healthcheck": {
         "test": [
           "CMD-SHELL",
-          "redis-cli -a \"$$REDIS_PASSWORD\" ping 2>/dev/null | grep -qx PONG"
+          "REDISCLI_AUTH=\"$$(cat /run/secrets/redis_password)\" redis-cli --user \"$$PERSEFONIA_REDIS_USERNAME\" ping 2>/dev/null | grep -qx PONG"
         ],
         "timeout": "5s",
         "interval": "5s",
@@ -172,6 +206,28 @@
           "target": 6379,
           "published": "6379",
           "protocol": "tcp"
+        }
+      ],
+      "read_only": true,
+      "secrets": [
+        {
+          "source": "redis_password",
+          "target": "redis_password"
+        }
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "tmpfs": [
+        "/tmp"
+      ],
+      "user": "999:1000",
+      "volumes": [
+        {
+          "type": "bind",
+          "source": "/synthetic/workspace/scripts/local-redis-entrypoint.sh",
+          "target": "/usr/local/bin/persefonia-local-redis-entrypoint.sh",
+          "read_only": true
         }
       ]
     }

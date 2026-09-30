@@ -26,15 +26,28 @@ class LocalComposeVerifierContractTest {
                 [[ $COMPOSE_DISABLE_ENV_FILE == 1 ]]
                 [[ ${LOCAL_SHELL_POISON:-} == '' ]]
                 [[ $1 == compose && $2 == --env-file && $3 == .env.example ]]
-                [[ $4 == -f && $5 == compose.yaml && $6 == config && $7 == --format && $8 == json ]]
+                [[ $4 == -f && $5 == compose.yaml ]]
+                fixture=automation-tests/src/test/resources/compose/valid-local-development.json
+                if [[ $6 == -f ]]; then
+                  [[ $7 == compose.override.example.yaml && $8 == config && $9 == --format && ${10} == json ]]
+                  fixture=automation-tests/src/test/resources/compose/valid-local-development-override.json
+                else
+                  [[ $6 == config && $7 == --format && $8 == json ]]
+                fi
                 jq --arg workspace "$PWD" --arg mode "$(cat -- "${0%/*}/mode")" '
                   .services.app.volumes[0].source = $workspace |
-                  if $mode == "unsafe" then .services.app.read_only = false else . end
-                ' automation-tests/src/test/resources/compose/valid-local-development.json
+                  .services.redis.volumes[0].source = ($workspace + "/scripts/local-redis-entrypoint.sh") |
+                  .secrets |= with_entries(.value.file |= sub("^/synthetic/workspace"; $workspace)) |
+                  if $mode == "unsafe" then .services.app.read_only = false
+                  elif $mode == "optional-unsafe" and (.secrets | has("oidc_client_secret"))
+                    then .services.app.environment.SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_AUTHELIA_CLIENT_SECRET = "unsafe"
+                  else . end
+                ' "$fixture"
                 """);
         docker.toFile().setExecutable(true);
         assertThat(run(bin, "valid").status()).isZero();
         assertThat(run(bin, "unsafe").status()).isNotZero();
+        assertThat(run(bin, "optional-unsafe").status()).isNotZero();
     }
 
     private CommandResult run(Path bin, String mode) throws Exception {

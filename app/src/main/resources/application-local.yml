@@ -4,7 +4,6 @@ spring:
   datasource:
     url: ${PERSEFONIA_DATASOURCE_URL}
     username: ${PERSEFONIA_DATASOURCE_USERNAME}
-    password: ${PERSEFONIA_DATASOURCE_PASSWORD}
     hikari:
       maximum-pool-size: 10
   flyway:
