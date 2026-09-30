@@ -187,6 +187,12 @@ tasks.processResources {
     from(generatedViteDirectory)
 }
 
+tasks.register<Exec>("browserCheck") {
+    dependsOn(tasks.named("bootJar"), npmCi)
+    workingDir(rootProject.layout.projectDirectory)
+    commandLine("bash", "scripts/browser/check.sh")
+}
+
 tasks.test {
     classpath += files(precompiledJteDirectory)
     maxHeapSize = "1g"

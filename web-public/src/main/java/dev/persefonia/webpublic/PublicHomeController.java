@@ -24,7 +24,7 @@ import jakarta.servlet.http.HttpServletResponse;
 
 @Controller
 public class PublicHomeController {
-    private static final String FRONTEND_ENTRY = "src/main.ts";
+    private static final String FRONTEND_ENTRY = "src/home.ts";
 
     private final FrontendAssetResolver assetResolver;
     private final PublicHomepageSettingsQueryService settings;
@@ -34,7 +34,6 @@ public class PublicHomeController {
     private final PublicCanonicalUrlFactory canonicalUrlFactory;
     private final PublicInsightsObservationGateway insights;
     private final PublicContentResponseHeaders responseHeaders;
-    private final String publicBaseUrl;
     private final String ownerAlias;
 
     public PublicHomeController(
@@ -46,7 +45,6 @@ public class PublicHomeController {
             PublicCanonicalUrlFactory canonicalUrlFactory,
             PublicInsightsObservationGateway insights,
             PublicContentResponseHeaders responseHeaders,
-            @Value("${site.public-base-url}") String publicBaseUrl,
             @Value("${site.owner-alias}") String ownerAlias) {
         this.assetResolver = Objects.requireNonNull(assetResolver, "assetResolver");
         this.settings = Objects.requireNonNull(settings, "settings");
@@ -56,7 +54,6 @@ public class PublicHomeController {
         this.canonicalUrlFactory = Objects.requireNonNull(canonicalUrlFactory, "canonicalUrlFactory");
         this.insights = Objects.requireNonNull(insights, "insights");
         this.responseHeaders = Objects.requireNonNull(responseHeaders, "responseHeaders");
-        this.publicBaseUrl = publicBaseUrl;
         this.ownerAlias = ownerAlias;
     }
 
@@ -66,36 +63,32 @@ public class PublicHomeController {
         insights.recordPageView(PublicInsightSurface.HOME);
         PublicHomepageSettingsView homepage = settings.current();
         Optional<PublicProfileSummaryView> profile = profiles.currentSummary(homepage.defaultLanguage());
-        var homepageFeaturedProjects = homepage.showFeaturedProjects()
+        var homepageFeaturedProjects = homepage.promoteFeaturedProjects()
                 ? featuredProjects.list(homepage.defaultLanguage(), homepage.featuredProjectLimit())
                 : List.<dev.persefonia.profileportfolio.application.query.PublicFeaturedProjectView>of();
         DiscoveryLanguage language = DiscoveryLanguage.valueOf(homepage.defaultLanguage());
-        List<PublicHomepageContentEntry> latestWriting = homepage.showLatestWriting()
-                ? homepageContent.latestWriting(language, Math.min(homepage.latestWritingLimit(), 20))
+        List<PublicHomepageContentEntry> latestWriting = homepage.promoteLatestWriting()
+                ? homepageContent.latestWriting(language, homepage.latestWritingLimit())
                 : List.of();
-        List<PublicHomepageContentEntry> researchHighlights = homepage.showResearchHighlights()
-                ? homepageContent.latestResearch(language, 3)
+        List<PublicHomepageContentEntry> researchHighlights = homepage.promoteResearchHighlights()
+                ? homepageContent.latestResearch(language, homepage.researchHighlightLimit())
                 : List.of();
         model.addAttribute("page", new PublicHomeViewModel(
                 homepage.siteName(),
                 pageTitle(homepage),
                 homepage.defaultLanguage(),
                 homepage.defaultMetaDescription(),
-                homepage.defaultTheme(),
                 ownerAlias,
-                publicBaseUrl,
                 canonicalUrlFactory.canonicalUrl("/"),
-                profile.isPresent(),
+                PublicHomePageCopy.forLanguage(homepage.defaultLanguage()),
                 profile,
-                homepage.showFeaturedProjects(),
+                homepage.promoteFeaturedProjects(),
                 homepageFeaturedProjects,
                 PublicProjectPageCopy.forLanguage(homepage.defaultLanguage()).featuredProjectsTitle(),
-                homepage.showLatestWriting(),
-                homepage.showResearchHighlights(),
+                homepage.promoteLatestWriting(),
+                homepage.promoteResearchHighlights(),
                 latestWriting,
                 researchHighlights,
-                homepage.featuredProjectLimit(),
-                homepage.latestWritingLimit(),
                 assetResolver.scriptPath(FRONTEND_ENTRY),
                 assetResolver.stylesheetPaths(FRONTEND_ENTRY)));
         return "site/home";

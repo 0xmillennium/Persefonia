@@ -79,12 +79,13 @@ public final class ProfilePortfolioAuditMapper {
                 List.of(
                         metadata("default_language", command.defaultLanguage()),
                         metadata("supported_language_count", command.supportedLanguages().size()),
-                        metadata("default_theme", command.defaultTheme()),
-                        metadata("show_featured_projects", command.showFeaturedProjects()),
-                        metadata("show_latest_writing", command.showLatestWriting()),
-                        metadata("show_research_highlights", command.showResearchHighlights()),
+                        metadata("standard_public_theme", command.standardPublicTheme()),
+                        metadata("promote_featured_projects", command.promoteFeaturedProjects()),
+                        metadata("promote_latest_writing", command.promoteLatestWriting()),
+                        metadata("promote_research_highlights", command.promoteResearchHighlights()),
                         metadata("featured_project_limit", command.featuredProjectLimit()),
-                        metadata("latest_writing_limit", command.latestWritingLimit())));
+                        metadata("latest_writing_limit", command.latestWritingLimit()),
+                        metadata("research_highlight_limit", command.researchHighlightLimit())));
     }
 
     public AppendAuditRecordCommand activeCvUpdated(UpdateActiveCvCommand command, ActiveCvUpdateResult result) {

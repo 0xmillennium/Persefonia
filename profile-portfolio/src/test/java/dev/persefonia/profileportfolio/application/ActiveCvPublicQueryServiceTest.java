@@ -15,6 +15,7 @@ import dev.persefonia.profileportfolio.domain.cv.ActiveCvProfileRepository;
 import dev.persefonia.profileportfolio.domain.cv.CvDisplayLabel;
 import dev.persefonia.profileportfolio.domain.cv.MediaAssetId;
 import dev.persefonia.profileportfolio.domain.settings.HomepageSettings;
+import dev.persefonia.profileportfolio.domain.settings.HomepagePromotionLimit;
 import dev.persefonia.profileportfolio.domain.settings.PositiveInteger;
 import dev.persefonia.profileportfolio.domain.settings.SiteName;
 import dev.persefonia.profileportfolio.domain.settings.SitePresentationSettings;
@@ -147,7 +148,7 @@ class ActiveCvPublicQueryServiceTest {
                     null,
                     null,
                     ThemePreference.SYSTEM,
-                    HomepageSettings.of(true, true, false, PositiveInteger.of(3), PositiveInteger.of(5)),
+                    HomepageSettings.of(true, true, false, HomepagePromotionLimit.of(3), HomepagePromotionLimit.of(3), HomepagePromotionLimit.of(3)),
                     NOW));
         }
         @Override public Optional<SitePresentationSettings> findById(SitePresentationSettingsId id) {

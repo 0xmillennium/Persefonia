@@ -12,6 +12,7 @@ import dev.persefonia.profileportfolio.application.service.SitePresentationSetti
 import dev.persefonia.profileportfolio.domain.common.AssetId;
 import dev.persefonia.profileportfolio.domain.common.ContentLanguage;
 import dev.persefonia.profileportfolio.domain.settings.HomepageSettings;
+import dev.persefonia.profileportfolio.domain.settings.HomepagePromotionLimit;
 import dev.persefonia.profileportfolio.domain.settings.PositiveInteger;
 import dev.persefonia.profileportfolio.domain.settings.SiteName;
 import dev.persefonia.profileportfolio.domain.settings.SitePresentationSettings;
@@ -40,7 +41,7 @@ class SitePresentationSettingsCommandServiceTest {
         assertThat(result.version()).isEqualTo(1);
         assertThat(repository.current.siteName().value()).isEqualTo("Portfolio");
         assertThat(repository.current.defaultLanguage()).isEqualTo(ContentLanguage.EN);
-        assertThat(repository.current.defaultTheme()).isEqualTo(ThemePreference.DARK);
+        assertThat(repository.current.standardPublicTheme()).isEqualTo(ThemePreference.DARK);
     }
 
     @Test
@@ -120,7 +121,8 @@ class SitePresentationSettingsCommandServiceTest {
                 true,
                 false,
                 3,
-                5,
+                3,
+                3,
                 NOW);
     }
 
@@ -134,7 +136,7 @@ class SitePresentationSettingsCommandServiceTest {
                 null,
                 assetId,
                 ThemePreference.SYSTEM,
-                HomepageSettings.of(true, true, false, PositiveInteger.of(3), PositiveInteger.of(5)),
+                HomepageSettings.of(true, true, false, HomepagePromotionLimit.of(3), HomepagePromotionLimit.of(3), HomepagePromotionLimit.of(3)),
                 NOW);
     }
 

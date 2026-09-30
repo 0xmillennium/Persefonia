@@ -13,12 +13,12 @@ final class IntegrationBaselineRestorer {
             statement.executeUpdate("""
                     INSERT INTO portfolio.site_presentation_settings (
                         id, singleton_key, site_name, default_language, title_suffix,
-                        default_meta_description, default_og_image_asset_id, default_theme,
-                        show_featured_projects, show_latest_writing, show_research_highlights,
-                        featured_project_limit, latest_writing_limit, updated_at, version
+                        default_meta_description, default_og_image_asset_id, standard_public_theme,
+                        promote_featured_projects, promote_latest_writing, promote_research_highlights,
+                        featured_project_limit, latest_writing_limit, research_highlight_limit, updated_at, version
                     ) VALUES (
                         '00000000-0000-0000-0000-000000000701', true, 'Persefonia', 'TR', NULL,
-                        NULL, NULL, 'SYSTEM', true, true, false, 3, 5, CURRENT_TIMESTAMP, 0
+                        NULL, NULL, 'SYSTEM', true, true, false, 3, 3, 3, CURRENT_TIMESTAMP, 0
                     )
                     """);
             statement.executeUpdate("""

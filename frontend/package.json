@@ -8,10 +8,10 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "build": "vite build",
-    "test:browser": "node e2e/homepage.mjs"
+    "test:browser": "playwright test"
   },
   "devDependencies": {
-    "playwright-core": "1.57.0",
+    "@playwright/test": "1.57.0",
     "type-fest": "^5.7.0",
     "typescript": "6.0.3",
     "vite": "8.0.16"

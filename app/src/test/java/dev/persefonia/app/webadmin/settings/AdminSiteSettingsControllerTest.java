@@ -67,9 +67,10 @@ class AdminSiteSettingsControllerTest {
 
         assertThat(settings.current().siteName().value()).isEqualTo("Updated Site");
         assertThat(settings.current().defaultLanguage()).isEqualTo(ContentLanguage.EN);
-        assertThat(settings.current().defaultTheme()).isEqualTo(ThemePreference.DARK);
-        assertThat(settings.current().homepageSettings().featuredProjectLimit().value()).isEqualTo(4);
-        assertThat(settings.current().homepageSettings().latestWritingLimit().value()).isEqualTo(6);
+        assertThat(settings.current().standardPublicTheme()).isEqualTo(ThemePreference.DARK);
+        assertThat(settings.current().homepageSettings().featuredProjectLimit().value()).isEqualTo(2);
+        assertThat(settings.current().homepageSettings().latestWritingLimit().value()).isEqualTo(3);
+        assertThat(settings.current().homepageSettings().researchHighlightLimit().value()).isEqualTo(3);
     }
 
     @Test
@@ -79,7 +80,7 @@ class AdminSiteSettingsControllerTest {
         mockMvc.perform(post("/admin/settings/site").with(owner).with(csrf())
                         .param("siteName", " ")
                         .param("defaultLanguage", "DE")
-                        .param("defaultTheme", "BLUE")
+                        .param("standardPublicTheme", "BLUE")
                         .param("featuredProjectLimit", "0")
                         .param("latestWritingLimit", "abc"))
                 .andExpect(status().isOk())
@@ -87,16 +88,16 @@ class AdminSiteSettingsControllerTest {
                 .andExpect(content().string(containsString("Choose TR or EN.")))
                 .andExpect(content().string(containsString("Select at least one supported language.")))
                 .andExpect(content().string(containsString("Choose LIGHT, DARK, or SYSTEM.")))
-                .andExpect(content().string(containsString("Featured project limit must be positive.")))
+                .andExpect(content().string(containsString("Featured project limit must be between 1 and 3.")))
                 .andExpect(content().string(containsString("Latest writing limit must be a whole number.")));
 
         mockMvc.perform(post("/admin/settings/site").with(owner).with(csrf())
                         .param("siteName", "Updated Site")
                         .param("defaultLanguage", "EN")
                         .param("supportedTr", "true")
-                        .param("defaultTheme", "SYSTEM")
+                        .param("standardPublicTheme", "SYSTEM")
                         .param("featuredProjectLimit", "3")
-                        .param("latestWritingLimit", "5"))
+                        .param("latestWritingLimit", "3"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Default language must be one of the supported languages.")));
     }
@@ -109,10 +110,11 @@ class AdminSiteSettingsControllerTest {
                 .param("supportedEn", "true")
                 .param("titleSuffix", "| Updated")
                 .param("defaultMetaDescription", "Updated description.")
-                .param("defaultTheme", "DARK")
-                .param("showFeaturedProjects", "true")
-                .param("showLatestWriting", "true")
-                .param("featuredProjectLimit", "4")
-                .param("latestWritingLimit", "6");
+                .param("standardPublicTheme", "DARK")
+                .param("promoteFeaturedProjects", "true")
+                .param("promoteLatestWriting", "true")
+                .param("featuredProjectLimit", "2")
+                .param("latestWritingLimit", "3")
+                .param("researchHighlightLimit", "3");
     }
 }

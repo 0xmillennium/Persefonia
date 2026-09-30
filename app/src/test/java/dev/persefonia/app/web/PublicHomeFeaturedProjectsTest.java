@@ -17,6 +17,7 @@ import dev.persefonia.profileportfolio.domain.profile.PersonalProfile;
 import dev.persefonia.profileportfolio.domain.profile.PersonalProfileRepository;
 import dev.persefonia.profileportfolio.domain.profile.ProfileId;
 import dev.persefonia.profileportfolio.domain.settings.HomepageSettings;
+import dev.persefonia.profileportfolio.domain.settings.HomepagePromotionLimit;
 import dev.persefonia.profileportfolio.domain.settings.PositiveInteger;
 import dev.persefonia.profileportfolio.domain.settings.SiteName;
 import dev.persefonia.profileportfolio.domain.settings.SitePresentationSettings;
@@ -63,12 +64,14 @@ class PublicHomeFeaturedProjectsTest {
     }
 
     @Test
-    void showFeaturedProjectsFalseRendersNoFeaturedSection() throws Exception {
+    void disabledPromotionKeepsSelectedWorkChapterWithoutPromotedItemsOrEmptyMessage() throws Exception {
         settings.configure(ContentLanguage.EN, false, 3);
         projects.add(ProjectRecord.project("featured", Visibility.PUBLIC, Status.ACTIVE, ContentLanguage.EN).featured(true));
 
         mockMvc.perform(get("/"))
                 .andExpect(status().isOk())
+                .andExpect(content().string(containsString("id=\"work\"")))
+                .andExpect(content().string(containsString("Work, in context.")))
                 .andExpect(content().string(not(containsString("Featured projects"))))
                 .andExpect(content().string(not(containsString("featured"))));
     }
@@ -154,8 +157,8 @@ class PublicHomeFeaturedProjectsTest {
     static final class MutableSettingsRepository implements SitePresentationSettingsRepository {
         private SitePresentationSettings current = settings(ContentLanguage.EN, true, 3);
 
-        void configure(ContentLanguage defaultLanguage, boolean showFeaturedProjects, int featuredLimit) {
-            current = settings(defaultLanguage, showFeaturedProjects, featuredLimit);
+        void configure(ContentLanguage defaultLanguage, boolean promoteFeaturedProjects, int featuredLimit) {
+            current = settings(defaultLanguage, promoteFeaturedProjects, featuredLimit);
         }
 
         @Override
@@ -176,7 +179,7 @@ class PublicHomeFeaturedProjectsTest {
 
         private static SitePresentationSettings settings(
                 ContentLanguage defaultLanguage,
-                boolean showFeaturedProjects,
+                boolean promoteFeaturedProjects,
                 int featuredLimit) {
             return SitePresentationSettings.create(
                     SitePresentationSettingsId.newId(),
@@ -187,7 +190,7 @@ class PublicHomeFeaturedProjectsTest {
                     null,
                     null,
                     ThemePreference.SYSTEM,
-                    HomepageSettings.of(showFeaturedProjects, true, false, PositiveInteger.of(featuredLimit), PositiveInteger.of(5)),
+                    HomepageSettings.of(promoteFeaturedProjects, true, false, HomepagePromotionLimit.of(featuredLimit), HomepagePromotionLimit.of(3), HomepagePromotionLimit.of(3)),
                     Instant.parse("2026-06-16T10:00:00Z"));
         }
     }

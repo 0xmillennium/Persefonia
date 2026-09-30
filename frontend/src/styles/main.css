@@ -1,6 +1,7 @@
 :root {
   color-scheme: light dark;
   --page-bg: #f7f9f8;
+  --surface: #fff;
   --text: #1f2933;
   --muted: #5f6c72;
   --rule: #d7ddd7;

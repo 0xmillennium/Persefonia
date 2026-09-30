@@ -7,6 +7,7 @@ import dev.persefonia.profileportfolio.application.exception.SitePresentationSet
 import dev.persefonia.profileportfolio.application.service.SitePresentationSettingsAdminQueryService;
 import dev.persefonia.profileportfolio.domain.common.ContentLanguage;
 import dev.persefonia.profileportfolio.domain.settings.HomepageSettings;
+import dev.persefonia.profileportfolio.domain.settings.HomepagePromotionLimit;
 import dev.persefonia.profileportfolio.domain.settings.PositiveInteger;
 import dev.persefonia.profileportfolio.domain.settings.SeoDescription;
 import dev.persefonia.profileportfolio.domain.settings.SiteName;
@@ -32,9 +33,10 @@ class SitePresentationSettingsAdminQueryServiceTest {
         assertThat(view.supportedLanguages()).containsExactlyInAnyOrder("TR", "EN");
         assertThat(view.titleSuffix()).isEqualTo("| Notes");
         assertThat(view.defaultMetaDescription()).isEqualTo("Software notes.");
-        assertThat(view.defaultTheme()).isEqualTo("SYSTEM");
+        assertThat(view.standardPublicTheme()).isEqualTo("SYSTEM");
         assertThat(view.featuredProjectLimit()).isEqualTo(3);
-        assertThat(view.latestWritingLimit()).isEqualTo(5);
+        assertThat(view.latestWritingLimit()).isEqualTo(3);
+        assertThat(view.researchHighlightLimit()).isEqualTo(3);
     }
 
     @Test
@@ -54,7 +56,7 @@ class SitePresentationSettingsAdminQueryServiceTest {
                 SeoDescription.of("Software notes."),
                 null,
                 ThemePreference.SYSTEM,
-                HomepageSettings.of(true, true, false, PositiveInteger.of(3), PositiveInteger.of(5)),
+                HomepageSettings.of(true, true, false, HomepagePromotionLimit.of(3), HomepagePromotionLimit.of(3), HomepagePromotionLimit.of(3)),
                 Instant.parse("2026-06-16T10:00:00Z"));
     }
 

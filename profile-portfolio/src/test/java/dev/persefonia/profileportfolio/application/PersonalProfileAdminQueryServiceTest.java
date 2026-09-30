@@ -19,6 +19,7 @@ import dev.persefonia.profileportfolio.domain.profile.ProfileLocalization;
 import dev.persefonia.profileportfolio.domain.profile.ProfileLocalizationId;
 import dev.persefonia.profileportfolio.domain.profile.ShortBio;
 import dev.persefonia.profileportfolio.domain.settings.HomepageSettings;
+import dev.persefonia.profileportfolio.domain.settings.HomepagePromotionLimit;
 import dev.persefonia.profileportfolio.domain.settings.PositiveInteger;
 import dev.persefonia.profileportfolio.domain.settings.SiteName;
 import dev.persefonia.profileportfolio.domain.settings.SitePresentationSettings;
@@ -87,7 +88,7 @@ class PersonalProfileAdminQueryServiceTest {
                 null,
                 null,
                 ThemePreference.SYSTEM,
-                HomepageSettings.of(true, true, false, PositiveInteger.of(3), PositiveInteger.of(5)),
+                HomepageSettings.of(true, true, false, HomepagePromotionLimit.of(3), HomepagePromotionLimit.of(3), HomepagePromotionLimit.of(3)),
                 Instant.parse("2026-06-16T10:00:00Z")));
     }
 

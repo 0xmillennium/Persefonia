@@ -74,5 +74,6 @@ class PublicHomeRenderingTest {
         org.junit.jupiter.api.Assertions.assertFalse(response.contains("evil.example"));
         org.junit.jupiter.api.Assertions.assertFalse(response.contains("/rss.xml"));
         org.junit.jupiter.api.Assertions.assertFalse(response.contains("/atom.xml"));
+        org.junit.jupiter.api.Assertions.assertFalse(response.contains("href=\"/theme.css\""));
     }
 }

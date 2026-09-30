@@ -8,6 +8,7 @@
     <title>${page.title()}</title>
     @template.site.components.robotsMeta(page.noindex())
     @template.site.components.stylesheetLinks(page.stylesheetPaths())
+    <link rel="stylesheet" href="/theme.css">
 </head>
 <body>
     <a class="skip-link" href="#main-content">Skip to main content</a>

@@ -11,6 +11,7 @@
     @template.site.components.canonicalLink(page.canonicalUrl())
     @template.site.components.robotsMeta(page.noindex())
     @template.site.components.stylesheetLinks(page.stylesheetPaths())
+    <link rel="stylesheet" href="/theme.css">
     @template.site.components.feedDiscoveryLink()
 </head>
 <body>

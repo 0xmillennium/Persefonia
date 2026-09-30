@@ -22,11 +22,12 @@ public final class AdminSiteSettingsFormValidator {
             errors.add(new AdminSiteSettingsFieldError(
                     "defaultLanguage", "Default language must be one of the supported languages."));
         }
-        if (!THEMES.contains(form.getDefaultTheme())) {
-            errors.add(new AdminSiteSettingsFieldError("defaultTheme", "Choose LIGHT, DARK, or SYSTEM."));
+        if (!THEMES.contains(form.getStandardPublicTheme())) {
+            errors.add(new AdminSiteSettingsFieldError("standardPublicTheme", "Choose LIGHT, DARK, or SYSTEM."));
         }
-        positiveInteger(form.getFeaturedProjectLimit(), "featuredProjectLimit", "Featured project limit", errors);
-        positiveInteger(form.getLatestWritingLimit(), "latestWritingLimit", "Latest writing limit", errors);
+        promotionLimit(form.getFeaturedProjectLimit(), "featuredProjectLimit", "Featured project limit", errors);
+        promotionLimit(form.getLatestWritingLimit(), "latestWritingLimit", "Latest writing limit", errors);
+        promotionLimit(form.getResearchHighlightLimit(), "researchHighlightLimit", "Research highlight limit", errors);
         return List.copyOf(errors);
     }
 
@@ -38,14 +39,19 @@ public final class AdminSiteSettingsFormValidator {
         return Integer.parseInt(form.getLatestWritingLimit());
     }
 
-    private static void positiveInteger(
+    int researchHighlightLimit(AdminSiteSettingsForm form) {
+        return Integer.parseInt(form.getResearchHighlightLimit());
+    }
+
+    private static void promotionLimit(
             String value,
             String field,
             String label,
             List<AdminSiteSettingsFieldError> errors) {
         try {
-            if (Integer.parseInt(value) <= 0) {
-                errors.add(new AdminSiteSettingsFieldError(field, label + " must be positive."));
+            int parsed = Integer.parseInt(value);
+            if (parsed < 1 || parsed > 3) {
+                errors.add(new AdminSiteSettingsFieldError(field, label + " must be between 1 and 3."));
             }
         } catch (NumberFormatException exception) {
             errors.add(new AdminSiteSettingsFieldError(field, label + " must be a whole number."));

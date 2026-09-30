@@ -28,11 +28,11 @@ public final class PublicHomepageSettingsQueryService {
                 settings.defaultLanguage().name(),
                 settings.titleSuffix().map(TitleSuffix::value).orElse(""),
                 settings.defaultMetaDescription().map(SeoDescription::value).orElse(""),
-                settings.defaultTheme().name(),
-                homepage.showFeaturedProjects(),
-                homepage.showLatestWriting(),
-                homepage.showResearchHighlights(),
+                homepage.promoteFeaturedProjects(),
+                homepage.promoteLatestWriting(),
+                homepage.promoteResearchHighlights(),
                 homepage.featuredProjectLimit().value(),
-                homepage.latestWritingLimit().value());
+                homepage.latestWritingLimit().value(),
+                homepage.researchHighlightLimit().value());
     }
 }

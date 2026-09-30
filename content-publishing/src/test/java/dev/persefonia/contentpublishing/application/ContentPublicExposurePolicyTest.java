@@ -30,4 +30,22 @@ class ContentPublicExposurePolicyTest {
         assertThat(policy.snapshot(ContentStatus.ARCHIVED, ContentVisibility.PUBLIC, ContentType.NOTE))
                 .isEqualTo(dev.persefonia.contentpublishing.application.publicview.ContentPublicExposureSnapshot.none());
     }
+
+    @Test
+    void homepagePromotionRequiresPublishedPublicListedWritingOrResearch() {
+        for (ContentType type : new ContentType[] {ContentType.ARTICLE, ContentType.NOTE, ContentType.RESEARCH}) {
+            assertThat(policy.snapshot(ContentStatus.PUBLISHED, ContentVisibility.PUBLIC, type)
+                    .homepagePromotionEligible()).isTrue();
+            assertThat(policy.snapshot(ContentStatus.PUBLISHED, ContentVisibility.UNLISTED, type)
+                    .homepagePromotionEligible()).isFalse();
+            assertThat(policy.snapshot(ContentStatus.PUBLISHED, ContentVisibility.PRIVATE, type)
+                    .homepagePromotionEligible()).isFalse();
+            assertThat(policy.snapshot(ContentStatus.DRAFT, ContentVisibility.PUBLIC, type)
+                    .homepagePromotionEligible()).isFalse();
+            assertThat(policy.snapshot(ContentStatus.UNPUBLISHED, ContentVisibility.PUBLIC, type)
+                    .homepagePromotionEligible()).isFalse();
+        }
+        assertThat(policy.snapshot(ContentStatus.PUBLISHED, ContentVisibility.PUBLIC, ContentType.PAGE)
+                .homepagePromotionEligible()).isFalse();
+    }
 }

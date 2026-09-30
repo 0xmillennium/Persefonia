@@ -6,6 +6,9 @@ import dev.persefonia.contentpublishing.application.command.SeriesResult;
 import dev.persefonia.contentpublishing.application.command.TranslationGroupResult;
 import dev.persefonia.contentpublishing.application.publicview.*;
 import dev.persefonia.contentpublishing.domain.content.ContentId;
+import dev.persefonia.contentpublishing.domain.content.ContentStatus;
+import dev.persefonia.contentpublishing.domain.content.ContentType;
+import dev.persefonia.contentpublishing.domain.content.ContentVisibility;
 import dev.persefonia.contentpublishing.domain.content.ContentLanguage;
 import dev.persefonia.contentpublishing.domain.model.series.SeriesId;
 import dev.persefonia.contentpublishing.domain.translation.TranslationGroupId;
@@ -28,16 +31,50 @@ class PublicCacheInvalidationSignalMatrixTest {
     private final CapturingExecution execution = new CapturingExecution();
 
     @Test
+    void homepagePromotionTransitionMatrix() {
+        var policy = new ContentPublicExposurePolicy();
+        var none = ContentPublicExposureSnapshot.none();
+        for (ContentType type : new ContentType[] {ContentType.ARTICLE, ContentType.NOTE, ContentType.RESEARCH}) {
+            var eligible = policy.snapshot(ContentStatus.PUBLISHED, ContentVisibility.PUBLIC, type);
+            assertHomeInvalidated(none, eligible, true);
+            assertHomeInvalidated(eligible, eligible, true);
+            assertHomeInvalidated(eligible,
+                    policy.snapshot(ContentStatus.PUBLISHED, ContentVisibility.UNLISTED, type), true);
+            assertHomeInvalidated(eligible,
+                    policy.snapshot(ContentStatus.PUBLISHED, ContentVisibility.PRIVATE, type), true);
+            assertHomeInvalidated(eligible,
+                    policy.snapshot(ContentStatus.UNPUBLISHED, ContentVisibility.PUBLIC, type), true);
+            var privateExposure = policy.snapshot(ContentStatus.PUBLISHED, ContentVisibility.PRIVATE, type);
+            assertHomeInvalidated(privateExposure, privateExposure, false);
+            var unlisted = policy.snapshot(ContentStatus.PUBLISHED, ContentVisibility.UNLISTED, type);
+            assertHomeInvalidated(unlisted, unlisted, false);
+        }
+        var page = policy.snapshot(ContentStatus.PUBLISHED, ContentVisibility.PUBLIC, ContentType.PAGE);
+        assertHomeInvalidated(none, page, false);
+        assertHomeInvalidated(page, page, false);
+    }
+
+    private void assertHomeInvalidated(ContentPublicExposureSnapshot before, ContentPublicExposureSnapshot after,
+            boolean expected) {
+        execution.clear();
+        coordinator().handle(new PublicCacheInvalidationSignal.ContentChanged(new ContentPublicMutationFacts(
+                ContentId.newId(), before, after, Optional.of(new PublicUrl("/en/articles/example")),
+                Optional.of(new PublicUrl("/en/articles/example")))));
+        boolean actual = !execution.requests.isEmpty() && targets().contains("/");
+        assertThat(actual).as("homepage for %s -> %s", before, after).isEqualTo(expected);
+    }
+
+    @Test
     void contentCoversPublicUnlistedPrivateUnpublishArchivePageAndArchivedTagDependency() {
         ContentId id = ContentId.newId();
-        var listed = new ContentPublicExposureSnapshot(true, true, true, true);
-        var unlisted = new ContentPublicExposureSnapshot(true, false, false, false);
+        var listed = new ContentPublicExposureSnapshot(true, true, true, true, true);
+        var unlisted = new ContentPublicExposureSnapshot(true, false, false, false, false);
         coordinator((ignored, limit) -> new ContentPublicSurfaceDependencies(
                 List.of(new PublicUrl("/en/tags/archived")), List.of(), List.of(), false))
                 .handle(new PublicCacheInvalidationSignal.ContentChanged(new ContentPublicMutationFacts(
                         id, listed, listed, Optional.of(new PublicUrl("/en/articles/a")),
                         Optional.of(new PublicUrl("/en/articles/a")))));
-        assertTargets("/en/articles/a", "/en/tags/archived", "/feed.xml", "/sitemap.xml");
+        assertTargets("/", "/en/articles/a", "/en/tags/archived", "/feed.xml", "/sitemap.xml");
 
         execution.clear();
         coordinator().handle(new PublicCacheInvalidationSignal.ContentChanged(new ContentPublicMutationFacts(
@@ -57,7 +94,7 @@ class PublicCacheInvalidationSignalMatrixTest {
                 .handle(new PublicCacheInvalidationSignal.ContentChanged(new ContentPublicMutationFacts(
                         id, listed, ContentPublicExposureSnapshot.none(), Optional.of(new PublicUrl("/en/articles/a")),
                         Optional.empty())));
-        assertTargets("/en/articles/a", "/en/tags/archived", "/feed.xml", "/sitemap.xml");
+        assertTargets("/", "/en/articles/a", "/en/tags/archived", "/feed.xml", "/sitemap.xml");
     }
 
     @Test
@@ -162,7 +199,7 @@ class PublicCacheInvalidationSignalMatrixTest {
         execution.clear();
         coordinator().handle(new PublicCacheInvalidationSignal.SiteSettingsChanged(UUID.randomUUID()));
         assertThat(targets()).containsExactlyInAnyOrder("/", "/cv", "/cv/download", "/cv/en", "/cv/en/download",
-                "/cv/tr", "/cv/tr/download");
+                "/cv/tr", "/cv/tr/download", "/theme.css");
         execution.clear();
         coordinator().handle(new PublicCacheInvalidationSignal.ActiveCvChanged(UUID.randomUUID()));
         assertThat(targets()).containsExactlyInAnyOrder("/cv", "/cv/download", "/cv/en", "/cv/en/download",

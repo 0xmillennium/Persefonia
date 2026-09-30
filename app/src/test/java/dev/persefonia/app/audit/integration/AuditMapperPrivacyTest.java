@@ -320,7 +320,7 @@ class AuditMapperPrivacyTest {
                 NOW);
         var settings = new UpdateSitePresentationSettingsCommand(
                 actor, "PRIVATE_SITE_NAME", "EN", Set.of("EN", "TR"), "PRIVATE_SUFFIX",
-                "PRIVATE_META_DESCRIPTION", "SYSTEM", true, false, true, 4, 5, NOW);
+                "PRIVATE_META_DESCRIPTION", "SYSTEM", true, false, true, 3, 3, 3, NOW);
         var cv = new UpdateActiveCvCommand(
                 actor, List.of(new ActiveCvSelectionInput("EN", UUID.randomUUID().toString(), "PRIVATE_CV_LABEL")), NOW);
 
@@ -353,12 +353,13 @@ class AuditMapperPrivacyTest {
                 AuditEntityCatalog.SITE_PRESENTATION_SETTINGS, List.of(), List.of(
                         metadata("default_language", "EN"),
                         metadata("supported_language_count", 2),
-                        metadata("default_theme", "SYSTEM"),
-                        metadata("show_featured_projects", true),
-                        metadata("show_latest_writing", false),
-                        metadata("show_research_highlights", true),
-                        metadata("featured_project_limit", 4),
-                        metadata("latest_writing_limit", 5)));
+                        metadata("standard_public_theme", "SYSTEM"),
+                        metadata("promote_featured_projects", true),
+                        metadata("promote_latest_writing", false),
+                        metadata("promote_research_highlights", true),
+                        metadata("featured_project_limit", 3),
+                        metadata("latest_writing_limit", 3),
+                        metadata("research_highlight_limit", 3)));
         assertAdminCommand(mapped.get(4), AuditActionCatalog.CV_ACTIVE_UPDATED,
                 AuditEntityCatalog.ACTIVE_CV_PROFILE, List.of(), List.of(metadata("selection_count", 1)));
         assertThat(mapped.toString())

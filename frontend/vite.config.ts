@@ -21,6 +21,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: "src/main.ts",
+        home: "src/home.ts",
         "mermaid-loader": "src/mermaid-loader.ts"
       },
       output: {

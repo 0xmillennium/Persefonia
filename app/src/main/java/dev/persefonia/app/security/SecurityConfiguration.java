@@ -86,6 +86,7 @@ public class SecurityConfiguration {
                 .authorizeHttpRequests(authorize -> authorize
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         .requestMatchers(HttpMethod.GET, "/").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/theme.css").permitAll()
                         .requestMatchers(HttpMethod.GET, "/sitemap.xml", "/robots.txt").permitAll()
                         .requestMatchers(HttpMethod.GET, "/feed.xml").permitAll()
                         .requestMatchers(HttpMethod.GET, "/search").permitAll()

@@ -20,6 +20,7 @@ import dev.persefonia.profileportfolio.application.service.ProjectAdminQueryServ
 import dev.persefonia.profileportfolio.application.service.ProjectCommandService;
 import dev.persefonia.profileportfolio.application.service.PublicFeaturedProjectQueryService;
 import dev.persefonia.profileportfolio.application.service.PublicHomepageSettingsQueryService;
+import dev.persefonia.profileportfolio.application.service.StandardPublicThemeQueryService;
 import dev.persefonia.profileportfolio.application.service.PublicProjectDetailQueryService;
 import dev.persefonia.profileportfolio.application.service.PublicProjectListingQueryService;
 import dev.persefonia.profileportfolio.application.service.PublicProfileSummaryQueryService;
@@ -61,6 +62,12 @@ class ProfilePortfolioApplicationConfiguration {
     PublicHomepageSettingsQueryService publicHomepageSettingsQueryService(
             SitePresentationSettingsRepository settings) {
         return new PublicHomepageSettingsQueryService(settings);
+    }
+
+    @Bean
+    StandardPublicThemeQueryService standardPublicThemeQueryService(
+            SitePresentationSettingsRepository settings) {
+        return new StandardPublicThemeQueryService(settings);
     }
 
     @Bean

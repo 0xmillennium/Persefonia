@@ -1,6 +1,7 @@
 package dev.persefonia.app.discovery.persistence;
 
 import dev.persefonia.discovery.application.contract.DiscoveryLanguage;
+import dev.persefonia.discovery.application.contract.DiscoverableResourceType;
 import dev.persefonia.discovery.application.index.PublicHomepageContentEntry;
 import dev.persefonia.discovery.application.index.PublicHomepageContentQueryService;
 import java.util.List;
@@ -20,7 +21,6 @@ public class JdbcPublicHomepageContentQueryAdapter implements PublicHomepageCont
               AND language = :language
               AND resource_type IN (:resourceTypes)
               AND indexing_policy = 'INDEX'
-              AND sitemap_eligibility = 'ELIGIBLE'
               AND public_url IS NOT NULL
               AND published_at IS NOT NULL
             ORDER BY published_at DESC, source_updated_at DESC NULLS LAST, public_url ASC
@@ -35,16 +35,16 @@ public class JdbcPublicHomepageContentQueryAdapter implements PublicHomepageCont
 
     @Override
     public List<PublicHomepageContentEntry> latestWriting(DiscoveryLanguage language, int limit) {
-        return find(language, List.of("ARTICLE", "NOTE"), limit);
+        return find(language, List.of(DiscoverableResourceType.ARTICLE, DiscoverableResourceType.NOTE), limit);
     }
 
     @Override
     public List<PublicHomepageContentEntry> latestResearch(DiscoveryLanguage language, int limit) {
-        return find(language, List.of("RESEARCH"), limit);
+        return find(language, List.of(DiscoverableResourceType.RESEARCH), limit);
     }
 
-    private List<PublicHomepageContentEntry> find(DiscoveryLanguage language, List<String> resourceTypes, int limit) {
-        if (language == null || limit < 1 || limit > 20) {
+    private List<PublicHomepageContentEntry> find(DiscoveryLanguage language, List<DiscoverableResourceType> resourceTypes, int limit) {
+        if (language == null || limit < 1 || limit > 3) {
             throw new IllegalArgumentException("Invalid homepage content query");
         }
         NamedParameterJdbcTemplate available = jdbc.getIfAvailable();
@@ -53,7 +53,7 @@ public class JdbcPublicHomepageContentQueryAdapter implements PublicHomepageCont
         }
         return available.query(SQL, new MapSqlParameterSource()
                         .addValue("language", language.name())
-                        .addValue("resourceTypes", resourceTypes)
+                        .addValue("resourceTypes", resourceTypes.stream().map(Enum::name).toList())
                         .addValue("limit", limit),
                 (row, number) -> new PublicHomepageContentEntry(
                         row.getString("title"), row.getString("summary"), row.getString("public_url")));

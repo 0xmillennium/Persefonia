@@ -25,6 +25,7 @@ import dev.persefonia.profileportfolio.domain.project.ProjectId;
 import dev.persefonia.profileportfolio.domain.project.ProjectRepository;
 import dev.persefonia.profileportfolio.domain.project.ProjectSlug;
 import dev.persefonia.profileportfolio.domain.settings.HomepageSettings;
+import dev.persefonia.profileportfolio.domain.settings.HomepagePromotionLimit;
 import dev.persefonia.profileportfolio.domain.settings.PositiveInteger;
 import dev.persefonia.profileportfolio.domain.settings.SiteName;
 import dev.persefonia.profileportfolio.domain.settings.SitePresentationSettings;
@@ -267,7 +268,7 @@ class ProjectCommandServiceTest {
                 null,
                 null,
                 ThemePreference.SYSTEM,
-                HomepageSettings.of(true, true, false, PositiveInteger.of(3), PositiveInteger.of(5)),
+                HomepageSettings.of(true, true, false, HomepagePromotionLimit.of(3), HomepagePromotionLimit.of(3), HomepagePromotionLimit.of(3)),
                 NOW);
     }
 

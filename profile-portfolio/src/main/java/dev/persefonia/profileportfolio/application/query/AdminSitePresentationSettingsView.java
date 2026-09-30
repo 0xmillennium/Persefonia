@@ -11,12 +11,13 @@ public record AdminSitePresentationSettingsView(
         Set<String> supportedLanguages,
         String titleSuffix,
         String defaultMetaDescription,
-        String defaultTheme,
-        boolean showFeaturedProjects,
-        boolean showLatestWriting,
-        boolean showResearchHighlights,
+        String standardPublicTheme,
+        boolean promoteFeaturedProjects,
+        boolean promoteLatestWriting,
+        boolean promoteResearchHighlights,
         int featuredProjectLimit,
         int latestWritingLimit,
+        int researchHighlightLimit,
         Instant updatedAt,
         long version) {
     public AdminSitePresentationSettingsView {

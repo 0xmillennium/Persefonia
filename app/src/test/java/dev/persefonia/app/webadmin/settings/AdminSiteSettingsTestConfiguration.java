@@ -3,6 +3,7 @@ package dev.persefonia.app.webadmin.settings;
 import dev.persefonia.app.audit.MvcAuditTestConfiguration;
 import dev.persefonia.profileportfolio.domain.common.ContentLanguage;
 import dev.persefonia.profileportfolio.domain.settings.HomepageSettings;
+import dev.persefonia.profileportfolio.domain.settings.HomepagePromotionLimit;
 import dev.persefonia.profileportfolio.domain.settings.PositiveInteger;
 import dev.persefonia.profileportfolio.domain.settings.SeoDescription;
 import dev.persefonia.profileportfolio.domain.settings.SiteName;
@@ -47,7 +48,7 @@ class AdminSiteSettingsTestConfiguration {
                     SeoDescription.of("Seeded meta description."),
                     null,
                     ThemePreference.SYSTEM,
-                    HomepageSettings.of(true, true, false, PositiveInteger.of(3), PositiveInteger.of(5)),
+                    HomepageSettings.of(true, true, false, HomepagePromotionLimit.of(3), HomepagePromotionLimit.of(3), HomepagePromotionLimit.of(3)),
                     Instant.parse("2026-06-16T10:00:00Z"));
         }
 

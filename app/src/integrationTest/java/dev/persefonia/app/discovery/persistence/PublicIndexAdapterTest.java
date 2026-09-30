@@ -37,7 +37,7 @@ class PublicIndexAdapterTest extends DiscoveryRepositoryTestDatabase {
 
         assertThat(homepage.latestWriting(DiscoveryLanguage.EN, 3))
                 .extracting(entry -> entry.publicUrl())
-                .containsExactly("/en/articles/aurora-article", "/en/notes/aurora-note");
+                .containsExactly("/en/articles/aurora-article", "/en/articles/no-match", "/en/articles/not-eligible");
         assertThat(homepage.latestResearch(DiscoveryLanguage.EN, 3))
                 .extracting(entry -> entry.publicUrl())
                 .containsExactly("/en/research/aurora-study");

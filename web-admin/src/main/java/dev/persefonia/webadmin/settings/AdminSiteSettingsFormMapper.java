@@ -16,12 +16,13 @@ public final class AdminSiteSettingsFormMapper {
         form.setSupportedEn(view.supportedLanguages().contains("EN"));
         form.setTitleSuffix(view.titleSuffix());
         form.setDefaultMetaDescription(view.defaultMetaDescription());
-        form.setDefaultTheme(view.defaultTheme());
-        form.setShowFeaturedProjects(view.showFeaturedProjects());
-        form.setShowLatestWriting(view.showLatestWriting());
-        form.setShowResearchHighlights(view.showResearchHighlights());
+        form.setStandardPublicTheme(view.standardPublicTheme());
+        form.setPromoteFeaturedProjects(view.promoteFeaturedProjects());
+        form.setPromoteLatestWriting(view.promoteLatestWriting());
+        form.setPromoteResearchHighlights(view.promoteResearchHighlights());
         form.setFeaturedProjectLimit(Integer.toString(view.featuredProjectLimit()));
         form.setLatestWritingLimit(Integer.toString(view.latestWritingLimit()));
+        form.setResearchHighlightLimit(Integer.toString(view.researchHighlightLimit()));
         return form;
     }
 
@@ -30,6 +31,7 @@ public final class AdminSiteSettingsFormMapper {
             AdminSiteSettingsForm form,
             int featuredProjectLimit,
             int latestWritingLimit,
+            int researchHighlightLimit,
             Instant requestedAt) {
         return new UpdateSitePresentationSettingsCommand(
                 actor,
@@ -38,12 +40,13 @@ public final class AdminSiteSettingsFormMapper {
                 supportedLanguages(form),
                 form.getTitleSuffix(),
                 form.getDefaultMetaDescription(),
-                form.getDefaultTheme(),
-                form.isShowFeaturedProjects(),
-                form.isShowLatestWriting(),
-                form.isShowResearchHighlights(),
+                form.getStandardPublicTheme(),
+                form.isPromoteFeaturedProjects(),
+                form.isPromoteLatestWriting(),
+                form.isPromoteResearchHighlights(),
                 featuredProjectLimit,
                 latestWritingLimit,
+                researchHighlightLimit,
                 requestedAt);
     }
 

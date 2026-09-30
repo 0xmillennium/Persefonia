@@ -15,6 +15,7 @@
     @endif
     @template.site.components.openGraphTags("website", page.project().title(), page.project().summary(), page.canonicalUrl())
     @template.site.components.stylesheetLinks(page.stylesheetPaths())
+    <link rel="stylesheet" href="/theme.css">
     @template.site.components.feedDiscoveryLink()
 </head>
 <body>

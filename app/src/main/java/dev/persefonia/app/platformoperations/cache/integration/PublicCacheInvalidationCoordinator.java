@@ -25,6 +25,7 @@ public final class PublicCacheInvalidationCoordinator {
     private static final String HOME = "/";
     private static final String FEED = "/feed.xml";
     private static final String SITEMAP = "/sitemap.xml";
+    private static final String THEME = "/theme.css";
 
     private final ContentPublicSurfaceDependencyQuery contentDependencies;
     private final PublicTranslationMemberRouteQuery translationMembers;
@@ -66,7 +67,7 @@ public final class PublicCacheInvalidationCoordinator {
             case PublicCacheInvalidationSignal.TagChanged changed -> tagRoutes(changed);
             case PublicCacheInvalidationSignal.ProjectChanged changed -> projectRoutes(changed);
             case PublicCacheInvalidationSignal.PersonalProfileChanged ignored -> List.of(HOME);
-            case PublicCacheInvalidationSignal.SiteSettingsChanged ignored -> withHome(PublicCvRoutes.ALL);
+            case PublicCacheInvalidationSignal.SiteSettingsChanged ignored -> withHomeAndTheme(PublicCvRoutes.ALL);
             case PublicCacheInvalidationSignal.ActiveCvChanged ignored -> PublicCvRoutes.ALL;
             case PublicCacheInvalidationSignal.AssetVisibilityChanged changed -> assetRoutes(changed);
             case PublicCacheInvalidationSignal.RedirectChanged changed -> List.of(changed.sourceUrl().value());
@@ -79,6 +80,9 @@ public final class PublicCacheInvalidationCoordinator {
         List<String> routes = new ArrayList<>();
         if (facts.beforeExposure().directReachable()) facts.oldPublicRoute().ifPresent(route -> add(routes, route));
         if (facts.afterExposure().directReachable()) facts.currentPublicRoute().ifPresent(route -> add(routes, route));
+        if (facts.beforeExposure().homepagePromotionEligible() || facts.afterExposure().homepagePromotionEligible()) {
+            routes.add(HOME);
+        }
         if (facts.beforeExposure().listed() || facts.afterExposure().listed()) {
             var dependencies = contentDependencies.findFor(facts.contentId(), DEPENDENCY_QUERY_LIMIT);
             if (dependencies.overflow()) throw new PublicCacheTargetPlanner.PublicCacheTargetOverflowException();
@@ -164,9 +168,10 @@ public final class PublicCacheInvalidationCoordinator {
         return routes;
     }
 
-    private static List<String> withHome(List<String> routes) {
+    private static List<String> withHomeAndTheme(List<String> routes) {
         List<String> result = new ArrayList<>();
         result.add(HOME);
+        result.add(THEME);
         result.addAll(routes);
         return result;
     }
