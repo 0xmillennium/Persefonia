@@ -1,5 +1,5 @@
 import {
-  chapterPosition, desktopArchiveStates, interpolateNumber, mobileArchiveStates, tabletArchiveStates,
+  chapterPosition, desktopArchiveStates, interpolateNumber, interpolateSheetProminence, mobileArchiveStates, tabletArchiveStates,
   type ArchivePose, type Breakpoint, type GeometryPose, type PointPose, type SheetPose
 } from "./archive-model";
 
@@ -91,7 +91,7 @@ export function enhanceArchive(): void {
     folio.style.opacity = String(global[3]);
     sheets.forEach((sheet, part) => {
       setMaterial(sheet, mix(from.sheets[part]!, to.sheets[part]!, progress));
-      sheet.dataset.materialRole = String(progress < .5 ? from.sheetRoles[part]! : to.sheetRoles[part]!);
+      sheet.style.setProperty("--archive-sheet-prominence", String(interpolateSheetProminence(from, to, part, progress)));
     });
     vellums.forEach((vellum, part) => setMaterial(vellum, mix(from.vellums[part]!, to.vellums[part]!, progress)));
     tabs.forEach((tab, part) => setMaterial(tab, mix(from.tabs[part]!, to.tabs[part]!, progress)));

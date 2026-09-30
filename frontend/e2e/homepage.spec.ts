@@ -41,6 +41,7 @@ async function assertStructure(page: Page, language: string): Promise<void> {
   expect(overflow.width, JSON.stringify(overflow)).toBeLessThanOrEqual(overflow.viewport + 1);
   expect(await page.locator("body").innerText()).not.toMatch(/\[Public project title\]|ref\. pending|\[excerpt incomplete\]/);
   await expect(page.locator("meta[name='color-scheme']")).toHaveAttribute("content", "dark");
+  expect(await page.locator("html").evaluate(node => getComputedStyle(node).colorScheme)).toBe("dark");
   await expect(page.locator("link[href='/theme.css']")).toHaveCount(0);
 }
 
@@ -153,6 +154,7 @@ test("isolated Archive scroll records runtime long tasks after load settles", as
     state.archiveObserver.observe({ entryTypes: ["longtask"] });
     return true;
   });
+  expect(supported, "Long Tasks API support is required for scroll performance evidence").toBe(true);
   const steps = 14;
   for (let index = 0; index < steps; index++) {
     await page.evaluate(fraction => window.scrollTo(0, (document.documentElement.scrollHeight - window.innerHeight) * fraction), index / (steps - 1));
@@ -165,7 +167,40 @@ test("isolated Archive scroll records runtime long tasks after load settles", as
     return recorded;
   });
   console.log(`${testInfo.project.name} local Chromium loading: DOMContentLoaded ${timing.domContentLoaded.toFixed(1)} ms, load ${timing.load.toFixed(1)} ms`);
-  console.log(`${testInfo.project.name} isolated scroll: ${steps} steps, long tasks ${durations.length}, max ${Math.max(0, ...durations).toFixed(1)} ms, observer supported ${supported}; no screenshots during interval`);
+  console.log(`${testInfo.project.name} isolated scroll: API supported ${supported}, ${steps} steps, long tasks ${durations.length}, max ${Math.max(0, ...durations).toFixed(1)} ms; settled first, observer started with no buffered records, no screenshots during interval`);
+});
+
+test("Archive sheet materials follow scroll position across key transitions", async ({ page }, testInfo) => {
+  await visit(page);
+  await expect(page.locator("html")).toHaveClass(/archive-enhanced/);
+  const anchors = await page.evaluate(() => Array.from(document.querySelectorAll<HTMLElement>("[data-archive-chapter]"))
+    .map(chapter => chapter.getBoundingClientRect().top + window.scrollY + chapter.offsetHeight / 2 - window.innerHeight / 2));
+  for (const [start, end] of [[0, 1], [3, 4], [4, 5]]) {
+    const progressValues = start === 3 ? [0, .25, .49, .5, .51, .75, 1] : [0, .49, .5, .51, 1];
+    const samples: { prominence: number[]; surface: string; border: string }[] = [];
+    for (const progress of progressValues) {
+      await page.evaluate(y => window.scrollTo(0, y), anchors[start]! + (anchors[end]! - anchors[start]!) * progress);
+      await expect.poll(async () => Number(await page.locator(".archive-stage").getAttribute("data-archive-position")))
+        .toBeGreaterThan(start + progress - .03);
+      samples.push(await page.locator("[data-archive-sheet]").evaluateAll(sheets => ({
+        prominence: sheets.map(sheet => Number(getComputedStyle(sheet).getPropertyValue("--archive-sheet-prominence"))),
+        surface: getComputedStyle(sheets[0]!).backgroundColor,
+        border: getComputedStyle(sheets[0]!).borderTopColor
+      })));
+      if (testInfo.project.name === "desktop-1440" && progress > 0 && progress < 1)
+        await page.screenshot({ path: testInfo.outputPath(`material-${start}-${end}-${Math.round(progress * 100)}.png`) });
+    }
+    for (let sheet = 0; sheet < 4; sheet++) {
+      const first = samples[0]!.prominence[sheet]!;
+      const last = samples.at(-1)!.prominence[sheet]!;
+      for (let index = 0; index < progressValues.length; index++) {
+        expect(samples[index]!.prominence[sheet]!, `${testInfo.project.name} transition ${start}→${end} sheet ${sheet}`)
+          .toBeCloseTo(first + (last - first) * progressValues[index]!, 2);
+      }
+    }
+    expect(samples[0]!.surface).not.toBe(samples.at(-1)!.surface);
+    expect(samples[0]!.border).not.toBe(samples.at(-1)!.border);
+  }
 });
 
 test("Turkish copy and content use the same document language", async ({ page }) => {
@@ -226,6 +261,34 @@ test("standard theme covers projects, content TOC, and CV in both system prefere
     await expect(page.locator("link[href='/theme.css']")).toHaveCount(0);
     expect(await page.locator("body").evaluate(node => getComputedStyle(node).backgroundColor)).toBe("rgb(11, 12, 15)");
   }
+});
+
+test("standard public CSS remains coherently light when the theme resource fails", async ({ browser }, testInfo) => {
+  const context = await browser.newContext({
+    viewport: testInfo.project.use.viewport as { width: number; height: number },
+    colorScheme: "dark",
+    javaScriptEnabled: false
+  });
+  const page = await context.newPage();
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  await page.route("**/theme.css", route => route.abort());
+  const response = await page.goto("/contact", { waitUntil: "networkidle" });
+  expect(response?.status()).toBe(200);
+  await expect(page.getByRole("heading", { name: "Contact" })).toBeVisible();
+  expect(await page.locator("html").evaluate(node => getComputedStyle(node).colorScheme)).toBe("light");
+  expect(await page.locator("body").evaluate(node => getComputedStyle(node).backgroundColor)).toBe("rgb(247, 249, 248)");
+  expect(await page.locator("body").evaluate(node => getComputedStyle(node).color)).toBe("rgb(31, 41, 51)");
+  await expect(page.getByLabel("Name")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Send message" })).toBeVisible();
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("link", { name: "Skip to main content" })).toBeFocused();
+  await page.getByLabel("Name").focus();
+  await page.keyboard.type("Ada");
+  await expect(page.getByLabel("Name")).toHaveValue("Ada");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(testInfo.project.use.viewport!.width);
+  expect(errors).toEqual([]);
+  await context.close();
 });
 
 test("enabled empty and disabled promotion keep chapters with distinct messages", async ({ page }) => {

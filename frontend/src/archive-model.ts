@@ -5,7 +5,7 @@ export type PointPose = readonly [number, number, number];
 export type ArchivePose = {
   readonly folio: FolioPose;
   readonly sheets: readonly SheetPose[];
-  readonly sheetRoles: readonly number[];
+  readonly sheetProminence: readonly number[];
   readonly vellums: readonly SheetPose[];
   readonly spine: GeometryPose;
   readonly tickExtent: number;
@@ -105,7 +105,8 @@ function buildStates(breakpoint: Breakpoint): readonly ArchivePose[] {
       : tablet ? [base.folio[0] * .5, base.folio[1] * .6, 1, base.folio[3]] : base.folio;
     return {
       folio, sheets,
-      sheetRoles: index === 4 ? [3, 2, 3, 2] : index === 3 ? [2, 1, 2, 1] : index === 1 ? [3, 1, 2, 1] : [2, 1, 1, 0],
+      sheetProminence: index === 4 ? [1, .6, 1, .6] : index === 3 ? [.6, .25, .6, .25]
+        : index === 1 ? [1, .25, .6, .25] : [.6, .25, .25, 0],
       vellums: [
         [0, index === 4 ? 28 : 0, index === 4 ? 1.35 : 1, index === 2 ? .08 : 1, 0, vellumOpacity],
         [index === 4 ? (mobile ? 30 : 95) : 0, index === 4 ? 145 : 35, 1, 1, 0, vellumOpacity * (index === 4 ? .8 : index === 3 ? .5 : .2)]
@@ -146,6 +147,9 @@ export const mobileArchiveStates = buildStates("mobile");
 
 export function interpolateNumber(a: number, b: number, progress: number): number {
   return a + (b - a) * progress;
+}
+export function interpolateSheetProminence(from: ArchivePose, to: ArchivePose, sheet: number, progress: number): number {
+  return interpolateNumber(from.sheetProminence[sheet]!, to.sheetProminence[sheet]!, progress);
 }
 export function chapterPosition(scrollY: number, anchors: readonly number[]): number {
   if (anchors.length !== 7) throw new Error("The Archive requires seven chapter anchors");

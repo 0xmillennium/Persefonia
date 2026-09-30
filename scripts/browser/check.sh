@@ -8,6 +8,8 @@ media_dir="$artifact_dir/media"
 mkdir -p "$media_dir/original"
 printf '%s\n' '%PDF-1.4' '1 0 obj << /Type /Catalog >> endobj' '%%EOF' > "$media_dir/original/browser-cv.pdf"
 container_name="persefonia-browser-$RANDOM-$$"
+postgres_image="${POSTGRES_IMAGE:-postgres:17.11-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73}"
+printf 'Browser PostgreSQL image: %s\n' "$postgres_image"
 app_pid=""
 cleanup() {
   if [[ -n "$app_pid" ]]; then
@@ -20,7 +22,7 @@ trap cleanup EXIT
 
 docker run --detach --rm --name "$container_name" --publish 127.0.0.1::5432 \
   --env POSTGRES_DB=persefonia_browser --env POSTGRES_USER=persefonia_browser \
-  --env POSTGRES_PASSWORD=browser_test_only postgres:17-alpine > "$artifact_dir/postgres-container.txt"
+  --env POSTGRES_PASSWORD=browser_test_only "$postgres_image" > "$artifact_dir/postgres-container.txt"
 for attempt in $(seq 1 60); do
   if docker exec "$container_name" pg_isready -h 127.0.0.1 -U persefonia_browser -d persefonia_browser >/dev/null 2>&1; then
     break

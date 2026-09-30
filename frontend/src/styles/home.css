@@ -30,6 +30,10 @@
   font-display: swap;
 }
 
+html.home-document {
+  color-scheme: dark;
+}
+
 .home-body {
   --home-bg: #0b0c0f;
   --home-elevated: #14161c;
@@ -721,11 +725,13 @@ html:not(.archive-enhanced) .home-work .home-projects { margin-top: 18rem; }
   height: 13rem;
   opacity: 0.85;
   transform-origin: center;
+  background: rgb(
+    calc(21 + 15 * var(--archive-sheet-prominence, .6))
+    calc(23 + 17 * var(--archive-sheet-prominence, .6))
+    calc(29 + 20 * var(--archive-sheet-prominence, .6))
+  );
+  border-color: rgb(241 238 231 / calc(.1 + .18 * var(--archive-sheet-prominence, .6)));
 }
-.archive-stage__sheet[data-material-role="3"] { background: #242831; border-color: rgb(241 238 231 / 28%); }
-.archive-stage__sheet[data-material-role="2"] { background: #1f2129; border-color: rgb(241 238 231 / 22%); }
-.archive-stage__sheet[data-material-role="1"] { background: #171a21; }
-.archive-stage__sheet[data-material-role="0"] { background: #15171d; border-color: rgb(241 238 231 / 10%); }
 
 .archive-stage__sheet::before {
   position: absolute;

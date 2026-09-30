@@ -1,7 +1,7 @@
 @import dev.persefonia.webpublic.PublicHomeViewModel
 @param PublicHomeViewModel page
 <!doctype html>
-<html lang="${page.defaultLanguage().toLowerCase(java.util.Locale.ROOT)}">
+<html class="home-document" lang="${page.defaultLanguage().toLowerCase(java.util.Locale.ROOT)}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">

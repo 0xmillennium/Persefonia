@@ -5,8 +5,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dev.persefonia.automation.support.WorkflowDocument;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
 class CiWorkflowContractTest {
@@ -40,6 +45,18 @@ class CiWorkflowContractTest {
             assertThatThrownBy(() -> assertDigestPinnedServices(changed)).as(mutable)
                     .isInstanceOf(AssertionError.class);
         }
+    }
+
+    @Test
+    void browserQualificationUsesTheCiPostgresImage() throws IOException {
+        String ciImage = (String) WorkflowDocument.map(
+                WorkflowDocument.map(workflow.job("verify").get("services")).get("postgres")).get("image");
+        String script = Files.readString(Path.of("../scripts/browser/check.sh"));
+        Matcher defaultImage = Pattern.compile("(?m)^postgres_image=\"\\$\\{POSTGRES_IMAGE:-([^}\\r\\n]+)}\"$")
+                .matcher(script);
+        assertThat(defaultImage.find()).isTrue();
+        assertThat(defaultImage.group(1)).matches("[^\\s@]+@sha256:[0-9a-f]{64}").isEqualTo(ciImage);
+        assertThat(script).contains("docker run", "\"$postgres_image\"");
     }
 
     @Test
@@ -111,13 +128,33 @@ class CiWorkflowContractTest {
         WorkflowDocument.list(missing.job("verify").get("steps")).removeIf(step ->
                 "Qualify homepage in Chromium".equals(WorkflowDocument.map(step).get("name")));
         assertThatThrownBy(() -> assertBrowserQualification(missing)).isInstanceOf(AssertionError.class);
+        WorkflowDocument withoutChromium = openCi();
+        WorkflowDocument.list(withoutChromium.job("verify").get("steps")).removeIf(step ->
+                "Install Playwright Chromium dependencies".equals(WorkflowDocument.map(step).get("name")));
+        assertThatThrownBy(() -> assertBrowserQualification(withoutChromium)).isInstanceOf(AssertionError.class);
+        WorkflowDocument reordered = openCi();
+        List<Object> steps = WorkflowDocument.list(reordered.job("verify").get("steps"));
+        int browserIndex = stepIndex(steps, "Qualify homepage in Chromium");
+        Collections.swap(steps, browserIndex, browserIndex - 1);
+        assertThatThrownBy(() -> assertBrowserQualification(reordered)).isInstanceOf(AssertionError.class);
+        WorkflowDocument bypassed = openCi();
+        bypassed.step("verify", "Qualify homepage in Chromium").put("run", "cd frontend && npm run test:browser");
+        assertThatThrownBy(() -> assertBrowserQualification(bypassed)).isInstanceOf(AssertionError.class);
+    }
+
+    private static int stepIndex(List<Object> steps, String name) {
+        for (int index = 0; index < steps.size(); index++) {
+            if (name.equals(WorkflowDocument.map(steps.get(index)).get("name"))) return index;
+        }
+        throw new IllegalArgumentException("Missing Verify step: " + name);
     }
 
     private static void assertBrowserQualification(WorkflowDocument ci) {
         assertThat(ci.steps("verify").stream().map(WorkflowDocument::map)
                 .map(step -> (String) step.get("name")))
-                .contains("Qualify homepage in Chromium")
-                .containsSubsequence("Install Playwright Chromium dependencies", "Qualify homepage in Chromium");
+                .containsSubsequence("Set up Node 22", "Build and test", "Verify BootJar",
+                        "Install Playwright Chromium dependencies", "Qualify homepage in Chromium",
+                        "Set up Temurin Java 21", "Verify Java 21 compatibility");
         assertThat(ci.step("verify", "Qualify homepage in Chromium").get("run"))
                 .asString().contains(":app:browserCheck");
     }
