@@ -5,6 +5,7 @@ import dev.persefonia.profileportfolio.application.service.ActiveCvPublicDownloa
 import dev.persefonia.profileportfolio.application.service.ActiveCvPublicQueryService;
 import dev.persefonia.profileportfolio.application.publicview.PublicCvRoutes;
 import dev.persefonia.webpublic.content.PublicCanonicalUrlFactory;
+import dev.persefonia.webpublic.FrontendAssetResolver;
 import dev.persefonia.webpublic.content.PublicContentResponseHeaders;
 import dev.persefonia.webpublic.content.PublicContentViewModelFactory;
 import dev.persefonia.webpublic.insights.PublicInsightsObservationGateway;
@@ -24,12 +25,14 @@ import org.springframework.web.servlet.ModelAndView;
 
 @Controller
 public final class PublicCvController {
+    private static final String MAIN_FRONTEND_ENTRY = "src/main.ts";
     private final ObjectProvider<ActiveCvPublicQueryService> queries;
     private final ObjectProvider<ActiveCvPublicDownloadService> downloads;
     private final PublicContentResponseHeaders responseHeaders;
     private final PublicContentViewModelFactory viewModelFactory;
     private final PublicCanonicalUrlFactory canonicalUrlFactory;
     private final PublicInsightsObservationGateway insights;
+    private final FrontendAssetResolver assetResolver;
 
     public PublicCvController(
             ObjectProvider<ActiveCvPublicQueryService> queries,
@@ -37,13 +40,15 @@ public final class PublicCvController {
             PublicContentResponseHeaders responseHeaders,
             PublicContentViewModelFactory viewModelFactory,
             PublicCanonicalUrlFactory canonicalUrlFactory,
-            PublicInsightsObservationGateway insights) {
+            PublicInsightsObservationGateway insights,
+            FrontendAssetResolver assetResolver) {
         this.queries = Objects.requireNonNull(queries, "queries");
         this.downloads = Objects.requireNonNull(downloads, "downloads");
         this.responseHeaders = Objects.requireNonNull(responseHeaders, "responseHeaders");
         this.viewModelFactory = Objects.requireNonNull(viewModelFactory, "viewModelFactory");
         this.canonicalUrlFactory = Objects.requireNonNull(canonicalUrlFactory, "canonicalUrlFactory");
         this.insights = Objects.requireNonNull(insights, "insights");
+        this.assetResolver = Objects.requireNonNull(assetResolver, "assetResolver");
     }
 
     @GetMapping(PublicCvRoutes.DEFAULT_PAGE)
@@ -99,7 +104,8 @@ public final class PublicCvController {
         responseHeaders.applyPublicContentHeaders(response);
         insights.recordCvViewed();
         return new ModelAndView("site/cv/index", "page",
-                PublicCvPage.from(view, canonicalUrlFactory.canonicalUrl(canonicalPath)));
+                PublicCvPage.from(view, canonicalUrlFactory.canonicalUrl(canonicalPath),
+                        assetResolver.stylesheetPaths(MAIN_FRONTEND_ENTRY)));
     }
 
     private ModelAndView notFound(HttpServletResponse response) {

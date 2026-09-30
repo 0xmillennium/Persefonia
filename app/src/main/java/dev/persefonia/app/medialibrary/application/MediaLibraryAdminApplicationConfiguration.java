@@ -10,6 +10,7 @@ import dev.persefonia.medialibrary.application.publicview.PublicPdfAssetQuerySer
 import dev.persefonia.medialibrary.application.publicview.PublicPdfAssetReadModel;
 import dev.persefonia.medialibrary.application.storage.AssetStoragePort;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -32,7 +33,7 @@ public class MediaLibraryAdminApplicationConfiguration {
     }
 
     @Bean
-    @ConditionalOnBean({AssetRepository.class, AssetStoragePort.class})
+    @ConditionalOnProperty(prefix = "persefonia.media", name = "storage-root")
     PublicPdfAssetContentService publicPdfAssetContentService(
             AssetRepository assets, AssetStoragePort storage) {
         return new PublicPdfAssetContentService(assets, storage);

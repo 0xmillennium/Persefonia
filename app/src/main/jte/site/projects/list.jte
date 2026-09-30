@@ -11,8 +11,7 @@
     @template.site.components.canonicalLink(page.canonicalUrl())
     @template.site.components.robotsMeta(page.noindex())
     @template.site.components.openGraphTags("website", page.title(), page.copy().projectsMetaDescription(), page.canonicalUrl())
-    @template.site.components.stylesheetLinks(page.stylesheetPaths())
-    <link rel="stylesheet" href="/theme.css">
+    @template.site.components.standardPublicStyles(page.stylesheetPaths())
     @template.site.components.feedDiscoveryLink()
 </head>
 <body>

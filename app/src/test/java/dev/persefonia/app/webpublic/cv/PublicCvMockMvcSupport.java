@@ -54,7 +54,8 @@ final class PublicCvMockMvcSupport {
                 new PublicContentResponseHeaders(),
                 new PublicContentViewModelFactory(new TestAssetResolver(), canonicalUrlFactory),
                 canonicalUrlFactory,
-                new NoOpPublicInsightsObservationGateway());
+                new NoOpPublicInsightsObservationGateway(),
+                new TestAssetResolver());
 
         MockMvc mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setViewResolvers(new JteViewResolver())

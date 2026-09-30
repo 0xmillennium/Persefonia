@@ -1,15 +1,19 @@
 export type SheetPose = readonly [number, number, number, number, number, number];
 export type FolioPose = readonly [number, number, number, number];
 export type GeometryPose = readonly [number, number, number, number, number];
+export type PointPose = readonly [number, number, number];
 export type ArchivePose = {
   readonly folio: FolioPose;
   readonly sheets: readonly SheetPose[];
-  readonly vellum: SheetPose;
+  readonly sheetRoles: readonly number[];
+  readonly vellums: readonly SheetPose[];
   readonly spine: GeometryPose;
-  readonly seam: GeometryPose;
+  readonly tickExtent: number;
+  readonly seams: readonly GeometryPose[];
   readonly branch: GeometryPose;
-  readonly trace: readonly [number, number, number];
-  readonly joint: readonly [number, number, number];
+  readonly traces: readonly PointPose[];
+  readonly joints: readonly PointPose[];
+  readonly tabs: readonly SheetPose[];
 };
 export type Breakpoint = "desktop" | "tablet" | "mobile";
 
@@ -91,18 +95,47 @@ function buildStates(breakpoint: Breakpoint): readonly ArchivePose[] {
   const tablet = breakpoint === "tablet";
   const centerX = mobile ? 280 : tablet ? 260 : 280;
   return desktopMaterialPoses.map((base, index) => {
-    const [spineLength, spineOpacity, seamOpacity, branchOpacity, traceOpacity, jointOpacity, vellumOpacity] = structure[breakpoint][index]!;
+    const [originalLength, spineOpacity, seamOpacity, branchOpacity, traceOpacity, jointOpacity, vellumOpacity] = structure[breakpoint][index]!;
+    const spineLength = index === 4 ? (mobile ? 350 : tablet ? 400 : 470) : originalLength;
+    const centerY = index === 4 ? 310 : 190;
+    const reach = mobile ? 66 : tablet ? 104 : 150;
+    const density = index === 4 ? 1 : index === 3 ? .65 : index === 1 ? .42 : index === 2 ? .22 : index === 5 ? .25 : .12;
     const sheets = mobile ? mobileSheets[index]! : tablet ? tabletSheets[index]! : base.sheets;
     const folio: FolioPose = mobile ? [0, index === 4 ? -10 : 0, 1, base.folio[3]]
       : tablet ? [base.folio[0] * .5, base.folio[1] * .6, 1, base.folio[3]] : base.folio;
     return {
       folio, sheets,
-      vellum: [0, index === 4 ? 28 : 0, index === 4 ? 1.4 : 1, index === 2 ? .08 : 1, 0, vellumOpacity],
-      spine: [centerX, 190 - spineLength / 2, centerX, 190 + spineLength / 2, spineOpacity],
-      seam: [centerX - (mobile ? 68 : 150), 190, centerX + (mobile ? 68 : 150), 190, seamOpacity],
-      branch: [centerX, 190, centerX + (mobile ? 58 : 125), 190 + (mobile ? 130 : 115), branchOpacity],
-      trace: [centerX + (mobile ? 58 : 125), 190 + (mobile ? 130 : 115), traceOpacity],
-      joint: [centerX, 190, jointOpacity]
+      sheetRoles: index === 4 ? [3, 2, 3, 2] : index === 3 ? [2, 1, 2, 1] : index === 1 ? [3, 1, 2, 1] : [2, 1, 1, 0],
+      vellums: [
+        [0, index === 4 ? 28 : 0, index === 4 ? 1.35 : 1, index === 2 ? .08 : 1, 0, vellumOpacity],
+        [index === 4 ? (mobile ? 30 : 95) : 0, index === 4 ? 145 : 35, 1, 1, 0, vellumOpacity * (index === 4 ? .8 : index === 3 ? .5 : .2)]
+      ],
+      spine: [centerX, centerY - spineLength / 2, centerX, centerY + spineLength / 2, spineOpacity],
+      tickExtent: index === 4 ? 1 : index === 3 ? .7 : index === 1 ? .48 : index === 2 ? .25 : index === 6 ? .08 : .18,
+      seams: [
+        [centerX - reach, centerY, centerX + reach, centerY, seamOpacity],
+        [centerX - reach * .7, centerY - 95, centerX + reach * .45, centerY - 95, seamOpacity * density],
+        [centerX - reach * .35, centerY + 112, centerX + reach, centerY + 112, seamOpacity * density],
+        [centerX - reach, centerY + 195, centerX + reach * .55, centerY + 195, seamOpacity * (index === 4 ? .82 : .12)]
+      ],
+      branch: [centerX, centerY, centerX + (mobile ? 58 : 125), centerY + (mobile ? 130 : 115), branchOpacity],
+      traces: [
+        [centerX + (mobile ? 58 : 125), centerY + (mobile ? 130 : 115), traceOpacity],
+        [centerX - reach * .7, centerY - 95, traceOpacity * density],
+        [centerX + reach * .55, centerY + 195, traceOpacity * (index === 4 ? .75 : .08)]
+      ],
+      joints: [
+        [centerX, centerY, jointOpacity],
+        [centerX, centerY - 95, jointOpacity * density],
+        [centerX, centerY + 112, jointOpacity * density],
+        [centerX, centerY + 195, jointOpacity * (index === 4 ? .9 : .1)]
+      ],
+      tabs: [
+        [-8, 96, 1, 1, 0, index === 4 ? .95 : .45],
+        [mobile ? 205 : 375, 150, 1, 1, 0, density * .8],
+        [-8, 320, 1, 1, 0, index === 4 ? .8 : .1],
+        [mobile ? 205 : 375, 395, 1, 1, 0, index === 4 ? .65 : .06]
+      ]
     };
   });
 }

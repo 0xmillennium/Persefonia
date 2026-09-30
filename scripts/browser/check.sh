@@ -4,6 +4,9 @@ set -euo pipefail
 project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 artifact_dir="$project_root/app/build/browser"
 mkdir -p "$artifact_dir"
+media_dir="$artifact_dir/media"
+mkdir -p "$media_dir/original"
+printf '%s\n' '%PDF-1.4' '1 0 obj << /Type /Catalog >> endobj' '%%EOF' > "$media_dir/original/browser-cv.pdf"
 container_name="persefonia-browser-$RANDOM-$$"
 app_pid=""
 cleanup() {
@@ -39,6 +42,7 @@ java -jar "$project_root/app/build/libs/persefonia.jar" \
   "--site.public-base-url=$PERSEFONIA_BROWSER_URL" \
   "--server.port=$app_port" \
   --management.server.port=0 \
+  "--persefonia.media.storage-root=$media_dir" \
   --management.health.redis.enabled=false > "$artifact_dir/application.log" 2>&1 &
 app_pid=$!
 for attempt in $(seq 1 90); do

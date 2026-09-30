@@ -1,6 +1,6 @@
 -- Browser qualification data only. Applied to a disposable PostgreSQL container by browserCheck.
 TRUNCATE discovery.discoverable_resources, publishing.content_items,
-    portfolio.projects, portfolio.personal_profiles CASCADE;
+    portfolio.projects, portfolio.personal_profiles, portfolio.active_cv_documents, media.assets CASCADE;
 
 UPDATE portfolio.site_presentation_settings
 SET default_language = 'EN', promote_featured_projects = true,
@@ -101,6 +101,13 @@ INSERT INTO publishing.content_render_snapshots
     (content_item_id, rendered_html, rendered_at, renderer_version, reading_time_minutes, contains_mermaid)
 SELECT id, '<p>This is test-only published content.</p>', now(), 'browser-fixture', 1, false
 FROM publishing.content_items WHERE slug LIKE 'fixture-%';
+UPDATE publishing.content_render_snapshots snapshots
+SET rendered_html = '<h2 id="fixture-section">Fixture section</h2><p>This is test-only published content.</p>'
+FROM publishing.content_items items
+WHERE snapshots.content_item_id = items.id AND items.slug = 'fixture-writing-1';
+INSERT INTO publishing.content_rendered_headings (id, content_item_id, level, text, anchor, position)
+SELECT md5('browser-heading-' || id::text)::uuid, id, 2, 'Fixture section', 'fixture-section', 1
+FROM publishing.content_items WHERE slug = 'fixture-writing-1';
 INSERT INTO discovery.discoverable_resources
     (id, source_context, source_type, source_entity_id, resource_type, route_purpose, language,
      public_url, canonical_url, title, summary, indexing_policy, search_eligibility,
@@ -123,3 +130,15 @@ SELECT md5('browser-discovery-' || id::text)::uuid,
        'INDEX', 'ELIGIBLE', 'ELIGIBLE', 'ELIGIBLE', published_at, updated_at,
        title || ' ' || summary, created_at, 0
 FROM publishing.content_items WHERE slug LIKE 'fixture-%';
+
+INSERT INTO media.assets
+    (id, original_filename, stored_filename, storage_path, content_type, file_extension,
+     size_bytes, checksum, kind, visibility, processing_status, created_at, updated_at, version)
+VALUES ('10000000-0000-0000-0000-0000000000c1', 'browser-cv.pdf', 'browser-cv.pdf',
+        'original/browser-cv.pdf', 'application/pdf', 'pdf', 51, 'browser-cv-fixture',
+        'PDF', 'PUBLIC', 'NOT_REQUIRED', now(), now(), 0);
+INSERT INTO portfolio.active_cv_documents
+    (id, active_cv_profile_id, language, asset_id, display_label, selected_at, created_at, updated_at)
+SELECT md5('browser-cv-' || language)::uuid, '00000000-0000-0000-0000-000000000801', language,
+       '10000000-0000-0000-0000-0000000000c1', 'Fixture CV', now(), now(), now()
+FROM (VALUES ('EN'), ('TR')) AS languages(language);

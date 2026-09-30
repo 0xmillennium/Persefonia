@@ -21,21 +21,34 @@
             <div class="archive-stage__folio" data-archive-folio>
                 <svg class="archive-stage__geometry" viewBox="0 0 560 640" aria-hidden="true" focusable="false">
                     <line data-archive-spine class="archive-stage__geometry-spine" />
-                    <line data-archive-seam class="archive-stage__geometry-seam" />
+                    @for(int i = 0; i < 12; i++)
+                        <line data-archive-tick class="archive-stage__geometry-tick" />
+                    @endfor
+                    @for(int i = 0; i < 4; i++)
+                        <line data-archive-seam class="archive-stage__geometry-seam" />
+                    @endfor
                     <line data-archive-branch class="archive-stage__geometry-branch" />
-                    <circle data-archive-trace class="archive-stage__geometry-trace" r="3" />
-                    <circle data-archive-joint class="archive-stage__geometry-joint" r="4" />
+                    @for(int i = 0; i < 3; i++)
+                        <circle data-archive-trace class="archive-stage__geometry-trace" r="3" />
+                    @endfor
+                    @for(int i = 0; i < 4; i++)
+                        <circle data-archive-joint class="archive-stage__geometry-joint" r="4" />
+                    @endfor
                 </svg>
                 <span class="archive-stage__sheet archive-stage__sheet--a" data-archive-sheet="0"><span class="archive-stage__index">§ 01</span><span class="archive-stage__rule"></span><span class="archive-stage__folio-number">f.i</span></span>
                 <span class="archive-stage__sheet archive-stage__sheet--b" data-archive-sheet="1"><span class="archive-stage__index">§ 02</span><span class="archive-stage__rule"></span><span class="archive-stage__folio-number">f.ii</span></span>
                 <span class="archive-stage__sheet archive-stage__sheet--c" data-archive-sheet="2"><span class="archive-stage__index">§ 03</span><span class="archive-stage__rule"></span><span class="archive-stage__folio-number">f.iii</span></span>
                 <span class="archive-stage__sheet archive-stage__sheet--d" data-archive-sheet="3"><span class="archive-stage__index">§ 04</span><span class="archive-stage__rule"></span><span class="archive-stage__folio-number">f.iv</span></span>
                 <span class="archive-stage__vellum" data-archive-vellum></span>
+                <span class="archive-stage__vellum archive-stage__vellum--secondary" data-archive-vellum></span>
+                @for(int i = 0; i < 4; i++)
+                    <span class="archive-stage__tab" data-archive-tab></span>
+                @endfor
             </div>
         </div>
         <section class="home-section home-identity" id="identity" data-archive-chapter="0" aria-labelledby="identity-title">
             <div class="home-section__inner">
-                <div class="archive-snapshot archive-snapshot--identity" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+                @template.site.components.archiveSnapshot("identity")
                 <header class="home-nav">
                     <a class="home-nav__brand" href="/">${page.siteName()}</a>
                     <nav class="home-nav__links" aria-label="${page.copy().primaryNavigation()}">
@@ -62,7 +75,7 @@
         </section>
         <section class="home-section home-work" id="work" data-archive-chapter="1" aria-labelledby="work-title">
             <div class="home-section__inner">
-                <div class="archive-snapshot archive-snapshot--work" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+                @template.site.components.archiveSnapshot("work")
                 <div class="home-section__heading">
                     <p class="home-kicker">02 / ${page.copy().selectedWork()}</p>
                     <h2 id="work-title">${page.copy().workTitle()}</h2>
@@ -142,7 +155,7 @@
         </section>
         <section class="home-section home-architecture" id="architecture" data-archive-chapter="4" aria-labelledby="architecture-title">
             <div class="home-section__inner">
-                <div class="archive-snapshot archive-snapshot--architecture" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+                @template.site.components.archiveSnapshot("architecture")
                 <div class="home-section__heading">
                     <p class="home-kicker">05 / ${page.copy().architecture()}</p>
                     <h2 id="architecture-title">${page.copy().architectureTitle()}</h2>

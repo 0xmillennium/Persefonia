@@ -4,6 +4,7 @@ import dev.persefonia.profileportfolio.application.query.ActiveCvPublicView;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.Objects;
+import java.util.List;
 
 public record PublicCvPage(
         String title,
@@ -15,7 +16,8 @@ public record PublicCvPage(
         String contentType,
         String sizeLabel,
         String selectedAt,
-        String assetUpdatedAt) {
+        String assetUpdatedAt,
+        List<String> stylesheetPaths) {
     private static final DateTimeFormatter DATE_FORMATTER =
             DateTimeFormatter.ofPattern("yyyy-MM-dd").withZone(ZoneOffset.UTC);
 
@@ -30,9 +32,10 @@ public record PublicCvPage(
         Objects.requireNonNull(sizeLabel, "sizeLabel");
         Objects.requireNonNull(selectedAt, "selectedAt");
         Objects.requireNonNull(assetUpdatedAt, "assetUpdatedAt");
+        stylesheetPaths = List.copyOf(stylesheetPaths);
     }
 
-    static PublicCvPage from(ActiveCvPublicView view, String canonicalUrl) {
+    static PublicCvPage from(ActiveCvPublicView view, String canonicalUrl, List<String> stylesheetPaths) {
         return new PublicCvPage(
                 "CV",
                 view.language(),
@@ -43,7 +46,8 @@ public record PublicCvPage(
                 view.contentType(),
                 sizeLabel(view.sizeBytes()),
                 DATE_FORMATTER.format(view.selectedAt()),
-                DATE_FORMATTER.format(view.assetUpdatedAt()));
+                DATE_FORMATTER.format(view.assetUpdatedAt()),
+                stylesheetPaths);
     }
 
     private static String sizeLabel(long sizeBytes) {

@@ -1,6 +1,6 @@
 import {
   chapterPosition, desktopArchiveStates, interpolateNumber, mobileArchiveStates, tabletArchiveStates,
-  type ArchivePose, type Breakpoint, type GeometryPose, type SheetPose
+  type ArchivePose, type Breakpoint, type GeometryPose, type PointPose, type SheetPose
 } from "./archive-model";
 
 function breakpoint(): Breakpoint {
@@ -20,6 +20,12 @@ function setLine(element: SVGLineElement, pose: GeometryPose): void {
   element.style.opacity = String(pose[4]);
 }
 
+function setPoint(element: SVGCircleElement, pose: PointPose): void {
+  element.setAttribute("cx", String(pose[0]));
+  element.setAttribute("cy", String(pose[1]));
+  element.style.opacity = String(pose[2]);
+}
+
 function mix<T extends readonly number[]>(a: T, b: T, progress: number): T {
   return a.map((value, index) => interpolateNumber(value, b[index] ?? value, progress)) as unknown as T;
 }
@@ -29,26 +35,51 @@ export function enhanceArchive(): void {
   if (!stage) return;
   const folio = stage.querySelector<HTMLElement>("[data-archive-folio]");
   const sheets = Array.from(stage.querySelectorAll<HTMLElement>("[data-archive-sheet]"));
-  const vellum = stage.querySelector<HTMLElement>("[data-archive-vellum]");
+  const vellums = Array.from(stage.querySelectorAll<HTMLElement>("[data-archive-vellum]"));
+  const tabs = Array.from(stage.querySelectorAll<HTMLElement>("[data-archive-tab]"));
   const chapters = Array.from(document.querySelectorAll<HTMLElement>("[data-archive-chapter]"));
   const spine = stage.querySelector<SVGLineElement>("[data-archive-spine]");
-  const seam = stage.querySelector<SVGLineElement>("[data-archive-seam]");
+  const ticks = Array.from(stage.querySelectorAll<SVGLineElement>("[data-archive-tick]"));
+  const seams = Array.from(stage.querySelectorAll<SVGLineElement>("[data-archive-seam]"));
   const branch = stage.querySelector<SVGLineElement>("[data-archive-branch]");
-  const trace = stage.querySelector<SVGCircleElement>("[data-archive-trace]");
-  const joint = stage.querySelector<SVGCircleElement>("[data-archive-joint]");
-  if (!folio || !vellum || sheets.length !== 4 || chapters.length !== 7 ||
-      !spine || !seam || !branch || !trace || !joint) return;
+  const traces = Array.from(stage.querySelectorAll<SVGCircleElement>("[data-archive-trace]"));
+  const joints = Array.from(stage.querySelectorAll<SVGCircleElement>("[data-archive-joint]"));
+  if (!folio || !spine || !branch || sheets.length !== 4 || vellums.length !== 2 ||
+      tabs.length !== 4 || chapters.length !== 7 || ticks.length !== 12 ||
+      seams.length !== 4 || traces.length !== 3 || joints.length !== 4) return;
 
   const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
   let anchors: number[] = [];
   let mode: Breakpoint = breakpoint();
-  let queued = false;
-  let measureQueued = false;
+  let renderFrameId = 0;
+  let measureFrameId = 0;
   let active = false;
+  let failed = false;
+  let observer: ResizeObserver | undefined;
+
+  const stop = (): void => {
+    active = false;
+    cancelAnimationFrame(renderFrameId);
+    cancelAnimationFrame(measureFrameId);
+    renderFrameId = 0;
+    measureFrameId = 0;
+    document.documentElement.classList.remove("archive-enhanced");
+  };
+  const rollback = (error: unknown): void => {
+    failed = true;
+    stop();
+    observer?.disconnect();
+    window.removeEventListener("scroll", queue);
+    window.removeEventListener("resize", queueMeasure);
+    document.removeEventListener("visibilitychange", visibilityChanged);
+    motion.removeEventListener("change", updateMotion);
+    console.error("Living Archive enhancement stopped", error);
+  };
 
   const render = (): void => {
-    queued = false;
-    if (!active || document.hidden) return;
+    renderFrameId = 0;
+    if (!active || failed || document.hidden) return;
+    try {
     const states = mode === "mobile" ? mobileArchiveStates : mode === "tablet" ? tabletArchiveStates : desktopArchiveStates;
     const position = chapterPosition(window.scrollY, anchors);
     const index = Math.min(6, Math.floor(position));
@@ -58,58 +89,75 @@ export function enhanceArchive(): void {
     const global = mix(from.folio, to.folio, progress);
     folio.style.transform = `translate3d(${global[0]}px, ${global[1]}px, 0) scale(${global[2]})`;
     folio.style.opacity = String(global[3]);
-    sheets.forEach((sheet, part) => setMaterial(sheet, mix(from.sheets[part]!, to.sheets[part]!, progress)));
-    setMaterial(vellum, mix(from.vellum, to.vellum, progress));
-    setLine(spine, mix(from.spine, to.spine, progress));
-    setLine(seam, mix(from.seam, to.seam, progress));
+    sheets.forEach((sheet, part) => {
+      setMaterial(sheet, mix(from.sheets[part]!, to.sheets[part]!, progress));
+      sheet.dataset.materialRole = String(progress < .5 ? from.sheetRoles[part]! : to.sheetRoles[part]!);
+    });
+    vellums.forEach((vellum, part) => setMaterial(vellum, mix(from.vellums[part]!, to.vellums[part]!, progress)));
+    tabs.forEach((tab, part) => setMaterial(tab, mix(from.tabs[part]!, to.tabs[part]!, progress)));
+    const spinePose = mix(from.spine, to.spine, progress);
+    setLine(spine, spinePose);
+    const tickExtent = interpolateNumber(from.tickExtent, to.tickExtent, progress);
+    ticks.forEach((tick, part) => {
+      const fraction = (part + .5) / ticks.length;
+      const y = interpolateNumber(spinePose[1], spinePose[3], fraction);
+      const length = part % 4 === 0 ? 16 : part % 2 === 0 ? 10 : 6;
+      setLine(tick, [spinePose[0] + 2, y, spinePose[0] + length, y,
+        fraction <= tickExtent ? spinePose[4] * (part % 4 === 0 ? .9 : .55) : 0]);
+    });
+    seams.forEach((seam, part) => setLine(seam, mix(from.seams[part]!, to.seams[part]!, progress)));
     setLine(branch, mix(from.branch, to.branch, progress));
-    const tracePose = mix(from.trace, to.trace, progress);
-    trace.setAttribute("cx", String(tracePose[0]));
-    trace.setAttribute("cy", String(tracePose[1]));
-    trace.style.opacity = String(tracePose[2]);
-    const jointPose = mix(from.joint, to.joint, progress);
-    joint.setAttribute("cx", String(jointPose[0]));
-    joint.setAttribute("cy", String(jointPose[1]));
-    joint.style.opacity = String(jointPose[2]);
+    traces.forEach((trace, part) => setPoint(trace, mix(from.traces[part]!, to.traces[part]!, progress)));
+    joints.forEach((joint, part) => setPoint(joint, mix(from.joints[part]!, to.joints[part]!, progress)));
     stage.dataset.archivePosition = String(position);
-  };
-  const queue = (): void => {
-    if (active && !queued && !document.hidden) {
-      queued = true;
-      requestAnimationFrame(render);
+    stage.dataset.archiveState = String(index);
+    document.documentElement.classList.add("archive-enhanced");
+    } catch (error) {
+      rollback(error);
     }
   };
+  function queue(): void {
+    if (active && !failed && !renderFrameId && !document.hidden) renderFrameId = requestAnimationFrame(render);
+  }
   const measure = (): void => {
-    measureQueued = false;
-    mode = breakpoint();
-    anchors = chapters.map(chapter =>
-      chapter.getBoundingClientRect().top + window.scrollY + chapter.offsetHeight / 2 - window.innerHeight / 2
-    );
-    queue();
-  };
-  const queueMeasure = (): void => {
-    if (!measureQueued && !document.hidden) {
-      measureQueued = true;
-      requestAnimationFrame(measure);
+    measureFrameId = 0;
+    if (failed || motion.matches || document.hidden) return;
+    try {
+      mode = breakpoint();
+      anchors = chapters.map(chapter =>
+        chapter.getBoundingClientRect().top + window.scrollY + chapter.offsetHeight / 2 - window.innerHeight / 2
+      );
+      active = true;
+      render();
+    } catch (error) {
+      rollback(error);
     }
   };
-  const updateMotion = (): void => {
-    active = !motion.matches;
-    document.documentElement.classList.toggle("archive-enhanced", active);
-    if (active) queueMeasure();
-  };
+  function queueMeasure(): void {
+    if (!failed && !motion.matches && !measureFrameId && !document.hidden)
+      measureFrameId = requestAnimationFrame(measure);
+  }
+  function visibilityChanged(): void { if (!document.hidden) queueMeasure(); }
+  function updateMotion(): void {
+    stop();
+    if (!motion.matches && !failed) measure();
+  }
 
   // Validate required geometry and the motion query before installing listeners or hiding SSR snapshots.
-  measure();
-  const observer = new ResizeObserver(queueMeasure);
-  chapters.forEach(chapter => observer.observe(chapter));
-  window.addEventListener("scroll", queue, { passive: true });
-  window.addEventListener("resize", queueMeasure, { passive: true });
-  document.addEventListener("visibilitychange", () => { if (!document.hidden) queueMeasure(); });
-  motion.addEventListener("change", updateMotion);
-  document.fonts.ready.then(queueMeasure).catch(() => {});
-  document.querySelectorAll<HTMLAnchorElement>(".home-nav__mobile nav a").forEach(link => {
-    link.addEventListener("click", () => link.closest("details")?.removeAttribute("open"));
-  });
-  updateMotion();
+  if (!motion.matches) measure();
+  if (failed) return;
+  try {
+    observer = new ResizeObserver(queueMeasure);
+    chapters.forEach(chapter => observer!.observe(chapter));
+    window.addEventListener("scroll", queue, { passive: true });
+    window.addEventListener("resize", queueMeasure, { passive: true });
+    document.addEventListener("visibilitychange", visibilityChanged);
+    motion.addEventListener("change", updateMotion);
+    document.fonts.ready.then(queueMeasure).catch(() => {});
+    document.querySelectorAll<HTMLAnchorElement>(".home-nav__mobile nav a").forEach(link => {
+      link.addEventListener("click", () => link.closest("details")?.removeAttribute("open"));
+    });
+  } catch (error) {
+    rollback(error);
+  }
 }

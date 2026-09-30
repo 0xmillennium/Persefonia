@@ -106,7 +106,7 @@ a:focus-visible {
   padding: 1rem 1.25rem;
   border: 1px solid var(--rule);
   border-radius: 8px;
-  background: color-mix(in srgb, white 54%, transparent);
+  background: var(--surface);
 }
 
 .public-toc ol {

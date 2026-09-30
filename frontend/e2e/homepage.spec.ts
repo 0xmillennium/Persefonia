@@ -44,6 +44,20 @@ async function assertStructure(page: Page, language: string): Promise<void> {
   await expect(page.locator("link[href='/theme.css']")).toHaveCount(0);
 }
 
+function contrast(foreground: string, background: string): number {
+  const luminance = (color: string): number => {
+    const channels = color.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+    if (!channels) throw new Error(`Expected an opaque computed RGB color: ${color}`);
+    const linear = channels.slice(1, 4).map(value => {
+      const channel = Number(value) / 255;
+      return channel <= .04045 ? channel / 12.92 : ((channel + .055) / 1.055) ** 2.4;
+    });
+    return linear[0]! * .2126 + linear[1]! * .7152 + linear[2]! * .0722;
+  };
+  const values = [luminance(foreground), luminance(background)].sort((a, b) => b - a);
+  return (values[0]! + .05) / (values[1]! + .05);
+}
+
 test.describe.configure({ mode: "serial" });
 test.beforeEach(() => {
   if (!databaseContainer) throw new Error("browserCheck must provide an isolated fixture database");
@@ -55,17 +69,10 @@ test.beforeEach(() => {
 test("populated EN layout, routes, Archive transformation and screenshots", async ({ page }, testInfo) => {
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
-  await page.addInitScript(() => {
-    (window as Window & { browserLongTasks?: number[] }).browserLongTasks = [];
-    try {
-      new PerformanceObserver(list => {
-        (window as Window & { browserLongTasks?: number[] }).browserLongTasks?.push(
-          ...list.getEntries().map(entry => entry.duration));
-      }).observe({ entryTypes: ["longtask"] });
-    } catch { /* Unsupported observation is not a page failure. */ }
-  });
   await visit(page);
   await assertStructure(page, "EN");
+  expect(await page.evaluate(() => ["Instrument Serif", "Inter", "IBM Plex Mono"].every(font =>
+    document.fonts.check(`16px "${font}"`)))).toBe(true);
   await expect(page.locator(".home-projects__item")).toHaveCount(3);
   await expect(page.locator(".home-writing__list li")).toHaveCount(3);
   await expect(page.locator(".home-research__list li")).toHaveCount(3);
@@ -73,11 +80,17 @@ test("populated EN layout, routes, Archive transformation and screenshots", asyn
   await expect(page.locator("html")).toHaveClass(/archive-enhanced/);
   await expect(page.locator("[data-archive-sheet]")).toHaveCount(4);
   await expect(page.locator("[data-archive-spine]")).toHaveCount(1);
+  await expect(page.locator("[data-archive-tick]")).toHaveCount(12);
+  await expect(page.locator("[data-archive-seam]")).toHaveCount(4);
+  await expect(page.locator("[data-archive-joint]")).toHaveCount(4);
+  await expect(page.locator("[data-archive-trace]")).toHaveCount(3);
+  await expect(page.locator("[data-archive-tab]")).toHaveCount(4);
+  await expect(page.locator("[data-archive-vellum]")).toHaveCount(2);
   await expect(page.locator("[data-archive-branch]")).toHaveCount(1);
 
   const captures = testInfo.project.name === "desktop-1440"
     ? ["identity", "work", "research", "architecture"]
-    : testInfo.project.name === "tablet-834" ? ["architecture"] : ["identity", "architecture"];
+    : testInfo.project.name === "tablet-834" ? ["architecture"] : ["identity", "research", "architecture"];
   for (const chapter of captures) {
     await scrollToChapter(page, chapter);
     await page.screenshot({ path: testInfo.outputPath(`${chapter}.png`) });
@@ -114,14 +127,45 @@ test("populated EN layout, routes, Archive transformation and screenshots", asyn
   expect(listingHref).toMatch(/^\/en\/projects$/);
   expect((await page.request.get(listingHref!)).status()).toBe(200);
   expect(errors).toEqual([]);
-  const longTasks = await page.evaluate(() => (window as Window & { browserLongTasks?: number[] }).browserLongTasks ?? []);
   const navigation = await page.evaluate(() => {
     const entry = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
     return entry ? { domContentLoaded: entry.domContentLoadedEventEnd, load: entry.loadEventEnd } : null;
   });
   expect(navigation).not.toBeNull();
   console.log(`${testInfo.project.name} local navigation: DOM ready ${navigation!.domContentLoaded.toFixed(1)} ms, load ${navigation!.load.toFixed(1)} ms`);
-  console.log(`${testInfo.project.name} local long tasks: ${longTasks.length}, max ${Math.max(0, ...longTasks).toFixed(1)} ms`);
+});
+
+test("isolated Archive scroll records runtime long tasks after load settles", async ({ page }, testInfo) => {
+  await visit(page);
+  await expect(page.locator("html")).toHaveClass(/archive-enhanced/);
+  await page.waitForTimeout(250);
+  const timing = await page.evaluate(() => {
+    const entry = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming;
+    return { domContentLoaded: entry.domContentLoadedEventEnd, load: entry.loadEventEnd };
+  });
+  const supported = await page.evaluate(() => {
+    const state = window as Window & { archiveLongTasks?: number[]; archiveObserver?: PerformanceObserver };
+    state.archiveLongTasks = [];
+    if (!PerformanceObserver.supportedEntryTypes.includes("longtask")) return false;
+    state.archiveObserver = new PerformanceObserver(list => {
+      state.archiveLongTasks!.push(...list.getEntries().map(entry => entry.duration));
+    });
+    state.archiveObserver.observe({ entryTypes: ["longtask"] });
+    return true;
+  });
+  const steps = 14;
+  for (let index = 0; index < steps; index++) {
+    await page.evaluate(fraction => window.scrollTo(0, (document.documentElement.scrollHeight - window.innerHeight) * fraction), index / (steps - 1));
+    await page.waitForTimeout(80);
+  }
+  const durations = await page.evaluate(() => {
+    const state = window as Window & { archiveLongTasks?: number[]; archiveObserver?: PerformanceObserver };
+    const recorded = state.archiveLongTasks ?? [];
+    state.archiveObserver?.disconnect();
+    return recorded;
+  });
+  console.log(`${testInfo.project.name} local Chromium loading: DOMContentLoaded ${timing.domContentLoaded.toFixed(1)} ms, load ${timing.load.toFixed(1)} ms`);
+  console.log(`${testInfo.project.name} isolated scroll: ${steps} steps, long tasks ${durations.length}, max ${Math.max(0, ...durations).toFixed(1)} ms, observer supported ${supported}; no screenshots during interval`);
 });
 
 test("Turkish copy and content use the same document language", async ({ page }) => {
@@ -135,24 +179,53 @@ test("Turkish copy and content use the same document language", async ({ page })
   await expect(page.getByRole("link", { name: /İletişime geç/ })).toHaveCount(1);
 });
 
-test("standard public theme responds to LIGHT, DARK and SYSTEM without changing homepage styling", async ({ page }) => {
-  for (const [theme, expectedBackground] of [
-    ["LIGHT", "rgb(247, 249, 248)"],
-    ["DARK", "rgb(16, 22, 27)"],
-    ["SYSTEM", "rgb(16, 22, 27)"]
+test("standard theme covers projects, content TOC, and CV in both system preferences", async ({ page }, testInfo) => {
+  test.setTimeout(120_000);
+  for (const [theme, preference, expectedBackground, expectedSurface] of [
+    ["LIGHT", "dark", "rgb(247, 249, 248)", "rgb(255, 255, 255)"],
+    ["DARK", "light", "rgb(16, 22, 27)", "rgb(27, 37, 43)"],
+    ["SYSTEM", "light", "rgb(247, 249, 248)", "rgb(255, 255, 255)"],
+    ["SYSTEM", "dark", "rgb(16, 22, 27)", "rgb(27, 37, 43)"]
   ] as const) {
     setSettings(`UPDATE portfolio.site_presentation_settings SET standard_public_theme='${theme}'`);
-    await page.emulateMedia({ colorScheme: "dark" });
-    await page.goto("/en/projects", { waitUntil: "networkidle" });
-    await expect(page.locator("link[href='/theme.css']")).toHaveCount(1);
-    expect(await page.locator("body").evaluate(node => getComputedStyle(node).backgroundColor)).toBe(expectedBackground);
+    await page.emulateMedia({ colorScheme: preference });
+    for (const route of ["/en/projects", "/en/articles/fixture-writing-1", "/cv", "/cv/en", "/cv/tr"]) {
+      const response = await page.goto(route, { waitUntil: "networkidle" });
+      expect(response?.status(), route).toBe(200);
+      const links = await page.locator("head link[rel='stylesheet']").evaluateAll(nodes => nodes.map(node => node.getAttribute("href")));
+      expect(links.at(-1), route).toBe("/theme.css");
+      expect(links.some(href => href?.startsWith("/assets/main-")), route).toBe(true);
+      expect(await page.locator("body").evaluate(node => getComputedStyle(node).backgroundColor), route).toBe(expectedBackground);
+      expect(await page.locator("body").evaluate(node => getComputedStyle(node).color), route).not.toBe(expectedBackground);
+      if (route === "/cv/tr") await expect(page.locator("html")).toHaveAttribute("lang", "tr");
+      if (route.includes("articles")) {
+        await expect(page.locator(".public-toc")).toBeVisible();
+        const colors = await page.locator(".public-toc").evaluate(node => ({
+          background: getComputedStyle(node).backgroundColor,
+          text: getComputedStyle(node).color,
+          link: getComputedStyle(node.querySelector("a")!).color
+        }));
+        expect(colors.background).toBe(expectedSurface);
+        const textContrast = contrast(colors.text, colors.background);
+        expect(textContrast).toBeGreaterThanOrEqual(4.5);
+        expect(contrast(colors.link, colors.background)).toBeGreaterThanOrEqual(4.5);
+        console.log(`${theme}/${preference} TOC text contrast ${textContrast.toFixed(2)}:1`);
+        await page.locator(".public-toc a").focus();
+        expect(await page.locator(".public-toc a").evaluate(node => getComputedStyle(node).outlineStyle)).not.toBe("none");
+        if (testInfo.project.name === "desktop-1440" && theme !== "SYSTEM")
+          await page.screenshot({ path: testInfo.outputPath(`toc-${theme.toLowerCase()}.png`) });
+      }
+      if (route === "/cv/en" && testInfo.project.name === "desktop-1440" && theme !== "SYSTEM")
+        await page.screenshot({ path: testInfo.outputPath(`cv-${theme.toLowerCase()}.png`) });
+    }
     const stylesheet = await page.request.get("/theme.css");
     expect(stylesheet.status()).toBe(200);
+    expect(stylesheet.headers()["content-type"]).toContain("text/css");
     expect(stylesheet.headers()["cache-control"]).toBe("public, no-cache, must-revalidate");
+    await page.goto("/", { waitUntil: "networkidle" });
+    await expect(page.locator("link[href='/theme.css']")).toHaveCount(0);
+    expect(await page.locator("body").evaluate(node => getComputedStyle(node).backgroundColor)).toBe("rgb(11, 12, 15)");
   }
-  await page.goto("/", { waitUntil: "networkidle" });
-  await expect(page.locator("link[href='/theme.css']")).toHaveCount(0);
-  expect(await page.locator("body").evaluate(node => getComputedStyle(node).backgroundColor)).toBe("rgb(11, 12, 15)");
 });
 
 test("enabled empty and disabled promotion keep chapters with distinct messages", async ({ page }) => {
@@ -175,8 +248,12 @@ test("reduced motion uses complete static compositions", async ({ browser }, tes
   await assertStructure(page, "EN");
   await expect(page.locator("html")).not.toHaveClass(/archive-enhanced/);
   for (const chapter of ["identity", "work", "architecture"]) await expect(page.locator(`.archive-snapshot--${chapter}`)).toBeVisible();
-  for (const chapter of ["identity", "architecture"]) {
-    await scrollToChapter(page, chapter);
+  for (const chapter of ["identity", "work", "architecture"]) {
+    if (chapter === "work") {
+      await page.locator("#work").evaluate(section => window.scrollTo(0, section.getBoundingClientRect().top + window.scrollY + 16));
+    } else {
+      await scrollToChapter(page, chapter);
+    }
     await page.screenshot({ path: testInfo.outputPath(`reduced-${chapter}.png`) });
   }
   await context.close();
@@ -184,12 +261,22 @@ test("reduced motion uses complete static compositions", async ({ browser }, tes
 
 test("script absence and initialization failure preserve SSR and snapshots", async ({ browser }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile-390");
-  for (const failure of ["disabled", "load", "init"]) {
+  for (const failure of ["disabled", "load", "init", "first-render", "after-render-init"]) {
     const context = await browser.newContext({ viewport: { width: 390, height: 850 }, javaScriptEnabled: failure !== "disabled" });
     const page = await context.newPage();
     if (failure === "load") await page.route(/\/assets\/home-[^/]+\.js$/, route => route.abort());
     if (failure === "init") await page.addInitScript(() => {
       window.matchMedia = () => { throw new Error("simulated Archive initialization failure"); };
+    });
+    if (failure === "first-render") await page.addInitScript(() => {
+      const original = SVGElement.prototype.setAttribute;
+      SVGElement.prototype.setAttribute = function(name, value) {
+        if (this.matches("[data-archive-spine]") && name === "x1") throw new Error("simulated first render failure");
+        original.call(this, name, value);
+      };
+    });
+    if (failure === "after-render-init") await page.addInitScript(() => {
+      window.ResizeObserver = class { constructor() { throw new Error("simulated observer initialization failure"); } } as typeof ResizeObserver;
     });
     await visit(page);
     await assertStructure(page, "EN");
@@ -199,6 +286,42 @@ test("script absence and initialization failure preserve SSR and snapshots", asy
     await expect(page.locator(".home-project h3 a")).toHaveCount(3);
     await context.close();
   }
+});
+
+test("runtime render failure restores snapshots and stops the enhancement", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile-390");
+  await visit(page);
+  await expect(page.locator("html")).toHaveClass(/archive-enhanced/);
+  await page.evaluate(() => {
+    const original = SVGElement.prototype.setAttribute;
+    const state = window as Window & { failedArchiveWrites?: number };
+    state.failedArchiveWrites = 0;
+    SVGElement.prototype.setAttribute = function(name, value) {
+      if (this.matches("[data-archive-spine]") && name === "x1") {
+        state.failedArchiveWrites!++;
+        throw new Error("simulated runtime render failure");
+      }
+      original.call(this, name, value);
+    };
+  });
+  await scrollToChapter(page, "research");
+  await expect(page.locator("html")).not.toHaveClass(/archive-enhanced/);
+  await expect(page.locator(".archive-snapshot--architecture")).toBeVisible();
+  await scrollToChapter(page, "architecture");
+  expect(await page.evaluate(() => (window as Window & { failedArchiveWrites?: number }).failedArchiveWrites)).toBe(1);
+  await expect(page.locator("#architecture h2")).toBeVisible();
+});
+
+test("changing reduced-motion preference restores and reactivates the Archive safely", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile-390");
+  await visit(page);
+  await expect(page.locator("html")).toHaveClass(/archive-enhanced/);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect(page.locator("html")).not.toHaveClass(/archive-enhanced/);
+  await expect(page.locator(".archive-snapshot--identity")).toBeVisible();
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await expect(page.locator("html")).toHaveClass(/archive-enhanced/);
+  await expect(page.locator(".archive-snapshot--identity")).toBeHidden();
 });
 
 test("keyboard reaches skip link and mobile navigation", async ({ page }, testInfo) => {

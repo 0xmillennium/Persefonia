@@ -14,7 +14,8 @@ import org.junit.jupiter.api.io.TempDir;
 
 class AutomationRepositoryPolicyTest {
     private static final List<Path> PRODUCTION_ROOTS = List.of(
-            Path.of("scripts/ci"), Path.of("scripts/release"), Path.of("scripts/deploy"));
+            Path.of("scripts/ci"), Path.of("scripts/release"), Path.of("scripts/deploy"),
+            Path.of("scripts/browser"));
     @TempDir Path temporary;
 
     @Test
@@ -37,7 +38,8 @@ class AutomationRepositoryPolicyTest {
     @Test
     void recursiveProductionRootsAcceptNestedScriptsAndRejectInvalidSources() throws Exception {
         String valid = "#!/usr/bin/env bash\nset -euo pipefail\n";
-        for (String file : List.of("scripts/release/lib/example.sh", "scripts/ci/helpers/example.sh")) {
+        for (String file : List.of("scripts/release/lib/example.sh", "scripts/ci/helpers/example.sh",
+                "scripts/browser/example.sh")) {
             writeFixture(file, valid);
             assertProductionShell(temporary, file, "100755");
         }

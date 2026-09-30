@@ -11,11 +11,11 @@ import dev.persefonia.profileportfolio.application.port.ActiveCvPublicAssetRefer
 import dev.persefonia.profileportfolio.domain.cv.MediaAssetId;
 import java.util.Objects;
 import java.util.Optional;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 @Component
-@ConditionalOnBean({PublicPdfAssetQueryService.class, PublicPdfAssetContentService.class})
+@ConditionalOnProperty(prefix = "persefonia.media", name = "storage-root")
 public class MediaLibraryActiveCvPublicAssetAdapter implements ActiveCvPublicAssetPort {
     private final PublicPdfAssetQueryService queryService;
     private final PublicPdfAssetContentService contentService;

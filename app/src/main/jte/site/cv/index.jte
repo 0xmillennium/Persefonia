@@ -10,6 +10,7 @@
     @template.site.components.canonicalLink(page.canonicalUrl())
     @template.site.components.robotsMeta(false)
     @template.site.components.openGraphTags("website", page.title(), page.displayLabel(), page.canonicalUrl())
+    @template.site.components.standardPublicStyles(page.stylesheetPaths())
     @template.site.components.feedDiscoveryLink()
 </head>
 <body>

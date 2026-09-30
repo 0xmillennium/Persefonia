@@ -105,6 +105,24 @@ class CiWorkflowContractTest {
     }
 
     @Test
+    void verifyRequiresHomepageBrowserQualification() {
+        assertBrowserQualification(workflow);
+        WorkflowDocument missing = openCi();
+        WorkflowDocument.list(missing.job("verify").get("steps")).removeIf(step ->
+                "Qualify homepage in Chromium".equals(WorkflowDocument.map(step).get("name")));
+        assertThatThrownBy(() -> assertBrowserQualification(missing)).isInstanceOf(AssertionError.class);
+    }
+
+    private static void assertBrowserQualification(WorkflowDocument ci) {
+        assertThat(ci.steps("verify").stream().map(WorkflowDocument::map)
+                .map(step -> (String) step.get("name")))
+                .contains("Qualify homepage in Chromium")
+                .containsSubsequence("Install Playwright Chromium dependencies", "Qualify homepage in Chromium");
+        assertThat(ci.step("verify", "Qualify homepage in Chromium").get("run"))
+                .asString().contains(":app:browserCheck");
+    }
+
+    @Test
     void stableGateRequiresBothResultsAndHasNoRepositoryOrSecretAccess() {
         Map<String, Object> gate = workflow.job("gate");
         assertThat(WorkflowDocument.list(gate.get("needs"))).containsExactlyInAnyOrder("automation", "verify");

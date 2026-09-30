@@ -10,8 +10,7 @@
     <meta name="description" content="${page.description().isBlank() ? page.name() : page.description()}">
     @template.site.components.canonicalLink(page.canonicalUrl())
     @template.site.components.robotsMeta(page.noindex())
-    @template.site.components.stylesheetLinks(page.stylesheetPaths())
-    <link rel="stylesheet" href="/theme.css">
+    @template.site.components.standardPublicStyles(page.stylesheetPaths())
     @template.site.components.feedDiscoveryLink()
 </head>
 <body>
