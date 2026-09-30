@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dev.persefonia.automation.support.CommandRunner;
+import java.nio.file.LinkOption;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -31,6 +32,14 @@ class AutomationRepositoryPolicyTest {
             String mode = parts[0].substring(0, 6);
             String file = parts[1];
             if (file.startsWith("automation-tests/src/test/")) continue;
+            if (!Files.exists(repository.resolve(file), LinkOption.NOFOLLOW_LINKS)) continue;
+            assertProductionShell(repository, file, mode);
+        }
+        var untracked = runner.run("git", "ls-files", "--others", "--exclude-standard", "-z", "--", "*.sh");
+        untracked.requireSuccess();
+        for (String file : untracked.stdout().split("\0")) {
+            if (file.isEmpty() || file.startsWith("automation-tests/src/test/")) continue;
+            String mode = Files.isExecutable(repository.resolve(file)) ? "100755" : "100644";
             assertProductionShell(repository, file, mode);
         }
     }

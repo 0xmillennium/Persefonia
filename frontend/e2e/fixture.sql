@@ -1,4 +1,7 @@
--- Browser qualification data only. Applied to a disposable PostgreSQL container by browserCheck.
+-- Destructive browser fixture: browserCheck applies this to disposable PostgreSQL.
+-- It may also be loaded explicitly into disposable local Compose data for visual review.
+-- The active CV row references a PDF created separately by browserCheck; local Compose
+-- does not create that file, so the fixture alone cannot qualify CV download.
 TRUNCATE discovery.discoverable_resources, publishing.content_items,
     portfolio.projects, portfolio.personal_profiles, portfolio.active_cv_documents, media.assets CASCADE;
 

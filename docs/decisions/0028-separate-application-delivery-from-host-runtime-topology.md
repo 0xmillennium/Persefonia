@@ -2,13 +2,15 @@
 
 | Field | Value |
 |---|---|
-| Status | Accepted |
+| Status | Superseded |
 | Date | 2026-09-28 |
 | Scope | architecture / operations / deployment / repository ownership |
 | Supersedes | ADR 0023 |
-| Superseded by | none |
+| Superseded by | ADR 0033 |
 
-Implementation refinement: [ADR 0030](0030-route-deployment-runtime-operations-through-a-narrow-host-privilege-gateway.md) is the active implementation decision. Persefonia owns deployment orchestration. The external runtime owns the privileged runtime gateway, physical topology, runtime operator, Docker authority, secrets, durable state, and preflight implementation. Routing operations through the gateway does not transfer runtime ownership to Persefonia. [ADR 0029](0029-execute-repository-owned-rc-deployment-orchestration-ephemerally-over-authenticated-ssh.md) records the preceding streamed-payload mechanism.
+Historical implementation refinement: [ADR 0030](0030-route-deployment-runtime-operations-through-a-narrow-host-privilege-gateway.md) is the active implementation decision. Persefonia owns deployment orchestration. The external runtime owns the privileged runtime gateway, physical topology, runtime operator, Docker authority, secrets, durable state, and preflight implementation. Routing operations through the gateway does not transfer runtime ownership to Persefonia. [ADR 0029](0029-execute-repository-owned-rc-deployment-orchestration-ephemerally-over-authenticated-ssh.md) records the preceding streamed-payload mechanism.
+
+The application-only root `compose.yaml` contract below is superseded by [ADR 0033](0033-keep-production-runtime-topology-external-and-use-compose-for-containerized-local-development.md). Its production runtime ownership boundary remains in force.
 
 ## Context
 

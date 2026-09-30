@@ -91,12 +91,13 @@ nb-configuration.xml
 .env.production
 *.log
 
-# Application-consumed runtime secrets; examples remain repository source.
-/secrets/postgres_password
-/secrets/redis_password
-/secrets/contact_rate_limit_secret
-/secrets/oidc_client_secret
-/secrets/cloudflare_api_token
+# Application-consumed secret files; fake .examples remain repository source.
+/secrets/*
+!/secrets/*.examples
+
+# Local Compose extensions.
+/compose.override.yaml
+/compose.override.yml
 
 # Node / frontend
 frontend/node_modules/

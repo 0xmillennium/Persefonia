@@ -131,9 +131,15 @@ jobs:
           docker version
           docker compose version
 
-      - name: Validate application Compose contract
+      - name: Validate local Compose contract
         run: |
-          ./scripts/ci/verify-compose.sh
+          ./scripts/ci/verify-local-compose.sh
+
+      - name: Verify development toolchain platforms
+        run: |
+          ./scripts/release/verify-image-platforms.sh \
+            "ghcr.io/ringcentral-docker/node:22.22.2-jdk25@sha256:d8b709dbd229236715fa16403e68c6e310fde38e285cd0bfc788f049a3cab535" \
+            supported-platforms.txt contains
 
       - name: Build and test
         run: ./gradlew --no-daemon --stacktrace clean applicationCheck :app:bootJar

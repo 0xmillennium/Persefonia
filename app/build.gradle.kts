@@ -1,6 +1,7 @@
 import org.gradle.api.tasks.Exec
 import org.gradle.api.tasks.testing.Test
 import org.springframework.boot.gradle.tasks.bundling.BootJar
+import org.springframework.boot.gradle.tasks.run.BootRun
 
 plugins {
     alias(libs.plugins.spring.boot)
@@ -156,6 +157,7 @@ val npmCi by tasks.registering(Exec::class) {
         frontendDirectory.file("package.json"),
         frontendDirectory.file("package-lock.json")
     )
+    inputs.property("nodePlatform", System.getProperty("os.name") + "-" + System.getProperty("os.arch"))
     outputs.dir(frontendDirectory.dir("node_modules"))
 }
 
@@ -210,6 +212,11 @@ tasks.named<BootJar>("bootJar") {
         include("**/*.class")
         into("BOOT-INF/classes")
     }
+}
+
+tasks.named<BootRun>("bootRun") {
+    dependsOn("precompileJte")
+    classpath += files(precompiledJteDirectory)
 }
 
 tasks.named("jar") {

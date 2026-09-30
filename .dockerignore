@@ -1,7 +1,5 @@
 *
-!docker/
-docker/*
-!docker/Dockerfile
+!Dockerfile
 !app/
 app/*
 !app/build/

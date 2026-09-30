@@ -138,7 +138,7 @@ class ContainerImageContractTest {
                         "FAKE_GH_LOG", temporary.resolve("gh.log").toString(), "FAKE_GH_SIGNED", signed ? "1" : "0"))
                 .run(repository.resolve("scripts/release/verify-container-image.sh").toString(),
                         image + "@" + fixture.indexDigest, "linux/amd64",
-                        repository.resolve("docker/supported-platforms.txt").toString(), sourceUrl, source, "0.1.0");
+                        repository.resolve("supported-platforms.txt").toString(), sourceUrl, source, "0.1.0");
     }
 
     private Path fakes() throws Exception {

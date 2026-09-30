@@ -130,6 +130,6 @@ class ImagePlatformsContractTest {
                         "FAKE_MANIFEST_FALLBACK", fallback ? "1" : "0"))
                 .run(repository.resolve("scripts/release/verify-image-platforms.sh").toString(),
                         "example.invalid/image@sha256:" + "a".repeat(64),
-                        repository.resolve("docker/supported-platforms.txt").toString(), mode);
+                        repository.resolve("supported-platforms.txt").toString(), mode);
     }
 }

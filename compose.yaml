@@ -1,60 +1,90 @@
+# Local source runtime. Production deployment consumes only the qualified OCI artifact.
+name: persefonia-local
 services:
   app:
-    image: ${PERSEFONIA_IMAGE_REF:?PERSEFONIA_IMAGE_REF is required}
-    user: "10001:10001"
+    image: ghcr.io/ringcentral-docker/node:22.22.2-jdk25@sha256:d8b709dbd229236715fa16403e68c6e310fde38e285cd0bfc788f049a3cab535
+    working_dir: /workspace
+    user: "${PERSEFONIA_LOCAL_UID:-1000}:${PERSEFONIA_LOCAL_GID:-1000}"
+    init: true
     read_only: true
     cap_drop:
       - ALL
     security_opt:
       - no-new-privileges:true
-    environment:
-      SPRING_PROFILES_ACTIVE: docker
-      SPRING_DATA_REDIS_USERNAME: "${PERSEFONIA_REDIS_USERNAME:?}"
-      PERSEFONIA_CONTACT_RATE_LIMIT_REDIS_KEY_PREFIX: "${PERSEFONIA_REDIS_KEY_PREFIX:?}"
-      PERSEFONIA_MANAGEMENT_PORT: "${PERSEFONIA_MANAGEMENT_PORT:?}"
-      PERSEFONIA_POSTGRES_HOST: "${PERSEFONIA_POSTGRES_HOST:?}"
-      PERSEFONIA_POSTGRES_PORT: "${PERSEFONIA_POSTGRES_PORT:?}"
-      PERSEFONIA_REDIS_HOST: "${PERSEFONIA_REDIS_HOST:?}"
-      PERSEFONIA_REDIS_PORT: "${PERSEFONIA_REDIS_PORT:?}"
-      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
-      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
-    secrets:
-      - source: postgres_password
-        target: spring.datasource.password
-      - source: redis_password
-        target: spring.data.redis.password
-      - source: contact_rate_limit_secret
-        target: persefonia.contact.rate-limit.secret
-      - source: oidc_client_secret
-        target: spring.security.oauth2.client.registration.authelia.client-secret
-      - source: cloudflare_api_token
-        target: persefonia.cache-purge.cloudflare.api-token
-    volumes:
-      - type: bind
-        source: ${PERSEFONIA_MEDIA_HOST_PATH:?PERSEFONIA_MEDIA_HOST_PATH is required}
-        target: /var/lib/persefonia/media
-        bind:
-          create_host_path: false
     tmpfs:
       - /tmp
+    volumes:
+      - type: bind
+        source: .
+        target: /workspace
+    environment:
+      HOME: /workspace/.runtime/home
+      GRADLE_USER_HOME: /workspace/.runtime/gradle
+      NPM_CONFIG_CACHE: /workspace/.runtime/npm
+      SPRING_PROFILES_ACTIVE: local
+      PERSEFONIA_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      PERSEFONIA_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      PERSEFONIA_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      PERSEFONIA_REDIS_HOST: redis
+      PERSEFONIA_REDIS_PORT: "6379"
+      SPRING_DATA_REDIS_USERNAME: default
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD}
+      PERSEFONIA_PUBLIC_BASE_URL: ${PERSEFONIA_PUBLIC_BASE_URL}
+      PERSEFONIA_MEDIA_STORAGE_ROOT: /workspace/.runtime/media
+      PERSEFONIA_MEDIA_STORAGE_REQUIRED: "true"
+      MANAGEMENT_ENDPOINT_HEALTH_GROUP_READINESS_INCLUDE: readinessState,db,mediaStorage,databaseMigrations
+      PERSEFONIA_MANAGEMENT_ADDRESS: 0.0.0.0
+      PERSEFONIA_MANAGEMENT_PORT: "9001"
+      PERSEFONIA_CONTACT_RATE_LIMIT_SECRET: ${PERSEFONIA_CONTACT_RATE_LIMIT_SECRET}
+      PERSEFONIA_CONTACT_RATE_LIMIT_REDIS_KEY_PREFIX: ${PERSEFONIA_REDIS_KEY_PREFIX}
+    command:
+      - ./gradlew
+      - --no-daemon
+      - --console=plain
+      - :app:bootRun
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     healthcheck:
-      test:
-        ["CMD", "curl", "--fail", "--silent", "--show-error", "--output", "/dev/null", "http://127.0.0.1:${PERSEFONIA_MANAGEMENT_PORT:?}/actuator/health/readiness"]
-      interval: 10s
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "--output", "/dev/null", "http://127.0.0.1:9001/actuator/health/readiness"]
+      interval: 15s
       timeout: 5s
-      retries: 12
-      start_period: 30s
+      retries: 20
+      start_period: 15m
     ports:
-      - "127.0.0.1:${PERSEFONIA_APP_PORT:?PERSEFONIA_APP_PORT is required}:8080"
+      - "127.0.0.1:${PERSEFONIA_APP_PORT:-8080}:8080"
+      - "127.0.0.1:${PERSEFONIA_MANAGEMENT_PORT:-9001}:9001"
 
-secrets:
-  postgres_password:
-    file: ${PERSEFONIA_POSTGRES_PASSWORD_FILE:?PERSEFONIA_POSTGRES_PASSWORD_FILE is required}
-  redis_password:
-    file: ${PERSEFONIA_REDIS_PASSWORD_FILE:?PERSEFONIA_REDIS_PASSWORD_FILE is required}
-  contact_rate_limit_secret:
-    file: ${PERSEFONIA_CONTACT_RATE_LIMIT_SECRET_FILE:?PERSEFONIA_CONTACT_RATE_LIMIT_SECRET_FILE is required}
-  oidc_client_secret:
-    file: ${PERSEFONIA_OIDC_CLIENT_SECRET_FILE:?PERSEFONIA_OIDC_CLIENT_SECRET_FILE is required}
-  cloudflare_api_token:
-    file: ${PERSEFONIA_CLOUDFLARE_API_TOKEN_FILE:?PERSEFONIA_CLOUDFLARE_API_TOKEN_FILE is required}
+  postgres:
+    image: postgres:17.11-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    ports:
+      - "127.0.0.1:${PERSEFONIA_POSTGRES_PORT:-5432}:5432"
+
+  redis:
+    image: redis:8.10-alpine@sha256:becdda6c7f4b3fb42e42fd7f120bbf5c54c4caaaf16f26da24e4563d2c1f0576
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    command: ["sh", "-ec", "exec redis-server --requirepass \"$$REDIS_PASSWORD\" --appendonly no --save ''"]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping 2>/dev/null | grep -qx PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    ports:
+      - "127.0.0.1:${PERSEFONIA_REDIS_HOST_PORT:-6379}:6379"
+
+volumes:
+  postgres-data:

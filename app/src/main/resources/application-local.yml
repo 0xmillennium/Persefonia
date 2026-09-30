@@ -1,4 +1,6 @@
 spring:
+  config:
+    import: "optional:configtree:/run/secrets/"
   datasource:
     url: ${PERSEFONIA_DATASOURCE_URL}
     username: ${PERSEFONIA_DATASOURCE_USERNAME}

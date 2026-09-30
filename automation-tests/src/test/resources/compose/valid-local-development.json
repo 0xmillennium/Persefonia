@@ -1,0 +1,184 @@
+{
+  "name": "persefonia-local",
+  "networks": {
+    "default": {
+      "name": "persefonia-local_default",
+      "ipam": {}
+    }
+  },
+  "services": {
+    "app": {
+      "cap_drop": [
+        "ALL"
+      ],
+      "command": [
+        "./gradlew",
+        "--no-daemon",
+        "--console=plain",
+        ":app:bootRun"
+      ],
+      "depends_on": {
+        "postgres": {
+          "condition": "service_healthy",
+          "required": true
+        },
+        "redis": {
+          "condition": "service_healthy",
+          "required": true
+        }
+      },
+      "entrypoint": null,
+      "environment": {
+        "GRADLE_USER_HOME": "/workspace/.runtime/gradle",
+        "HOME": "/workspace/.runtime/home",
+        "MANAGEMENT_ENDPOINT_HEALTH_GROUP_READINESS_INCLUDE": "readinessState,db,mediaStorage,databaseMigrations",
+        "NPM_CONFIG_CACHE": "/workspace/.runtime/npm",
+        "PERSEFONIA_CONTACT_RATE_LIMIT_REDIS_KEY_PREFIX": "persefonia:local:rate-limit",
+        "PERSEFONIA_CONTACT_RATE_LIMIT_SECRET": "local-only-contact-rate-limit-secret-32-characters",
+        "PERSEFONIA_DATASOURCE_PASSWORD": "local-only-postgres-password",
+        "PERSEFONIA_DATASOURCE_URL": "jdbc:postgresql://postgres:5432/persefonia",
+        "PERSEFONIA_DATASOURCE_USERNAME": "persefonia",
+        "PERSEFONIA_MANAGEMENT_ADDRESS": "0.0.0.0",
+        "PERSEFONIA_MANAGEMENT_PORT": "9001",
+        "PERSEFONIA_MEDIA_STORAGE_REQUIRED": "true",
+        "PERSEFONIA_MEDIA_STORAGE_ROOT": "/workspace/.runtime/media",
+        "PERSEFONIA_PUBLIC_BASE_URL": "http://localhost:8080",
+        "PERSEFONIA_REDIS_HOST": "redis",
+        "PERSEFONIA_REDIS_PORT": "6379",
+        "SPRING_DATA_REDIS_PASSWORD": "local-only-redis-password",
+        "SPRING_DATA_REDIS_USERNAME": "default",
+        "SPRING_PROFILES_ACTIVE": "local"
+      },
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "curl",
+          "--fail",
+          "--silent",
+          "--show-error",
+          "--output",
+          "/dev/null",
+          "http://127.0.0.1:9001/actuator/health/readiness"
+        ],
+        "timeout": "5s",
+        "interval": "15s",
+        "retries": 20,
+        "start_period": "15m0s"
+      },
+      "image": "ghcr.io/ringcentral-docker/node:22.22.2-jdk25@sha256:d8b709dbd229236715fa16403e68c6e310fde38e285cd0bfc788f049a3cab535",
+      "init": true,
+      "networks": {
+        "default": null
+      },
+      "ports": [
+        {
+          "mode": "ingress",
+          "host_ip": "127.0.0.1",
+          "target": 8080,
+          "published": "8080",
+          "protocol": "tcp"
+        },
+        {
+          "mode": "ingress",
+          "host_ip": "127.0.0.1",
+          "target": 9001,
+          "published": "9001",
+          "protocol": "tcp"
+        }
+      ],
+      "read_only": true,
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "tmpfs": [
+        "/tmp"
+      ],
+      "user": "1000:1000",
+      "volumes": [
+        {
+          "type": "bind",
+          "source": "/synthetic/workspace",
+          "target": "/workspace"
+        }
+      ],
+      "working_dir": "/workspace"
+    },
+    "postgres": {
+      "command": null,
+      "entrypoint": null,
+      "environment": {
+        "POSTGRES_DB": "persefonia",
+        "POSTGRES_PASSWORD": "local-only-postgres-password",
+        "POSTGRES_USER": "persefonia"
+      },
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""
+        ],
+        "timeout": "5s",
+        "interval": "5s",
+        "retries": 20
+      },
+      "image": "postgres:17.11-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73",
+      "networks": {
+        "default": null
+      },
+      "ports": [
+        {
+          "mode": "ingress",
+          "host_ip": "127.0.0.1",
+          "target": 5432,
+          "published": "5432",
+          "protocol": "tcp"
+        }
+      ],
+      "volumes": [
+        {
+          "type": "volume",
+          "source": "postgres-data",
+          "target": "/var/lib/postgresql/data",
+          "volume": {}
+        }
+      ]
+    },
+    "redis": {
+      "command": [
+        "sh",
+        "-ec",
+        "exec redis-server --requirepass \"$$REDIS_PASSWORD\" --appendonly no --save ''"
+      ],
+      "entrypoint": null,
+      "environment": {
+        "REDIS_PASSWORD": "local-only-redis-password"
+      },
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "redis-cli -a \"$$REDIS_PASSWORD\" ping 2>/dev/null | grep -qx PONG"
+        ],
+        "timeout": "5s",
+        "interval": "5s",
+        "retries": 20
+      },
+      "image": "redis:8.10-alpine@sha256:becdda6c7f4b3fb42e42fd7f120bbf5c54c4caaaf16f26da24e4563d2c1f0576",
+      "networks": {
+        "default": null
+      },
+      "ports": [
+        {
+          "mode": "ingress",
+          "host_ip": "127.0.0.1",
+          "target": 6379,
+          "published": "6379",
+          "protocol": "tcp"
+        }
+      ]
+    }
+  },
+  "volumes": {
+    "postgres-data": {
+      "name": "persefonia-local_postgres-data"
+    }
+  }
+}

@@ -13,6 +13,8 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
+import org.snakeyaml.engine.v2.api.Load;
+import org.snakeyaml.engine.v2.api.LoadSettings;
 
 class CiWorkflowContractTest {
     private final WorkflowDocument workflow = WorkflowDocument.open("ci.yml");
@@ -57,6 +59,34 @@ class CiWorkflowContractTest {
         assertThat(defaultImage.find()).isTrue();
         assertThat(defaultImage.group(1)).matches("[^\\s@]+@sha256:[0-9a-f]{64}").isEqualTo(ciImage);
         assertThat(script).contains("docker run", "\"$postgres_image\"");
+    }
+
+    @Test
+    void localDependenciesUseTheAcceptedCiImages() throws IOException {
+        Object localYaml = new Load(LoadSettings.builder().build())
+                .loadFromString(Files.readString(Path.of("../compose.yaml")));
+        Map<String, Object> localServices = WorkflowDocument.map(WorkflowDocument.map(localYaml).get("services"));
+        Map<String, Object> ciServices = WorkflowDocument.map(workflow.job("verify").get("services"));
+        for (String service : List.of("postgres", "redis")) {
+            assertThat(WorkflowDocument.map(localServices.get(service)).get("image"))
+                    .as(service).isEqualTo(WorkflowDocument.map(ciServices.get(service)).get("image"));
+        }
+    }
+
+    @Test
+    void verifyChecksTheLocalComposeContract() {
+        assertThat(workflow.step("verify", "Validate local Compose contract").get("run"))
+                .asString().contains("./scripts/ci/verify-local-compose.sh");
+        try {
+            Object localYaml = new Load(LoadSettings.builder().build())
+                    .loadFromString(Files.readString(Path.of("../compose.yaml")));
+            String appImage = (String) WorkflowDocument.map(
+                    WorkflowDocument.map(WorkflowDocument.map(localYaml).get("services")).get("app")).get("image");
+            assertThat(workflow.step("verify", "Verify development toolchain platforms").get("run"))
+                    .asString().contains("verify-image-platforms.sh", appImage, "supported-platforms.txt contains");
+        } catch (IOException exception) {
+            throw new IllegalStateException(exception);
+        }
     }
 
     @Test

@@ -14,6 +14,31 @@ import org.junit.jupiter.api.io.TempDir;
 class RuntimeOwnershipBoundaryTest {
     @TempDir Path temporary;
     @Test
+    void rootArtifactsAreUniqueAndDevelopmentComposeIsNotProductionTopology() throws Exception {
+        Path repository = Path.of("..").toAbsolutePath().normalize();
+        assertThat(repository.resolve("Dockerfile")).exists();
+        assertThat(repository.resolve("supported-platforms.txt")).exists();
+        assertThat(repository.resolve("compose.yaml")).exists();
+        assertThat(repository.resolve(".env.example")).exists();
+        assertThat(repository.resolve("docker")).doesNotExist();
+        assertThat(repository.resolve("dev")).doesNotExist();
+        assertThat(repository.resolve("scripts/dev")).doesNotExist();
+        String compose = Files.readString(repository.resolve("compose.yaml"));
+        assertThat(compose).contains("Local source runtime", "name: persefonia-local");
+        assertThat(compose).doesNotContain("PERSEFONIA_IMAGE_REF", "ghcr.io/0xmillennium/persefonia");
+    }
+
+    @Test
+    void productionWorkflowsCannotConsumeLocalComposeOrEnvironment() throws Exception {
+        Path repository = Path.of("..").toAbsolutePath().normalize();
+        for (String workflow : List.of("delivery.yml", "deploy-rc.yml", "redeploy-rc.yml")) {
+            String source = Files.readString(repository.resolve(".github/workflows/" + workflow));
+            assertThat(source).as(workflow).doesNotContain("compose.yaml", ".env.example", "docker compose",
+                    "docker-compose", "--no-deps app");
+        }
+    }
+
+    @Test
     void repositoryDoesNotOwnProductionTopologyDependencyServersOrHostPreflight() {
         for (String removed : List.of("compose.production.yaml", ".env.production.example",
                 "scripts/deploy/preflight.sh", "docker/postgresql", "docker/redis",
@@ -39,8 +64,8 @@ class RuntimeOwnershipBoundaryTest {
 
     @Test
     void semanticOwnershipPolicyAllowsNestedBuildSupportAndRejectsHostArtifacts() {
-        for (String file : List.of("docker/Dockerfile", "docker/supported-platforms.txt",
-                "docker/build/assets/entrypoint.sh", "compose.yaml", ".env.example",
+        for (String file : List.of("Dockerfile", "supported-platforms.txt",
+                "compose.yaml", ".env.example",
                 "secrets/postgres_password.examples")) {
             assertThat(prohibitedRuntimeArtifact(file)).as(file).isFalse();
         }
