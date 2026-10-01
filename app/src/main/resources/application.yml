@@ -1,6 +1,17 @@
 spring:
   application:
     name: persefonia
+  mail:
+    host: ${PERSEFONIA_SMTP_HOST:localhost}
+    port: ${PERSEFONIA_SMTP_PORT:25}
+    username: ${PERSEFONIA_SMTP_USERNAME:}
+    properties:
+      mail.smtp.auth: ${PERSEFONIA_SMTP_AUTH_ENABLED:false}
+      mail.smtp.starttls.enable: ${PERSEFONIA_SMTP_STARTTLS_ENABLED:false}
+      mail.smtp.starttls.required: ${PERSEFONIA_SMTP_STARTTLS_REQUIRED:false}
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 5000
+      mail.smtp.writetimeout: 5000
   profiles:
     default: local
   threads:

@@ -34,13 +34,13 @@ class LocalComposeVerifierContractTest {
                 else
                   [[ $6 == config && $7 == --format && $8 == json ]]
                 fi
-                jq --arg workspace "$PWD" --arg mode "$(cat -- "${0%/*}/mode")" '
+                jq --arg workspace "$PWD" --arg mode "$(cat -- "${0%/*}/mode")" --arg fixture_name "$fixture" '
                   .services.app.volumes[0].source = $workspace |
                   .services.redis.volumes[0].source = ($workspace + "/scripts/local-redis-entrypoint.sh") |
                   .secrets |= with_entries(.value.file |= sub("^/synthetic/workspace"; $workspace)) |
                   if $mode == "unsafe" then .services.app.read_only = false
-                  elif $mode == "optional-unsafe" and (.secrets | has("oidc_client_secret"))
-                    then .services.app.environment.SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_AUTHELIA_CLIENT_SECRET = "unsafe"
+                  elif $mode == "optional-unsafe" and ($fixture_name | endswith("override.json"))
+                    then .services.app.environment.PERSEFONIA_CACHE_PURGE_PROVIDER = "CLOUDFLARE"
                   else . end
                 ' "$fixture"
                 """);

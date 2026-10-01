@@ -7,17 +7,9 @@
     }
   },
   "secrets": {
-    "cloudflare_api_token": {
-      "name": "persefonia-local_cloudflare_api_token",
-      "file": "/synthetic/workspace/secrets/cloudflare_api_token.examples"
-    },
     "contact_rate_limit_secret": {
       "name": "persefonia-local_contact_rate_limit_secret",
       "file": "/synthetic/workspace/secrets/contact_rate_limit_secret.examples"
-    },
-    "oidc_client_secret": {
-      "name": "persefonia-local_oidc_client_secret",
-      "file": "/synthetic/workspace/secrets/oidc_client_secret.examples"
     },
     "postgres_password": {
       "name": "persefonia-local_postgres_password",
@@ -55,9 +47,6 @@
         "HOME": "/workspace/.runtime/home",
         "MANAGEMENT_ENDPOINT_HEALTH_GROUP_READINESS_INCLUDE": "readinessState,db,mediaStorage,databaseMigrations",
         "NPM_CONFIG_CACHE": "/workspace/.runtime/npm",
-        "PERSEFONIA_ADMIN_REQUIRED_OIDC_GROUP": "admin",
-        "PERSEFONIA_CACHE_PURGE_PROVIDER": "CLOUDFLARE",
-        "PERSEFONIA_CLOUDFLARE_ZONE_ID": "local-example-zone",
         "PERSEFONIA_CONTACT_RATE_LIMIT_REDIS_KEY_PREFIX": "persefonia:local:rate-limit",
         "PERSEFONIA_DATASOURCE_URL": "jdbc:postgresql://postgres:5432/persefonia",
         "PERSEFONIA_DATASOURCE_USERNAME": "persefonia",
@@ -69,13 +58,7 @@
         "PERSEFONIA_REDIS_HOST": "redis",
         "PERSEFONIA_REDIS_PORT": "6379",
         "SPRING_DATA_REDIS_USERNAME": "persefonia",
-        "SPRING_PROFILES_ACTIVE": "local",
-        "SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_AUTHELIA_ISSUER_URI": "https://id.example.invalid",
-        "SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_AUTHELIA_AUTHORIZATION_GRANT_TYPE": "authorization_code",
-        "SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_AUTHELIA_CLIENT_AUTHENTICATION_METHOD": "client_secret_basic",
-        "SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_AUTHELIA_CLIENT_ID": "persefonia-local-example",
-        "SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_AUTHELIA_REDIRECT_URI": "{baseUrl}/login/oauth2/code/{registrationId}",
-        "SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_AUTHELIA_SCOPE": "openid,profile,email,groups,offline_access"
+        "SPRING_PROFILES_ACTIVE": "local"
       },
       "healthcheck": {
         "test": [
@@ -127,14 +110,6 @@
         {
           "source": "contact_rate_limit_secret",
           "target": "persefonia.contact.rate-limit.secret"
-        },
-        {
-          "source": "oidc_client_secret",
-          "target": "spring.security.oauth2.client.registration.authelia.client-secret"
-        },
-        {
-          "source": "cloudflare_api_token",
-          "target": "persefonia.cache-purge.cloudflare.api-token"
         }
       ],
       "security_opt": [
@@ -151,7 +126,8 @@
           "target": "/workspace"
         }
       ],
-      "working_dir": "/workspace"
+      "working_dir": "/workspace",
+      "stop_grace_period": "30s"
     },
     "postgres": {
       "command": null,
@@ -213,8 +189,9 @@
       },
       "healthcheck": {
         "test": [
-          "CMD-SHELL",
-          "REDISCLI_AUTH=\"$$(cat /run/secrets/redis_password)\" redis-cli --user \"$$PERSEFONIA_REDIS_USERNAME\" ping 2>/dev/null | grep -qx PONG"
+          "CMD",
+          "redis-cli",
+          "ping"
         ],
         "timeout": "5s",
         "interval": "5s",

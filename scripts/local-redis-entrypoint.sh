@@ -36,8 +36,8 @@ umask 077
 temporary_file="${acl_file}.tmp.$$"
 trap 'rm -f -- "$temporary_file"' EXIT HUP INT TERM
 {
-    printf '%s\n' 'user default off'
-    printf 'user %s on #%s ~%s:* +hello +ping +client|setinfo +incr +pexpire\n' \
+    printf '%s\n' 'user default reset on nopass -@all +ping'
+    printf 'user %s reset on #%s ~%s:* +hello +client|setinfo +incr +pexpire\n' \
         "$username" "$hash" "$prefix"
 } > "$temporary_file" || fail 'could not create ACL file'
 chmod 600 "$temporary_file" || fail 'could not protect ACL file'

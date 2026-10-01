@@ -25,11 +25,12 @@ check(.name == "persefonia-local"; "local Compose project name changed")
     "Redis image differs from the accepted identity")
 | check(.services.app.working_dir == "/workspace"
     and .services.app.command == ["./gradlew", "--no-daemon", "--console=plain", ":app:bootRun"]
+    and .services.app.stop_grace_period == "30s"
     and (.services.app.volumes | length) == 1
     and .services.app.volumes[0].type == "bind"
     and .services.app.volumes[0].source == $workspace
     and .services.app.volumes[0].target == "/workspace";
-    "app must run the current bind-mounted source through Gradle bootRun")
+    "app must run the current bind-mounted source through Gradle bootRun with a graceful stop budget")
 | check((.services.app.user | test("^[1-9][0-9]*:[1-9][0-9]*$")); "app must use a non-root UID/GID")
 | check(.services.app.init == true and .services.app.read_only == true
         and .services.app.cap_drop == ["ALL"]
@@ -103,10 +104,8 @@ check(.name == "persefonia-local"; "local Compose project name changed")
     and .services.redis.volumes[0].read_only == true
     and .services.redis.entrypoint == ["sh", "/usr/local/bin/persefonia-local-redis-entrypoint.sh"]
     and .services.redis.command == null
-    and .services.redis.healthcheck.test[0] == "CMD-SHELL"
-    and (.services.redis.healthcheck.test[1] | contains("--user") and contains("/run/secrets/redis_password")
-        and (contains("requirepass") | not));
-    "Redis must use a non-root ACL bootstrap, authenticated health, and no durable state")
+    and .services.redis.healthcheck.test == ["CMD", "redis-cli", "ping"];
+    "Redis must use a non-root ACL bootstrap, credential-free PING health, and no durable state")
 | check((.networks | keys) == ["default"] and (.networks.default.external // false) == false
     and (.services.app.labels // {}) == {};
     "local Compose must not own production networks or routing")

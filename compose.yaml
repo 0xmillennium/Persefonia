@@ -41,11 +41,8 @@ services:
         target: spring.data.redis.password
       - source: contact_rate_limit_secret
         target: persefonia.contact.rate-limit.secret
-    command:
-      - ./gradlew
-      - --no-daemon
-      - --console=plain
-      - :app:bootRun
+    command: ["./gradlew", "--no-daemon", "--console=plain", ":app:bootRun"]
+    stop_grace_period: 30s
     depends_on:
       postgres:
         condition: service_healthy
@@ -103,7 +100,7 @@ services:
         target: redis_password
     entrypoint: ["sh", "/usr/local/bin/persefonia-local-redis-entrypoint.sh"]
     healthcheck:
-      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$(cat /run/secrets/redis_password)\" redis-cli --user \"$$PERSEFONIA_REDIS_USERNAME\" ping 2>/dev/null | grep -qx PONG"]
+      test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 5s
       retries: 20

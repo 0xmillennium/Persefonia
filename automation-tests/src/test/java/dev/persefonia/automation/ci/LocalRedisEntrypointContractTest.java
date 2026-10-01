@@ -34,9 +34,9 @@ class LocalRedisEntrypointContractTest {
         String content = Files.readString(acl);
         byte[] digest = MessageDigest.getInstance("SHA-256")
                 .digest(FAKE_PASSWORD.getBytes(StandardCharsets.UTF_8));
-        assertThat(content).isEqualTo("user default off\nuser persefonia on #"
+        assertThat(content).isEqualTo("user default reset on nopass -@all +ping\nuser persefonia reset on #"
                 + HexFormat.of().formatHex(digest)
-                + " ~persefonia:local:rate-limit:* +hello +ping +client|setinfo +incr +pexpire\n");
+                + " ~persefonia:local:rate-limit:* +hello +client|setinfo +incr +pexpire\n");
         assertThat(content).doesNotContain(FAKE_PASSWORD, "~*", "+@all", "+flushall", "+config", "+acl");
         assertThat(Files.getPosixFilePermissions(acl))
                 .isEqualTo(Set.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE));

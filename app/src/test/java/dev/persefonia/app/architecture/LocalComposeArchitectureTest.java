@@ -38,6 +38,9 @@ class LocalComposeArchitectureTest {
         assertThat(app.get("user")).isEqualTo("${PERSEFONIA_LOCAL_UID:-1000}:${PERSEFONIA_LOCAL_GID:-1000}");
         assertThat(app.get("working_dir")).isEqualTo("/workspace");
         assertThat(app.get("command")).isEqualTo(List.of("./gradlew", "--no-daemon", "--console=plain", ":app:bootRun"));
+        assertThat(app.get("stop_grace_period")).isEqualTo("30s");
+        assertThat(Files.readString(LOCAL_COMPOSE))
+                .contains("command: [\"./gradlew\", \"--no-daemon\", \"--console=plain\", \":app:bootRun\"]");
         assertThat(app.get("init")).isEqualTo(true);
         assertThat(app.get("read_only")).isEqualTo(true);
         assertThat(app.get("cap_drop")).isEqualTo(List.of("ALL"));
@@ -95,6 +98,28 @@ class LocalComposeArchitectureTest {
         assertThat(redis.get("ports")).isEqualTo(List.of("127.0.0.1:${PERSEFONIA_REDIS_HOST_PORT:-6379}:6379"));
         assertThat(postgres).containsKey("healthcheck");
         assertThat(redis).containsKey("healthcheck");
+        assertThat(mapping(redis.get("healthcheck")).get("test"))
+                .isEqualTo(List.of("CMD", "redis-cli", "ping"));
+    }
+
+    @Test
+    void optionalIntegrationTemplateIsInertAndDocumentsSupportedBindings() throws Exception {
+        String source = Files.readString(Path.of("../compose.override.example.yaml"));
+        Map<String, Object> override = mapping(new Yaml().load(source));
+        assertThat(override.keySet()).containsExactly("services");
+        assertThat(mapping(override.get("services"))).containsOnlyKeys("app");
+        assertThat(mapping(mapping(override.get("services")).get("app"))).isEmpty();
+        assertThat(source).contains(
+                "SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_AUTHELIA_ISSUER_URI",
+                "spring.security.oauth2.client.registration.authelia.client-secret",
+                "PERSEFONIA_CACHE_PURGE_PROVIDER",
+                "persefonia.cache-purge.cloudflare.api-token",
+                "PERSEFONIA_SMTP_HOST", "PERSEFONIA_SMTP_PORT", "PERSEFONIA_SMTP_USERNAME",
+                "PERSEFONIA_SMTP_AUTH_ENABLED", "PERSEFONIA_SMTP_STARTTLS_ENABLED",
+                "PERSEFONIA_SMTP_STARTTLS_REQUIRED", "PERSEFONIA_SMTP_PASSWORD_FILE",
+                "spring.mail.password", "PERSEFONIA_CONTACT_MAIL_OWNER_RECIPIENT",
+                "PERSEFONIA_CONTACT_MAIL_FROM", "SERVER_FORWARD_HEADERS_STRATEGY",
+                "SERVER_TOMCAT_REMOTEIP_INTERNAL_PROXIES", "PERSEFONIA_SESSION_COOKIE_SECURE");
     }
 
     private static Map<String, Object> descriptor() throws Exception {

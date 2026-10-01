@@ -13,10 +13,15 @@ import org.yaml.snakeyaml.Yaml;
 class RuntimeSecretContractTest {
     private static final List<String> SECRETS = List.of(
             "postgres_password", "redis_password", "contact_rate_limit_secret",
-            "oidc_client_secret", "cloudflare_api_token");
+            "oidc_client_secret", "cloudflare_api_token", "smtp_password");
 
     @Test
     void applicationCredentialExamplesRemainTrackedAndRealSecretsStayIgnoredAndUntracked() throws Exception {
+        try (var files = Files.list(Path.of("../secrets"))) {
+            assertThat(files.map(path -> path.getFileName().toString())
+                    .filter(name -> name.endsWith(".examples")).toList())
+                    .containsExactlyInAnyOrderElementsOf(SECRETS.stream().map(name -> name + ".examples").toList());
+        }
         for (String name : SECRETS) {
             String real = "secrets/" + name;
             String example = real + ".examples";
@@ -29,7 +34,7 @@ class RuntimeSecretContractTest {
             assertThat(git("ls-files", "--", real).output()).isEmpty();
         }
         for (String local : List.of(".env", ".env.production", "compose.override.yaml", "compose.override.yml",
-                "secrets/another_real_secret")) {
+                "secrets/another_real_secret", "secrets/smtp_password")) {
             assertThat(git("check-ignore", "-q", local).status()).as(local).isZero();
         }
     }
@@ -60,6 +65,9 @@ class RuntimeSecretContractTest {
                 .contains("optional:configtree:/run/secrets/");
         assertThat(Files.readString(Path.of("src/main/resources/application-docker.yml")))
                 .contains("configtree:/run/secrets/");
+        assertThat(Files.readString(Path.of("../compose.override.example.yaml")))
+                .contains("target: spring.mail.password", "PERSEFONIA_SMTP_PASSWORD_FILE")
+                .doesNotContain("redis_healthcheck_password", "traefik_password");
     }
 
     @Test
