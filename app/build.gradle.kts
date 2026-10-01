@@ -172,6 +172,23 @@ val npmRunTypecheck by tasks.registering(Exec::class) {
     )
 }
 
+val npmRunUnitTest by tasks.registering(Exec::class) {
+    group = "verification"
+    description = "Runs pure frontend unit tests."
+    dependsOn(npmCi)
+    workingDir(frontendDirectory)
+    commandLine("npm", "run", "test:unit")
+    inputs.dir(frontendDirectory.dir("src"))
+    inputs.files(
+        frontendDirectory.file("package.json"),
+        frontendDirectory.file("vitest.config.ts")
+    )
+}
+
+tasks.check {
+    dependsOn(npmRunUnitTest)
+}
+
 val viteBuild by tasks.registering(Exec::class) {
     dependsOn(npmRunTypecheck)
     workingDir(frontendDirectory)

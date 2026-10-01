@@ -351,6 +351,30 @@ test("script absence and initialization failure preserve SSR and snapshots", asy
   }
 });
 
+test("the opt-in Pixi candidate initializes without replacing semantic content", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop-1440");
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  page.on("console", message => {
+    if (message.type() === "error") errors.push(message.text());
+  });
+  await page.route("**/", async route => {
+    const response = await route.fetch();
+    const html = await response.text();
+    const script = '<script type="module"';
+    expect(html).toContain(script);
+    await route.fulfill({ response, body: html.replace(script, '<div data-homepage-runtime aria-hidden="true"></div>' + script) });
+  });
+
+  await visit(page);
+  await expect(page.locator("[data-homepage-runtime] canvas")).toHaveCount(1);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
+  await expect(page.locator("[data-archive-chapter]")).toHaveCount(7);
+  expect(await page.locator("[data-homepage-runtime] canvas").evaluate(canvas =>
+    (canvas as HTMLCanvasElement).getContext("webgl2") !== null)).toBe(true);
+  expect(errors).toEqual([]);
+});
+
 test("runtime render failure restores snapshots and stops the enhancement", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile-390");
   await visit(page);

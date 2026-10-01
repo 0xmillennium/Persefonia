@@ -36,6 +36,11 @@ export default defineConfig({
                 if (!match) {
                   return null;
                 }
+                // Pixi's module graph contains cycles; let automatic chunking
+                // keep its initialization order intact.
+                if (match[1] === "pixi.js") {
+                  return null;
+                }
                 return `vendor-${match[1].replace("@", "").replace("/", "-")}`;
               },
               minSize: 20_000,
