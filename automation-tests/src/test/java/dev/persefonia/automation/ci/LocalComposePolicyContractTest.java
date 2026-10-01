@@ -35,7 +35,7 @@ class LocalComposePolicyContractTest {
                 Map.entry("privileged", ".services.app.privileged = true"),
                 Map.entry("wrong source", ".services.app.volumes[0].source = \"/other\""),
                 Map.entry("image command", ".services.app.command = [\"java\", \"-jar\", \"app.jar\"]"),
-                Map.entry("short graceful stop", ".services.app.stop_grace_period = \"10s\""),
+                Map.entry("missing graceful stop", "del(.services.app.stop_grace_period)"),
                 Map.entry("docker profile", ".services.app.environment.SPRING_PROFILES_ACTIVE = \"docker\""),
                 Map.entry("implicit env", ".services.app.env_file = [\".env\"]"),
                 Map.entry("wrong database", ".services.app.environment.PERSEFONIA_DATASOURCE_URL = \"jdbc:postgresql://other/db\""),

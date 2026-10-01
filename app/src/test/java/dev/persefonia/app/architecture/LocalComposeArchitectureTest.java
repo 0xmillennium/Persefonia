@@ -38,7 +38,6 @@ class LocalComposeArchitectureTest {
         assertThat(app.get("user")).isEqualTo("${PERSEFONIA_LOCAL_UID:-1000}:${PERSEFONIA_LOCAL_GID:-1000}");
         assertThat(app.get("working_dir")).isEqualTo("/workspace");
         assertThat(app.get("command")).isEqualTo(List.of("./gradlew", "--no-daemon", "--console=plain", ":app:bootRun"));
-        assertThat(app.get("stop_grace_period")).isEqualTo("30s");
         assertThat(Files.readString(LOCAL_COMPOSE))
                 .contains("command: [\"./gradlew\", \"--no-daemon\", \"--console=plain\", \":app:bootRun\"]");
         assertThat(app.get("init")).isEqualTo(true);

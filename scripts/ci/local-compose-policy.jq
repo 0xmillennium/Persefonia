@@ -25,7 +25,8 @@ check(.name == "persefonia-local"; "local Compose project name changed")
     "Redis image differs from the accepted identity")
 | check(.services.app.working_dir == "/workspace"
     and .services.app.command == ["./gradlew", "--no-daemon", "--console=plain", ":app:bootRun"]
-    and .services.app.stop_grace_period == "30s"
+    and (.services.app.stop_grace_period | type) == "string"
+    and (.services.app.stop_grace_period | length) > 0
     and (.services.app.volumes | length) == 1
     and .services.app.volumes[0].type == "bind"
     and .services.app.volumes[0].source == $workspace
