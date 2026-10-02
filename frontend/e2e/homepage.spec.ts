@@ -1,6 +1,8 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { chromium, expect, test, type Page } from "@playwright/test";
+import { chapterPosition } from "../src/archive-model";
+import { renderedArchivePositionMatches } from "./support/archive-position";
 
 const databaseContainer = process.env.PERSEFONIA_BROWSER_DB_CONTAINER;
 const chapters = ["identity", "work", "writing", "research", "architecture", "about", "contact"];
@@ -180,9 +182,16 @@ test("Archive sheet materials follow scroll position across key transitions", as
     const progressValues = start === 3 ? [0, .25, .49, .5, .51, .75, 1] : [0, .49, .5, .51, 1];
     const samples: { prominence: number[]; surface: string; border: string }[] = [];
     for (const progress of progressValues) {
-      await page.evaluate(y => window.scrollTo(0, y), anchors[start]! + (anchors[end]! - anchors[start]!) * progress);
-      await expect.poll(async () => Number(await page.locator(".archive-stage").getAttribute("data-archive-position")))
-        .toBeGreaterThan(start + progress - .03);
+      const scrollY = await page.evaluate(y => {
+        window.scrollTo(0, y);
+        return window.scrollY;
+      }, anchors[start]! + (anchors[end]! - anchors[start]!) * progress);
+      const target = chapterPosition(scrollY, anchors);
+      // The controller publishes this position after writing every rendered Archive style.
+      await expect.poll(async () => {
+        const observed = await page.locator(".archive-stage").getAttribute("data-archive-position");
+        return observed !== null && renderedArchivePositionMatches(Number(observed), target);
+      }).toBe(true);
       samples.push(await page.locator("[data-archive-sheet]").evaluateAll(sheets => ({
         prominence: sheets.map(sheet => Number(getComputedStyle(sheet).getPropertyValue("--archive-sheet-prominence"))),
         surface: getComputedStyle(sheets[0]!).backgroundColor,

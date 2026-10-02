@@ -1,5 +1,22 @@
 import { expect, test } from "@playwright/test";
 import { desktopArchiveStates, interpolateSheetProminence, mobileArchiveStates, tabletArchiveStates } from "../src/archive-model";
+import { renderedArchivePositionMatches } from "./support/archive-position";
+
+test("Archive rendered-position matching does not accept a preceding interpolation frame", ({}, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop-1440");
+  for (const [requested, target, preceding] of [
+    [.51, .5103790613718412, .5004512635379061],
+    [4.5, 4.500262881177708, 4.489747634069401],
+    [4.51, 4.509726603575184, 4.500262881177708]
+  ]) {
+    expect(preceding!).toBeGreaterThan(requested! - .03);
+    expect(renderedArchivePositionMatches(preceding!, target!)).toBe(false);
+    expect(renderedArchivePositionMatches(target!, target!)).toBe(true);
+    expect(renderedArchivePositionMatches(target! - .0000005, target!)).toBe(true);
+    expect(renderedArchivePositionMatches(target! + .0000005, target!)).toBe(true);
+    expect(renderedArchivePositionMatches(target! + .01, target!)).toBe(false);
+  }
+});
 
 test("Archive sheet material follows every chapter transition continuously", ({}, testInfo) => {
   test.skip(testInfo.project.name !== "desktop-1440");
