@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import { chromium, expect, test, type Page } from "@playwright/test";
 import { chapterPosition } from "../src/archive-model";
 import { renderedArchivePositionMatches } from "./support/archive-position";
+import { deriveNarrativeState } from "../src/homepage/narrative/derive-narrative-state";
+import { deriveSpatialSceneModel } from "../src/homepage/spatial/scene-model";
 
 const databaseContainer = process.env.PERSEFONIA_BROWSER_DB_CONTAINER;
 const chapters = ["identity", "work", "writing", "research", "architecture", "about", "contact"];
@@ -480,7 +482,7 @@ async function injectPrototype(page: Page, fixedProgress?: string): Promise<void
     const observer = new MutationObserver(() => {
       const mount = document.querySelector<HTMLElement>("[data-homepage-runtime]");
       if (!mount) return;
-      Object.assign(mount.style, { position: "fixed", right: "0", bottom: "0", zIndex: "10" });
+      Object.assign(mount.style, { position: "fixed", right: "0", bottom: "0", zIndex: "10", pointerEvents: "none" });
       observer.disconnect();
     });
     observer.observe(document, { childList: true, subtree: true });
@@ -502,12 +504,20 @@ async function currentNativeProgress(page: Page): Promise<number> {
   });
 }
 
-async function assertNativeProgress(page: Page): Promise<void> {
+async function assertNativeProgress(page: Page): Promise<Awaited<ReturnType<typeof nativeBrowserSnapshot>>> {
+  let snapshot: Awaited<ReturnType<typeof nativeBrowserSnapshot>> | undefined;
   await expect.poll(async () => {
-    const current = await currentNativeProgress(page);
-    const rendered = Number(await page.locator("[data-homepage-runtime]").getAttribute("data-homepage-runtime-progress"));
-    return Math.abs(rendered - current);
+    snapshot = await nativeBrowserSnapshot(page);
+    return Math.abs(Number(snapshot.diagnostics.progress) - snapshot.nativeProgress);
   }).toBeLessThan(.001);
+  const diagnostics = ["progress", "active-region", "navigator", "ariadne-points"]
+    .map(key => snapshot!.diagnostics[key]);
+  const narrative = deriveNarrativeState(Number(diagnostics[0]));
+  const scene = deriveSpatialSceneModel(narrative);
+  expect(diagnostics[1]).toBe(narrative.activeRegion);
+  expect(diagnostics[2]).toBe(JSON.stringify(scene.navigator.position));
+  expect(diagnostics[3]).toBe(String(scene.ariadne.points.length));
+  return snapshot!;
 }
 
 async function scrollNative(page: Page, progress: number): Promise<void> {
@@ -521,7 +531,7 @@ test("prototype current attention and independent presentation profiles preserve
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
   page.on("console", message => { if (message.type() === "error") errors.push(message.text()); });
-  await page.setViewportSize({ width: 1000, height: 800 });
+  await page.setViewportSize({ width: 1280, height: 900 });
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await injectPrototype(page, "0.580");
   await visit(page);
@@ -532,13 +542,30 @@ test("prototype current attention and independent presentation profiles preserve
   const truth = await mount.evaluate(node => ["progress", "active-region", "navigator", "ariadne-points"]
     .map(key => node.getAttribute(`data-homepage-runtime-${key}`)));
   expect(truth[0]).toBe("0.58");
-  await page.mouse.move(250, 200);
+  await page.mouse.move(320, 225);
   await expect(mount).toHaveAttribute("data-homepage-runtime-attention-active", "true");
   await expect(mount).toHaveAttribute("data-homepage-runtime-attention-modality", "pointer");
   await expect.poll(async () => Number(await mount.getAttribute("data-homepage-runtime-attention-x"))).toBeCloseTo(.25, 4);
   await expect.poll(async () => Number(await mount.getAttribute("data-homepage-runtime-attention-y"))).toBeCloseTo(.25, 4);
   await expect(mount).toHaveAttribute("data-homepage-runtime-hover-capability", "hover");
   await expect(mount).toHaveAttribute("data-homepage-runtime-pointer-precision", "fine");
+  for (const [width, height, reducedMotion, composition, motion] of [
+    [1280, 900, "no-preference", "wide", "full"], [1280, 900, "reduce", "wide", "reduced"],
+    [1280, 900, "no-preference", "wide", "full"], [390, 844, "no-preference", "compact", "full"],
+    [390, 844, "reduce", "compact", "reduced"], [390, 844, "no-preference", "compact", "full"]
+  ] as const) {
+    await page.setViewportSize({ width, height });
+    await page.emulateMedia({ reducedMotion });
+    expect(await page.evaluate(() => [window.innerWidth, window.innerHeight])).toEqual([width, height]);
+    await expect(mount).toHaveAttribute("data-homepage-runtime-composition-profile", composition);
+    await expect(mount).toHaveAttribute("data-homepage-runtime-motion-profile", motion);
+    await expect(mount).toHaveAttribute("data-homepage-runtime-active-region", "architecture");
+    await expect(mount).toHaveAttribute("data-homepage-runtime-ariadne-points", "10");
+    await expect(mount).toHaveAttribute("data-homepage-runtime-hover-capability", "hover");
+    await expect(mount).toHaveAttribute("data-homepage-runtime-pointer-precision", "fine");
+    expect(await narrativeDiagnostics(page)).toEqual(truth);
+    console.log(`Fixed profile ${width}x${height}/${motion}: ${JSON.stringify(await runtimeDiagnostics(page))}`);
+  }
   for (const [width, reducedMotion, composition, motion] of [
     [672, "no-preference", "compact", "full"], [672, "reduce", "compact", "reduced"],
     [673, "reduce", "wide", "reduced"], [673, "no-preference", "wide", "full"]
@@ -584,6 +611,8 @@ test("prototype native scroll stays authoritative through attention and live mot
     await expect(mount).toHaveAttribute("data-homepage-runtime-motion-profile", motion);
     await assertNativeProgress(page);
     expect(Number(await mount.getAttribute("data-homepage-runtime-progress"))).toBeGreaterThan(0);
+    // Archive fallback changes document geometry; native progress must follow that current geometry.
+    console.log(`Native live ${motion}: ${JSON.stringify(await runtimeDiagnostics(page))}`);
   }
   await expect(mount.locator("canvas")).toHaveCount(1);
 });
@@ -596,10 +625,25 @@ test("native prototype follows forward scroll, reverses Ariadne, and refreshes v
   await visit(page);
   const mount = page.locator("[data-homepage-runtime]");
   await expect(mount).toHaveAttribute("data-homepage-runtime-ready", "true");
+  const originalCanvas = await mount.locator("canvas").elementHandle();
   await scrollNative(page, 0);
   await expect(mount).toHaveAttribute("data-homepage-runtime-active-region", "threshold");
+  let prefix = Number(await mount.getAttribute("data-homepage-runtime-ariadne-points"));
+  let navigator = await mount.getAttribute("data-homepage-runtime-navigator");
+  for (const [progress, region] of [[.18, "work"], [.58, "architecture"], [.95, "final"]] as const) {
+    await scrollNative(page, progress);
+    await expect(mount).toHaveAttribute("data-homepage-runtime-active-region", region);
+    const currentPrefix = Number(await mount.getAttribute("data-homepage-runtime-ariadne-points"));
+    const currentNavigator = await mount.getAttribute("data-homepage-runtime-navigator");
+    expect(currentPrefix).toBeGreaterThan(prefix);
+    expect(currentNavigator).not.toBe(navigator);
+    prefix = currentPrefix;
+    navigator = currentNavigator;
+    console.log(`Native journey ${progress}: ${JSON.stringify(await runtimeDiagnostics(page))}`);
+  }
   await scrollNative(page, .3);
   await expect(mount).toHaveAttribute("data-homepage-runtime-active-region", "writing");
+  expect(Number(await mount.getAttribute("data-homepage-runtime-ariadne-points"))).toBeLessThan(prefix);
   const earlierPosition = await mount.getAttribute("data-homepage-runtime-navigator");
   await scrollNative(page, .8);
   await expect(mount).toHaveAttribute("data-homepage-runtime-active-region", "person");
@@ -615,10 +659,20 @@ test("native prototype follows forward scroll, reverses Ariadne, and refreshes v
   expect(restoredPosition.x).toBeCloseTo(initialPosition.x, 2);
   expect(restoredPosition.y).toBeCloseTo(initialPosition.y, 2);
   await page.screenshot({ path: testInfo.outputPath("native-backscroll.png") });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await expect(mount).toHaveAttribute("data-homepage-runtime-composition-profile", "wide");
+  await assertNativeProgress(page);
   await page.setViewportSize({ width: 500, height: 600 });
   await assertNativeProgress(page);
   await expect(mount.locator("canvas")).toHaveAttribute("width", "484");
   await expect(mount.locator("canvas")).toHaveAttribute("height", "271");
+  await expect(mount).toHaveAttribute("data-homepage-runtime-composition-profile", "compact");
+  expect(await page.evaluate(canvas => canvas === document.querySelector("[data-homepage-runtime] canvas"), originalCanvas)).toBe(true);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await expect(mount).toHaveAttribute("data-homepage-runtime-composition-profile", "wide");
+  await assertNativeProgress(page);
+  await expect(mount.locator("canvas")).toHaveAttribute("width", "640");
+  expect(await page.evaluate(canvas => canvas === document.querySelector("[data-homepage-runtime] canvas"), originalCanvas)).toBe(true);
   expect(Number(await mount.getAttribute("data-homepage-runtime-progress"))).toBeGreaterThan(0);
   await expect(mount.locator("canvas")).toHaveCount(1);
   await expect(page.locator("[data-archive-chapter]")).toHaveCount(7);
@@ -674,7 +728,7 @@ test("native prototype retains its canvas and current state through real BFCache
   // Playwright normally disables BFCache. Enable it only for this lifecycle qualification.
   const browser = await chromium.launch({ channel: "chromium", ignoreDefaultArgs: ["--disable-back-forward-cache"] });
   const context = await browser.newContext({ baseURL: testInfo.project.use.baseURL,
-    viewport: { width: 1440, height: 900 } });
+    viewport: { width: 1280, height: 900 }, reducedMotion: "no-preference" });
   const page = await context.newPage();
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
@@ -695,11 +749,17 @@ test("native prototype retains its canvas and current state through real BFCache
     await visit(page);
     await expect(page.locator("[data-homepage-runtime]")).toHaveAttribute("data-homepage-runtime-ready", "true");
     await scrollNative(page, .6);
+    const mount = page.locator("[data-homepage-runtime]");
+    await expect(mount).toHaveAttribute("data-homepage-runtime-composition-profile", "wide");
+    await expect(mount).toHaveAttribute("data-homepage-runtime-motion-profile", "full");
+    await page.mouse.move(100, 100);
+    await expect(mount).toHaveAttribute("data-homepage-runtime-attention-active", "true");
     await page.evaluate(() => {
       (window as Window & { prototypeCanvas?: HTMLCanvasElement }).prototypeCanvas =
         document.querySelector<HTMLCanvasElement>("[data-homepage-runtime] canvas")!;
     });
     await page.goto("/contact", { waitUntil: "networkidle" });
+    await page.emulateMedia({ reducedMotion: "reduce" });
     console.log("Prototype lifecycle: returning from /contact");
     await page.goBack({ waitUntil: "commit" });
     console.log("Prototype lifecycle: history return committed");
@@ -711,15 +771,286 @@ test("native prototype retains its canvas and current state through real BFCache
       });
       console.log(`BFCache GAP: persisted pageshow was ${persisted}; notRestoredReasons: ${limitation}`);
       testInfo.annotations.push({ type: "GAP", description: `Real BFCache unavailable: ${limitation}` });
-      test.skip(true, `Real BFCache unavailable: ${limitation}`);
+      expect(persisted, `Real BFCache unavailable: ${limitation}`).toBe(1);
     }
     expect(await page.evaluate(() => (window as Window & { prototypeCanvas?: HTMLCanvasElement }).prototypeCanvas ===
       document.querySelector("[data-homepage-runtime] canvas"))).toBe(true);
     await expect(page.locator("[data-homepage-runtime] canvas")).toHaveCount(1);
     await expect(page.locator("[data-homepage-runtime]")).toHaveCount(1);
     await assertNativeProgress(page);
+    await expect(mount).toHaveAttribute("data-homepage-runtime-state", "running");
+    await expect(mount).toHaveAttribute("data-homepage-runtime-composition-profile", "wide");
+    await expect(mount).toHaveAttribute("data-homepage-runtime-motion-profile", "reduced");
+    await expect(mount).toHaveAttribute("data-homepage-runtime-viewport-width", "1280");
+    await expect(mount).toHaveAttribute("data-homepage-runtime-viewport-height", "900");
+    await expect(mount).toHaveAttribute("data-homepage-runtime-hover-capability", "hover");
+    await expect(mount).toHaveAttribute("data-homepage-runtime-pointer-precision", "fine");
+    await expect(mount).toHaveAttribute("data-homepage-runtime-attention-active", "false");
+    await expect(mount).toHaveAttribute("data-homepage-runtime-attention-modality", "none");
+    expect(await mount.getAttribute("data-homepage-runtime-attention-x")).toBeNull();
+    expect(await mount.getAttribute("data-homepage-runtime-attention-y")).toBeNull();
+    await expect(mount.locator("canvas")).toHaveAttribute("aria-hidden", "true");
+    expect(await mount.locator("canvas").evaluate(node => getComputedStyle(node).pointerEvents)).toBe("none");
+    expect(await page.evaluate(() => window.matchMedia("(prefers-reduced-motion: reduce)").matches)).toBe(true);
+    console.log(`BFCache restored: ${JSON.stringify(await runtimeDiagnostics(page))}`);
     await scrollNative(page, .3);
     await expect(page.locator("[data-homepage-runtime]")).toHaveAttribute("data-homepage-runtime-active-region", "writing");
     expect(errors).toEqual([]);
   } finally { await context.close(); await browser.close(); }
+});
+
+async function narrativeDiagnostics(page: Page): Promise<(string | null)[]> {
+  return page.locator("[data-homepage-runtime]").evaluate(node =>
+    ["progress", "active-region", "navigator", "ariadne-points"].map(key => node.getAttribute(`data-homepage-runtime-${key}`)));
+}
+
+const runtimeDiagnosticKeys = ["progress", "active-region", "navigator", "ariadne-points", "state",
+  "composition-profile", "motion-profile", "viewport-width", "viewport-height", "hover-capability", "pointer-precision",
+  "attention-active", "attention-modality", "attention-x", "attention-y"];
+
+async function runtimeDiagnostics(page: Page): Promise<Record<string, string | null>> {
+  return page.locator("[data-homepage-runtime]").evaluate((node, keys) => Object.fromEntries(
+    keys.map(key => [key, node.getAttribute(`data-homepage-runtime-${key}`)])), runtimeDiagnosticKeys);
+}
+
+async function nativeBrowserSnapshot(page: Page) {
+  return page.locator("[data-homepage-runtime]").evaluate((node, keys) => {
+    const range = Math.max(document.documentElement.scrollHeight - window.innerHeight, 0);
+    return { scrollY: window.scrollY, nativeProgress: range > 0 ? Math.min(1, Math.max(0, window.scrollY / range)) : 0,
+      diagnostics: Object.fromEntries(keys.map(key => [key, node.getAttribute(`data-homepage-runtime-${key}`)])) };
+  }, runtimeDiagnosticKeys);
+}
+
+async function assertSemanticHomepage(page: Page): Promise<void> {
+  await assertStructure(page, "EN");
+  await expect(page.locator("h1")).toHaveCount(1);
+  await expect(page.locator("h1")).toHaveText("Building systems worth explaining.");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Building systems worth explaining.");
+  for (const selector of [".home-project h3 a", ".home-writing__list h3 a", ".home-research__list h3 a"]) {
+    await expect(page.locator(selector)).toHaveCount(3);
+    const link = page.locator(selector).first();
+    expect(await link.innerText()).not.toBe("");
+    expect(await link.getAttribute("href")).toMatch(/^\/en\/(projects|articles|notes|research)\/[a-z0-9-]+$/);
+  }
+  for (const target of ["#work", "#writing", "#research", "#about"]) {
+    await expect(page.locator(`.home-nav a[href='${target}']`).first()).toHaveAttribute("href", target);
+  }
+  await expect(page.locator("#about")).toContainText("Fixture Engineer");
+  await expect(page.locator(".home-contact__link")).toHaveAttribute("href", "/contact");
+  // The current homepage has no CV anchor; the server owns a separate real CV route.
+  expect((await page.request.get("/cv")).status()).toBe(200);
+}
+
+async function auditHomepageAccessibility(page: Page): Promise<void> {
+  await assertSemanticHomepage(page);
+  await expect(page.getByRole("main")).toHaveCount(1);
+  await expect(page.getByRole("link", { name: "Skip to main content" })).toHaveAttribute("href", "#main-content");
+  const audit = await page.evaluate(() => ({
+    unnamedLinks: Array.from(document.querySelectorAll("a")).filter(link =>
+      !link.textContent?.trim() && !link.getAttribute("aria-label") && !link.querySelector("img[alt]")).length,
+    missingAlt: document.querySelectorAll("img:not([alt])").length,
+    positiveTabindex: Array.from(document.querySelectorAll("[tabindex]"))
+      .filter(node => Number(node.getAttribute("tabindex")) > 0).length,
+    invalidChapterLabels: Array.from(document.querySelectorAll("[data-archive-chapter]")).filter(section =>
+      !document.getElementById(section.getAttribute("aria-labelledby") ?? "")?.textContent?.trim()).length,
+    background: getComputedStyle(document.body).backgroundColor,
+    text: getComputedStyle(document.querySelector("h1")!).color,
+    intro: getComputedStyle(document.querySelector(".home-identity__intro")!).color
+  }));
+  expect(audit.unnamedLinks).toBe(0);
+  expect(audit.missingAlt).toBe(0);
+  expect(audit.positiveTabindex).toBe(0);
+  expect(audit.invalidChapterLabels).toBe(0);
+  expect(contrast(audit.text, audit.background)).toBeGreaterThanOrEqual(4.5);
+  expect(contrast(audit.intro, audit.background)).toBeGreaterThanOrEqual(4.5);
+  console.log(`Homepage accessibility ${await page.evaluate(() => window.innerWidth)}px: ${JSON.stringify(audit)}`);
+}
+
+test("decorative prototype preserves semantic accessibility, visible keyboard focus and DOM link activation", async ({ page }, testInfo) => {
+  if (testInfo.project.name === "mobile-390") await page.setViewportSize({ width: 390, height: 844 });
+  await visit(page);
+  await expect(page.locator("[data-homepage-runtime]")).toHaveCount(0);
+  await expect(page.locator("html")).toHaveClass(/archive-enhanced/);
+  await auditHomepageAccessibility(page);
+  await injectPrototype(page, "0.580");
+  await visit(page);
+  const mount = page.locator("[data-homepage-runtime]");
+  const canvas = mount.locator("canvas");
+  await expect(mount).toHaveAttribute("data-homepage-runtime-ready", "true");
+  await expect(canvas).toHaveCount(1);
+  await expect(canvas).toHaveAttribute("aria-hidden", "true");
+  expect(await canvas.getAttribute("tabindex")).toBeNull();
+  expect(await canvas.evaluate(node => (node as HTMLCanvasElement).tabIndex)).toBeLessThan(0);
+  for (const attribute of ["role", "aria-label", "aria-labelledby", "title"]) expect(await canvas.getAttribute(attribute)).toBeNull();
+  expect(await canvas.evaluate(node => getComputedStyle(node).pointerEvents)).toBe("none");
+  await expect(mount.locator("a, button, h1, h2, nav, main, [role]")).toHaveCount(0);
+  await auditHomepageAccessibility(page);
+  // Visit the complete source-order tab sequence; the renderer must never receive focus.
+  const seen = new Set<string>();
+  let visibleFocus: unknown;
+  let completedTabSequence = false;
+  for (let index = 0; index < 50; index++) {
+    await page.keyboard.press("Tab");
+    const focused = await page.evaluate(() => {
+      const node = document.activeElement as HTMLElement;
+      const style = getComputedStyle(node);
+      return { tag: node.tagName, className: node.className, href: node.getAttribute("href"),
+        focusVisible: node.matches(":focus-visible"), outlineStyle: style.outlineStyle,
+        outlineWidth: style.outlineWidth, outlineColor: style.outlineColor, outlineOffset: style.outlineOffset };
+    });
+    expect(focused.tag).not.toBe("CANVAS");
+    if (focused.className === "skip-link" && seen.size > 0) { completedTabSequence = true; break; }
+    if (focused.tag === "A") seen.add(focused.href!);
+    if (focused.className === "home-button") {
+      await expect(page.locator(".home-actions .home-button")).toBeFocused();
+      expect(focused.focusVisible).toBe(true);
+      expect(focused.outlineStyle).toBe("solid");
+      expect(parseFloat(focused.outlineWidth)).toBeGreaterThanOrEqual(2);
+      expect(focused.outlineColor).not.toBe("rgba(0, 0, 0, 0)");
+      visibleFocus = focused;
+      await page.screenshot({ path: testInfo.outputPath("prototype-visible-focus.png") });
+    }
+  }
+  expect(completedTabSequence).toBe(true);
+  expect(visibleFocus).toBeDefined();
+  expect(seen.has("/contact")).toBe(true);
+  console.log(`Keyboard DOM focus: ${JSON.stringify(visibleFocus)}`);
+  await page.screenshot({ path: testInfo.outputPath("prototype-semantic-page.png"), fullPage: true });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect(mount).toHaveAttribute("data-homepage-runtime-motion-profile", "reduced");
+  await auditHomepageAccessibility(page);
+  // Put the decorative canvas over a real target and prove browser hit-testing reaches the anchor.
+  const link = page.locator(".home-contact__link");
+  await link.scrollIntoViewIfNeeded();
+  // Move only the renderer surface: the test-owned mount must not become a covering hit target.
+  await canvas.evaluate((node, box) => {
+    Object.assign((node as HTMLCanvasElement).style,
+      { position: "fixed", left: `${box!.x}px`, top: `${box!.y}px` });
+  }, await link.boundingBox());
+  const box = (await link.boundingBox())!;
+  expect(await canvas.evaluate((node, target) => {
+    const rect = node.getBoundingClientRect();
+    return target.x + target.width / 2 >= rect.left && target.x + target.width / 2 <= rect.right &&
+      target.y + target.height / 2 >= rect.top && target.y + target.height / 2 <= rect.bottom;
+  }, box), "renderer canvas covers the DOM activation point").toBe(true);
+  expect(await link.evaluate(node => {
+    const rect = node.getBoundingClientRect();
+    return node.contains(document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2));
+  }), "native hit-testing reaches the DOM anchor through the renderer").toBe(true);
+  await link.click();
+  await expect(page).toHaveURL(/\/contact$/);
+  await expect(page.getByRole("heading", { name: "Contact", exact: true })).toBeVisible();
+});
+
+test("native Chromium touch coexists with attention and browser-owned scrolling", async ({ browser }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile-390");
+  const context = await browser.newContext({ baseURL: testInfo.project.use.baseURL,
+    viewport: { width: 390, height: 844 }, hasTouch: true, reducedMotion: "no-preference" });
+  const page = await context.newPage();
+  try {
+    await injectPrototype(page);
+    await visit(page);
+    const mount = page.locator("[data-homepage-runtime]");
+    await expect(mount).toHaveAttribute("data-homepage-runtime-ready", "true");
+    await expect(mount).toHaveAttribute("data-homepage-runtime-pointer-precision", "coarse");
+    await scrollNative(page, .12);
+    const initial = await assertNativeProgress(page);
+    await page.evaluate(() => {
+      const state = window as Window & { nativeTouchEvents?: { type: string; trusted: boolean; x: number; y: number }[] };
+      state.nativeTouchEvents = [];
+      for (const type of ["pointerdown", "pointermove", "pointercancel", "pointerup"]) {
+        document.addEventListener(type, event => {
+          const pointer = event as PointerEvent;
+          state.nativeTouchEvents!.push({ type, trusted: event.isTrusted, x: pointer.clientX, y: pointer.clientY });
+        }, { passive: true });
+      }
+    });
+    const cdp = await context.newCDPSession(page);
+    const touch = (y: number) => [{ x: 195, y, id: 1, radiusX: 1, radiusY: 1, force: 1 }];
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: touch(680) });
+    await expect(mount).toHaveAttribute("data-homepage-runtime-attention-active", "true");
+    await expect(mount).toHaveAttribute("data-homepage-runtime-attention-modality", "touch");
+    await expect.poll(async () => Number(await mount.getAttribute("data-homepage-runtime-attention-x"))).toBeCloseTo(.5, 4);
+    await expect.poll(async () => Number(await mount.getAttribute("data-homepage-runtime-attention-y"))).toBeCloseTo(680 / 844, 4);
+    expect(await narrativeDiagnostics(page)).toEqual([initial.diagnostics.progress, initial.diagnostics["active-region"],
+      initial.diagnostics.navigator, initial.diagnostics["ariadne-points"]]);
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: touch(675) });
+    await expect.poll(async () => Number(await mount.getAttribute("data-homepage-runtime-attention-y"))).toBeCloseTo(675 / 844, 4);
+    const contact = await runtimeDiagnostics(page);
+    for (const y of [650, 600, 520, 420, 320, 220]) {
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: touch(y) });
+    }
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(initial.scrollY + 100);
+    await assertNativeProgress(page);
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await expect(mount).toHaveAttribute("data-homepage-runtime-attention-active", "false");
+    await expect(mount).toHaveAttribute("data-homepage-runtime-attention-modality", "none");
+    const result = await assertNativeProgress(page);
+    expect(Number(result.diagnostics.progress)).toBeGreaterThan(Number(initial.diagnostics.progress));
+    expect(result.diagnostics["active-region"]).not.toBe(initial.diagnostics["active-region"]);
+    expect(result.diagnostics.navigator).not.toBe(initial.diagnostics.navigator);
+    expect(Number(result.diagnostics["ariadne-points"])).toBeGreaterThan(Number(initial.diagnostics["ariadne-points"]));
+    const events = await page.evaluate(() => (window as Window & { nativeTouchEvents?: unknown[] }).nativeTouchEvents);
+    expect(events).toEqual(expect.arrayContaining([expect.objectContaining({ type: "pointerdown", trusted: true })]));
+    await expect(mount.locator("canvas")).toHaveCount(1);
+    await expect(page.locator("[data-homepage-runtime]")).toHaveCount(1);
+    console.log(`Native CDP touch: ${JSON.stringify({ initial, contact, result, events })}`);
+    await cdp.detach();
+  } finally { await context.close(); }
+});
+
+test("unavailable WebGL removes the candidate safely and preserves real DOM navigation", async ({ browser }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop-1440");
+  const context = await browser.newContext({ baseURL: testInfo.project.use.baseURL, viewport: { width: 1280, height: 900 } });
+  const page = await context.newPage();
+  const errors: string[] = [];
+  const consoleErrors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  page.on("console", message => { if (message.type() === "error") consoleErrors.push(message.text()); });
+  try {
+    await page.addInitScript(() => {
+      const getContext = HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext = function(type: string, options?: unknown) {
+        if (["webgl", "webgl2", "experimental-webgl"].includes(type)) return null;
+        return getContext.call(this, type, options);
+      } as typeof getContext;
+    });
+    await injectPrototype(page);
+    await visit(page);
+    await expect.poll(() => consoleErrors.filter(message => message.startsWith("Homepage candidate runtime could not initialize")).length).toBe(1);
+    await expect(page.locator("[data-homepage-runtime] canvas")).toHaveCount(0);
+    expect(await page.locator("[data-homepage-runtime]").evaluate(node => node.getAttributeNames()
+      .filter(name => name.startsWith("data-homepage-runtime-")))).toEqual([]);
+    await expect(page.locator("html")).toHaveClass(/archive-enhanced/);
+    await assertSemanticHomepage(page);
+    expect(errors).toEqual([]);
+    expect(consoleErrors.filter(message => !message.startsWith("Homepage candidate runtime could not initialize"))).toEqual([]);
+    console.log(`Handled unavailable WebGL: ${JSON.stringify(consoleErrors)}`);
+    await page.locator(".home-contact__link").click();
+    await expect(page).toHaveURL(/\/contact$/);
+    await expect(page.getByRole("heading", { name: "Contact", exact: true })).toBeVisible();
+  } finally { await context.close(); }
+});
+
+test("compact JavaScript-disabled homepage retains initial SSR content and real navigation", async ({ browser }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile-390");
+  const context = await browser.newContext({ baseURL: testInfo.project.use.baseURL,
+    viewport: { width: 390, height: 844 }, javaScriptEnabled: false });
+  const page = await context.newPage();
+  try {
+    const response = await page.goto("/", { waitUntil: "networkidle" });
+    expect(response?.status()).toBe(200);
+    const html = await response!.text();
+    expect(html).toContain('<h1 id="identity-title">Building systems');
+    expect(html).toContain('href="/contact"');
+    expect(html).toContain('href="/en/projects/fixture-project-1"');
+    expect(html).not.toContain("data-homepage-runtime");
+    await assertSemanticHomepage(page);
+    await expect(page.locator("canvas, [data-homepage-runtime]")).toHaveCount(0);
+    await expect(page.locator("html")).not.toHaveClass(/archive-enhanced/);
+    await expect(page.locator(".archive-snapshot--identity")).toBeVisible();
+    await page.locator(".home-project h3 a").first().click();
+    await expect(page).toHaveURL(/\/en\/projects\/fixture-project-1$/);
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("A publishing system for resilient editorial workflows");
+  } finally { await context.close(); }
 });

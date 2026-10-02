@@ -7,7 +7,7 @@ import { deriveSpatialSceneModel } from "../spatial/scene-model";
 
 const pixi = vi.hoisted(() => ({
   init: vi.fn(), destroy: vi.fn(), resize: vi.fn(), rendererDestroy: vi.fn(),
-  canvas: { setAttribute: vi.fn(), remove: vi.fn(), parentElement: null as unknown }
+  canvas: { setAttribute: vi.fn(), style: { pointerEvents: "" }, remove: vi.fn(), parentElement: null as unknown }
 }));
 vi.mock("pixi.js", () => ({
   Application: class {
@@ -55,7 +55,7 @@ const frameAt = (progress: number, width: number, height: number) => expect.obje
 });
 const latestFrame = () => vi.mocked(renderSpatialPrototype).mock.calls.at(-1)![1];
 
-beforeEach(() => { vi.resetAllMocks(); pixi.canvas.parentElement = null; });
+beforeEach(() => { vi.resetAllMocks(); pixi.canvas.parentElement = null; pixi.canvas.style.pointerEvents = ""; });
 
 test("a homepage without a runtime mount keeps its semantic page untouched", async () => {
   expect(await bootstrapHomepageRuntime(null)).toBeUndefined();
@@ -67,6 +67,8 @@ test.each<Record<string, string>>([{}, { "data-homepage-prototype-mode": "foo" }
   const dispose = await bootstrapHomepageRuntime(mount);
   expect(renderSpatialPrototype).toHaveBeenCalledWith(expect.anything(), frameAt(0, 640, 358));
   expect(pixi.canvas.setAttribute).toHaveBeenCalledWith("aria-hidden", "true");
+  expect(pixi.canvas.setAttribute.mock.calls).toEqual([["aria-hidden", "true"]]);
+  expect(pixi.canvas.style.pointerEvents).toBe("none");
   dispose?.(); dispose?.();
   expect(pixi.destroy).toHaveBeenCalledTimes(1);
   expect(pixi.canvas.remove).toHaveBeenCalledTimes(1);

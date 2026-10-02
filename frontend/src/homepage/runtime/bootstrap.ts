@@ -88,6 +88,7 @@ async function initializeHomepageRuntime(mount: HTMLElement): Promise<(() => voi
       // Size and attach before measuring: an in-flow opt-in canvas can change document height.
       application.renderer.resize(width, height);
       application.canvas.setAttribute("aria-hidden", "true");
+      application.canvas.style.pointerEvents = "none";
       if (native && application.canvas.parentElement !== mount) mount.append(application.canvas);
       const progress = native ? readDocumentScrollProgress(view) : fixedProgress;
       const current = deriveHomepageRuntimeFrame({ progress, viewport, capabilities: capabilities.read(),
