@@ -1,9 +1,10 @@
 import { Graphics, type Application } from "pixi.js";
-import type { SpatialSceneModel } from "../spatial/scene-model";
+import type { HomepageRuntimeFrame } from "./frame-state";
 import { deriveViewportProjection, projectSpatialPointToPlane, projectSpatialPointToViewport, type ProjectedPoint } from "../spatial/projection";
 import type { SpatialPoint } from "../spatial/canonical-route";
 
-export function renderSpatialPrototype(application: Application, scene: SpatialSceneModel, width: number, height: number): void {
+export function renderSpatialPrototype(application: Application, frame: HomepageRuntimeFrame): void {
+  const { spatial: scene, surface: { width, height } } = frame;
   for (const child of application.stage.removeChildren()) child.destroy();
   const graphic = (): Graphics => application.stage.addChild(new Graphics());
   const projection = deriveViewportProjection(scene.macroMap.route, width, height);
