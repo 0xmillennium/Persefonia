@@ -72,6 +72,7 @@ test("populated EN layout, routes, Archive transformation and screenshots", asyn
   page.on("pageerror", error => errors.push(error.message));
   await visit(page);
   await assertStructure(page, "EN");
+  await expect(page.locator("[data-homepage-runtime]")).toHaveCount(0);
   expect(await page.evaluate(() => ["Instrument Serif", "Inter", "IBM Plex Mono"].every(font =>
     document.fonts.check(`16px "${font}"`)))).toBe(true);
   await expect(page.locator(".home-projects__item")).toHaveCount(3);
@@ -372,6 +373,40 @@ test("the opt-in Pixi candidate initializes without replacing semantic content",
   await expect(page.locator("[data-archive-chapter]")).toHaveCount(7);
   expect(await page.locator("[data-homepage-runtime] canvas").evaluate(canvas =>
     (canvas as HTMLCanvasElement).getContext("webgl2") !== null)).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+test("the opt-in spatial topology renders from canonical progress under CSP", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop-1440");
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  page.on("console", message => { if (message.type() === "error") errors.push(message.text()); });
+  let progress = "0.000";
+  await page.route("**/", async route => {
+    const response = await route.fetch();
+    const html = await response.text();
+    const script = '<script type="module"';
+    expect(html).toContain(script);
+    await route.fulfill({ response, body: html.replace(script,
+      `<div data-homepage-runtime data-homepage-prototype-progress="${progress}" aria-hidden="true"></div>${script}`) });
+  });
+  const captures: Buffer[] = [];
+  for (const value of ["0.000", "0.180", "0.437", "0.580", "0.810", "1.000"]) {
+    progress = value;
+    await visit(page);
+    const mount = page.locator("[data-homepage-runtime]");
+    await expect(mount).toHaveAttribute("data-homepage-runtime-ready", "true");
+    const canvas = mount.locator("canvas");
+    await expect(canvas).toHaveCount(1);
+    expect(await canvas.evaluate(node => (node as HTMLCanvasElement).getContext("webgl2") !== null)).toBe(true);
+    await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
+    await expect(page.locator("[data-archive-chapter]")).toHaveCount(7);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      await page.evaluate(() => window.innerWidth + 1));
+    captures.push(await canvas.screenshot());
+  }
+  expect(captures[0]!.equals(captures[2]!)).toBe(false);
+  expect(captures[2]!.equals(captures[5]!)).toBe(false);
   expect(errors).toEqual([]);
 });
 
