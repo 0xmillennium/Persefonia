@@ -12,7 +12,4 @@ try {
   console.error("Living Archive enhancement could not initialize", error);
 }
 
-void bootstrapHomepageRuntime(document.querySelector<HTMLElement>("[data-homepage-runtime]"))
-  .then(dispose => {
-    if (dispose) window.addEventListener("pagehide", dispose, { once: true });
-  });
+void bootstrapHomepageRuntime(document.querySelector<HTMLElement>("[data-homepage-runtime]"));

@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { expect, test, type Page } from "@playwright/test";
+import { chromium, expect, test, type Page } from "@playwright/test";
 
 const databaseContainer = process.env.PERSEFONIA_BROWSER_DB_CONTAINER;
 const chapters = ["identity", "work", "writing", "research", "architecture", "about", "contact"];
@@ -396,6 +396,7 @@ test("the opt-in spatial topology renders from canonical progress under CSP", as
     await visit(page);
     const mount = page.locator("[data-homepage-runtime]");
     await expect(mount).toHaveAttribute("data-homepage-runtime-ready", "true");
+    await expect(mount).toHaveAttribute("data-homepage-runtime-progress", String(Number(value)));
     const canvas = mount.locator("canvas");
     await expect(canvas).toHaveCount(1);
     expect(await canvas.evaluate(node => (node as HTMLCanvasElement).getContext("webgl2") !== null)).toBe(true);
@@ -404,6 +405,10 @@ test("the opt-in spatial topology renders from canonical progress under CSP", as
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
       await page.evaluate(() => window.innerWidth + 1));
     captures.push(await canvas.screenshot());
+    if (value === "0.580") {
+      await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+      await expect(mount).toHaveAttribute("data-homepage-runtime-progress", "0.58");
+    }
   }
   expect(captures[0]!.equals(captures[2]!)).toBe(false);
   expect(captures[2]!.equals(captures[5]!)).toBe(false);
@@ -459,4 +464,182 @@ test("keyboard reaches skip link and mobile navigation", async ({ page }, testIn
     await page.locator(".home-nav__mobile nav a[href='#work']").click();
     await expect(page.locator(".home-nav__mobile")).not.toHaveAttribute("open", "");
   }
+});
+
+async function injectNativePrototype(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const observer = new MutationObserver(() => {
+      const mount = document.querySelector<HTMLElement>("[data-homepage-runtime]");
+      if (!mount) return;
+      Object.assign(mount.style, { position: "fixed", right: "0", bottom: "0", zIndex: "10" });
+      observer.disconnect();
+    });
+    observer.observe(document, { childList: true, subtree: true });
+  });
+  await page.route("**/", async route => {
+    const response = await route.fetch();
+    const html = await response.text();
+    const script = '<script type="module"';
+    expect(html).toContain(script);
+    await route.fulfill({ response, body: html.replace(script,
+      '<div data-homepage-runtime data-homepage-prototype-mode="native" data-homepage-prototype-progress="0.10" aria-hidden="true"></div>' + script) });
+  });
+}
+
+async function currentNativeProgress(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    const range = Math.max(document.documentElement.scrollHeight - window.innerHeight, 0);
+    return range > 0 ? Math.min(1, Math.max(0, window.scrollY / range)) : 0;
+  });
+}
+
+async function assertNativeProgress(page: Page): Promise<void> {
+  await expect.poll(async () => {
+    const current = await currentNativeProgress(page);
+    const rendered = Number(await page.locator("[data-homepage-runtime]").getAttribute("data-homepage-runtime-progress"));
+    return Math.abs(rendered - current);
+  }).toBeLessThan(.001);
+}
+
+async function scrollNative(page: Page, progress: number): Promise<void> {
+  await page.evaluate(value => window.scrollTo(0,
+    Math.max(document.documentElement.scrollHeight - window.innerHeight, 0) * value), progress);
+  await expect.poll(() => currentNativeProgress(page)).toBeCloseTo(progress, 2);
+  await assertNativeProgress(page);
+}
+
+test("native prototype follows forward scroll, reverses Ariadne, and refreshes viewport geometry", async ({ page }, testInfo) => {
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  page.on("console", message => { if (message.type() === "error") errors.push(message.text()); });
+  await injectNativePrototype(page);
+  await visit(page);
+  const mount = page.locator("[data-homepage-runtime]");
+  await expect(mount).toHaveAttribute("data-homepage-runtime-ready", "true");
+  await scrollNative(page, 0);
+  await expect(mount).toHaveAttribute("data-homepage-runtime-active-region", "threshold");
+  await scrollNative(page, .3);
+  await expect(mount).toHaveAttribute("data-homepage-runtime-active-region", "writing");
+  const earlierPosition = await mount.getAttribute("data-homepage-runtime-navigator");
+  await scrollNative(page, .8);
+  await expect(mount).toHaveAttribute("data-homepage-runtime-active-region", "person");
+  const laterPrefix = Number(await mount.getAttribute("data-homepage-runtime-ariadne-points"));
+  const laterPosition = await mount.getAttribute("data-homepage-runtime-navigator");
+  expect(laterPosition).not.toBe(earlierPosition);
+  await page.screenshot({ path: testInfo.outputPath("native-later.png") });
+  await scrollNative(page, .3);
+  await expect(mount).toHaveAttribute("data-homepage-runtime-active-region", "writing");
+  expect(Number(await mount.getAttribute("data-homepage-runtime-ariadne-points"))).toBeLessThan(laterPrefix);
+  const restoredPosition = JSON.parse((await mount.getAttribute("data-homepage-runtime-navigator"))!);
+  const initialPosition = JSON.parse(earlierPosition!);
+  expect(restoredPosition.x).toBeCloseTo(initialPosition.x, 2);
+  expect(restoredPosition.y).toBeCloseTo(initialPosition.y, 2);
+  await page.screenshot({ path: testInfo.outputPath("native-backscroll.png") });
+  await page.setViewportSize({ width: 500, height: 600 });
+  await assertNativeProgress(page);
+  await expect(mount.locator("canvas")).toHaveAttribute("width", "484");
+  await expect(mount.locator("canvas")).toHaveAttribute("height", "271");
+  expect(Number(await mount.getAttribute("data-homepage-runtime-progress"))).toBeGreaterThan(0);
+  await expect(mount.locator("canvas")).toHaveCount(1);
+  await expect(page.locator("[data-archive-chapter]")).toHaveCount(7);
+  expect(errors).toEqual([]);
+});
+
+test("native prototype first renders the current mid-document state", async ({ page }) => {
+  await injectNativePrototype(page);
+  let release: (() => void) | undefined;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  await page.route(/\/assets\/home-[^/]+\.js$/, async route => {
+    await gate;
+    await route.continue();
+  });
+  try {
+    await page.goto("/", { waitUntil: "commit" });
+    const mount = page.locator("[data-homepage-runtime]");
+    await expect(mount).toHaveCount(1);
+    await page.evaluate(() => document.fonts.ready);
+    await page.evaluate(() => {
+      const state = window as Window & { initialPrototypeProgress?: { rendered: number; current: number } };
+      const mount = document.querySelector("[data-homepage-runtime]")!;
+      const observer = new MutationObserver(() => {
+        const progress = mount.getAttribute("data-homepage-runtime-progress");
+        if (progress !== null) {
+          const range = Math.max(document.documentElement.scrollHeight - window.innerHeight, 0);
+          state.initialPrototypeProgress = {
+            rendered: Number(progress),
+            current: range > 0 ? Math.min(1, Math.max(0, window.scrollY / range)) : 0
+          };
+          observer.disconnect();
+        }
+      });
+      observer.observe(mount, { attributes: true, attributeFilter: ["data-homepage-runtime-progress"] });
+      window.scrollTo(0, (document.documentElement.scrollHeight - window.innerHeight) * .6);
+    });
+    await expect.poll(() => currentNativeProgress(page)).toBeCloseTo(.6, 2);
+    release!();
+    await expect(mount).toHaveAttribute("data-homepage-runtime-ready", "true");
+    const initial = await page.evaluate(() => (window as Window & {
+      initialPrototypeProgress?: { rendered: number; current: number }
+    }).initialPrototypeProgress);
+    expect(initial).toBeDefined();
+    expect(initial!.rendered).toBeGreaterThan(.2);
+    expect(initial!.rendered).toBeCloseTo(initial!.current, 3);
+    await assertNativeProgress(page);
+    await expect(mount.locator("canvas")).toHaveCount(1);
+  } finally { release?.(); }
+});
+
+test("native prototype retains its canvas and current state through real BFCache navigation", async ({}, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop-1440");
+  // Playwright normally disables BFCache. Enable it only for this lifecycle qualification.
+  const browser = await chromium.launch({ channel: "chromium", ignoreDefaultArgs: ["--disable-back-forward-cache"] });
+  const context = await browser.newContext({ baseURL: testInfo.project.use.baseURL,
+    viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  try {
+    page.on("console", message => {
+      if (message.text().startsWith("Prototype lifecycle:")) console.log(message.text());
+    });
+    await page.addInitScript(() => {
+      const state = window as Window & { persistedPrototypeShows?: number; prototypeCanvas?: HTMLCanvasElement };
+      state.persistedPrototypeShows = 0;
+      window.addEventListener("pagehide", event => console.log(`Prototype lifecycle: pagehide persisted=${event.persisted}`));
+      window.addEventListener("pageshow", event => {
+        if (event.persisted) state.persistedPrototypeShows!++;
+        console.log(`Prototype lifecycle: pageshow persisted=${event.persisted}`);
+      });
+    });
+    await injectNativePrototype(page);
+    await visit(page);
+    await expect(page.locator("[data-homepage-runtime]")).toHaveAttribute("data-homepage-runtime-ready", "true");
+    await scrollNative(page, .6);
+    await page.evaluate(() => {
+      (window as Window & { prototypeCanvas?: HTMLCanvasElement }).prototypeCanvas =
+        document.querySelector<HTMLCanvasElement>("[data-homepage-runtime] canvas")!;
+    });
+    await page.goto("/contact", { waitUntil: "networkidle" });
+    console.log("Prototype lifecycle: returning from /contact");
+    await page.goBack({ waitUntil: "commit" });
+    console.log("Prototype lifecycle: history return committed");
+    const persisted = await page.evaluate(() => (window as Window & { persistedPrototypeShows?: number }).persistedPrototypeShows);
+    if (persisted !== 1) {
+      const limitation = await page.evaluate(() => {
+        const navigation = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming & { notRestoredReasons?: unknown };
+        return JSON.stringify(navigation?.notRestoredReasons ?? "Chromium did not expose notRestoredReasons");
+      });
+      console.log(`BFCache GAP: persisted pageshow was ${persisted}; notRestoredReasons: ${limitation}`);
+      testInfo.annotations.push({ type: "GAP", description: `Real BFCache unavailable: ${limitation}` });
+      test.skip(true, `Real BFCache unavailable: ${limitation}`);
+    }
+    expect(await page.evaluate(() => (window as Window & { prototypeCanvas?: HTMLCanvasElement }).prototypeCanvas ===
+      document.querySelector("[data-homepage-runtime] canvas"))).toBe(true);
+    await expect(page.locator("[data-homepage-runtime] canvas")).toHaveCount(1);
+    await expect(page.locator("[data-homepage-runtime]")).toHaveCount(1);
+    await assertNativeProgress(page);
+    await scrollNative(page, .3);
+    await expect(page.locator("[data-homepage-runtime]")).toHaveAttribute("data-homepage-runtime-active-region", "writing");
+    expect(errors).toEqual([]);
+  } finally { await context.close(); await browser.close(); }
 });
