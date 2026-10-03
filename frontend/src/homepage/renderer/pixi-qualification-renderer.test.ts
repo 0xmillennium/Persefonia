@@ -211,15 +211,28 @@ describe("qualification styles", () => {
   });
 
   test.each([
-    ["trace", 0xc8d5c7, 3, .92], ["registration", 0xb6996b, 1.5, .72], ["structure", 0x9e9a92, 1.25, .58]
+    ["trace", 0xc8d5c7, 2, .78], ["registration", 0xb6996b, 1.5, .72], ["structure", 0x9e9a92, 1.25, .58]
   ] as const)("PR-14: %s line-role base style is exact", (lineRole, color, width, alpha) => {
     const f = draw(manualScene([], [{ ...manualLine, lineRole }]));
     expect(style(f.stage.children[1]!, "stroke")).toEqual([["stroke", { color, width, alpha }]]);
     expect(style(f.stage.children[1]!, "fill")).toEqual([]);
   });
 
+  test("trace remains stronger than registration, and registration stronger than MEMORY structure", () => {
+    const scene = rig(), f = draw(scene);
+    const strokes = ["ariadne-trace", "registration-seam", "structure-line"].map(id =>
+      style(drawableGraphics(scene, f.stage.children, id), "stroke")[0]![1] as { width: number; alpha: number });
+    const [trace, registration, structure] = strokes;
+    expect(structure!.width).toBe(1.125);
+    expect(structure!.alpha).toBeCloseTo(.406, 12);
+    expect(trace!.width).toBeGreaterThan(registration!.width);
+    expect(trace!.alpha).toBeGreaterThan(registration!.alpha);
+    expect(registration!.width).toBeGreaterThan(structure!.width);
+    expect(registration!.alpha).toBeGreaterThan(structure!.alpha);
+  });
+
   const lineRoles = [
-    ["trace", 0xc8d5c7, 3, .92], ["registration", 0xb6996b, 1.5, .72], ["structure", 0x9e9a92, 1.25, .58]
+    ["trace", 0xc8d5c7, 2, .78], ["registration", 0xb6996b, 1.5, .72], ["structure", 0x9e9a92, 1.25, .58]
   ] as const;
   describe.each(lineRoles)("%s lifecycle", (lineRole, color, baseWidth, baseAlpha) => {
     test.each([["MEMORY", .70, .90], ["ACTIVE", 1, 1], ["UNVISITED", .45, .85]] as const)(
@@ -237,13 +250,14 @@ describe("qualification styles", () => {
 });
 
 const navigatorPath = [
-  ["moveTo", -4, -7],
-  ["bezierCurveTo", 0, -8, 3, -6, 5, -4],
-  ["bezierCurveTo", 8, -4, 10, -1, 10, 3],
-  ["bezierCurveTo", 10, 7, 7, 10, 3, 10],
-  ["bezierCurveTo", -1, 10, -3, 8, -4, 6],
-  ["bezierCurveTo", -7, 5, -9, 2, -9, -1],
-  ["bezierCurveTo", -9, -5, -7, -7, -4, -7],
+  ["moveTo", -2, -11],
+  ["bezierCurveTo", -5, -11, -7, -8, -7, -4],
+  ["bezierCurveTo", -7, 0, -6, 4, -4, 6],
+  ["bezierCurveTo", -3, 8, -1, 10, 2, 10],
+  ["bezierCurveTo", 5, 10, 7, 8, 7, 5],
+  ["bezierCurveTo", 8, 1, 7, -3, 5, -5],
+  ["bezierCurveTo", 4, -7, 2, -7, 1, -8],
+  ["bezierCurveTo", 0, -10, -1, -11, -2, -11],
   ["closePath"]
 ];
 
@@ -254,7 +268,7 @@ describe("exact trace and Navigator geometry", () => {
     expect(() => renderQualificationCompositingScene(f.application, scene)).not.toThrow();
     expect(pixi.instances).toHaveLength(3);
     expect(f.stage.children[1]!.commands).toEqual([
-      ["moveTo", 19, 71], ["stroke", { color: 0xc8d5c7, alpha: .92, width: 3 }]
+      ["moveTo", 19, 71], ["stroke", { color: 0xc8d5c7, alpha: .78, width: 2 }]
     ]);
     expect(f.stage.children).toEqual(pixi.instances);
     expect(supplied).toEqual([{ x: 19, y: 71 }]);
@@ -278,10 +292,14 @@ describe("exact trace and Navigator geometry", () => {
     expect(f.render).not.toHaveBeenCalled();
   });
 
-  test("PR-18: one Navigator Graphics with the exact continuous one-move, six-Bezier closed contour", () => {
+  test("PR-18: one Navigator Graphics with the exact continuous one-move, seven-Bezier closed contour", () => {
     const scene = rig(), f = draw(scene), navigator = drawableGraphics(scene, f.stage.children, "navigator");
     expect(f.stage.children.filter(resource => resource.commands.some(([name]) => name === "bezierCurveTo"))).toEqual([navigator]);
     expect(paths(navigator)).toEqual(navigatorPath);
+    expect(navigator.commands.filter(([name]) => name === "moveTo")).toHaveLength(1);
+    expect(navigator.commands.filter(([name]) => name === "bezierCurveTo")).toHaveLength(7);
+    expect(navigator.commands.filter(([name]) => name === "closePath")).toHaveLength(1);
+    expect(navigator.commands.filter(([name]) => ["circle", "ellipse", "roundRect", "rect"].includes(name))).toEqual([]);
   });
 
   test("PR-19: Navigator position is the exact model transform", () => {

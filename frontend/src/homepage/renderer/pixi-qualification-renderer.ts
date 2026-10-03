@@ -16,7 +16,7 @@ const SURFACE_STYLES = {
   UNVISITED: { fillAlpha: .06, strokeAlpha: .28, strokeWidth: 1 }
 } as const;
 const LINE_STYLES = {
-  trace: { color: TRACE, width: 3, alpha: .92 },
+  trace: { color: TRACE, width: 2, alpha: .78 },
   registration: { color: WARM, width: 1.5, alpha: .72 },
   structure: { color: MUTED, width: 1.25, alpha: .58 }
 } as const;
@@ -101,13 +101,14 @@ export function renderQualificationCompositingScene(application: Application, sc
         line(graphics, drawable);
         break;
       case "navigator":
-        graphics.moveTo(-4, -7)
-          .bezierCurveTo(0, -8, 3, -6, 5, -4)
-          .bezierCurveTo(8, -4, 10, -1, 10, 3)
-          .bezierCurveTo(10, 7, 7, 10, 3, 10)
-          .bezierCurveTo(-1, 10, -3, 8, -4, 6)
-          .bezierCurveTo(-7, 5, -9, 2, -9, -1)
-          .bezierCurveTo(-9, -5, -7, -7, -4, -7)
+        graphics.moveTo(-2, -11)
+          .bezierCurveTo(-5, -11, -7, -8, -7, -4)
+          .bezierCurveTo(-7, 0, -6, 4, -4, 6)
+          .bezierCurveTo(-3, 8, -1, 10, 2, 10)
+          .bezierCurveTo(5, 10, 7, 8, 7, 5)
+          .bezierCurveTo(8, 1, 7, -3, 5, -5)
+          .bezierCurveTo(4, -7, 2, -7, 1, -8)
+          .bezierCurveTo(0, -10, -1, -11, -2, -11)
           .closePath().fill({ color: PALE, alpha: 1 }).stroke({ color: MUTED, alpha: .60, width: 1 });
         graphics.position.set(drawable.position.x, drawable.position.y);
         graphics.rotation = drawable.rotationRadians;
