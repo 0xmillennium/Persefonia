@@ -26,7 +26,7 @@ This directory is not a planning archive.
 - local scratch notes
 - documentation-only migration placeholders
 
-Temporary notes belong in `.local/TODO.md`.
+Temporary notes and working contracts belong in ignored `.local/` under [ADR 0034](0034-permit-structured-ignored-local-working-contracts.md). `.local/TODO.md` remains the working queue; `.local/design/` holds active design contracts, authority indexes, and decision ledgers. These documents do not become canonical authority automatically.
 
 ## Lifecycle
 
@@ -50,7 +50,7 @@ Use [TEMPLATE.md](TEMPLATE.md) for new decision records.
 
 - [ADR 0001: Record Architecture Decisions](0001-record-architecture-decisions.md) — establishes ADRs as the durable decision mechanism.
 - [ADR 0002: Keep Documentation Limited to Decision Records](0002-keep-documentation-limited-to-decision-records.md) — keeps committed documentation minimal until the project is mature enough for public maintainer guides.
-- [ADR 0003: Use Local Ignored TODO for Temporary Notes](0003-use-local-ignored-todo-for-temporary-notes.md) — defines `.local/TODO.md` as the private, uncommitted place for immature notes.
+- [ADR 0003: Use Local Ignored TODO for Temporary Notes](0003-use-local-ignored-todo-for-temporary-notes.md) — superseded by ADR 0034; records the historical TODO-only temporary-notes policy.
 - [ADR 0004: Use Modular Monolith with App Composition Root](0004-use-modular-monolith-with-app-composition-root.md) — keeps deployment simple while preserving internal boundaries.
 - [ADR 0005: Keep Domain Modules Framework-free](0005-keep-domain-modules-framework-free.md) — protects domain code from framework and infrastructure coupling.
 - [ADR 0006: Use Explicit SQL Migrations](0006-use-explicit-sql-migrations.md) — requires executable Flyway SQL migrations and forbids documentation-only migration placeholders.
@@ -82,3 +82,4 @@ Use [TEMPLATE.md](TEMPLATE.md) for new decision records.
 - [ADR 0031: Separate Repository Automation Verification from Application Tests](0031-separate-repository-automation-verification-from-application-tests.md) — separates deterministic automation source checks and contracts from application verification and establishes a stable CI gate.
 - [ADR 0032: Add CI/CD Foundation and Qualified-Artifact RC Redeployment](0032-add-ci-cd-foundation-and-qualified-artifact-rc-redeployment.md) — defines delivery qualification and exact-artifact operator redeployment through the existing RC contract.
 - [ADR 0033: Keep Production Runtime Topology External and Use Compose for Containerized Local Development](0033-keep-production-runtime-topology-external-and-use-compose-for-containerized-local-development.md) — makes root Compose a source-based local runtime while keeping production topology external and immutable OCI delivery authoritative.
+- [ADR 0034: Permit Structured Ignored Local Working Contracts](0034-permit-structured-ignored-local-working-contracts.md) — supersedes ADR 0003; permits temporary working contracts and design ledgers in ignored `.local/` while preserving committed ADR authority.
