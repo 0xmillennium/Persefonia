@@ -1,0 +1,12 @@
+{
+  "source": "User-supplied approved hero film; source retained outside public delivery",
+  "sourcePath": ".local/media/home/hero/hero-master-4k.mp4",
+  "sourceSha256": "bc572ca5d9483d8ede6187c6fe842acbe1543940a31312e5c458fa8b9fe10a53",
+  "authorization": "User's attached homepage implementation request, sections 4 and 12",
+  "thirdPartyAssets": [],
+  "pipeline": "scripts/media/prepare-home-film.sh",
+  "derivatives": ["coast-720.mp4", "coast-1280.mp4", "coast-opening.webp", "coast-settled.webp"],
+  "video": "Complete eight-second film, H.264/yuv420p, keyframe every 8 frames, no audio, faststart",
+  "posters": "Opening at 0 seconds and settled at 7.5 seconds; 1600-pixel WebP",
+  "delivery": "Vite emits content-hashed same-origin assets; master is never bundled"
+}

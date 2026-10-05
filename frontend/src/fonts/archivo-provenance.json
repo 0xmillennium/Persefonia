@@ -1,0 +1,10 @@
+{
+  "family": "Archivo",
+  "authors": "Hector Gatti and the Archivo Project Authors / Omnibus-Type",
+  "license": "SIL Open Font License 1.1",
+  "licenseFile": "OFL-Archivo.txt",
+  "source": "https://github.com/google/fonts/blob/95f4904fc8bcf26d3420fe315560c96417c6dec7/ofl/archivo/Archivo%5Bwdth%2Cwght%5D.ttf",
+  "sourceSha256": "0e094a7d3c7c4c25cf1310c4b30014f1dae9332220b1c2c88f4fa996f0b05053",
+  "derivative": "archivo.woff2",
+  "preparation": "fontTools: subset Latin U+0000-024F, U+1E00-1EFF, punctuation U+2000-206F and arrows U+2190-21FF, then constrain wght to 400-650 and wdth to 85-100; WOFF2 compression. Turkish glyphs retained."
+}

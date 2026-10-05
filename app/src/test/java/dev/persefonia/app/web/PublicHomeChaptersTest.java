@@ -47,11 +47,12 @@ class PublicHomeChaptersTest {
         for (String id : List.of("identity", "work", "writing", "research", "architecture", "about", "contact")) {
             assertThat(html).contains("id=\"" + id + "\"");
         }
-        assertThat(html).contains("<h1 id=\"identity-title\">Building systems");
+        assertThat(html).contains("<h1 id=\"identity-title\" class=\"home-masthead\">0xmillennium");
         assertThat(html).contains("href=\"#work\"", "href=\"#writing\"", "href=\"/contact\"");
         assertThat(html).contains("href=\"/en/articles/real-article\"", "href=\"/en/research/real-study\"");
         assertThat(html).contains("A real article", "A real study");
-        assertThat(html).contains("class=\"archive-stage\" aria-hidden=\"true\"");
+        assertThat(html).contains("class=\"home-cinema__image\" aria-hidden=\"true\"");
+        assertThat(html).contains("class=\"home-layer\"", "Spring MVC", "PostgreSQL");
         assertThat(html).doesNotContain("[Published article title]", "[Published research title]", "ref. pending");
     }
 }

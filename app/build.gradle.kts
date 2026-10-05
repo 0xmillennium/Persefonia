@@ -194,6 +194,7 @@ val viteBuild by tasks.registering(Exec::class) {
     workingDir(frontendDirectory)
     commandLine("npm", "run", "build")
     inputs.dir(frontendDirectory.dir("src"))
+    inputs.dir(frontendDirectory.dir("public"))
     inputs.files(
         frontendDirectory.file("package.json"),
         frontendDirectory.file("vite.config.ts")
