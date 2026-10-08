@@ -172,6 +172,32 @@ class CiWorkflowContractTest {
         assertThatThrownBy(() -> assertBrowserQualification(bypassed)).isInstanceOf(AssertionError.class);
     }
 
+    @Test
+    void verifyRequiresSegmentedIdentityQualification() {
+        assertIdentityQualification(workflow);
+        for (String name : List.of("Check segmented identity sources and deterministic physics",
+                "Install identity browser matrix", "Qualify segmented identity browsers and release lifecycle")) {
+            WorkflowDocument missing = openCi();
+            WorkflowDocument.list(missing.job("verify").get("steps")).removeIf(step ->
+                    name.equals(WorkflowDocument.map(step).get("name")));
+            assertThatThrownBy(() -> assertIdentityQualification(missing)).isInstanceOf(AssertionError.class);
+        }
+    }
+
+    private static void assertIdentityQualification(WorkflowDocument ci) {
+        assertThat(ci.steps("verify").stream().map(WorkflowDocument::map)
+                .map(step -> (String) step.get("name")))
+                .containsSubsequence("Qualify homepage in Chromium",
+                        "Check segmented identity sources and deterministic physics", "Install identity browser matrix",
+                        "Qualify segmented identity browsers and release lifecycle", "Set up Temurin Java 21");
+        assertThat(ci.step("verify", "Check segmented identity sources and deterministic physics").get("run"))
+                .asString().contains("npm run identity:check");
+        assertThat(ci.step("verify", "Install identity browser matrix").get("run"))
+                .asString().contains("playwright install --with-deps firefox webkit");
+        assertThat(ci.step("verify", "Qualify segmented identity browsers and release lifecycle").get("run"))
+                .asString().contains("npm run identity:browser", "npm run identity:browser:built");
+    }
+
     private static int stepIndex(List<Object> steps, String name) {
         for (int index = 0; index < steps.size(); index++) {
             if (name.equals(WorkflowDocument.map(steps.get(index)).get("name"))) return index;

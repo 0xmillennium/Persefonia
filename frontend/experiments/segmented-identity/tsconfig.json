@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "resolveJsonModule": true,
+    "types": [
+      "vite/client",
+      "node"
+    ],
+    "skipLibCheck": true
+  },
+  "include": [
+    "*.ts",
+    "tests/**/*.ts"
+  ]
+}

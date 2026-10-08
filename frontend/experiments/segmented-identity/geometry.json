@@ -1,0 +1,759 @@
+{
+  "schemaVersion": "1.0.0",
+  "name": "Persefonia segmented abstract identity",
+  "coordinateSystem": {
+    "units": "canonical units",
+    "origin": "midpoint between the two envelope centers",
+    "xAxis": "right",
+    "yAxis": "down",
+    "polygonWinding": "positive signed area in y-down coordinates; visually clockwise",
+    "precisionDecimals": 5,
+    "homePose": "vertices are already in world coordinates; no additional home transform",
+    "localAnchorOrigin": "area centroid of each fragment"
+  },
+  "canonicalEnvelope": {
+    "individualWidth": 132,
+    "individualHeight": 180,
+    "aspectRatio": 0.73333333,
+    "profile": {
+      "type": "superellipse",
+      "halfWidth": 66,
+      "halfHeight": 90,
+      "exponent": 2.35,
+      "equation": "abs(x/66)^2.35 + abs(y/90)^2.35 = 1",
+      "authority": "profile describes construction; fragment vertices are the authoritative boundaries",
+      "inspectionOutlineVertices": [
+        [66.0, 0.0],
+        [65.87972, 8.83571],
+        [65.51915, 15.90907],
+        [64.91915, 22.39689],
+        [64.08113, 28.48819],
+        [63.00703, 34.25725],
+        [61.69932, 39.73859],
+        [60.16097, 44.94854],
+        [58.39538, 49.89382],
+        [56.40636, 54.57567],
+        [54.19805, 58.99202],
+        [51.77483, 63.1388],
+        [49.14123, 67.01077],
+        [46.30179, 70.60204],
+        [43.26081, 73.90643],
+        [40.02216, 76.91777],
+        [36.5888, 79.63007],
+        [32.96226, 82.03769],
+        [29.14163, 84.13544],
+        [25.12198, 85.91867],
+        [20.89134, 87.38335],
+        [16.42439, 88.52611],
+        [11.66665, 89.34429],
+        [6.47952, 89.83598],
+        [0.0, 90.0],
+        [-6.47952, 89.83598],
+        [-11.66665, 89.34429],
+        [-16.42439, 88.52611],
+        [-20.89134, 87.38335],
+        [-25.12198, 85.91867],
+        [-29.14163, 84.13544],
+        [-32.96226, 82.03769],
+        [-36.5888, 79.63007],
+        [-40.02216, 76.91777],
+        [-43.26081, 73.90643],
+        [-46.30179, 70.60204],
+        [-49.14123, 67.01077],
+        [-51.77483, 63.1388],
+        [-54.19805, 58.99202],
+        [-56.40636, 54.57567],
+        [-58.39538, 49.89382],
+        [-60.16097, 44.94854],
+        [-61.69932, 39.73859],
+        [-63.00703, 34.25725],
+        [-64.08113, 28.48819],
+        [-64.91915, 22.39689],
+        [-65.51915, 15.90907],
+        [-65.87972, 8.83571],
+        [-66.0, 0.0],
+        [-65.87972, -8.83571],
+        [-65.51915, -15.90907],
+        [-64.91915, -22.39689],
+        [-64.08113, -28.48819],
+        [-63.00703, -34.25725],
+        [-61.69932, -39.73859],
+        [-60.16097, -44.94854],
+        [-58.39538, -49.89382],
+        [-56.40636, -54.57567],
+        [-54.19805, -58.99202],
+        [-51.77483, -63.1388],
+        [-49.14123, -67.01077],
+        [-46.30179, -70.60204],
+        [-43.26081, -73.90643],
+        [-40.02216, -76.91777],
+        [-36.5888, -79.63007],
+        [-32.96226, -82.03769],
+        [-29.14163, -84.13544],
+        [-25.12198, -85.91867],
+        [-20.89134, -87.38335],
+        [-16.42439, -88.52611],
+        [-11.66665, -89.34429],
+        [-6.47952, -89.83598],
+        [0.0, -90.0],
+        [6.47952, -89.83598],
+        [11.66665, -89.34429],
+        [16.42439, -88.52611],
+        [20.89134, -87.38335],
+        [25.12198, -85.91867],
+        [29.14163, -84.13544],
+        [32.96226, -82.03769],
+        [36.5888, -79.63007],
+        [40.02216, -76.91777],
+        [43.26081, -73.90643],
+        [46.30179, -70.60204],
+        [49.14123, -67.01077],
+        [51.77483, -63.1388],
+        [54.19805, -58.99202],
+        [56.40636, -54.57567],
+        [58.39538, -49.89382],
+        [60.16097, -44.94854],
+        [61.69932, -39.73859],
+        [63.00703, -34.25725],
+        [64.08113, -28.48819],
+        [64.91915, -22.39689],
+        [65.51915, -15.90907],
+        [65.87972, -8.83571]
+      ]
+    },
+    "shapeCenters": {
+      "left": [-80.0, 0.0],
+      "right": [80.0, 0.0]
+    },
+    "markBounds": {
+      "minX": -146,
+      "maxX": 146,
+      "minY": -90,
+      "maxY": 90
+    },
+    "individualNominalDisplaySize": {
+      "widthPx": 132,
+      "heightPx": 180
+    }
+  },
+  "opticalSpacing": {
+    "centerDistance": 160,
+    "envelopeEdgeGap": 28,
+    "gapToIndividualWidthRatio": 0.21212121,
+    "alignment": "same envelope extrema and baseline; center blade is optical, not a registration point",
+    "scalePolicy": "scale the complete canonical mark uniformly; do not redraw, stroke, inflate, or substitute proxies"
+  },
+  "seams": {
+    "left": {
+      "construction": "four oblique connectors between offset outer and inner arc endpoints",
+      "outerBoundaryAnglesDegrees": [-144, -36, 36, 144],
+      "outerHalfGapDegrees": 2.2,
+      "innerHalfGapDegrees": 3.8,
+      "innerAngularOffsetDegrees": 7,
+      "cavity": {
+        "halfWidth": 26,
+        "halfHeight": 52,
+        "exponent": 2.2
+      },
+      "centerSeparation": "continuous open moat between the blade and all four outer bands; measured clearance recorded by validation",
+      "minimumMeasuredOuterSeamClearance": 5.21238,
+      "minimumMeasuredCenterClearance": 14.84595
+    },
+    "right": {
+      "construction": "four convex regions separated by continuous parallel diagonal cuts, with short nose bevels at the central intersection",
+      "diagonalSlopeMagnitude": 1.3636363636363635,
+      "diagonalNormalWidth": 6.5,
+      "halfplaneOffset": 5.49577223,
+      "innerTipCut": {
+        "upperLowerAbsY": 7.3,
+        "leftRightAbsX": 5.4
+      },
+      "junction": "small beveled intersection of the two 6.5-unit diagonal channels; no large rectangular aperture"
+    }
+  },
+  "shapes": [
+    {
+      "id": "left",
+      "center": [-80.0, 0.0],
+      "fragmentCount": 5,
+      "filledArea": 15453.52234,
+      "bounds": {
+        "minX": -146.0,
+        "maxX": -14.0,
+        "minY": -90.0,
+        "maxY": 90.0
+      }
+    },
+    {
+      "id": "right",
+      "center": [80.0, 0.0],
+      "fragmentCount": 4,
+      "filledArea": 17574.05984,
+      "bounds": {
+        "minX": 14.0,
+        "maxX": 146.0,
+        "minY": -90.0,
+        "maxY": 90.0
+      }
+    }
+  ],
+  "fragments": [
+    {
+      "id": "left-cap-upper",
+      "shape": "left",
+      "role": "cap-upper",
+      "polygonType": "simple-concave",
+      "vertices": [
+        [-133.76189, -59.78669],
+        [-128.70064, -67.6044],
+        [-122.84034, -74.32501],
+        [-116.21117, -79.90149],
+        [-108.82749, -84.28973],
+        [-100.65938, -87.45245],
+        [-91.53487, -89.36165],
+        [-80.0, -90.0],
+        [-68.46513, -89.36165],
+        [-59.34062, -87.45245],
+        [-51.17251, -84.28973],
+        [-43.78883, -79.90149],
+        [-37.15966, -74.32501],
+        [-31.29936, -67.6044],
+        [-26.23811, -59.78669],
+        [-57.79747, -29.78324],
+        [-60.71547, -37.31141],
+        [-64.35357, -43.4289],
+        [-68.63288, -47.98622],
+        [-73.49655, -50.86427],
+        [-80.0, -52.0],
+        [-85.16653, -51.31907],
+        [-90.18164, -48.88342],
+        [-94.61318, -44.74449],
+        [-98.42214, -39.01155]
+      ],
+      "centroid": [-78.29916, -64.76529],
+      "area": 3736.79678,
+      "anchorCandidates": [
+        {
+          "contourVertexIndex": 0,
+          "world": [-133.76189, -59.78669],
+          "local": [-55.46273, 4.9786]
+        },
+        {
+          "contourVertexIndex": 7,
+          "world": [-80.0, -90.0],
+          "local": [-1.70084, -25.23471]
+        },
+        {
+          "contourVertexIndex": 14,
+          "world": [-26.23811, -59.78669],
+          "local": [52.06105, 4.9786]
+        },
+        {
+          "contourVertexIndex": 15,
+          "world": [-57.79747, -29.78324],
+          "local": [20.50169, 34.98205]
+        },
+        {
+          "contourVertexIndex": 24,
+          "world": [-98.42214, -39.01155],
+          "local": [-20.12298, 25.75374]
+        }
+      ]
+    },
+    {
+      "id": "left-flank-right",
+      "shape": "left",
+      "role": "flank-right",
+      "polygonType": "simple-concave",
+      "vertices": [
+        [-23.62165, -54.63631],
+        [-21.09794, -48.5636],
+        [-18.94642, -42.05389],
+        [-17.17489, -35.0999],
+        [-15.78993, -27.67298],
+        [-14.79682, -19.69633],
+        [-14.1994, -10.95226],
+        [-14.0, 0.0],
+        [-14.1994, 10.95226],
+        [-14.79682, 19.69633],
+        [-15.78993, 27.67298],
+        [-17.17489, 35.0999],
+        [-18.94642, 42.05389],
+        [-21.09794, 48.5636],
+        [-23.62165, 54.63631],
+        [-59.37897, 34.26536],
+        [-57.62776, 29.22635],
+        [-56.20481, 23.6761],
+        [-55.12556, 17.64617],
+        [-54.40197, 11.13608],
+        [-54.0, 0.0],
+        [-54.05016, -4.34029],
+        [-54.42591, -11.42991],
+        [-55.16517, -17.91811],
+        [-56.25963, -23.92756]
+      ],
+      "centroid": [-34.04726, 2.35001],
+      "area": 3453.09159,
+      "anchorCandidates": [
+        {
+          "contourVertexIndex": 15,
+          "world": [-59.37897, 34.26536],
+          "local": [-25.33171, 31.91535]
+        },
+        {
+          "contourVertexIndex": 0,
+          "world": [-23.62165, -54.63631],
+          "local": [10.42561, -56.98632]
+        },
+        {
+          "contourVertexIndex": 7,
+          "world": [-14.0, 0.0],
+          "local": [20.04726, -2.35001]
+        },
+        {
+          "contourVertexIndex": 14,
+          "world": [-23.62165, 54.63631],
+          "local": [10.42561, 52.2863]
+        },
+        {
+          "contourVertexIndex": 23,
+          "world": [-55.16517, -17.91811],
+          "local": [-21.11791, -20.26812]
+        }
+      ]
+    },
+    {
+      "id": "left-cap-lower",
+      "shape": "left",
+      "role": "cap-lower",
+      "polygonType": "simple-concave",
+      "vertices": [
+        [-26.23811, 59.78669],
+        [-31.29936, 67.6044],
+        [-37.15966, 74.32501],
+        [-43.78883, 79.90149],
+        [-51.17251, 84.28973],
+        [-59.34062, 87.45245],
+        [-68.46513, 89.36165],
+        [-80.0, 90.0],
+        [-91.53487, 89.36165],
+        [-100.65938, 87.45245],
+        [-108.82749, 84.28973],
+        [-116.21117, 79.90149],
+        [-122.84034, 74.32501],
+        [-128.70064, 67.6044],
+        [-133.76189, 59.78669],
+        [-102.20253, 29.78324],
+        [-99.28453, 37.31141],
+        [-95.64643, 43.4289],
+        [-91.36712, 47.98622],
+        [-86.50345, 50.86427],
+        [-80.0, 52.0],
+        [-74.83347, 51.31907],
+        [-69.81836, 48.88342],
+        [-65.38682, 44.74449],
+        [-61.57786, 39.01155]
+      ],
+      "centroid": [-81.70084, 64.76529],
+      "area": 3736.79678,
+      "anchorCandidates": [
+        {
+          "contourVertexIndex": 14,
+          "world": [-133.76189, 59.78669],
+          "local": [-52.06105, -4.9786]
+        },
+        {
+          "contourVertexIndex": 15,
+          "world": [-102.20253, 29.78324],
+          "local": [-20.50169, -34.98205]
+        },
+        {
+          "contourVertexIndex": 0,
+          "world": [-26.23811, 59.78669],
+          "local": [55.46273, -4.9786]
+        },
+        {
+          "contourVertexIndex": 7,
+          "world": [-80.0, 90.0],
+          "local": [1.70084, 25.23471]
+        },
+        {
+          "contourVertexIndex": 24,
+          "world": [-61.57786, 39.01155],
+          "local": [20.12298, -25.75374]
+        }
+      ]
+    },
+    {
+      "id": "left-flank-left",
+      "shape": "left",
+      "role": "flank-left",
+      "polygonType": "simple-concave",
+      "vertices": [
+        [-136.37835, 54.63631],
+        [-138.90206, 48.5636],
+        [-141.05358, 42.05389],
+        [-142.82511, 35.0999],
+        [-144.21007, 27.67298],
+        [-145.20318, 19.69633],
+        [-145.8006, 10.95226],
+        [-146.0, 0.0],
+        [-145.8006, -10.95226],
+        [-145.20318, -19.69633],
+        [-144.21007, -27.67298],
+        [-142.82511, -35.0999],
+        [-141.05358, -42.05389],
+        [-138.90206, -48.5636],
+        [-136.37835, -54.63631],
+        [-100.62103, -34.26536],
+        [-102.37224, -29.22635],
+        [-103.79519, -23.6761],
+        [-104.87444, -17.64617],
+        [-105.59803, -11.13608],
+        [-106.0, 0.0],
+        [-105.94984, 4.34029],
+        [-105.57409, 11.42991],
+        [-104.83483, 17.91811],
+        [-103.74037, 23.92756]
+      ],
+      "centroid": [-125.95274, -2.35001],
+      "area": 3453.09159,
+      "anchorCandidates": [
+        {
+          "contourVertexIndex": 7,
+          "world": [-146.0, 0.0],
+          "local": [-20.04726, 2.35001]
+        },
+        {
+          "contourVertexIndex": 14,
+          "world": [-136.37835, -54.63631],
+          "local": [-10.42561, -52.2863]
+        },
+        {
+          "contourVertexIndex": 15,
+          "world": [-100.62103, -34.26536],
+          "local": [25.33171, -31.91535]
+        },
+        {
+          "contourVertexIndex": 0,
+          "world": [-136.37835, 54.63631],
+          "local": [-10.42561, 56.98632]
+        },
+        {
+          "contourVertexIndex": 23,
+          "world": [-104.83483, 17.91811],
+          "local": [21.11791, 20.26812]
+        }
+      ]
+    },
+    {
+      "id": "left-center",
+      "shape": "left",
+      "role": "vertical blade",
+      "polygonType": "convex",
+      "vertices": [
+        [-83.44, -31.22],
+        [-80.38, -33.38],
+        [-74.62, -27.62],
+        [-72.28, -23.48],
+        [-69.72, -14.52],
+        [-69.18, -7.32],
+        [-69.82, 9.32],
+        [-71.44, 17.78],
+        [-76.56, 31.22],
+        [-79.62, 33.38],
+        [-85.38, 27.62],
+        [-87.72, 23.48],
+        [-90.28, 14.52],
+        [-90.82, 7.32],
+        [-90.18, -9.32],
+        [-88.56, -17.78]
+      ],
+      "centroid": [-80.0, 0.0],
+      "area": 1073.7456,
+      "anchorCandidates": [
+        {
+          "contourVertexIndex": 13,
+          "world": [-90.82, 7.32],
+          "local": [-10.82, 7.32]
+        },
+        {
+          "contourVertexIndex": 1,
+          "world": [-80.38, -33.38],
+          "local": [-0.38, -33.38]
+        },
+        {
+          "contourVertexIndex": 5,
+          "world": [-69.18, -7.32],
+          "local": [10.82, -7.32]
+        },
+        {
+          "contourVertexIndex": 9,
+          "world": [-79.62, 33.38],
+          "local": [0.38, 33.38]
+        },
+        {
+          "contourVertexIndex": 7,
+          "world": [-71.44, 17.78],
+          "local": [8.56, 17.78]
+        }
+      ]
+    },
+    {
+      "id": "right-cap-upper",
+      "shape": "right",
+      "role": "cap-upper",
+      "polygonType": "convex",
+      "vertices": [
+        [32.92968, -69.68258],
+        [36.93247, -74.09993],
+        [41.28212, -78.00204],
+        [45.97245, -81.37518],
+        [51.00295, -84.20678],
+        [56.3842, -86.48587],
+        [62.15027, -88.20337],
+        [68.39403, -89.35232],
+        [80.0, -90.0],
+        [84.56613, -89.92799],
+        [91.60597, -89.35232],
+        [97.84973, -88.20337],
+        [103.6158, -86.48587],
+        [108.99705, -84.20678],
+        [114.02755, -81.37518],
+        [118.71788, -78.00204],
+        [123.06753, -74.09993],
+        [127.07032, -69.68258],
+        [81.3231, -7.3],
+        [78.6769, -7.3]
+      ],
+      "centroid": [80.0013, -57.64665],
+      "area": 4393.60084,
+      "anchorCandidates": [
+        {
+          "contourVertexIndex": 0,
+          "world": [32.92968, -69.68258],
+          "local": [-47.07162, -12.03593]
+        },
+        {
+          "contourVertexIndex": 8,
+          "world": [80.0, -90.0],
+          "local": [-0.0013, -32.35335]
+        },
+        {
+          "contourVertexIndex": 17,
+          "world": [127.07032, -69.68258],
+          "local": [47.06902, -12.03593]
+        },
+        {
+          "contourVertexIndex": 18,
+          "world": [81.3231, -7.3],
+          "local": [1.3218, 50.34665]
+        },
+        {
+          "contourVertexIndex": 19,
+          "world": [78.6769, -7.3],
+          "local": [-1.3244, 50.34665]
+        }
+      ]
+    },
+    {
+      "id": "right-flank-right",
+      "shape": "right",
+      "role": "flank-right",
+      "polygonType": "convex",
+      "vertices": [
+        [131.10056, -64.1868],
+        [134.33995, -58.72844],
+        [137.2015, -52.79711],
+        [139.67513, -46.4012],
+        [141.75164, -39.54144],
+        [143.42297, -32.20336],
+        [144.68247, -24.34054],
+        [145.52503, -15.82633],
+        [146.0, 0.0],
+        [145.94719, 6.22654],
+        [145.52503, 15.82633],
+        [144.68247, 24.34054],
+        [143.42297, 32.20336],
+        [141.75164, 39.54144],
+        [139.67513, 46.4012],
+        [137.2015, 52.79711],
+        [134.33995, 58.72844],
+        [131.10056, 64.1868],
+        [85.4, 1.86786],
+        [85.4, -1.86786]
+      ],
+      "centroid": [122.27565, 0.00177],
+      "area": 4393.42908,
+      "anchorCandidates": [
+        {
+          "contourVertexIndex": 18,
+          "world": [85.4, 1.86786],
+          "local": [-36.87565, 1.86609]
+        },
+        {
+          "contourVertexIndex": 0,
+          "world": [131.10056, -64.1868],
+          "local": [8.82491, -64.18857]
+        },
+        {
+          "contourVertexIndex": 8,
+          "world": [146.0, 0.0],
+          "local": [23.72435, -0.00177]
+        },
+        {
+          "contourVertexIndex": 17,
+          "world": [131.10056, 64.1868],
+          "local": [8.82491, 64.18503]
+        },
+        {
+          "contourVertexIndex": 19,
+          "world": [85.4, -1.86786],
+          "local": [-36.87565, -1.86963]
+        }
+      ]
+    },
+    {
+      "id": "right-cap-lower",
+      "shape": "right",
+      "role": "cap-lower",
+      "polygonType": "convex",
+      "vertices": [
+        [127.07032, 69.68258],
+        [123.06753, 74.09993],
+        [118.71788, 78.00204],
+        [114.02755, 81.37518],
+        [108.99705, 84.20678],
+        [103.6158, 86.48587],
+        [97.84973, 88.20337],
+        [91.60597, 89.35232],
+        [80.0, 90.0],
+        [75.43387, 89.92799],
+        [68.39403, 89.35232],
+        [62.15027, 88.20337],
+        [56.3842, 86.48587],
+        [51.00295, 84.20678],
+        [45.97245, 81.37518],
+        [41.28212, 78.00204],
+        [36.93247, 74.09993],
+        [32.92968, 69.68258],
+        [78.6769, 7.3],
+        [81.3231, 7.3]
+      ],
+      "centroid": [79.9987, 57.64665],
+      "area": 4393.60084,
+      "anchorCandidates": [
+        {
+          "contourVertexIndex": 17,
+          "world": [32.92968, 69.68258],
+          "local": [-47.06902, 12.03593]
+        },
+        {
+          "contourVertexIndex": 18,
+          "world": [78.6769, 7.3],
+          "local": [-1.3218, -50.34665]
+        },
+        {
+          "contourVertexIndex": 0,
+          "world": [127.07032, 69.68258],
+          "local": [47.07162, 12.03593]
+        },
+        {
+          "contourVertexIndex": 8,
+          "world": [80.0, 90.0],
+          "local": [0.0013, 32.35335]
+        },
+        {
+          "contourVertexIndex": 19,
+          "world": [81.3231, 7.3],
+          "local": [1.3244, -50.34665]
+        }
+      ]
+    },
+    {
+      "id": "right-flank-left",
+      "shape": "right",
+      "role": "flank-left",
+      "polygonType": "convex",
+      "vertices": [
+        [28.89944, 64.1868],
+        [25.66005, 58.72844],
+        [22.7985, 52.79711],
+        [20.32487, 46.4012],
+        [18.24836, 39.54144],
+        [16.57703, 32.20336],
+        [15.31753, 24.34054],
+        [14.47497, 15.82633],
+        [14.0, 0.0],
+        [14.05281, -6.22654],
+        [14.47497, -15.82633],
+        [15.31753, -24.34054],
+        [16.57703, -32.20336],
+        [18.24836, -39.54144],
+        [20.32487, -46.4012],
+        [22.7985, -52.79711],
+        [25.66005, -58.72844],
+        [28.89944, -64.1868],
+        [74.6, -1.86786],
+        [74.6, 1.86786]
+      ],
+      "centroid": [37.72435, -0.00177],
+      "area": 4393.42908,
+      "anchorCandidates": [
+        {
+          "contourVertexIndex": 8,
+          "world": [14.0, 0.0],
+          "local": [-23.72435, 0.00177]
+        },
+        {
+          "contourVertexIndex": 17,
+          "world": [28.89944, -64.1868],
+          "local": [-8.82491, -64.18503]
+        },
+        {
+          "contourVertexIndex": 18,
+          "world": [74.6, -1.86786],
+          "local": [36.87565, -1.86609]
+        },
+        {
+          "contourVertexIndex": 0,
+          "world": [28.89944, 64.1868],
+          "local": [-8.82491, 64.18857]
+        },
+        {
+          "contourVertexIndex": 19,
+          "world": [74.6, 1.86786],
+          "local": [36.87565, 1.86963]
+        }
+      ]
+    }
+  ],
+  "reuseContract": {
+    "visibleSVGElement": "polygon",
+    "pointsSource": "fragments[].vertices, unchanged",
+    "noStroke": true,
+    "noOverlapAtHome": true,
+    "concaveHandling": "The four left outer bands are simple concave polygons. A future engine requiring convex bodies must partition these exact polygons; preserve the union and never replace them with circles. No physical solver has been evaluated.",
+    "anchorPolicy": "Five contour vertices per fragment are suggested attachment candidates, not joints or simulation settings. Local = world minus fragment centroid."
+  },
+  "validation": {
+    "method": "deterministic polygon predicates and Euclidean segment distances on the delivered 5-decimal vertices",
+    "fragmentCounts": {
+      "left": 5,
+      "right": 4
+    },
+    "simplePolygons": 9,
+    "overlapPairCount": 0,
+    "testedFragmentPairs": 36,
+    "convexFragmentCount": 5,
+    "concaveFragmentCount": 4,
+    "contourVertexRange": [16, 25],
+    "minimumOuterFragmentClearance": {
+      "left": 5.21238,
+      "right": 6.5
+    },
+    "minimumCenterToOuterClearance": 14.84595,
+    "filledAreaDifferencePercentOfMean": 12.841,
+    "physicsValidation": "not performed; geometry checks only"
+  }
+}

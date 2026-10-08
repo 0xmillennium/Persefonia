@@ -9,10 +9,19 @@
     "typecheck": "tsc --noEmit",
     "build": "vite build",
     "test:unit": "vitest run",
-    "test:browser": "playwright test"
+    "test:browser": "playwright test",
+    "identity:dev": "vite --config experiments/segmented-identity/vite.config.ts",
+    "identity:geometry": "node experiments/segmented-identity/generate-static.mjs",
+    "identity:typecheck": "tsc --noEmit -p experiments/segmented-identity/tsconfig.json",
+    "identity:build": "node experiments/segmented-identity/generate-static.mjs --check && vite build --config experiments/segmented-identity/vite.config.ts",
+    "identity:test": "vitest run --config experiments/segmented-identity/vitest.config.ts",
+    "identity:browser": "playwright test --config experiments/segmented-identity/playwright.config.ts",
+    "identity:browser:built": "playwright test --config experiments/segmented-identity/production.playwright.config.ts",
+    "identity:check": "npm run identity:typecheck && npm run identity:test && npm run identity:build"
   },
   "devDependencies": {
     "@playwright/test": "1.57.0",
+    "@types/node": "22.20.5",
     "type-fest": "^5.7.0",
     "typescript": "6.0.3",
     "vite": "8.0.16",

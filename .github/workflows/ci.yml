@@ -73,7 +73,7 @@ jobs:
     permissions:
       contents: read
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 60
     services:
       postgres:
         image: postgres:17.11-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73
@@ -155,6 +155,18 @@ jobs:
 
       - name: Qualify homepage in Chromium
         run: ./gradlew --no-daemon --stacktrace :app:browserCheck
+
+      - name: Check segmented identity sources and deterministic physics
+        run: cd frontend && npm run identity:check
+
+      - name: Install identity browser matrix
+        run: cd frontend && npx playwright install --with-deps firefox webkit
+
+      - name: Qualify segmented identity browsers and release lifecycle
+        run: |
+          cd frontend
+          npm run identity:browser
+          npm run identity:browser:built
 
       - name: Set up Temurin Java 21
         uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
