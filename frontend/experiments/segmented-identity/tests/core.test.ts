@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { PhysicsCore, navigatorTransfer } from "../core";
 import { polygonProperties, decompose, polygonContact, transform } from "../math";
 import type { FragmentGeometry } from "../core";
-import { CollisionPermissions, DEADLOCK } from "../deadlock";
+import { CollisionPermissions } from "../deadlock";
 
 const square = [{ x: -20, y: -20 }, { x: 20, y: -20 }, { x: 20, y: 20 }, { x: -20, y: 20 }];
 const g = (id: string, x: number): FragmentGeometry => ({ id, vertices: square, parts: [square],
@@ -16,7 +16,7 @@ const blockedPairs = () => [{ key: "a/b", a: "a", b: "b", contact: true, overlap
 const approve = (permissions: CollisionPermissions, step: number, selected?: readonly string[]) => {
   const request = permissions.requests[0];
   if (request) permissions.acceptPrediction(step, { request, selected: selected ?? request.candidates,
-    baselineReduction: .001, selectedReduction: .1, trials: 4, simulatedSteps: 48 });
+    baselineReduction: .001, selectedReduction: .1, trials: 2, simulatedSteps: 12 });
 };
 
 describe("predictive permission boundary", () => {
@@ -30,18 +30,42 @@ describe("predictive permission boundary", () => {
     expect(p.events.map(e => e.key).sort()).toEqual(pairs.map(p => p.key).sort());
     expect(p.events.every(e => e.step === 7)).toBe(true);
   });
-  it("allows a prediction to select only the useful subset", () => {
+  it("rejects a partial permission for an indivisible return cohort", () => {
     const p = new CollisionPermissions(1 / 120);
     for (let step = 1; step <= 7; step++) p.observe(step, blockedBodies(), blockedPairs());
     approve(p, 7, ["b/c"]);
-    expect(p.ghosted("b/c")).toBe(true); expect(p.ghosted("a/b")).toBe(false);
+    expect(p.ghosted("b/c")).toBe(false); expect(p.ghosted("a/b")).toBe(false);
   });
-  it("keeps an unrelated moving neighbour outside a calm candidate group", () => {
+  it("keeps a moving contact group solid without evidence of suppressed progress", () => {
     const p = new CollisionPermissions(1 / 120);
     for (let step = 1; step <= 20; step++) p.observe(step,
       blockedBodies().map(b => b.id === "c" ? { ...b, speed: 20, energy: 200 } : b), blockedPairs());
-    expect(p.requests[0]!.candidates).toEqual(["a/b"]);
+    expect(p.requests).toEqual([]);
     approve(p, 20); expect(p.ghosted("b/c")).toBe(false);
+  });
+  it("keeps a calm contact island nominated across brief relative-speed spikes", () => {
+    const p = new CollisionPermissions(1 / 120);
+    for (let step = 1; step <= 30; step++) {
+      p.observe(step, blockedBodies().map(b => {
+        const vx = b.id === "c" && step % 7 === 0 ? 12.1 : 0;
+        return { ...b, speed: vx, velocityX: vx, velocityY: 0, energy: .5 * vx ** 2 };
+      }), blockedPairs());
+      if (step >= 7) {
+        expect(p.requests[0]!.members).toEqual(["a", "b", "c"]);
+        expect([...p.requests[0]!.candidates].sort()).toEqual(["a/b", "b/c"]);
+      }
+    }
+    expect(p.events).toEqual([]);
+  });
+  it("blocks release during sustained new motion without a progress observation", () => {
+    const p = new CollisionPermissions(1 / 120);
+    for (let step = 1; step <= 7; step++) p.observe(step, blockedBodies(), blockedPairs());
+    for (let step = 8; step <= 20; step++) {
+      p.observe(step, blockedBodies().map(b => b.id === "c" ? { ...b, speed: 20, energy: 200 } : b), blockedPairs());
+      expect(p.requests.every(r => !r.members.includes("c"))).toBe(true);
+    }
+    expect(p.requests).toEqual([]);
+    expect(p.events).toEqual([]);
   });
   it("retains supporting contacts as candidates without automatically exempting them", () => {
     const p = new CollisionPermissions(1 / 120), pairs = blockedPairs(); pairs[1]!.blocking = -6;
@@ -62,17 +86,18 @@ describe("predictive permission boundary", () => {
     const request = p.requests[0]!;
     p.observe(8, blockedBodies().map(b => ({ ...b, navigatorContact: reason === "navigator" && b.id === "a" })),
       pairs.map(p => ({ ...p, blocking: reason === "lost blocking" ? 0 : p.blocking })));
-    p.acceptPrediction(8, { request, selected: ["a/b", "b/c"], baselineReduction: 0, selectedReduction: .1, trials: 4, simulatedSteps: 48 });
+    p.acceptPrediction(8, { request, selected: ["a/b", "b/c"], baselineReduction: 0, selectedReduction: .1, trials: 2, simulatedSteps: 12 });
     expect(p.events).toEqual([]);
   });
-  it("prepares nearby contacts but cannot commit a partly approaching joint release", () => {
+  it("does not add a merely approaching outsider to an existing return cohort", () => {
     const p = new CollisionPermissions(1 / 120), pairs = blockedPairs();
     pairs[1] = { ...pairs[1]!, contact: false, gap: 1, blocking: 0 };
     for (let step = 1; step <= 7; step++) p.observe(step, blockedBodies(), pairs);
-    expect(p.requests[0]!.candidates).toHaveLength(2); approve(p, 7);
-    expect(p.events).toEqual([]);
+    expect(p.requests[0]!.members).toEqual(["a", "b"]); approve(p, 7);
+    expect(p.ghosted("a/b")).toBe(true); expect(p.ghosted("b/c")).toBe(false);
     for (let step = 8; step <= 10; step++) p.observe(step, blockedBodies(), blockedPairs());
-    approve(p, 10); expect(p.events).toHaveLength(2);
+    approve(p, 10); expect(p.events.map(e => e.key)).toEqual(["a/b", "b/c"]);
+    expect(p.snapshot().every(pair => pair.cohort === "a|b|c")).toBe(true);
   });
   it("adds a new touching edge without another long per-pair history", () => {
     const p = new CollisionPermissions(1 / 120);
@@ -112,7 +137,7 @@ describe("predictive permission boundary", () => {
     const p = new CollisionPermissions(1 / 120), pairs = blockedPairs().slice(0, 1);
     for (let step = 1; step <= 7; step++) p.observe(step, blockedBodies(), pairs);
     approve(p, 7);
-    for (let step = 8; step <= 15; step++) p.observe(step, blockedBodies(), [{ ...pairs[0]!, contact: false, gap: 1 }]);
+    for (let step = 8; step <= 15; step++) p.observe(step, blockedBodies().map(b => ({ ...b, error: 0 })), [{ ...pairs[0]!, contact: false, gap: 1 }]);
     p.observe(16, blockedBodies(), pairs); approve(p, 16);
     expect(p.events.filter(e => e.type === "ghost")).toHaveLength(1);
     p.observe(17, blockedBodies(), pairs); p.observe(18, blockedBodies(), pairs); approve(p, 18);
@@ -249,12 +274,12 @@ describe("deterministic isolated physics", () => {
     approve(p, 259);
     expect(p.ghosted("a/b")).toBe(true);
     for (let step = 260; step < 3500; step++) p.observe(step,
-      bodies.map(b => Object.freeze({ ...b, navigatorContact: true })), [{ ...pair, overlap: 10 }]);
+      bodies.map(b => Object.freeze({ ...b, navigatorContact: step > 3300 })), [{ ...pair, overlap: 10 }]);
     expect(p.ghosted("a/b")).toBe(true);
     expect(p.failures).toHaveLength(1);
-    for (let step = 3500; step < 3507; step++) p.observe(step, bodies, [{ ...pair, contact: false, overlap: 0, gap: 1 }]);
+    for (let step = 3500; step < 3507; step++) p.observe(step, bodies.map(b => ({ ...b, error: 0 })), [{ ...pair, contact: false, overlap: 0, gap: 1 }]);
     expect(p.ghosted("a/b")).toBe(true);
-    p.observe(3507, bodies, [{ ...pair, contact: false, overlap: 0, gap: 1 }]);
+    p.observe(3507, bodies.map(b => ({ ...b, error: 0 })), [{ ...pair, contact: false, overlap: 0, gap: 1 }]);
     expect(p.ghosted("a/b")).toBe(false);
   });
   it("does not let any observation bypass the forecast decision", () => {
@@ -271,7 +296,7 @@ it("bounds long-session event storage while preserving cumulative transitions an
     for (let cycle = 0; cycle < 300; cycle++) {
       for (let i = 0; i < 7; i++) p.observe(++step, blockedBodies(), blockedPairs());
       approve(p, step);
-      for (let i = 0; i < 8; i++) p.observe(++step, blockedBodies(), blockedPairs().map(pair => ({ ...pair, contact: false, gap: 1 })));
+      for (let i = 0; i < 8; i++) p.observe(++step, blockedBodies().map(b => ({ ...b, error: 0 })), blockedPairs().map(pair => ({ ...pair, contact: false, gap: 1 })));
     }
     expect(p.eventCount).toBe(1200);
     expect(p.events).toHaveLength(limit === Infinity ? 1200 : 512);

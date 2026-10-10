@@ -46,7 +46,7 @@ export function inside(p: Vec, polygon: readonly Vec[]): boolean {
   return result;
 }
 
-export type Contact = { normal: Vec; depth: number; point: Vec };
+export type Contact = Readonly<{ normal: Vec; depth: number; point: Vec }>;
 
 export const isConvex = (points: readonly Vec[]): boolean => points.every((p, i) =>
   cross(sub(points[(i + 1) % points.length]!, p),
@@ -89,17 +89,45 @@ export function decompose(polygon: readonly Vec[]): Vec[][] {
   return parts;
 }
 
-type Bounds = { minx: number; maxx: number; miny: number; maxy: number };
+type Bounds = Readonly<{ minx: number; maxx: number; miny: number; maxy: number }>;
 const boundsCache = new WeakMap<readonly Vec[], Bounds>();
-function bounds(p: readonly Vec[]): Bounds {
+export function polygonBounds(p: readonly Vec[]): Bounds {
   const cached = boundsCache.get(p);
   if (cached) return cached;
-  const result = { minx: Math.min(...p.map(v => v.x)), maxx: Math.max(...p.map(v => v.x)),
-    miny: Math.min(...p.map(v => v.y)), maxy: Math.max(...p.map(v => v.y)) };
+  let minx = Infinity, maxx = -Infinity, miny = Infinity, maxy = -Infinity;
+  for (const v of p) {
+    minx = Math.min(minx, v.x); maxx = Math.max(maxx, v.x);
+    miny = Math.min(miny, v.y); maxy = Math.max(maxy, v.y);
+  }
+  const result = { minx, maxx, miny, maxy };
   boundsCache.set(p, result); return result;
 }
+function projectionRange(points: readonly Vec[], axis: Vec): { min: number; max: number } {
+  let min = Infinity, max = -Infinity;
+  for (const p of points) { const value = dot(p, axis); min = Math.min(min, value); max = Math.max(max, value); }
+  return { min, max };
+}
+type AxisRange = Readonly<{ axis: Vec; min: number; max: number }>;
+const axesCache = new WeakMap<readonly Vec[], (AxisRange | undefined)[]>();
+function cachedAxes(polygon: readonly Vec[]): (AxisRange | undefined)[] {
+  let axes = axesCache.get(polygon);
+  if (!axes) { axes = []; axesCache.set(polygon, axes); }
+  return axes;
+}
+function axisRange(polygon: readonly Vec[], axes: (AxisRange | undefined)[], index: number): AxisRange {
+  const cached = axes[index];
+  if (cached) return cached;
+  // Like bounds, these values belong to immutable world-contour arrays. A new
+  // pose creates new arrays, so no invalidation or rounded pose keys are used.
+  // Reuse a curved part's self-projections across all opposing convex parts.
+  // Populate lazily so SAT can still stop at its first separating axis.
+  const edge = sub(polygon[(index + 1) % polygon.length]!, polygon[index]!);
+  const axis = unit({ x: -edge.y, y: edge.x });
+  const result = { axis, ...projectionRange(polygon, axis) };
+  axes[index] = result; return result;
+}
 export function boundsGap(a: readonly Vec[], b: readonly Vec[]): number {
-  const ab = bounds(a), bb = bounds(b);
+  const ab = polygonBounds(a), bb = polygonBounds(b);
   return Math.hypot(Math.max(0, ab.minx - bb.maxx, bb.minx - ab.maxx),
     Math.max(0, ab.miny - bb.maxy, bb.miny - ab.maxy));
 }
@@ -128,19 +156,81 @@ export function polygonContacts(a: readonly Vec[], b: readonly Vec[],
   return contacts;
 }
 
+// A deepest convex-part MTV need not separate two concave bodies: another
+// subpart can still intersect, or the next MTV can undo the first. For deep
+// unresolved overlap, find a whole-compound translation along six directions.
+// Each SAT pair defines an interval of translations that would intersect. The
+// connected union containing zero ends at a verified separating displacement.
+// This is the shortest of these candidates, not a global minimum translation.
+export function compoundSeparation(aparts: readonly (readonly Vec[])[], bparts: readonly (readonly Vec[])[], preferred: Vec,
+  allowed: (translation: Vec) => boolean = () => true): Vec {
+  // A part's own support ranges are shared across all opposing parts, rather
+  // than recomputed (and allocated) for every pair and candidate direction.
+  const prepare = (parts: readonly (readonly Vec[])[]) => parts.map(polygon => {
+    const axes = cachedAxes(polygon);
+    return { polygon, axes: Array.from({ length: polygon.length }, (_, i) => axisRange(polygon, axes, i)) };
+  });
+  const preparedA = prepare(aparts), preparedB = prepare(bparts);
+  const constraints = preparedA.flatMap(a => preparedB.map(b => {
+    const first = a.axes.map(c => {
+      const other = projectionRange(b.polygon, c.axis);
+      return { axis: c.axis, min: c.min - other.max, max: c.max - other.min };
+    });
+    const second = b.axes.map(c => {
+      const other = projectionRange(a.polygon, c.axis);
+      return { axis: c.axis, min: other.min - c.max, max: other.max - c.min };
+    });
+    return [...first, ...second];
+  }));
+  let best: Vec = { x: Infinity, y: Infinity }, bestDistance = Infinity;
+  let fallback: Vec = best, fallbackDistance = Infinity;
+  const normal = unit(preferred);
+  for (const direction of [normal, mul(normal, -1), { x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }]) {
+    const intervals: { enter: number; exit: number }[] = [];
+    for (const pair of constraints) {
+      let enter = -Infinity, exit = Infinity;
+      for (const c of pair) {
+        const speed = dot(direction, c.axis);
+        if (Math.abs(speed) < 1e-12) {
+          if (c.min > 0 || c.max < 0) { enter = Infinity; break; }
+        } else {
+          const a = c.min / speed, b = c.max / speed;
+          enter = Math.max(enter, Math.min(a, b)); exit = Math.min(exit, Math.max(a, b));
+        }
+        // Intersecting more constraints cannot restore an empty interval.
+        if (enter > exit) break;
+      }
+      if (enter !== Infinity && enter <= exit && exit >= 0) intervals.push({ enter, exit });
+    }
+    intervals.sort((a, b) => a.enter - b.enter);
+    let distance = 0;
+    for (const interval of intervals) {
+      if (interval.enter > distance + 1e-9) break;
+      // Include clearance while merging: adding it afterwards could land in
+      // the next subpart interval when the intervening gap is smaller than it.
+      distance = Math.max(distance, interval.exit + .00001);
+    }
+    const translation = mul(direction, distance);
+    if (distance < fallbackDistance) { fallbackDistance = distance; fallback = translation; }
+    if (distance < bestDistance && allowed(translation)) { bestDistance = distance; best = translation; }
+  }
+  if (!Number.isFinite(fallbackDistance)) throw new Error("No finite compound separation");
+  return Number.isFinite(bestDistance) ? best : fallback;
+}
+
 // SAT uses the same polygon vertices that SVG renders. Convex input is validated
 // by the geometry loader; a concave shape must be explicitly decomposed there.
 export function convexContact(a: readonly Vec[], b: readonly Vec[]): Contact | null {
-  const ab = bounds(a), bb = bounds(b);
+  const ab = polygonBounds(a), bb = polygonBounds(b);
   if (ab.maxx < bb.minx || bb.maxx < ab.minx || ab.maxy < bb.miny || bb.maxy < ab.miny) return null;
   let depth = Infinity, normal: Vec = { x: 1, y: 0 };
-  for (const polygon of [a, b]) {
+  for (const first of [true, false]) {
+    const polygon = first ? a : b, axes = cachedAxes(polygon);
     for (let i = 0; i < polygon.length; i++) {
-      const edge = sub(polygon[(i + 1) % polygon.length]!, polygon[i]!);
-      const axis = unit({ x: -edge.y, y: edge.x });
-      let amin = Infinity, amax = -Infinity, bmin = Infinity, bmax = -Infinity;
-      for (const p of a) { const d = dot(p, axis); amin = Math.min(amin, d); amax = Math.max(amax, d); }
-      for (const p of b) { const d = dot(p, axis); bmin = Math.min(bmin, d); bmax = Math.max(bmax, d); }
+      const own = axisRange(polygon, axes, i);
+      const { axis } = own, other = projectionRange(first ? b : a, axis);
+      const amin = first ? own.min : other.min, amax = first ? own.max : other.max;
+      const bmin = first ? other.min : own.min, bmax = first ? other.max : own.max;
       const forward = amax - bmin, backward = bmax - amin;
       if (forward < 0 || backward < 0) return null;
       const overlap = Math.min(forward, backward);
@@ -175,6 +265,11 @@ export function polygonGap(a: readonly Vec[], b: readonly Vec[]): number {
 }
 
 export function circleContact(polygon: readonly Vec[], center: Vec, radius: number): Contact | null {
+  const box = polygonBounds(polygon);
+  // Conservative broad phase only. Touching boxes still enter the exact
+  // contour test, including concave cavities and zero-distance edge contacts.
+  if (center.x + radius < box.minx || center.x - radius > box.maxx
+    || center.y + radius < box.miny || center.y - radius > box.maxy) return null;
   let nearest: Vec = polygon[0]!, distance = Infinity, nearestEdge = sub(polygon[1]!, polygon[0]!);
   polygon.forEach((a, i) => {
     const p = closestOnSegment(center, a, polygon[(i + 1) % polygon.length]!);
@@ -190,4 +285,46 @@ export function circleContact(polygon: readonly Vec[], center: Vec, radius: numb
   const normal = distance < 1e-9 ? unit({ x: nearestEdge.y, y: -nearestEdge.x })
     : unit(contained ? sub(nearest, center) : sub(center, nearest));
   return { normal, depth: contained ? radius + distance : radius - distance, point: nearest };
+}
+
+// Earliest entry of a translating circle into a fixed simple, positively wound
+// contour. Cast against each finite edge's outward offset and each vertex's
+// radius disk, rather than the convex hull (which would fill concave cavities).
+// This is a linear shape query at the current body pose, not rotating-body CCD.
+export function circleCast(polygon: readonly Vec[], start: Vec, end: Vec, radius: number): (Contact & { fraction: number }) | null {
+  const box = polygonBounds(polygon);
+  if (Math.max(start.x, end.x) + radius < box.minx || Math.min(start.x, end.x) - radius > box.maxx
+    || Math.max(start.y, end.y) + radius < box.miny || Math.min(start.y, end.y) - radius > box.maxy) return null;
+  const delta = sub(end, start), squared = dot(delta, delta);
+  const initial = circleContact(polygon, start, radius);
+  if (initial && (initial.depth > 1e-8 || dot(delta, initial.normal) < 0)) return { ...initial, fraction: 0 };
+  if (squared < 1e-16) return null;
+  let first = Infinity, hitPoint: Vec = polygon[0]!, hitNormal: Vec = { x: 0, y: 0 };
+  const accept = (fraction: number, point: Vec, normal: Vec) => {
+    if (fraction >= -1e-10 && fraction <= 1 && fraction < first) {
+      first = Math.max(0, fraction); hitPoint = point; hitNormal = normal;
+    }
+  };
+  for (let i = 0; i < polygon.length; i++) {
+    const a = polygon[i]!, b = polygon[(i + 1) % polygon.length]!;
+    const edge = sub(b, a), extent = length(edge), normal = { x: edge.y / extent, y: -edge.x / extent };
+    const relative = sub(start, a), speed = dot(delta, normal);
+    if (speed < -1e-12) {
+      const fraction = (radius - dot(relative, normal)) / speed;
+      if (fraction >= -1e-10 && fraction <= 1 && fraction < first) {
+        const center = add(start, mul(delta, fraction)), along = dot(sub(center, a), edge) / (extent * extent);
+        if (along >= 0 && along <= 1) accept(fraction, add(a, mul(edge, along)), normal);
+      }
+    }
+    const projection = dot(relative, delta), constant = dot(relative, relative) - radius * radius;
+    const discriminant = projection * projection - squared * constant;
+    if (discriminant >= 0) {
+      const fraction = (-projection - Math.sqrt(discriminant)) / squared;
+      if (fraction >= -1e-10 && fraction <= 1 && fraction < first) {
+        const normal = unit(add(relative, mul(delta, fraction)));
+        if (dot(delta, normal) < -1e-12) accept(fraction, a, normal);
+      }
+    }
+  }
+  return Number.isFinite(first) ? { fraction: first, point: hitPoint, normal: hitNormal, depth: 0 } : null;
 }

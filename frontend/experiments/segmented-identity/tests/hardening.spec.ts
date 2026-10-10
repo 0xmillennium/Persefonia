@@ -37,7 +37,7 @@ test("anchor diagnostics reuse nodes across frames and telemetry exposes bounded
     return snapshot.events.length <= 512 && Number.isInteger(snapshot.eventCount) && Number.isInteger(snapshot.droppedPointerSamples);
   }).toBe(true);
 });
-test("a whole-stage stroke is replayed without a single half-second animation callback", async ({ page, browserName }, info) => {
+test("a whole-stage stroke arrives promptly without a long animation callback", async ({ page, browserName }, info) => {
   await page.addInitScript(() => {
     const durations: number[] = [];
     const request = window.requestAnimationFrame.bind(window);
@@ -55,4 +55,153 @@ test("a whole-stage stroke is replayed without a single half-second animation ca
   await info.attach(`frame-cost-${browserName}.json`, { body: JSON.stringify(durations), contentType: "application/json" });
   // Generous regression ceiling for CI hardware, not a claimed 60fps guarantee.
   expect(Math.max(...durations)).toBeLessThan(150);
+});
+
+test("native fast mouse movement reaches the rendered navigator without a replay tail", async ({ page, browserName }, info) => {
+  const timings: { y: number; elapsed: number; updates: number }[] = [];
+  for (const y of [100, 310]) for (let repeat = 0; repeat < 3; repeat++) {
+    await page.goto("/"); await expect(page.locator("#status")).toHaveText("REST");
+    const start = await stagePoint(page, 50, y), end = await stagePoint(page, 910, y);
+    await page.mouse.move(0, 0);
+    await page.mouse.move(start.x, start.y);
+    await expect(page.locator(".navigator")).toHaveAttribute("visibility", "visible");
+    await page.locator(".stage").evaluate(svg => {
+      const nav = svg.querySelector(".navigator")!, state = { started: 0, elapsed: -1, updates: 0, x: NaN, y: NaN };
+      Object.assign(window, { pointerArrival: state });
+      svg.addEventListener("pointermove", e => {
+        if (!state.started) state.started = performance.now();
+        // Browser automation bridges may round native device coordinates.
+        // Qualify tracking against the delivered event, not the requested point.
+        const event = e as PointerEvent;
+        const p = new DOMPoint(event.clientX, event.clientY).matrixTransform((svg as SVGSVGElement).getScreenCTM()!.inverse());
+        state.x = p.x; state.y = p.y;
+      }, { once: true });
+      const observer = new MutationObserver(() => {
+        if (!state.started) return;
+        state.updates++;
+        if (Math.abs(Number(nav.getAttribute("cx")) - state.x) < .02 && Math.abs(Number(nav.getAttribute("cy")) - state.y) < .02) {
+          state.elapsed = performance.now() - state.started; observer.disconnect();
+        }
+      });
+      observer.observe(nav, { attributes: true });
+    });
+    await page.mouse.move(end.x, end.y);
+    await page.waitForFunction(() => (window as unknown as { pointerArrival: { elapsed: number } }).pointerArrival.elapsed >= 0);
+    const result = await page.evaluate(() => (window as unknown as { pointerArrival: { elapsed: number; updates: number } }).pointerArrival);
+    timings.push({ y, elapsed: result.elapsed, updates: result.updates });
+    // CI allowance for input-to-DOM latency, separate from callback cost. The
+    // previous 225+ ms replay policy fails this even in otherwise empty space.
+    expect(result.elapsed).toBeLessThan(75); expect(result.updates).toBe(1);
+  }
+  await info.attach(`pointer-arrival-${browserName}.json`, { body: JSON.stringify(timings), contentType: "application/json" });
+});
+
+test("coalesced reversals are consumed on the first awake frame, and cancellation discards them", async ({ page }) => {
+  await page.goto("/"); await expect(page.locator("#status")).toHaveText("REST");
+  const start = await stagePoint(page, 280, 310), corner = await stagePoint(page, 680, 310), end = await stagePoint(page, 910, 100);
+  await page.mouse.move(0, 0);
+  await page.mouse.move(start.x, start.y);
+  await expect(page.locator(".navigator")).toHaveAttribute("visibility", "visible");
+  const result = await page.locator(".stage").evaluate((svg, points) => new Promise<{ x: number; y: number; expectedX: number; expectedY: number; moved: boolean }>(resolve => {
+    const nodes = [...svg.querySelectorAll("[data-fragment]")], before = nodes.map(n => n.getAttribute("transform"));
+    const observations = points.map(point => new PointerEvent("pointermove", { clientX: point.x, clientY: point.y,
+      pointerType: "mouse", isPrimary: true }));
+    const parent = observations.at(-1)!;
+    const expected = new DOMPoint(parent.clientX, parent.clientY).matrixTransform((svg as SVGSVGElement).getScreenCTM()!.inverse());
+    Object.defineProperty(parent, "getCoalescedEvents", { value: () => observations });
+    svg.dispatchEvent(parent);
+    requestAnimationFrame(() => {
+      const nav = svg.querySelector(".navigator")!;
+      resolve({ x: Number(nav.getAttribute("cx")), y: Number(nav.getAttribute("cy")), expectedX: expected.x, expectedY: expected.y,
+        moved: nodes.some((n, i) => n.getAttribute("transform") !== before[i]) });
+    });
+  }), [corner, start, end]);
+  expect(result.x).toBeCloseTo(result.expectedX, 4); expect(result.y).toBeCloseTo(result.expectedY, 4); expect(result.moved).toBe(true);
+  await page.reload(); await expect(page.locator("#status")).toHaveText("REST");
+  await page.mouse.move(0, 0);
+  await page.mouse.move(start.x, start.y);
+  await expect(page.locator(".navigator")).toHaveAttribute("visibility", "visible");
+  const cancelled = await page.locator(".stage").evaluate((svg, point) => new Promise<{ hidden: boolean; moved: boolean }>(resolve => {
+    const nodes = [...svg.querySelectorAll("[data-fragment]")], before = nodes.map(n => n.getAttribute("transform"));
+    svg.dispatchEvent(new PointerEvent("pointermove", { clientX: point.x, clientY: point.y, pointerType: "mouse", isPrimary: true }));
+    svg.dispatchEvent(new PointerEvent("pointercancel"));
+    requestAnimationFrame(() => resolve({ hidden: svg.querySelector(".navigator")!.getAttribute("visibility") === "hidden",
+      moved: nodes.some((n, i) => n.getAttribute("transform") !== before[i]) }));
+  }), corner);
+  expect(cancelled).toEqual({ hidden: true, moved: false });
+  await page.reload(); await expect(page.locator("#status")).toHaveText("REST");
+  await page.mouse.move(0, 0); await page.mouse.move(start.x, start.y);
+  await expect(page.locator(".navigator")).toHaveAttribute("visibility", "visible");
+  const reentered = await page.locator(".stage").evaluate((svg, points) => new Promise<{ x: number; y: number; expectedX: number; expectedY: number; moved: boolean }>(resolve => {
+    const nodes = [...svg.querySelectorAll("[data-fragment]")], before = nodes.map(n => n.getAttribute("transform"));
+    svg.dispatchEvent(new PointerEvent("pointermove", { clientX: points[0]!.x, clientY: points[0]!.y, pointerType: "mouse", isPrimary: true }));
+    svg.dispatchEvent(new PointerEvent("pointercancel"));
+    const fresh = new PointerEvent("pointermove", { clientX: points[1]!.x, clientY: points[1]!.y, pointerType: "mouse", isPrimary: true });
+    const expected = new DOMPoint(fresh.clientX, fresh.clientY).matrixTransform((svg as SVGSVGElement).getScreenCTM()!.inverse());
+    svg.dispatchEvent(fresh);
+    requestAnimationFrame(() => {
+      const nav = svg.querySelector(".navigator")!;
+      resolve({ x: Number(nav.getAttribute("cx")), y: Number(nav.getAttribute("cy")), expectedX: expected.x, expectedY: expected.y,
+        moved: nodes.some((n, i) => n.getAttribute("transform") !== before[i]) });
+    });
+  }), [corner, end]);
+  expect(reentered.x).toBeCloseTo(reentered.expectedX, 4); expect(reentered.y).toBeCloseTo(reentered.expectedY, 4);
+  expect(reentered.moved).toBe(false);
+});
+
+test("live batched strokes preserve strict physics and recover in the browser engine", async ({ page }) => {
+  await page.goto("/?test=1"); await page.waitForFunction(() => !!window.__identityTest);
+  const result = await page.evaluate(() => {
+    const api = window.__identityTest, failures: string[] = [];
+    api.stepStroke([{ x: 50, y: 100 }]);
+    for (let i = 0; i < 16; i++) {
+      api.stepStroke([{ x: 480 + 420 * Math.sin(i * 1.41), y: 310 + 220 * Math.cos(i * 1.17), elapsedSeconds: .008 },
+        { x: 480 + 420 * Math.sin((i + 1) * 1.41), y: 310 + 220 * Math.cos((i + 1) * 1.17), elapsedSeconds: .008 }]);
+      const s = api.getSnapshot();
+      if (!s.finite || !s.contained || s.fragments.some(b => b.navigatorOverlap > .02)
+        || s.pairs.some(p => p.state === "SOLID" && p.overlap > .3) || s.ledger.permissions !== 0) failures.push(`stroke ${i}`);
+    }
+    api.stepStroke([{ x: 0, y: 0, active: false }]);
+    for (let i = 0; i < 5400 && !api.getSnapshot().rest; i++) api.stepFixed();
+    const s = api.getSnapshot(); return { failures: [...failures, ...s.failures], rest: s.rest };
+  });
+  expect(result.failures).toEqual([]); expect(result.rest).toBe(true);
+});
+
+test("rendering an unchanged pose makes no SVG mutations, including visible anchors", async ({ page }) => {
+  await page.goto("/?test=1");
+  await page.waitForFunction(() => !!window.__identityTest);
+  await page.getByLabel("Show home anchors").check();
+  const mutations = await page.locator(".stage").evaluate(svg => {
+    const observer = new MutationObserver(() => {});
+    observer.observe(svg, { attributes: true, childList: true, subtree: true });
+    window.__identityTest.stepFixed(0);
+    const count = observer.takeRecords().length; observer.disconnect(); return count;
+  });
+  expect(mutations).toBe(0);
+});
+
+test("live telemetry refreshes at a bounded rate and stops updating while closed", async ({ page }) => {
+  await page.goto("/"); await expect(page.locator("#status")).toHaveText("REST");
+  await page.locator("summary").click();
+  await expect(page.locator("#telemetry")).toContainText('"step": 0');
+  const start = await stagePoint(page, 280, 310), end = await stagePoint(page, 600, 310);
+  await page.mouse.move(start.x, start.y); await page.waitForTimeout(40);
+  const observe = () => page.locator("#telemetry").evaluate(node => {
+    const observer = new MutationObserver(records => { state.count += records.length; });
+    const state = { count: 0, started: performance.now(), observer };
+    observer.observe(node, { childList: true, characterData: true, subtree: true });
+    Object.assign(window, { telemetryObservation: state });
+  });
+  const sample = () => page.evaluate(() => {
+    const state = (window as unknown as { telemetryObservation: { count: number; started: number; observer: MutationObserver } }).telemetryObservation;
+    state.observer.disconnect(); return { count: state.count, duration: performance.now() - state.started };
+  });
+  await observe(); await page.mouse.move(end.x, end.y); await page.waitForTimeout(1000);
+  const open = await sample();
+  expect(open.count).toBeGreaterThan(0);
+  expect(open.count).toBeLessThanOrEqual(Math.ceil(open.duration / 200) + 2);
+  await expect(page.locator("#telemetry")).not.toContainText('"step": 0');
+  await page.locator("summary").click(); await observe(); await page.waitForTimeout(300);
+  expect((await sample()).count).toBe(0);
 });

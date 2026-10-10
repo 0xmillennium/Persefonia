@@ -6,6 +6,7 @@ function createTestApi(get: () => PhysicsCore, replace: (core: PhysicsCore) => v
   const api = Object.freeze({
     reset(options: { deadlock?: boolean } = {}) { replace(createSimulation(options.deadlock ?? true)); render(); },
     stepFixed(n = 1, pointer?: PointerSample) { get().stepFixed(n, pointer); render(); },
+    stepStroke(samples: readonly PointerSample[]) { get().stepStroke(samples); render(); },
     getSnapshot: () => get().getSnapshot(),
     getFragmentState: (id: string) => get().getSnapshot().fragments.find(b => b.id === id),
     getPairState: (a: string, b: string) => get().getSnapshot().pairs.find(p => p.key === pairKey(a, b)),

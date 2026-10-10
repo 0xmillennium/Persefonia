@@ -28,7 +28,7 @@ try {
     <header><h1>Experiment 01 — Segmented 0x Identity Physics</h1><p>0xmillennium · isolated engineering study</p></header>
     <svg class="stage" viewBox="0 0 960 620" role="img" aria-labelledby="mark-title mark-description">
       <title id="mark-title">Segmented 0x identity</title>
-      <desc id="mark-description">Two neighboring abstract forms, made of five and four separate geometric fragments.</desc>
+      <desc id="mark-description">One unified symbol made of eight independent three-corner fragments. The surrounding negative space forms a zero; straight diagonal channels through the core form an x.</desc>
 ${polygons}
     </svg>
     <p class="caption">Move a mouse through the mark. Momentum disperses the fragments; distributed home gravity draws them back. Touch and reduced-motion retain the static identity.</p>

@@ -1,16 +1,17 @@
 import { CollisionPermissions, pairKey, DEADLOCK } from "./deadlock";
 import type { PairObservation } from "./deadlock";
 import { GroupForecast, FORECAST } from "./forecast";
-import { projectHomeOnly, orientationBias } from "./home-response";
+import { orientationBias } from "./home-response";
+import { PointerStroke, POINTER_STROKE } from "./pointer-stroke";
 import type { ForecastRequest, ForecastBranch } from "./forecast";
 import { add, sub, mul, dot, cross, length, rotate, transform, polygonContact,
-  polygonContacts, polygonGap, circleContact } from "./math";
+  polygonContacts, polygonGap, circleContact, circleCast, compoundSeparation, polygonBounds } from "./math";
 import type { Vec, Contact } from "./math";
 
 export const FIXED_DT = 1 / 120;
 export const PHYSICS = Object.freeze({ homeStiffness: 12, linearDamping: 3.2,
   angularDamping: 3.6, restitution: .08, navigatorRadius: 10,
-  navigatorSpeedLimit: 720, solverIterations: 10, microsteps: 4,
+  navigatorSpeedLimit: 720, solverIterations: 10, recoveryIterations: 20, microsteps: 4,
   contactMargin: .16, solidTolerance: .3, restError: .002, restSpeed: .002, restAngularSpeed: .0001 });
 export const navigatorTransfer = (speed: number): number =>
   PHYSICS.navigatorSpeedLimit * Math.tanh(Math.max(0, speed) / PHYSICS.navigatorSpeedLimit);
@@ -20,7 +21,7 @@ export type FragmentGeometry = Readonly<{
   home: Vec; mass: number; inertia: number;
 }>;
 export type Body = {
-  geometry: FragmentGeometry; position: Vec; angle: number; velocity: Vec; angularVelocity: number;
+  readonly geometry: FragmentGeometry; position: Vec; angle: number; velocity: Vec; angularVelocity: number;
   navigatorContact: boolean; contacts: string[];
 };
 export type BodyFixture = { id: string; position?: Vec; angle?: number; velocity?: Vec; angularVelocity?: number };
@@ -37,11 +38,26 @@ const pointVelocity = (b: Body, point: Vec): Vec => {
   return add(b.velocity, { x: -r.y * b.angularVelocity, y: r.x * b.angularVelocity });
 };
 
+const partIndices = new WeakMap<FragmentGeometry, readonly (readonly number[])[] | null>();
+function transformedParts(geometry: FragmentGeometry, vertices: Vec[], position: Vec, angle: number): Vec[][] {
+  let indices = partIndices.get(geometry);
+  if (indices === undefined) {
+    const mapped = geometry.parts.map(part => part.map(point => geometry.vertices.indexOf(point)));
+    indices = mapped.some(part => part.includes(-1)) ? null : mapped;
+    partIndices.set(geometry, indices);
+  }
+  // Decomposition reuses contour vertices. Transform each unique point once;
+  // the same numeric pose serves every triangle instead of allocating and
+  // rotating duplicate points. Independently authored parts retain the old path.
+  return indices ? indices.map(part => part.length === vertices.length && part.every((index, i) => index === i)
+    ? vertices : part.map(index => vertices[index]!)) : geometry.parts.map(part => transform(part, position, angle));
+}
+
 type ForecastJob = { search: GroupForecast; poses: { id: string; position: Vec; angle: number; velocity: Vec; angularVelocity: number }[];
     navigator: { position: Vec; active: boolean }; permissions: string; potential: number; center: Vec; velocity: Vec; walls: string; validating: boolean };
 
 export class PhysicsCore {
-  readonly bodies: Body[];
+  readonly bodies: readonly Body[];
   readonly permissions: CollisionPermissions;
   readonly navigator = { position: { x: -100, y: -100 }, velocity: { x: 0, y: 0 }, active: false };
   readonly width: number;
@@ -58,10 +74,15 @@ export class PhysicsCore {
   private forecast: ForecastJob | null = null;
   private lastForecastKey = "";
   private navigatorOrigin: Vec = { x: -100, y: -100 };
+  private navigatorPath: readonly Vec[] = [];
   readonly forecastWork = { started: 0, cancelled: 0, completed: 0, simulatedSteps: 0 };
 
   constructor(geometry: readonly FragmentGeometry[], options: { width?: number; height?: number; deadlock?: boolean; eventHistoryLimit?: number; forecastPermissions?: CollisionPermissions } = {}) {
     this.width = options.width ?? 960; this.height = options.height ?? 620;
+    if (![this.width, this.height].every(v => Number.isFinite(v) && v > 0)) throw new Error("Invalid stage dimensions");
+    if (new Set(geometry.map(g => g.id)).size !== geometry.length) throw new Error("Duplicate fragment IDs");
+    if (geometry.some(g => ![g.mass, g.inertia].every(v => Number.isFinite(v) && v > 0)))
+      throw new Error("Invalid fragment mass or inertia");
     this.bodies = geometry.map(g => ({ geometry: g, position: add(g.home, { x: this.width / 2, y: this.height / 2 }),
       angle: 0, velocity: { x: 0, y: 0 }, angularVelocity: 0, navigatorContact: false, contacts: [] }));
     this.predicting = !!options.forecastPermissions;
@@ -70,15 +91,15 @@ export class PhysicsCore {
   }
   energy(): number { return this.bodies.reduce((sum, b) => sum + bodyEnergy(b), 0); }
   home(b: Body): Vec { return add(b.geometry.home, { x: this.width / 2, y: this.height / 2 }); }
-  vertices(b: Body): Vec[] {
+  vertices(b: Body): readonly Vec[] {
     const cached = this.polygonCache.get(b);
     if (cached && cached.x === b.position.x && cached.y === b.position.y && cached.angle === b.angle) return cached.vertices;
     const vertices = transform(b.geometry.vertices, b.position, b.angle);
     this.polygonCache.set(b, { x: b.position.x, y: b.position.y, angle: b.angle, vertices,
-      parts: b.geometry.parts.map(p => transform(p, b.position, b.angle)) });
+      parts: transformedParts(b.geometry, vertices, b.position, b.angle) });
     return vertices;
   }
-  parts(b: Body): Vec[][] { this.vertices(b); return this.polygonCache.get(b)!.parts; }
+  parts(b: Body): readonly (readonly Vec[])[] { this.vertices(b); return this.polygonCache.get(b)!.parts; }
   anchors(b: Body): { current: Vec; target: Vec }[] {
     return b.geometry.anchors.map(a => ({ current: add(b.position, rotate(a, b.angle)), target: add(this.home(b), a) }));
   }
@@ -101,15 +122,17 @@ export class PhysicsCore {
   }
   loadFixture(fixtures: readonly BodyFixture[]): void {
     if (this.step !== 0) throw new Error("Fixtures require a fresh simulation");
-    for (const fixture of fixtures) {
+    if (new Set(fixtures.map(f => f.id)).size !== fixtures.length) throw new Error("Duplicate fixture IDs");
+    const prepared = fixtures.map(fixture => {
       const b = this.bodies.find(b => b.geometry.id === fixture.id);
       if (!b) throw new Error(`Unknown fragment ${fixture.id}`);
-      if (fixture.position) b.position = { ...fixture.position };
-      if (fixture.angle !== undefined) b.angle = fixture.angle;
-      if (fixture.velocity) b.velocity = { ...fixture.velocity };
-      if (fixture.angularVelocity !== undefined) b.angularVelocity = fixture.angularVelocity;
-      if (![b.position.x, b.position.y, b.angle, b.velocity.x, b.velocity.y, b.angularVelocity].every(Number.isFinite))
-        throw new Error("Non-finite fixture");
+      const position = { ...(fixture.position ?? b.position) }, angle = fixture.angle ?? b.angle;
+      const velocity = { ...(fixture.velocity ?? b.velocity) }, angularVelocity = fixture.angularVelocity ?? b.angularVelocity;
+      if (![position.x, position.y, angle, velocity.x, velocity.y, angularVelocity].every(Number.isFinite)) throw new Error("Non-finite fixture");
+      return { b, position, angle, velocity, angularVelocity };
+    });
+    for (const { b, position, angle, velocity, angularVelocity } of prepared) {
+      b.position = position; b.angle = angle; b.velocity = velocity; b.angularVelocity = angularVelocity;
     }
     this.inspectPairs();
   }
@@ -127,23 +150,37 @@ export class PhysicsCore {
     this.impulse(a, mul(c.normal, -j), c.point);
     if (b) this.impulse(b, mul(c.normal, j), c.point);
   }
-  private solveFragments(): void {
+  private solveFragments(recoverCompound = false, minimumDepth?: number): void {
     for (let i = 0; i < this.bodies.length; i++) for (let j = i + 1; j < this.bodies.length; j++) {
       const a = this.bodies[i]!, b = this.bodies[j]!, key = pairKey(a.geometry.id, b.geometry.id);
       if (this.permissions.ghosted(key)) continue;
       const c = polygonContact(this.vertices(a), this.vertices(b), this.parts(a), this.parts(b));
-      if (!c) continue;
+      if (!c || minimumDepth !== undefined && c.depth <= minimumDepth) continue;
       this.recentContacts.set(key, c);
       this.solveContact(a, b, c);
       // Position-only geometric constraint projection. Never a velocity bias.
       // A ghosted pair never enters either this projection or impulse solver.
       const total = a.geometry.mass + b.geometry.mass;
-      const correction = Math.max(0, c.depth - .00001);
-      if (correction > 0) {
-        a.position = sub(a.position, mul(c.normal, correction * b.geometry.mass / total));
-        b.position = add(b.position, mul(c.normal, correction * a.geometry.mass / total));
+      const correction = recoverCompound && c.depth > PHYSICS.solidTolerance && (a.geometry.parts.length > 1 || b.geometry.parts.length > 1)
+        ? compoundSeparation(this.parts(a), this.parts(b), c.normal, translation =>
+          this.projectionAllowed(a, mul(translation, -b.geometry.mass / total))
+          && this.projectionAllowed(b, mul(translation, a.geometry.mass / total)))
+        : mul(c.normal, Math.max(0, c.depth - .00001));
+      if (length(correction) > 0) {
+        a.position = sub(a.position, mul(correction, b.geometry.mass / total));
+        b.position = add(b.position, mul(correction, a.geometry.mass / total));
       }
     }
+  }
+  private projectionAllowed(body: Body, translation: Vec): boolean {
+    const vertices = this.vertices(body), moved = vertices.map(p => add(p, translation));
+    const minx = Math.min(0, ...vertices.map(p => p.x)), maxx = Math.max(this.width, ...vertices.map(p => p.x));
+    const miny = Math.min(0, ...vertices.map(p => p.y)), maxy = Math.max(this.height, ...vertices.map(p => p.y));
+    if (moved.some(p => p.x < minx - .00001 || p.x > maxx + .00001 || p.y < miny - .00001 || p.y > maxy + .00001)) return false;
+    if (!this.navigator.active) return true;
+    // Avoid a correction that the prescribed navigator will immediately undo.
+    const depth = (points: readonly Vec[]) => circleContact(points, this.navigator.position, PHYSICS.navigatorRadius)?.depth ?? 0;
+    return depth(moved) <= Math.max(0, depth(vertices)) + .00001;
   }
   private solveNavigator(): void {
     if (!this.navigator.active) return;
@@ -172,6 +209,8 @@ export class PhysicsCore {
   }
   private solveBoundaries(): void {
     for (const b of this.bodies) {
+      const box = polygonBounds(this.vertices(b));
+      if (box.minx >= 0 && box.maxx <= this.width && box.miny >= 0 && box.maxy <= this.height) continue;
       for (const wall of [0, 1, 2, 3]) {
         const vertices = this.vertices(b);
         const value = (p: Vec) => wall === 0 ? -p.x : wall === 1 ? p.x - this.width
@@ -194,7 +233,27 @@ export class PhysicsCore {
     if (!Number.isInteger(count) || count < 0 || count > 100_000) throw new Error("Invalid fixed-step count");
     for (let n = 0; n < count; n++) this.tick(n === 0 ? pointer : undefined, forecastBudget);
   }
-  private tick(pointer: PointerSample | undefined, forecastBudget: number): void {
+  // Live observations represent motion already performed by the user. Consume
+  // all of them in this tick, with bounded body integration and contour casts
+  // for longer legs. Scalar stepFixed input retains exact sampled fixture replay.
+  stepStroke(samples: readonly PointerSample[], forecastBudget: number = FORECAST.workPerTick): void {
+    if (!Number.isInteger(forecastBudget) || forecastBudget < 0) throw new Error("Invalid forecast budget");
+    if (samples.length > POINTER_STROKE.capacity) throw new Error("Pointer stroke exceeds capacity");
+    for (const [index, p] of samples.entries()) {
+      if (![p.x, p.y].every(Number.isFinite)) throw new Error("Invalid pointer sample");
+      if (p.elapsedSeconds !== undefined && (!Number.isFinite(p.elapsedSeconds) || p.elapsedSeconds <= 0))
+        throw new Error("Invalid pointer observation interval");
+      if (index > 0 && p.active === false) throw new Error("Cancellation must precede the new stroke");
+    }
+    // Cancellation can be followed by re-entry before the next frame. Preserve
+    // that discontinuity: the new stroke starts at its first fresh observation,
+    // rather than casting from the pre-cancellation navigator position.
+    const cancelled = samples[0]?.active === false;
+    this.tick(cancelled ? samples[0] : undefined, forecastBudget, cancelled ? samples.slice(1) : samples);
+  }
+  private tick(pointer: PointerSample | undefined, forecastBudget: number, samples?: readonly PointerSample[]): void {
+    const observedInterval = pointer?.elapsedSeconds ?? FIXED_DT;
+    if (!Number.isFinite(observedInterval) || observedInterval <= 0) throw new Error("Invalid pointer observation interval");
     let end = this.navigator.position;
     if (pointer) {
       if (![pointer.x, pointer.y].every(Number.isFinite)) throw new Error("Invalid pointer sample");
@@ -204,15 +263,25 @@ export class PhysicsCore {
       if (!this.navigator.active) this.navigator.position = end;
       this.navigator.active = pointer.active ?? true;
     }
+    let stroke: PointerStroke | undefined;
+    if (samples?.length) {
+      if (!this.navigator.active) this.navigator.position = {
+        x: Math.max(0, Math.min(this.width, samples[0]!.x)), y: Math.max(0, Math.min(this.height, samples[0]!.y))
+      };
+      this.navigator.active = true;
+      stroke = new PointerStroke(this.navigator.position, samples, this.width, this.height, FIXED_DT);
+      end = stroke.points.at(-1)!;
+    }
     const delta = sub(end, this.navigator.position);
     this.navigatorOrigin = { ...this.navigator.position };
-    const observedInterval = pointer?.elapsedSeconds ?? FIXED_DT;
-    if (!Number.isFinite(observedInterval) || observedInterval <= 0) throw new Error("Invalid pointer observation interval");
+    this.navigatorPath = stroke?.points ?? [];
     const rawSpeed = length(delta) / observedInterval;
     this.navigator.velocity = mul(delta, navigatorTransfer(rawSpeed) / (length(delta) || 1));
-    // Fixed 120Hz external clock. Deterministic internal subdivisions resolve a
-    // swept navigator at <=2px intervals, and body motion at <=1/480s.
-    const subdivisions = Math.max(PHYSICS.microsteps, this.navigator.active ? Math.ceil(length(delta) / 2) : 0);
+    // Fixed 120Hz external clock; body motion remains at <=1/480s. Scalar
+    // fixtures sample at <=2 units; live strokes cap subdivisions and cast the
+    // longer legs instead of imposing a replay speed on the user's pointer.
+    const subdivisions = stroke ? PHYSICS.microsteps
+      : Math.max(PHYSICS.microsteps, this.navigator.active ? Math.ceil(length(delta) / 2) : 0);
     const dt = FIXED_DT / subdivisions;
     const origin = this.navigator.position;
     this.recentContacts.clear();
@@ -220,9 +289,14 @@ export class PhysicsCore {
     this.ledger = { before: this.energy(), home: 0, damping: 0, fragments: 0,
       navigator: 0, boundaries: 0, permissions: 0, after: 0 };
     for (let s = 1; s <= subdivisions; s++) {
-      const desired = add(origin, mul(delta, s / subdivisions));
+      const legs = stroke?.take(s === subdivisions ? Infinity : stroke.distance * s / subdivisions, this.navigator.position);
+      const desired = stroke ? legs?.at(-1)?.end ?? this.navigator.position : add(origin, mul(delta, s / subdivisions));
       const travel = sub(desired, this.navigator.position);
-      this.navigator.position = add(this.navigator.position, mul(travel, Math.min(1, 2 / (length(travel) || 1))));
+      this.navigator.position = stroke ? desired : add(this.navigator.position, mul(travel, Math.min(1, 2 / (length(travel) || 1))));
+      if (legs?.length) {
+        const last = legs.at(-1)!;
+        this.navigator.velocity = mul(last.delta, navigatorTransfer(length(last.delta) / last.elapsedSeconds) / (length(last.delta) || 1));
+      }
       this.account("home", () => {
         for (const b of this.bodies) {
           const f = this.homeForce(b);
@@ -237,9 +311,24 @@ export class PhysicsCore {
           b.position = add(b.position, mul(b.velocity, dt)); b.angle += b.angularVelocity * dt;
         });
       });
+      if (legs) this.account("navigator", () => {
+        for (const leg of legs) {
+          // Short legs still use the original local positional solver. Long
+          // legs apply bounded momentum at every crossed body's first entry;
+          // they do not drag a body across a fast stroke's entire distance.
+          if (length(sub(leg.end, leg.start)) <= POINTER_STROKE.spacing) continue;
+          const velocity = mul(leg.delta, navigatorTransfer(length(leg.delta) / leg.elapsedSeconds) / (length(leg.delta) || 1));
+          for (const b of this.bodies) {
+            const c = circleCast(this.vertices(b), leg.start, leg.end, PHYSICS.navigatorRadius);
+            if (!c) continue;
+            b.navigatorContact = true; this.solveContact(b, null, c, velocity);
+          }
+        }
+      });
       for (let iteration = 0; iteration < PHYSICS.solverIterations; iteration++) {
         const poses = this.bodies.map(b => b.position);
-        this.account("fragments", () => this.solveFragments());
+        // Reserve compound recovery for overlap left by the ordinary passes.
+        this.account("fragments", () => this.solveFragments(iteration >= PHYSICS.solverIterations - 2));
         this.account("boundaries", () => this.solveBoundaries());
         this.account("navigator", () => this.solveNavigator());
         if (this.bodies.every((b, i) => b.position === poses[i])) break;
@@ -247,79 +336,87 @@ export class PhysicsCore {
     }
     this.step++;
     if (this.predicting) this.inspectPredictionPairs(); else this.inspectPairs();
-    this.account("permissions", () => this.permissions.observe(this.step, this.predicting ? [] : this.bodies.map(b => ({
+    // A final compound correction can reintroduce another solid contact. New
+    // fast-stroke poses exposed this in tightly packed concave groups. Recover
+    // only residual violations, with bounded position/impulse passes and no
+    // additional integration time, force, bias or permission changes. Renewed
+    // strikes after rearming can couple three curved corners; reserve up to
+    // twenty residual passes, exiting as soon as all solid contacts are valid.
+    for (let pass = 0; pass < PHYSICS.recoveryIterations && this.unresolvedSolids(); pass++) {
+      // Do not polish already acceptable contacts here: their shallow MTVs
+      // can undo a repaired concave pair and keep the whole group oscillating.
+      this.account("fragments", () => this.solveFragments(true, PHYSICS.solidTolerance));
+      this.account("boundaries", () => this.solveBoundaries());
+      this.account("navigator", () => this.solveNavigator());
+      if (this.predicting) this.inspectPredictionPairs(); else this.inspectPairs();
+    }
+    this.account("permissions", () => this.permissions.observe(this.step, this.bodies.map(b => {
+      const response = this.homeForce(b);
+      return {
       id: b.geometry.id, mass: b.geometry.mass, inertia: b.geometry.inertia, speed: length(b.velocity), angularSpeed: Math.abs(b.angularVelocity),
-      velocityX: b.velocity.x, velocityY: b.velocity.y, energy: bodyEnergy(b), error: this.homeError(b), homeRequest: length(this.homeForce(b).acceleration)
-        + Math.abs(this.homeForce(b).torque) / b.geometry.inertia, navigatorContact: b.navigatorContact
-    })), this.pairs));
+      velocityX: b.velocity.x, velocityY: b.velocity.y, energy: bodyEnergy(b), error: this.homeError(b), homeRequest: length(response.acceleration)
+        + Math.abs(response.torque) / b.geometry.inertia, navigatorContact: b.navigatorContact
+    }; }), this.pairs, members => {
+      const metrics = this.homeMetrics(members, true);
+      // Free response over the same 50 ms horizon, including angular work and
+      // damping. Common translation has already been removed from this score.
+      const freePower = metrics.power + .5 * FORECAST.horizonSteps * FIXED_DT * metrics.powerDerivative;
+      return { actual: metrics.power, expected: freePower };
+    }));
     if (!this.predicting) this.account("permissions", () => this.advanceForecast(forecastBudget));
     this.ledger.after = this.energy(); this.maxEnergy = Math.max(this.maxEnergy, this.ledger.after);
   }
-  private homeMetrics(members: readonly string[], source = this.bodies) {
-    const bodies = source.filter(b => members.includes(b.geometry.id));
+  private unresolvedSolids(): boolean {
+    if (!this.predicting) return this.pairs.some(p => !this.permissions.ghosted(p.key) && p.overlap > PHYSICS.solidTolerance);
+    // Prediction observations intentionally contain only existing latches;
+    // guard all other solid relationships using the same actual geometry.
+    for (let i = 0; i < this.bodies.length; i++) for (let j = i + 1; j < this.bodies.length; j++) {
+      const a = this.bodies[i]!, b = this.bodies[j]!;
+      if (!this.permissions.ghosted(pairKey(a.geometry.id, b.geometry.id))
+        && (polygonContact(this.vertices(a), this.vertices(b), this.parts(a), this.parts(b))?.depth ?? 0) > PHYSICS.solidTolerance) return true;
+    }
+    return false;
+  }
+  private homeMetrics(members: readonly string[], progress = false) {
+    const bodies = this.bodies.filter(b => members.includes(b.geometry.id));
     const mass = bodies.reduce((sum, b) => sum + b.geometry.mass, 0);
     const rows = bodies.map(b => ({ b, anchors: this.anchors(b) }));
     const meanError = mul(rows.reduce((sum, { b, anchors }) => add(sum,
       mul(anchors.reduce((sum, a) => add(sum, sub(a.target, a.current)), { x: 0, y: 0 }),
         b.geometry.mass / anchors.length)), { x: 0, y: 0 }), 1 / mass);
     const meanVelocity = mul(bodies.reduce((sum, b) => add(sum, mul(b.velocity, b.geometry.mass)), { x: 0, y: 0 }), 1 / mass);
-    let potential = 0, scale = 0, power = 0, relativeEnergy = 0, maximumRelativeSpeed = 0;
+    const meanAnchorVelocity = progress ? mul(rows.reduce((sum, { b, anchors }) => add(sum,
+      mul(anchors.reduce((sum, a) => add(sum, pointVelocity(b, a.current)), { x: 0, y: 0 }),
+        b.geometry.mass / anchors.length)), { x: 0, y: 0 }), 1 / mass) : meanVelocity;
+    let potential = 0, scale = 0, power = 0, powerDerivative = 0;
     for (const { b, anchors } of rows) {
       let force: Vec = { x: 0, y: 0 }, torque = 0;
       const coefficient = b.geometry.mass * PHYSICS.homeStiffness / anchors.length;
+      let curvature = 0;
+      const velocity = sub(b.velocity, meanVelocity);
       for (const a of anchors) {
+        const r = sub(a.current, b.position);
+        const anchorVelocity = progress ? sub(pointVelocity(b, a.current), meanAnchorVelocity) : { x: 0, y: 0 };
         const error = sub(sub(a.target, a.current), meanError), f = mul(error, coefficient);
         potential += .5 * coefficient * dot(error, error);
-        force = add(force, f); torque += cross(sub(a.current, b.position), f);
+        force = add(force, f); torque += cross(r, f);
+        if (progress) curvature += coefficient * (dot(anchorVelocity, anchorVelocity) + dot(error, r) * b.angularVelocity ** 2);
       }
-      const velocity = sub(b.velocity, meanVelocity);
       scale += (dot(force, force) / b.geometry.mass + torque ** 2 / b.geometry.inertia) / (2 * PHYSICS.homeStiffness);
       power += dot(force, velocity) + torque * b.angularVelocity;
-      relativeEnergy += .5 * b.geometry.mass * dot(velocity, velocity) + .5 * b.geometry.inertia * b.angularVelocity ** 2;
-      maximumRelativeSpeed = Math.max(maximumRelativeSpeed, length(velocity));
+      if (progress) {
+        const response = this.homeForce(b);
+        powerDerivative += dot(force, sub(response.acceleration, mul(velocity, PHYSICS.linearDamping)))
+          + torque * (response.torque / b.geometry.inertia - PHYSICS.angularDamping * b.angularVelocity) - curvature;
+      }
     }
     // Remove only common translation from the home objective. A fragment pair
     // cannot block that mode; it can block relative positions and orientations.
     // These are observation gradients, NEVER replacement forces for physics.
-    return { potential, scale: Math.min(potential, scale), power, relativeEnergy, maximumRelativeSpeed };
+    return { potential, scale: Math.min(potential, scale), power, powerDerivative };
   }
   private potential(members: readonly string[]): number { return this.homeMetrics(members).potential; }
   private responseScale(members: readonly string[]): number { return this.homeMetrics(members).scale; }
-  private projectedPotential(members: readonly string[]): number | undefined {
-    const bodies = this.bodies.filter(b => members.includes(b.geometry.id));
-    const projected = projectHomeOnly(bodies, bodies.map(b => this.home(b)), { steps: FORECAST.homeOnlySteps,
-      dt: FIXED_DT, stiffness: PHYSICS.homeStiffness, damping: PHYSICS.linearDamping,
-      angularDamping: PHYSICS.angularDamping, width: this.width, height: this.height,
-      navigator: { active: this.navigator.active, position: this.navigator.position, radius: PHYSICS.navigatorRadius } });
-    return projected ? this.homeMetrics(members, projected).potential : undefined;
-  }
-  private residualBlocks(members: readonly string[]): number {
-    this.inspectPairs();
-    const contacts = this.pairs.filter(p => p.contact && !this.permissions.ghosted(p.key)
-      && members.includes(p.a) && members.includes(p.b));
-    const visited = new Set<string>(); let blocked = 0;
-    for (const id of members) {
-      if (visited.has(id)) continue;
-      const component: string[] = [], queue = [id];
-      while (queue.length) {
-        const id = queue.pop()!; if (visited.has(id)) continue;
-        visited.add(id); component.push(id);
-        for (const p of contacts) if (p.a === id) queue.push(p.b); else if (p.b === id) queue.push(p.a);
-      }
-      if (!contacts.some(p => component.includes(p.a) && p.blocking > .1)) continue;
-      const bodies = this.bodies.filter(b => component.includes(b.geometry.id));
-      const mass = bodies.reduce((sum, b) => sum + b.geometry.mass, 0);
-      const inertia = bodies.reduce((sum, b) => sum + b.geometry.inertia, 0);
-      const metrics = this.homeMetrics(component);
-      const limit = .5 * (mass * DEADLOCK.speed ** 2 + inertia * DEADLOCK.angularSpeed ** 2);
-      if (metrics.relativeEnergy < 4 * limit && bodies.some(b => this.homeError(b) > DEADLOCK.error)
-        && metrics.maximumRelativeSpeed < DEADLOCK.instantaneousMultiplier * DEADLOCK.speed
-        && bodies.every(b => Math.abs(b.angularVelocity) < DEADLOCK.instantaneousMultiplier * DEADLOCK.angularSpeed)
-        && metrics.scale > 1e-12
-        && metrics.power < metrics.scale * FORECAST.baselineProgress / (FORECAST.horizonSteps * FIXED_DT)) blocked++;
-    }
-    return blocked;
-  }
   private center(members: readonly string[]): Vec {
     const bodies = this.bodies.filter(b => members.includes(b.geometry.id));
     return mul(bodies.reduce((sum, b) => add(sum, mul(b.position, b.geometry.mass)), { x: 0, y: 0 }),
@@ -335,14 +432,23 @@ export class PhysicsCore {
     return this.permissions.snapshot().filter(p => p.state === "GHOSTED_LATCHED").map(p => p.key).sort().join("|");
   }
   private forecastSafe(): boolean {
-    return this.energy() < 1e7 && this.permissions.failures.length === 0 && this.ledger.permissions === 0
+    if (!(this.energy() < 1e7 && this.permissions.failures.length === 0 && this.ledger.permissions === 0
       && Math.max(this.ledger.damping, this.ledger.fragments, this.ledger.boundaries) <= 1e-6
       && this.bodies.every(b => [b.position.x, b.position.y, b.angle, b.velocity.x, b.velocity.y,
         b.angularVelocity].every(Number.isFinite)
         && this.vertices(b).every(p => p.x >= -1e-4 && p.x <= this.width + 1e-4 && p.y >= -1e-4 && p.y <= this.height + 1e-4)
-        && (!this.navigator.active || (circleContact(this.vertices(b), this.navigator.position, PHYSICS.navigatorRadius)?.depth ?? 0) <= .02));
+        && (!this.navigator.active || (circleContact(this.vertices(b), this.navigator.position, PHYSICS.navigatorRadius)?.depth ?? 0) <= .02)))) return false;
+    // Shadow pair observations only track latches. Independently check solid
+    // geometry too: an alternative must not gain apparent progress by leaving
+    // a different, still-solid relationship illegally interpenetrating.
+    for (let i = 0; i < this.bodies.length; i++) for (let j = i + 1; j < this.bodies.length; j++) {
+      const a = this.bodies[i]!, b = this.bodies[j]!;
+      if (!this.permissions.ghosted(pairKey(a.geometry.id, b.geometry.id))
+        && (polygonContact(this.vertices(a), this.vertices(b), this.parts(a), this.parts(b))?.depth ?? 0) > PHYSICS.solidTolerance) return false;
+    }
+    return true;
   }
-  private startForecast(request: ForecastRequest, selected?: readonly string[]): NonNullable<PhysicsCore["forecast"]> {
+  private startForecast(request: ForecastRequest, validating = false): NonNullable<PhysicsCore["forecast"]> {
     // Every alternative starts from the SAME frozen world, including latches.
     const fixtures = this.bodies.map(b => ({ id: b.geometry.id, position: { ...b.position }, angle: b.angle,
       velocity: { ...b.velocity }, angularVelocity: b.angularVelocity }));
@@ -350,23 +456,21 @@ export class PhysicsCore {
     const navigator = { position: { ...this.navigator.position }, active: this.navigator.active };
     const create = (keys: readonly string[]): ForecastBranch => {
       const copy = new PhysicsCore(this.bodies.map(b => b.geometry), { width: this.width, height: this.height,
-        forecastPermissions: CollisionPermissions.forPrediction(FIXED_DT, states, keys, step) });
+        forecastPermissions: CollisionPermissions.forPrediction(FIXED_DT, states, keys, step, keys.length ? request.members : []) });
       for (const fixture of fixtures) {
         const b = copy.bodies.find(b => b.geometry.id === fixture.id)!;
         b.position = { ...fixture.position }; b.angle = fixture.angle;
         b.velocity = { ...fixture.velocity }; b.angularVelocity = fixture.angularVelocity;
       }
       copy.step = step; copy.navigator.position = { ...navigator.position }; copy.navigator.active = navigator.active;
-      return { advance: () => copy.stepFixed(), sample: (members, final) => ({ potential: copy.potential(members), safe: copy.forecastSafe(),
-        residualBlocks: final && keys.length ? copy.residualBlocks(members) : undefined,
-        futurePotential: final && keys.length ? copy.projectedPotential(members) : undefined }) };
+      return { advance: () => copy.stepFixed(), sample: members => ({ potential: copy.potential(members), safe: copy.forecastSafe() }) };
     };
     this.forecastWork.started++;
-    return { search: new GroupForecast({ ...request, members: [...request.members], candidates: [...request.candidates], present: request.present ? [...request.present] : undefined, responseScale: this.responseScale(request.members) }, create, selected ? [[], [...selected]] : undefined),
+    return { search: new GroupForecast({ ...request, members: [...request.members], candidates: [...request.candidates], present: request.present ? [...request.present] : undefined, responseScale: this.responseScale(request.members) }, create),
       poses: fixtures, navigator,
       permissions: this.permissionSignature(), potential: this.potential(request.members),
       center: this.center(request.members), velocity: this.meanVelocity(request.members),
-      walls: this.wallSignature(request.members), validating: selected !== undefined };
+      walls: this.wallSignature(request.members), validating };
   }
   private meanVelocity(members: readonly string[]): Vec {
     const bodies = this.bodies.filter(b => members.includes(b.geometry.id));
@@ -394,8 +498,9 @@ export class PhysicsCore {
       const stale = !current || request.candidates.length !== current.candidates.length || request.candidates.some(key => !current.candidates.includes(key))
         || this.step - request.step > FORECAST.maximumAgeSteps || job.permissions !== this.permissionSignature()
         || job.walls !== this.wallSignature(request.members) || length(translation) > FORECAST.maximumTranslationDrift
-        || ((job.navigator.active !== this.navigator.active || length(sub(job.navigator.position, this.navigator.position)) > .01)
-          && this.navigatorRelevant(request.members, [job.navigator.position, this.navigatorOrigin, this.navigator.position]))
+        || ((job.navigator.active !== this.navigator.active || length(sub(job.navigator.position, this.navigator.position)) > .01
+          || this.navigatorPath.some(p => length(sub(p, job.navigator.position)) > .01))
+          && this.navigatorRelevant(request.members, [job.navigator.position, this.navigatorOrigin, ...this.navigatorPath, this.navigator.position]))
         || progress >= FORECAST.baselineProgress
         || job.poses.some(p => { const b = this.bodies.find(b => b.geometry.id === p.id)!;
           const member = request.members.includes(p.id);
@@ -403,9 +508,8 @@ export class PhysicsCore {
             && Math.min(length(sub(p.position, other.position)), length(sub(b.position, other.position)))
               < Math.max(...b.geometry.vertices.map(length)) + Math.max(...other.geometry.vertices.map(length))
                 + (length(p.velocity) + length(b.velocity)) * FORECAST.maximumAgeSteps * FIXED_DT + FORECAST.maximumTranslationDrift);
-          // Outside motion can invalidate a candidate ranking, but restarting
-          // that search continually starves a calm island. The fresh baseline
-          // and selected batch own final authority and monitor those bodies.
+          // The initial comparison nominates a cohort. Fresh validation owns
+          // release authority and monitors nearby outsiders as well as members.
           if (!nearby || !member && !job.validating) return false;
           return length(sub(sub(b.position, p.position), member ? translation : { x: 0, y: 0 })) > FORECAST.maximumPositionDrift
             || Math.abs(b.angle - p.angle) > FORECAST.maximumAngleDrift
@@ -432,13 +536,9 @@ export class PhysicsCore {
     this.forecastWork.simulatedSteps += this.forecast.search.simulatedSteps - before;
     if (!decision) return;
     if (decision.selected.length && !this.forecast.validating) {
-      // Re-run just the baseline and selected batch from the current world.
-      // Prepared approaching contacts wait for all physical edges to exist.
-      const states = this.permissions.snapshot();
-      if (!decision.selected.every(key => states.some(p => p.key === key && p.state === "SOLID"
-        && p.contactSteps * FIXED_DT >= DEADLOCK.contactSeconds))) return;
+      // Re-run the solid baseline and complete cohort from the current world.
       const current = this.permissions.requests.find(r => r.key === decision.request.key);
-      if (current) this.forecast = this.startForecast(current, decision.selected);
+      if (current) this.forecast = this.startForecast(current, true);
       return;
     }
     if (this.permissions.acceptPrediction(this.step, decision)) {
@@ -459,6 +559,7 @@ export class PhysicsCore {
   }
   private inspectPairs(): void {
     this.pairs = [];
+    this.bodies.forEach(b => { b.contacts = []; });
     const requests = this.bodies.map(b => this.homeForce(b));
     const pointRequest = (index: number, point: Vec): Vec => {
       const body = this.bodies[index]!, request = requests[index]!;

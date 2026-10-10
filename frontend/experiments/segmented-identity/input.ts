@@ -1,5 +1,4 @@
 import type { PointerSample } from "./core";
-import type { Vec } from "./math";
 import { PointerPath } from "./pointer-path";
 
 type HoverObservation = Pick<PointerEvent, "pointerType" | "isPrimary" | "isTrusted" | "buttons" | "pressure" | "width" | "height">;
@@ -21,7 +20,7 @@ export class InputAdapter {
   private readonly abort = new AbortController();
   get pending(): boolean { return this.path.pending; }
   get droppedSamples(): number { return this.path.dropped; }
-  constructor(private readonly svg: SVGSVGElement, private readonly enabled: () => boolean, private readonly wake: () => void = () => {}) {
+  constructor(private readonly svg: SVGSVGElement, enabled: () => boolean, private readonly wake: () => void = () => {}) {
     svg.addEventListener("pointermove", e => {
       this.lastPointer = { x: e.clientX, y: e.clientY };
       if (e.pointerType === "touch") this.lastTouch = this.lastPointer;
@@ -40,7 +39,7 @@ export class InputAdapter {
       // touch. Do not duplicate pointer observations or replay synthetic touch
       // mouse events. Known touch coordinates allow for integer rounding.
       const matches = (point: { x: number; y: number } | undefined) => point
-        && Math.hypot(e.clientX - point.x, e.clientY - point.y) <= 1;
+        && Math.abs(e.clientX - point.x) <= 1 && Math.abs(e.clientY - point.y) <= 1;
       const source = e as MouseEvent & { sourceCapabilities?: { firesTouchEvents: boolean }; mozInputSource?: number };
       if (!e.isTrusted || e.buttons !== 0 || this.reduced.matches || !enabled()
         || source.sourceCapabilities?.firesTouchEvents || source.mozInputSource === 5
@@ -69,6 +68,6 @@ export class InputAdapter {
     this.previousTimestamp = undefined; this.lastPointer = undefined;
     this.path.push({ x: -100, y: -100, active: false }); this.wake();
   }
-  take(origin?: Vec, active = false): PointerSample | undefined { return this.path.take(origin, active); }
+  take(): readonly PointerSample[] | undefined { return this.path.take(); }
   dispose(): void { this.path.clear(); this.abort.abort(); }
 }

@@ -1,13 +1,51 @@
 import { test, expect } from "@playwright/test";
 import type { Page } from "@playwright/test";
 import type {} from "../test-support";
-import type { Snapshot } from "../core";
 
 const open = async (page: Page) => {
   await page.goto("/?test=1");
   await page.waitForFunction(() => !!window.__identityTest);
 };
-const snapshot = (page: Page): Promise<Snapshot> => page.evaluate(() => window.__identityTest.getSnapshot());
+
+test("renewed navigator strikes restore separated collisions before the group settles home", async ({ page }, info) => {
+  await open(page);
+  const outcome = await page.evaluate(() => {
+    const api = window.__identityTest, fixture = api.seedFixture(83);
+    api.loadFixture(fixture.fragments); api.applyDeterministicPointerPath(fixture.path);
+    for (let tick = 0; tick < 1200 && !api.getSnapshot().events.length; tick++) api.stepFixed();
+    const initialGhosts = api.getSnapshot().pairs.filter(p => p.state === "GHOSTED_LATCHED").length;
+    let unsafeRearm = false, penetration = false, energyGain = false, restoredWhileMoving = false;
+    const counts: number[] = [], violations: { tick: number; navigator: { id: string; depth: number }[]; solids: { key: string; depth: number }[] }[] = [];
+    for (let tick = 0; tick < 720; tick++) {
+      api.stepStroke(Array.from({ length: 3 }, (_, i) => {
+        const angle = (tick + (i + 1) / 3) * 12 / 120;
+        return { x: 480 + 100 * Math.cos(angle), y: 310 + 140 * Math.sin(angle), elapsedSeconds: 1 / 360 };
+      }));
+      const s = api.getSnapshot();
+      counts.push(s.pairs.filter(p => p.state === "GHOSTED_LATCHED").length);
+      const navigator = s.fragments.filter(b => b.navigatorOverlap > .02).map(b => ({ id: b.id, depth: b.navigatorOverlap }));
+      const solids = s.pairs.filter(p => p.state === "SOLID" && p.overlap > .3).map(p => ({ key: p.key, depth: p.overlap }));
+      if ((navigator.length || solids.length) && violations.length < 8) violations.push({ tick, navigator, solids });
+      penetration ||= !s.finite || !s.contained || s.fragments.some(b => b.navigatorOverlap > .02)
+        || s.pairs.some(p => p.state === "SOLID" && p.overlap > .3);
+      energyGain ||= s.ledger.permissions !== 0 || Math.max(s.ledger.fragments, s.ledger.boundaries, s.ledger.damping) > 1e-6;
+      for (const e of s.events.filter(e => e.type === "rearm" && e.step === s.step)) {
+        unsafeRearm ||= e.overlap > 0 || e.gap < .65 || e.separatedSteps < 8;
+        restoredWhileMoving ||= s.fragments.some(b => e.key.split("/").includes(b.id) && b.homeAnchorError > 1);
+      }
+    }
+    api.stepStroke([{ x: 0, y: 0, active: false }]);
+    for (let tick = 0; tick < 5400 && !api.getSnapshot().rest; tick++) api.stepFixed();
+    const final = api.getSnapshot();
+    return { initialGhosts, counts, violations, unsafeRearm, penetration, energyGain, restoredWhileMoving,
+      rest: final.rest, failures: final.failures };
+  });
+  await info.attach("renewed-interaction.json", { body: JSON.stringify(outcome, null, 2), contentType: "application/json" });
+  expect(outcome.initialGhosts).toBeGreaterThan(0); expect(outcome.counts[120]).toBeLessThanOrEqual(1);
+  expect(outcome.counts.at(-1)).toBe(0); expect(outcome.restoredWhileMoving).toBe(true);
+  expect(outcome.unsafeRearm).toBe(false); expect(outcome.penetration).toBe(false); expect(outcome.energyGain).toBe(false);
+  expect(outcome.rest).toBe(true); expect(outcome.failures).toEqual([]);
+});
 
 test("the real forecast solver releases a three-piece group together in Chromium", async ({ page }, info) => {
   await open(page);
@@ -34,7 +72,7 @@ test("the real forecast solver releases a three-piece group together in Chromium
   await info.attach("predictive-group.json", { body: JSON.stringify(outcome, null, 2), contentType: "application/json" });
   for (const result of outcome) {
     const events = result.events.filter((e: { type: string }) => e.type === "ghost");
-    expect(events.slice(0, 2).map((e: { key: string }) => e.key).sort()).toEqual(["a/b", "b/c"]);
+    expect(events.slice(0, 3).map((e: { key: string }) => e.key).sort()).toEqual(["a/b", "a/c", "b/c"]);
     expect(events[0]!.step).toBe(events[1]!.step);
     expect(events[0]!.step / 120).toBeLessThan(.25);
     expect(result.rest).toBe(true); expect(result.permissionEnergy).toBe(0);
@@ -60,7 +98,7 @@ test("swept navigator cannot tunnel and cannot force fragments through stage wal
   await open(page);
   const result = await page.evaluate(() => {
     const api = window.__identityTest;
-    api.loadFixture([{ id: "left-center", position: { x: 910, y: 310 } }]);
+    api.loadFixture([{ id: "inner-right", position: { x: 910, y: 310 } }]);
     api.stepFixed(1, { x: 840, y: 310 });
     let contained = true, strict = true;
     for (const x of [880, 940, 960, 960, 700, 100, 950]) {
@@ -76,7 +114,7 @@ test("navigator contact during an existing ghost overlap preserves its latch", a
   await open(page);
   const result = await page.evaluate(() => {
     const api = window.__identityTest;
-    const upper = api.getFragmentState("right-cap-upper")!, lower = api.getFragmentState("right-cap-lower")!;
+    const upper = api.getFragmentState("inner-top")!, lower = api.getFragmentState("inner-bottom")!;
     api.loadFixture([{ id: upper.id, position: lower.position }, { id: lower.id, position: upper.position }]);
     let pair: ReturnType<typeof api.getSnapshot>["pairs"][number] | undefined;
     for (let i = 0; i < 2500; i++) {
@@ -111,7 +149,7 @@ test("A: canonical rest is stable, rendered from exact collider vertices", async
   expect(result.after.events).toEqual([]);
   expect(result.after.fragments.map(b => b.position)).toEqual(result.before.fragments.map(b => b.position));
   expect(result.after.pairs.every(p => p.overlap === 0)).toBe(true);
-  expect(await page.locator("[data-fragment]").count()).toBe(9);
+  expect(await page.locator("[data-fragment]").count()).toBe(8);
   await page.screenshot({ path: "test-results/segmented-identity/rest-desktop.png" });
 });
 
@@ -121,13 +159,13 @@ test("B/C: slow, medium, fast strikes are bounded and off-center strikes rotate"
     const api = window.__identityTest;
     return [60, 240, 960, 9600, 96000].map(speed => {
       api.reset();
-      const f = api.getFragmentState("left-center")!;
+      const f = api.getFragmentState("inner-right")!;
       const edge = Math.min(...f.vertices.map(p => p.x));
       let x = edge - 11, y = f.position.y + 6;
       api.stepFixed(1, { x, y });
       // Identical swept contact geometry; only observed pointer speed changes.
       api.stepFixed(1, { x: x + 4, y, elapsedSeconds: 4 / speed });
-      const b = api.getFragmentState("left-center")!;
+      const b = api.getFragmentState("inner-right")!;
       return { speed, energy: b.kineticEnergy, angular: b.angularVelocity,
         penetration: api.getSnapshot().fragments.reduce((m, b) => Math.max(m, b.navigatorOverlap), 0) };
     });
@@ -147,15 +185,15 @@ test("D: fragment collisions transfer linear and angular momentum without energy
     // The receiving fragment starts at canonical REST. It has no home force
     // or momentum until this strike, so a large first-contact response proves
     // momentum transfer rather than measuring the target's own home gravity.
-    const target = api.getFragmentState("right-cap-upper")!;
-    api.loadFixture([{ id: "left-center", position: { x: target.position.x + 18, y: 140 },
+    const target = api.getFragmentState("corner-top-right")!;
+    api.loadFixture([{ id: "inner-right", position: { x: target.position.x + 18, y: 140 },
       velocity: { x: 0, y: 600 } }]);
     let transfer = false, rotation = false, maxCollisionGain = 0;
     for (let i = 0; i < 90; i++) {
       const before = api.getFragmentState(target.id)!;
       api.stepFixed(); const s = api.getSnapshot(), after = api.getFragmentState(target.id)!;
       maxCollisionGain = Math.max(maxCollisionGain, s.ledger.fragments);
-      if (after.contacts.includes("left-center")) {
+      if (after.contacts.includes("inner-right")) {
         transfer = before.kineticEnergy === 0 && after.kineticEnergy > 100
           && Math.hypot(after.velocity.x, after.velocity.y) > 10;
         rotation = Math.abs(after.angularVelocity) > .05;
@@ -172,7 +210,7 @@ test("E: high-energy fragments stay contained and walls dissipate energy", async
   await open(page);
   const result = await page.evaluate(() => {
     const api = window.__identityTest;
-    api.loadFixture([{ id: "left-center", position: { x: 30, y: 30 }, velocity: { x: -1500, y: -1200 }, angularVelocity: 8 }]);
+    api.loadFixture([{ id: "inner-right", position: { x: 30, y: 30 }, velocity: { x: -1500, y: -1200 }, angularVelocity: 8 }]);
     let contained = true, finite = true, dissipated = false, maximumGain = 0;
     for (let i = 0; i < 800; i++) {
       api.stepFixed(); const s = api.getSnapshot(); contained &&= s.contained; finite &&= s.finite;
@@ -190,7 +228,9 @@ test("F/I: ordinary disturbances rotate while travelling and recover repeatedly 
     const api = window.__identityTest;
     const cycles: { rest: boolean; ghosts: number; rotationDuringTravel: boolean }[] = [];
     for (let cycle = 0; cycle < 5; cycle++) {
-      api.reset(); const b = api.getFragmentState("right-flank-right")!;
+      // An outward-displaced corner has a clear return path. Moving a core
+      // flank outside its surrounding corners necessarily changes that setup.
+      api.reset(); const b = api.getFragmentState("corner-top-right")!;
       api.loadFixture([{ id: b.id, position: { x: b.position.x + 80, y: b.position.y }, angle: .45,
         velocity: { x: 180 + cycle * 20, y: 0 }, angularVelocity: .5 }]);
       api.stepFixed(60); const travelling = api.getFragmentState(b.id)!;
@@ -208,7 +248,7 @@ test("G: swapped canonical caps reproduce a deadlock and recover with latched lo
   const result = await page.evaluate(() => {
     const api = window.__identityTest;
     function fixture() {
-      const a = api.getFragmentState("right-cap-upper")!, b = api.getFragmentState("right-cap-lower")!;
+      const a = api.getFragmentState("inner-top")!, b = api.getFragmentState("inner-bottom")!;
       api.loadFixture([{ id: a.id, position: b.position }, { id: b.id, position: a.position }]);
     }
     api.reset({ deadlock: false }); fixture(); api.stepFixed(3000); const blocked = api.getSnapshot();
@@ -244,7 +284,7 @@ test("H: navigator contact is strict and prevents new ghost permissions", async 
   await open(page);
   const result = await page.evaluate(() => {
     const api = window.__identityTest;
-    const a = api.getFragmentState("right-cap-upper")!, b = api.getFragmentState("right-cap-lower")!;
+    const a = api.getFragmentState("inner-top")!, b = api.getFragmentState("inner-bottom")!;
     api.loadFixture([{ id: a.id, position: b.position }, { id: b.id, position: a.position }]);
     const failures: string[] = [];
     let activeContact = false;
@@ -370,7 +410,7 @@ test("semantic static identity remains without JavaScript and on touch", async (
   const context = await browser.newContext({ javaScriptEnabled: false, viewport: { width: 390, height: 850 } });
   const page = await context.newPage(); await page.goto("http://127.0.0.1:4178/");
   await expect(page.getByRole("img", { name: "Segmented 0x identity" })).toBeVisible();
-  expect(await page.locator("[data-fragment]").count()).toBe(9);
+  expect(await page.locator("[data-fragment]").count()).toBe(8);
   await page.screenshot({ path: "test-results/segmented-identity/rest-mobile-no-js.png" });
   await context.close();
   const touch = await browser.newContext({ hasTouch: true, isMobile: browserName !== "firefox", viewport: { width: 390, height: 850 } });
