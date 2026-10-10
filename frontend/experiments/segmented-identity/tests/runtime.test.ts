@@ -127,3 +127,42 @@ it("finishes the widest supported forecast before its age limit at 60 Hz", async
   }, () => 0);
   expect(finished).toBe(true); expect(search.simulatedSteps).toBe(12);
 });
+
+it("checks live failures without building a full diagnostic snapshot", () => {
+  const core = new PhysicsCore(canonicalGeometry);
+  core.stepFixed(); expect(core.runtimeFailure()).toBeNull();
+  core.permissions.failures.push("Return exceeded its deadline");
+  expect(core.runtimeFailure()).toBe("Return exceeded its deadline");
+  core.permissions.failures.length = 0;
+  core.bodies[0]!.velocity = { x: NaN, y: 0 };
+  expect(core.runtimeFailure()).toBe("Non-finite simulation state");
+});
+it("guards energy, containment and navigator clearance independently", () => {
+  const core = new PhysicsCore(canonicalGeometry);
+  core.stepFixed(); core.ledger.fragments = 1;
+  expect(core.runtimeFailure()).toBe("Simulation energy invariant failed");
+  core.ledger.fragments = 0; core.bodies[0]!.position = { x: -100, y: 310 };
+  expect(core.runtimeFailure()).toBe("Fragment left the stage");
+  core.bodies[0]!.position = { x: 480, y: 310 };
+  core.navigator.active = true; core.navigator.position = { ...core.bodies[0]!.position };
+  // Use a contour vertex: this is guaranteed to touch even for a concave body.
+  core.navigator.position = core.getSnapshot().fragments[0]!.vertices[0]!;
+  expect(core.runtimeFailure()).toBe("Navigator clearance invariant failed");
+});
+it("diagnostic reads preserve subsequent physics, permission decisions and energy accounting", () => {
+  const observed = new PhysicsCore(canonicalGeometry), silent = new PhysicsCore(canonicalGeometry);
+  const stroke = [{ x: 280, y: 310 }, { x: 550, y: 320, elapsedSeconds: .01 }];
+  observed.stepStroke(stroke); silent.stepStroke(stroke);
+  for (let step = 0; step < 180; step++) {
+    const snapshot = observed.getSnapshot();
+    const ledgerSum = snapshot.ledger.before + snapshot.ledger.home + snapshot.ledger.damping
+      + snapshot.ledger.fragments + snapshot.ledger.navigator + snapshot.ledger.boundaries + snapshot.ledger.permissions;
+    expect(ledgerSum).toBeCloseTo(snapshot.energy, 7);
+    observed.stepFixed(); silent.stepFixed();
+    expect(observed.runtimeFailure()).toBeNull();
+    expect(observed.bodies).toEqual(silent.bodies);
+    expect(observed.permissions.snapshot()).toEqual(silent.permissions.snapshot());
+    expect(observed.ledger).toEqual(silent.ledger);
+  }
+  expect(observed.getSnapshot()).toEqual(silent.getSnapshot());
+});

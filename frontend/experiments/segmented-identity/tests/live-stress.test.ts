@@ -14,18 +14,18 @@ it.each(seeds)("live seed %i: coalesced fast strokes preserve invariants and rec
   const core = new PhysicsCore(canonicalGeometry), fixture = seedFixture(seed);
   core.loadFixture(fixture.fragments);
   core.stepStroke([fixture.path[0]!]);
-  let failure = invariantFailure(core.getSnapshot());
+  let failure = invariantFailure(core.getSnapshot()) ?? core.runtimeFailure();
   // Three actual observations per tick exercise corners/reversals inside the
   // new production input path, rather than only the scalar fixture replay API.
   for (let i = 1; i < fixture.path.length - 1 && !failure; i += 3) {
     core.stepStroke(fixture.path.slice(i, Math.min(i + 3, fixture.path.length - 1)));
-    failure = invariantFailure(core.getSnapshot());
+    failure = invariantFailure(core.getSnapshot()) ?? core.runtimeFailure();
   }
   if (!failure) {
-    core.stepStroke([fixture.path.at(-1)!]); failure = invariantFailure(core.getSnapshot());
+    core.stepStroke([fixture.path.at(-1)!]); failure = invariantFailure(core.getSnapshot()) ?? core.runtimeFailure();
   }
   for (let i = 0; i < 45 / FIXED_DT && !failure && !core.isRest(); i++) {
-    core.stepFixed(); failure = invariantFailure(core.getSnapshot());
+    core.stepFixed(); failure = invariantFailure(core.getSnapshot()) ?? core.runtimeFailure();
   }
   results.push({ seed, failure, seconds: core.step * FIXED_DT, rest: core.isRest() });
   if (failure || !core.isRest()) {

@@ -9,12 +9,17 @@ afterAll(() => {
   writeFileSync("test-results/segmented-identity/unit-stress-summary.json", JSON.stringify(results, null, 2));
 });
 it.each(seeds)("seed %i converges without invariant failures", seed => {
-  const result = stressRun(seed);
+  let runtimeFailure: string | null = null;
+  const result = stressRun(seed, 45, core => {
+    const advance = core.stepFixed.bind(core);
+    core.stepFixed = (...args) => { advance(...args); runtimeFailure ??= core.runtimeFailure(); };
+  });
   results.push({ seed, passed: result.passed, failure: result.failure, seconds: result.snapshot.time,
     maximumEnergy: result.maximumEnergy, ghosts: result.snapshot.events.filter(e => e.type === "ghost").length });
   if (!result.passed) {
     mkdirSync("test-results/segmented-identity/seeds", { recursive: true });
     writeFileSync(`test-results/segmented-identity/seeds/${seed}.json`, JSON.stringify({ fixture: seedFixture(seed), ...result }, null, 2));
   }
+  expect(runtimeFailure, `live guard in seed ${seed}`).toBeNull();
   expect(result.passed, `seed ${seed}: ${result.failure}; error ${Math.max(...result.snapshot.fragments.map(b => b.homeAnchorError))}; energy ${result.snapshot.energy}`).toBe(true);
 });

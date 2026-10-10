@@ -335,7 +335,7 @@ export class PhysicsCore {
       }
     }
     this.step++;
-    if (this.predicting) this.inspectPredictionPairs(); else this.inspectPairs();
+    this.inspectPairs();
     // A final compound correction can reintroduce another solid contact. New
     // fast-stroke poses exposed this in tightly packed concave groups. Recover
     // only residual violations, with bounded position/impulse passes and no
@@ -348,7 +348,7 @@ export class PhysicsCore {
       this.account("fragments", () => this.solveFragments(true, PHYSICS.solidTolerance));
       this.account("boundaries", () => this.solveBoundaries());
       this.account("navigator", () => this.solveNavigator());
-      if (this.predicting) this.inspectPredictionPairs(); else this.inspectPairs();
+      this.inspectPairs();
     }
     this.account("permissions", () => this.permissions.observe(this.step, this.bodies.map(b => {
       const response = this.homeForce(b);
@@ -367,15 +367,7 @@ export class PhysicsCore {
     this.ledger.after = this.energy(); this.maxEnergy = Math.max(this.maxEnergy, this.ledger.after);
   }
   private unresolvedSolids(): boolean {
-    if (!this.predicting) return this.pairs.some(p => !this.permissions.ghosted(p.key) && p.overlap > PHYSICS.solidTolerance);
-    // Prediction observations intentionally contain only existing latches;
-    // guard all other solid relationships using the same actual geometry.
-    for (let i = 0; i < this.bodies.length; i++) for (let j = i + 1; j < this.bodies.length; j++) {
-      const a = this.bodies[i]!, b = this.bodies[j]!;
-      if (!this.permissions.ghosted(pairKey(a.geometry.id, b.geometry.id))
-        && (polygonContact(this.vertices(a), this.vertices(b), this.parts(a), this.parts(b))?.depth ?? 0) > PHYSICS.solidTolerance) return true;
-    }
-    return false;
+    return this.pairs.some(p => !this.permissions.ghosted(p.key) && p.overlap > PHYSICS.solidTolerance);
   }
   private homeMetrics(members: readonly string[], progress = false) {
     const bodies = this.bodies.filter(b => members.includes(b.geometry.id));
@@ -438,15 +430,34 @@ export class PhysicsCore {
         b.angularVelocity].every(Number.isFinite)
         && this.vertices(b).every(p => p.x >= -1e-4 && p.x <= this.width + 1e-4 && p.y >= -1e-4 && p.y <= this.height + 1e-4)
         && (!this.navigator.active || (circleContact(this.vertices(b), this.navigator.position, PHYSICS.navigatorRadius)?.depth ?? 0) <= .02)))) return false;
-    // Shadow pair observations only track latches. Independently check solid
-    // geometry too: an alternative must not gain apparent progress by leaving
-    // a different, still-solid relationship illegally interpenetrating.
+    // Independently check solid geometry too: an alternative must not gain
+    // apparent progress by leaving a different, still-solid relationship
+    // illegally interpenetrating.
     for (let i = 0; i < this.bodies.length; i++) for (let j = i + 1; j < this.bodies.length; j++) {
       const a = this.bodies[i]!, b = this.bodies[j]!;
       if (!this.permissions.ghosted(pairKey(a.geometry.id, b.geometry.id))
         && (polygonContact(this.vertices(a), this.vertices(b), this.parts(a), this.parts(b))?.depth ?? 0) > PHYSICS.solidTolerance) return false;
     }
     return true;
+  }
+  /** Tick guard uses final contact observations, without materializing diagnostics. */
+  runtimeFailure(): string | null {
+    if (this.permissions.failures.length) return this.permissions.failures[0]!;
+    if (![this.navigator.position.x, this.navigator.position.y, this.navigator.velocity.x, this.navigator.velocity.y,
+      ...Object.values(this.ledger)].every(Number.isFinite)
+      || this.bodies.some(b => ![b.position.x, b.position.y, b.angle, b.velocity.x, b.velocity.y, b.angularVelocity].every(Number.isFinite)))
+      return "Non-finite simulation state";
+    if (this.ledger.after >= 1e7 || this.ledger.permissions !== 0
+      || Math.max(this.ledger.damping, this.ledger.fragments, this.ledger.boundaries) > 1e-6)
+      return "Simulation energy invariant failed";
+    for (const b of this.bodies) {
+      const vertices = this.vertices(b), box = polygonBounds(vertices);
+      if (box.minx < -1e-4 || box.maxx > this.width + 1e-4 || box.miny < -1e-4 || box.maxy > this.height + 1e-4)
+        return "Fragment left the stage";
+      if (this.navigator.active && (circleContact(vertices, this.navigator.position, PHYSICS.navigatorRadius)?.depth ?? 0) > .02)
+        return "Navigator clearance invariant failed";
+    }
+    return this.unresolvedSolids() ? "Solid contact recovery failed" : null;
   }
   private startForecast(request: ForecastRequest, validating = false): NonNullable<PhysicsCore["forecast"]> {
     // Every alternative starts from the SAME frozen world, including latches.
@@ -545,19 +556,9 @@ export class PhysicsCore {
       this.forecastWork.completed++; this.forecast = null;
     }
   }
-  private inspectPredictionPairs(): void {
-    // Shadow worlds only need separation observations for existing latches.
-    // Solid contacts are already handled by the identical impulse solver.
-    this.pairs = this.permissions.snapshot().filter(p => p.state === "GHOSTED_LATCHED").map(p => {
-      const a = this.bodies.find(b => b.geometry.id === p.a)!, b = this.bodies.find(b => b.geometry.id === p.b)!;
-      const av = this.vertices(a), bv = this.vertices(b);
-      const contact = polygonContact(av, bv, this.parts(a), this.parts(b));
-      const gap = contact ? 0 : polygonGap(av, bv);
-      return { key: p.key, a: p.a, b: p.b, contact: !!contact || gap < PHYSICS.contactMargin,
-        overlap: contact?.depth ?? 0, gap, blocking: 0 };
-    });
-  }
   private inspectPairs(): void {
+    // Both live and shadow returns need solid neighbours to propagate
+    // navigator contact and interrupt the same latched cohort.
     this.pairs = [];
     this.bodies.forEach(b => { b.contacts = []; });
     const requests = this.bodies.map(b => this.homeForce(b));

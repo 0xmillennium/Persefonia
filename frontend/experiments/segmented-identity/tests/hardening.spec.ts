@@ -205,3 +205,93 @@ test("live telemetry refreshes at a bounded rate and stops updating while closed
   await page.locator("summary").click(); await observe(); await page.waitForTimeout(300);
   expect((await sample()).count).toBe(0);
 });
+
+for (const fault of ["exception", "empty exception", "return failure", "non-finite state"] as const) {
+  test(`runtime ${fault} restores the canonical logo and waits for explicit Reset`, async ({ page }) => {
+    await page.goto("/?test=1"); await page.waitForFunction(() => !!window.__identityTest);
+    await page.evaluate(async fault => {
+      const runtimePath = "/runtime.ts", corePath = "/core.ts", geometryPath = "/geometry.ts";
+      const { mountIdentity } = await import(runtimePath) as typeof import("../runtime");
+      const { PhysicsCore } = await import(corePath) as typeof import("../core");
+      const { canonicalGeometry } = await import(geometryPath) as typeof import("../geometry");
+      const original = document.querySelector("main")!, root = original.cloneNode(true) as HTMLElement;
+      original.remove(); root.querySelectorAll(".anchors, .navigator").forEach(node => node.remove());
+      document.body.append(root);
+      const canonical = [...root.querySelectorAll("[data-fragment]")].map(node => node.getAttribute("transform"));
+      const state = { factories: 0, ticks: 0, canonical, controller: null as ReturnType<typeof mountIdentity> | null };
+      state.controller = mountIdentity(root, { createCore: () => {
+        const core = new PhysicsCore(canonicalGeometry); state.factories++;
+        if (state.factories === 1) core.stepStroke = () => {
+          state.ticks++; core.bodies[0]!.position = { x: core.bodies[0]!.position.x + 10, y: core.bodies[0]!.position.y };
+          if (fault === "exception") throw new Error("Injected tick failure");
+          if (fault === "empty exception") throw new Error("");
+          if (fault === "return failure") core.permissions.failures.push("Injected return deadline");
+          else core.bodies[0]!.velocity = { x: NaN, y: 0 };
+        };
+        return core;
+      } });
+      Object.assign(window, { hardeningRuntime: state });
+    }, fault);
+    const start = await stagePoint(page, 280, 310);
+    await page.mouse.move(start.x, start.y);
+    await expect(page.locator("#status")).toHaveText("Static identity · motion unavailable");
+    await expect(page.locator("#pause")).toBeDisabled(); await expect(page.locator("#anchors")).toBeDisabled();
+    await expect(page.locator(".navigator")).toHaveAttribute("visibility", "hidden");
+    await page.locator("summary").click(); await expect(page.locator("#telemetry")).toContainText('"runtimeFailure"');
+    await page.mouse.move(start.x + 60, start.y); await page.waitForTimeout(100);
+    const frozen = await page.evaluate(() => {
+      const state = (window as unknown as { hardeningRuntime: { factories: number; ticks: number; canonical: (string | null)[] } }).hardeningRuntime;
+      return { factories: state.factories, ticks: state.ticks, canonical: state.canonical,
+        transforms: [...document.querySelectorAll("[data-fragment]")].map(node => node.getAttribute("transform")) };
+    });
+    expect(frozen.ticks).toBe(1); expect(frozen.factories).toBe(1); expect(frozen.transforms).toEqual(frozen.canonical);
+    await page.getByRole("button", { name: "Reset" }).click(); await expect(page.locator("#status")).toHaveText("REST");
+    await expect(page.locator("#pause")).toBeEnabled();
+    await page.mouse.move(start.x, start.y); await expect(page.locator(".navigator")).toHaveAttribute("visibility", "visible");
+    await page.evaluate(() => {
+      const state = (window as unknown as { hardeningRuntime: { controller: { dispose(): void; reset(): void } } }).hardeningRuntime;
+      state.controller.dispose(); state.controller.dispose(); state.controller.reset();
+    });
+    expect(await page.locator(".navigator, .anchors").count()).toBe(0);
+    await page.getByRole("button", { name: "Reset" }).click();
+    await page.mouse.move(start.x + 20, start.y); await page.waitForTimeout(50);
+    await expect(page.locator("#status")).toHaveText("Static identity");
+    await page.evaluate(async () => {
+      const runtimePath = "/runtime.ts";
+      const { mountIdentity } = await import(runtimePath) as typeof import("../runtime");
+      mountIdentity(document.querySelector<HTMLElement>("main")!);
+    });
+    expect(await page.locator(".navigator").count()).toBe(1);
+    await expect(page.locator("#status")).toHaveText("REST");
+  });
+}
+
+test("scoped controls and disposal do not affect a sibling identity", async ({ page }) => {
+  await page.goto("/?test=1"); await page.waitForFunction(() => !!window.__identityTest);
+  await page.evaluate(async () => {
+    const runtimePath = "/runtime.ts";
+    const { mountIdentity } = await import(runtimePath) as typeof import("../runtime");
+    const original = document.querySelector("main")!;
+    const roots = ["first", "second"].map(id => {
+      const root = original.cloneNode(true) as HTMLElement;
+      root.dataset.instance = id;
+      root.querySelectorAll(".anchors, .navigator").forEach(node => node.remove());
+      document.body.append(root); return root;
+    });
+    original.remove();
+    const controllers = roots.map(root => mountIdentity(root, { manual: true }));
+    Object.assign(window, { scopedControllers: controllers });
+  });
+  const first = page.locator('[data-instance="first"]'), second = page.locator('[data-instance="second"]');
+  await first.locator("#pause").click();
+  await expect(first.locator("#status")).toHaveText("Paused"); await expect(second.locator("#status")).toHaveText("REST");
+  await second.locator("#anchors").check();
+  await expect(second.locator(".anchors")).toHaveAttribute("visibility", "visible");
+  await expect(first.locator(".anchors")).toHaveAttribute("visibility", "hidden");
+  await page.evaluate(() => {
+    (window as unknown as { scopedControllers: { dispose(): void }[] }).scopedControllers[0]!.dispose();
+  });
+  expect(await first.locator(".navigator, .anchors").count()).toBe(0);
+  expect(await second.locator(".navigator").count()).toBe(1);
+  await second.locator("#pause").click(); await expect(second.locator("#status")).toHaveText("Paused");
+});
