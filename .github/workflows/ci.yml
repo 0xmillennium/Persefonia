@@ -159,6 +159,14 @@ jobs:
       - name: Check segmented identity sources and deterministic physics
         run: cd frontend && npm run identity:check
 
+      - name: Check scroll film navigator sources and deterministic interactions
+        run: |
+          cd frontend
+          npm run film:typecheck
+          npm run film:test
+        # Full asset/build/browser qualification remains an explicit local gate: it requires
+        # ~1.5 GB of source media, FFmpeg and a separately provisioned rendering workload.
+
       - name: Install identity browser matrix
         run: cd frontend && npx playwright install --with-deps firefox webkit
 

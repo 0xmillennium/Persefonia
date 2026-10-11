@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="Independent 0xmillennium interaction experiment: scroll-controlled film and liquid navigation.">
+  <title>02 / Film & Liquid — 0xmillennium</title>
+  <link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+  <main>
+    <div id="stage" aria-label="Interactive film stage">
+      <canvas id="film" aria-hidden="true"></canvas>
+      <canvas id="fallback" aria-hidden="true" hidden></canvas>
+      <div id="core" aria-hidden="true" hidden></div>
+      <output id="countdown" aria-live="off" hidden></output>
+      <header data-control>
+        <p class="identity">0xmillennium <span>Interaction studies</span></p>
+        <h1>Film & liquid <span>02</span></h1>
+      </header>
+      <div id="message" role="status">Preparing the first frame…</div>
+      <footer data-control>
+        <div class="instructions"><p>Scroll to move through the film.</p><p>Press and hold to change the scene. Release to retreat.</p></div>
+        <div class="controls">
+          <fieldset><legend>Scene</legend><button id="robot" type="button" aria-pressed="true">Robotic arm</button><button id="tree" type="button" aria-pressed="false">Tree</button></fieldset>
+          <label class="progress">Film position <input id="progress" type="range" min="0" max="1000" step="1" value="0"><output id="frame">001 / 192</output></label>
+          <button id="retry" type="button" hidden>Retry frames</button>
+          <button id="debug-toggle" type="button" hidden aria-expanded="false">Diagnostics</button>
+        </div>
+        <p id="selection" role="status" class="sr-only">Robotic arm selected.</p>
+      </footer>
+      <pre id="debug" data-control hidden></pre>
+    </div>
+    <div id="scroll-range" aria-hidden="true"></div>
+    <noscript><p class="no-js">This independent interaction experiment needs JavaScript for frame selection. No production content is hosted here.</p></noscript>
+  </main>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
