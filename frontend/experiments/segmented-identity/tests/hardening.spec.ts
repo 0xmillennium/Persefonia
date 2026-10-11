@@ -295,3 +295,84 @@ test("scoped controls and disposal do not affect a sibling identity", async ({ p
   expect(await second.locator(".navigator").count()).toBe(1);
   await second.locator("#pause").click(); await expect(second.locator("#status")).toHaveText("Paused");
 });
+
+test("native keyboard controls retain visible focus and operate without pointer input", async ({ page }) => {
+  await page.goto("/"); await expect(page.locator("#status")).toHaveText("REST");
+  await page.keyboard.press("Tab"); await expect(page.locator("#reset")).toBeFocused();
+  expect(await page.locator("#reset").evaluate(node => getComputedStyle(node).outlineStyle)).not.toBe("none");
+  await page.keyboard.press("Enter"); await expect(page.locator("#status")).toHaveText("REST");
+  await page.keyboard.press("Tab"); await expect(page.locator("#pause")).toBeFocused();
+  await page.keyboard.press("Space"); await expect(page.locator("#status")).toHaveText("Paused");
+  await page.keyboard.press("Tab"); await expect(page.locator("#anchors")).toBeFocused();
+  await page.keyboard.press("Space"); await expect(page.locator("#anchors")).toBeChecked();
+  await page.keyboard.press("Tab"); await expect(page.locator("summary")).toBeFocused();
+  await page.keyboard.press("Enter"); await expect(page.locator("details")).toHaveAttribute("open", "");
+});
+
+test("live resizing and orientation changes preserve pointer mapping and usable controls", async ({ page }) => {
+  await page.goto("/"); await expect(page.locator("#status")).toHaveText("REST");
+  for (const [width, height] of [[390, 844], [844, 390], [768, 1024], [1024, 768], [1200, 900], [1512, 982], [512, 740]]) {
+    await page.setViewportSize({ width: width!, height: height! });
+    const point = await stagePoint(page, 250, 100);
+    await page.locator(".stage").evaluate(svg => {
+      svg.addEventListener("pointermove", event => {
+        const e = event as PointerEvent;
+        const p = new DOMPoint(e.clientX, e.clientY).matrixTransform((svg as SVGSVGElement).getScreenCTM()!.inverse());
+        Object.assign(window, { resizedPointer: { x: p.x, y: p.y } });
+      }, { once: true });
+    });
+    await page.mouse.move(0, 0); await page.mouse.move(point.x, point.y);
+    await expect(page.locator(".navigator")).toHaveAttribute("visibility", "visible");
+    const delivered = await page.evaluate(() => (window as unknown as { resizedPointer: { x: number; y: number } }).resizedPointer);
+    await expect.poll(async () => Number(await page.locator(".navigator").getAttribute("cx"))).toBeCloseTo(delivered.x, 2);
+    await expect.poll(async () => Number(await page.locator(".navigator").getAttribute("cy"))).toBeCloseTo(delivered.y, 2);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.locator("#pause").click(); await expect(page.locator("#status")).toHaveText("Paused");
+    await page.locator("#pause").click(); await page.locator("#reset").click();
+    await expect(page.locator("#status")).toHaveText("REST");
+  }
+});
+
+test("repeated mounting, input, reset and disposal release DOM nodes and listeners", async ({ page, browserName }, info) => {
+  test.skip(browserName !== "chromium", "Chromium CDP exposes heap and listener counters");
+  await page.goto("/?test=1"); await page.waitForFunction(() => !!window.__identityTest);
+  const session = await page.context().newCDPSession(page);
+  try {
+    await session.send("Performance.enable");
+    await page.evaluate(() => {
+      const template = document.querySelector("main")!.cloneNode(true) as HTMLElement;
+      template.querySelectorAll(".anchors, .navigator").forEach(node => node.remove());
+      Object.assign(window, { lifetimeTemplate: template });
+    });
+    const measurements: Record<string, number>[] = [];
+    for (let batch = 0; batch < 6; batch++) {
+      await page.evaluate(async () => {
+        const runtimePath = "/runtime.ts";
+        const { mountIdentity } = await import(runtimePath) as typeof import("../runtime");
+        const template = (window as unknown as { lifetimeTemplate: HTMLElement }).lifetimeTemplate;
+        for (let cycle = 0; cycle < 20; cycle++) {
+          const root = template.cloneNode(true) as HTMLElement; document.body.append(root);
+          const controller = mountIdentity(root);
+          const svg = root.querySelector<SVGSVGElement>(".stage")!, m = svg.getScreenCTM()!;
+          const point = new DOMPoint(250, 100).matrixTransform(m);
+          svg.dispatchEvent(new PointerEvent("pointermove", { clientX: point.x, clientY: point.y, pointerType: "mouse", isPrimary: true }));
+          await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+          controller.reset(); controller.dispose(); controller.dispose(); root.remove();
+        }
+        await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+      });
+      await session.send("HeapProfiler.collectGarbage");
+      const { metrics } = await session.send("Performance.getMetrics");
+      measurements.push(Object.fromEntries(metrics.map(m => [m.name, m.value])));
+    }
+    const settled = measurements.slice(1), baseline = settled[0]!;
+    for (const sample of settled) {
+      expect(sample.Nodes).toBe(baseline.Nodes);
+      expect(sample.JSEventListeners).toBe(baseline.JSEventListeners);
+      expect(sample.Documents).toBe(baseline.Documents);
+      // Allow JIT/bookkeeping variation; reject sustained retained heap growth.
+      expect(sample.JSHeapUsedSize! - baseline.JSHeapUsedSize!).toBeLessThan(1024 * 1024);
+    }
+    await info.attach("lifetime-counters.json", { body: JSON.stringify(measurements), contentType: "application/json" });
+  } finally { await session.detach(); }
+});

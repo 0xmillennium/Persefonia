@@ -132,12 +132,23 @@ export function boundsGap(a: readonly Vec[], b: readonly Vec[]): number {
     Math.max(0, ab.miny - bb.maxy, bb.miny - ab.maxy));
 }
 
+const boundsOverlap = (a: Bounds, b: Bounds): boolean =>
+  a.maxx >= b.minx && b.maxx >= a.minx && a.maxy >= b.miny && b.maxy >= a.miny;
+const partBoundsCache = new WeakMap<readonly (readonly Vec[])[], readonly Bounds[]>();
+function partBounds(parts: readonly (readonly Vec[])[]): readonly Bounds[] {
+  let bounds = partBoundsCache.get(parts);
+  if (!bounds) { bounds = parts.map(polygonBounds); partBoundsCache.set(parts, bounds); }
+  return bounds;
+}
+
 export function polygonContact(a: readonly Vec[], b: readonly Vec[],
   aparts: readonly (readonly Vec[])[], bparts: readonly (readonly Vec[])[]): Contact | null {
-  if (boundsGap(a, b) > 0) return null;
+  if (!boundsOverlap(polygonBounds(a), polygonBounds(b))) return null;
+  const ab = partBounds(aparts), bb = partBounds(bparts);
   let contact: Contact | null = null;
-  for (const ap of aparts) for (const bp of bparts) {
-    const c = convexContact(ap, bp);
+  for (let i = 0; i < aparts.length; i++) for (let j = 0; j < bparts.length; j++) {
+    if (!boundsOverlap(ab[i]!, bb[j]!)) continue;
+    const c = convexContactNarrow(aparts[i]!, bparts[j]!);
     if (c && (!contact || c.depth > contact.depth)) contact = c;
   }
   return contact;
@@ -147,10 +158,12 @@ export function polygonContact(a: readonly Vec[], b: readonly Vec[],
 // contact unchanged, while deadlock detection can inspect every touching part.
 export function polygonContacts(a: readonly Vec[], b: readonly Vec[],
   aparts: readonly (readonly Vec[])[], bparts: readonly (readonly Vec[])[]): Contact[] {
-  if (boundsGap(a, b) > 0) return [];
+  if (!boundsOverlap(polygonBounds(a), polygonBounds(b))) return [];
+  const ab = partBounds(aparts), bb = partBounds(bparts);
   const contacts: Contact[] = [];
-  for (const ap of aparts) for (const bp of bparts) {
-    const contact = convexContact(ap, bp);
+  for (let i = 0; i < aparts.length; i++) for (let j = 0; j < bparts.length; j++) {
+    if (!boundsOverlap(ab[i]!, bb[j]!)) continue;
+    const contact = convexContactNarrow(aparts[i]!, bparts[j]!);
     if (contact) contacts.push(contact);
   }
   return contacts;
@@ -221,16 +234,25 @@ export function compoundSeparation(aparts: readonly (readonly Vec[])[], bparts: 
 // SAT uses the same polygon vertices that SVG renders. Convex input is validated
 // by the geometry loader; a concave shape must be explicitly decomposed there.
 export function convexContact(a: readonly Vec[], b: readonly Vec[]): Contact | null {
-  const ab = polygonBounds(a), bb = polygonBounds(b);
-  if (ab.maxx < bb.minx || bb.maxx < ab.minx || ab.maxy < bb.miny || bb.maxy < ab.miny) return null;
+  if (!boundsOverlap(polygonBounds(a), polygonBounds(b))) return null;
+  return convexContactNarrow(a, b);
+}
+function convexContactNarrow(a: readonly Vec[], b: readonly Vec[]): Contact | null {
   let depth = Infinity, normal: Vec = { x: 1, y: 0 };
-  for (const first of [true, false]) {
+  for (let side = 0; side < 2; side++) {
+    const first = side === 0;
     const polygon = first ? a : b, axes = cachedAxes(polygon);
     for (let i = 0; i < polygon.length; i++) {
       const own = axisRange(polygon, axes, i);
-      const { axis } = own, other = projectionRange(first ? b : a, axis);
-      const amin = first ? own.min : other.min, amax = first ? own.max : other.max;
-      const bmin = first ? other.min : own.min, bmax = first ? other.max : own.max;
+      const { axis } = own;
+      // Keep the opposing support interval scalar in this hot loop; allocating
+      // a range object for every SAT axis adds substantial collection work.
+      let min = Infinity, max = -Infinity;
+      for (const point of first ? b : a) {
+        const value = dot(point, axis); min = Math.min(min, value); max = Math.max(max, value);
+      }
+      const amin = first ? own.min : min, amax = first ? own.max : max;
+      const bmin = first ? min : own.min, bmax = first ? max : own.max;
       const forward = amax - bmin, backward = bmax - amin;
       if (forward < 0 || backward < 0) return null;
       const overlap = Math.min(forward, backward);
@@ -239,9 +261,13 @@ export function convexContact(a: readonly Vec[], b: readonly Vec[]): Contact | n
   }
   // Support-face averages avoid selecting an arbitrary end of a flat seam.
   const support = (polygon: readonly Vec[], axis: Vec) => {
-    const max = Math.max(...polygon.map(p => dot(p, axis)));
-    const face = polygon.filter(p => max - dot(p, axis) < 0.05);
-    return mul(face.reduce(add, { x: 0, y: 0 }), 1 / face.length);
+    let max = -Infinity;
+    for (const point of polygon) max = Math.max(max, dot(point, axis));
+    let x = 0, y = 0, count = 0;
+    for (const point of polygon) if (max - dot(point, axis) < .05) {
+      x += point.x; y += point.y; count++;
+    }
+    return mul({ x, y }, 1 / count);
   };
   return { normal, depth, point: mul(add(support(a, normal), support(b, mul(normal, -1))), .5) };
 }

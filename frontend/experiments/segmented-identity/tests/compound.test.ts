@@ -1,11 +1,39 @@
 import { it, expect } from "vitest";
-import { compoundSeparation, decompose, polygonContact, convexContact, transform, length, rotate, cross, dot } from "../math";
+import { compoundSeparation, decompose, polygonContact, polygonContacts, convexContact, transform, length, rotate, cross, dot } from "../math";
+import type { Contact } from "../math";
+import { canonicalGeometry } from "../geometry";
 import { createSimulation, seedFixture, invariantFailure } from "../scenarios";
 
 const corner = [{ x: 0, y: 0 }, { x: 40, y: 0 }, { x: 40, y: 10 },
   { x: 10, y: 10 }, { x: 10, y: 40 }, { x: 0, y: 40 }];
 const parts = decompose(corner);
 const square = [{ x: 5, y: 5 }, { x: 25, y: 5 }, { x: 25, y: 25 }, { x: 5, y: 25 }];
+
+it("compound broad phase preserves the exhaustive SAT manifold and deepest contact across fresh and reused poses", () => {
+  for (let sample = 0; sample < 36; sample++) {
+    const a = canonicalGeometry[sample % canonicalGeometry.length]!, b = canonicalGeometry[(sample * 3 + 1) % canonicalGeometry.length]!;
+    const angle = sample * .37, position = { x: 40 * Math.sin(sample), y: 30 * Math.cos(sample) };
+    const av = transform(a.vertices, { x: 0, y: 0 }, angle), bv = transform(b.vertices, position, -angle);
+    const ap = a.parts.map(p => transform(p, { x: 0, y: 0 }, angle)), bp = b.parts.map(p => transform(p, position, -angle));
+    const exhaustive = ap.flatMap(first => bp.flatMap(second => {
+      const contact = convexContact(first, second); return contact ? [contact] : [];
+    }));
+    const deepest = exhaustive.reduce<Contact | null>((best, c) => !best || c.depth > best.depth ? c : best, null);
+    for (let repeat = 0; repeat < 2; repeat++) {
+      expect(polygonContacts(av, bv, ap, bp)).toEqual(exhaustive);
+      expect(polygonContact(av, bv, ap, bp)).toEqual(deepest);
+    }
+  }
+});
+it("compound broad phase retains tangency at a shared edge and vertex", () => {
+  const box = [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }, { x: 0, y: 10 }];
+  for (const position of [{ x: 10, y: 0 }, { x: 10, y: 10 }]) {
+    const other = transform(box, position, 0), contact = convexContact(box, other);
+    expect(contact?.depth).toBe(0);
+    expect(polygonContact(box, other, [box], [other])).toEqual(contact);
+    expect(polygonContacts(box, other, [box], [other])).toEqual([contact]);
+  }
+});
 
 it("separates every compound subpart, including another part reached along the translation", () => {
   const translation = compoundSeparation(parts, [square], { x: 1, y: 0 }, p => p.x > 0 && p.y === 0);
