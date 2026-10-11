@@ -3,7 +3,7 @@ import { ready,state,progress } from "./support";
 import { mkdir,writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
-test("Constrained connection retains the complete renderer and last valid film during preparation",async({page,browserName},info)=>{
+test("Constrained connection retains the primary GPU renderer and last valid film during preparation",async({page,browserName},info)=>{
   test.skip(browserName!=="chromium","CDP bandwidth shaping is Chromium-specific; other engines retain functional coverage.");
   test.setTimeout(90000);
   const session=await page.context().newCDPSession(page);
@@ -13,7 +13,7 @@ test("Constrained connection retains the complete renderer and last valid film d
   let transferredBytes=0,completedRequests=0;
   session.on("Network.loadingFinished",event=>{transferredBytes+=event.encodedDataLength;completedRequests++;});
   const started=Date.now();await page.goto("/");await expect.poll(async()=>(await state(page)).drawn,{timeout:30000}).toBe("robotic-arm:0");
-  const initialReadyMs=Date.now()-started;await ready(page);expect((await state(page)).renderer.kind).toBe("canvas2d");
+  const initialReadyMs=Date.now()-started;await ready(page);expect((await state(page)).renderer.kind).toBe("webgl2");
   await progress(page,.5);const previous=await state(page),switchStarted=Date.now();
   await page.getByRole("button",{name:"Tree",exact:true}).click();
   const preparing=await state(page);expect(preparing.film).toBe("robotic-arm");expect(preparing.drawn).toBe(previous.drawn);expect(preparing.commits).toBe(0);

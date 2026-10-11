@@ -28,7 +28,7 @@ test("Rendered film, organic reveal, contraction, navigator refraction and respo
     const liquid=await page.screenshot({clip:{x:180,y:180,width:840,height:380}});measurements.deformation=difference(clean,liquid);
     expect(difference(clean,liquid).changed).toBeGreaterThan(100);
     measurements.slow=await page.evaluate(()=>window.__filmExperiment!.fieldMetrics());
-    await page.evaluate(()=>{window.__filmExperiment!.suspend();window.__filmExperiment!.resume();});
+    await page.evaluate(()=>{window.__filmExperiment!.clearFluid();});
     await scripted({x:180,y:470},{x:1000,y:280},3000);await shot("06-fast-liquid");
     measurements.fast=await page.evaluate(()=>window.__filmExperiment!.fieldMetrics());
     await page.evaluate(()=>window.__filmExperiment!.advance(.25));await shot("07-residual");
@@ -38,9 +38,9 @@ test("Rendered film, organic reveal, contraction, navigator refraction and respo
     await page.mouse.move(500,350);await page.mouse.down();await advance(1.3);await shot("09-hold-growth");
     const expanded=(await state(page)).hold.expansion;await page.mouse.up();await advance(.22);expect((await state(page)).hold.expansion).toBeLessThan(expanded);await shot("10-contraction");
     const residue=(await state(page)).hold.progress;await page.mouse.move(650,300);await page.mouse.down();expect((await state(page)).hold.progress).toBe(residue);await advance(.2);await shot("11-repress");
-    await advance(1.3);await shot("12-organic-reveal");await advance(.8);
+    await advance(1.3);measurements.lateGrowth=await state(page);await shot("12-late-current-film-growth");for(let n=0;n<40&&(await state(page)).commits===0;n++)await advance(.05);
     await expect.poll(async()=>(await state(page)).commits).toBe(1);await shot("13-tree-selected");
-    await advance(4);expect((await state(page)).commits).toBe(2);await shot("14-continuous-second-cycle");await page.mouse.up();await page.evaluate(()=>window.__filmExperiment!.freeze(false));
+    await advance(4);expect((await state(page)).commits).toBe(1);await shot("14-success-wait-release");await page.mouse.up();await page.evaluate(()=>window.__filmExperiment!.freeze(false));
     measurements.ending=await state(page);
   } else {
     await page.getByRole("button",{name:"Tree",exact:true}).click();await expect.poll(async()=>(await state(page)).film).toBe("tree");await shot("13-tree-selected");

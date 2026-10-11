@@ -5,7 +5,11 @@ test.beforeEach(async({page})=>{page.on("pageerror",error=>{throw error;});await
 test("Responsive ratios retain usable targets, film position and bounded countdown labels",async({page})=>{
   await progress(page,.35);await page.evaluate(()=>window.__filmExperiment!.freeze(true));
   for(const size of [{width:320,height:740},{width:640,height:900},{width:768,height:1024},{width:1024,height:768},{width:844,height:390},{width:1000,height:650},{width:1200,height:800},{width:1440,height:900}]) {
-    await page.setViewportSize(size);await expect.poll(async()=>(await state(page)).drawn).toBe("robotic-arm:67");
+    await page.setViewportSize(size);
+    // A pre-resize frame key can already match. Wait for the native resize handler
+    // to adopt this geometry and cancel the prior gesture before pressing again.
+    await expect.poll(async()=>{const s=await state(page);return {width:s.viewport.width,height:s.viewport.height,phase:s.hold.phase};}).toEqual({...size,phase:"IDLE"});
+    await expect.poll(async()=>(await state(page)).drawn).toBe("robotic-arm:67");
     const geometry=await page.evaluate(()=>({
       coarse:matchMedia("(any-pointer: coarse)").matches,
       controls:[...document.querySelectorAll<HTMLElement>("button:not([hidden]),input")].map(el=>{const box=el.getBoundingClientRect();return {tag:el.tagName,left:box.left,right:box.right,top:box.top,bottom:box.bottom,height:box.height};}),
@@ -39,24 +43,24 @@ test("Native keyboard/wheel and pointer cancel, blur, lost capture remain respon
   }
 });
 
-test("Mobile stationary hold, organic reveal and repeated cycle survive orientation changes",async({page,browserName},info)=>{
-  test.skip(!isTouch(info.project.name),"Touch viewport case; desktop repeated holds are tested independently.");
-  await progress(page,.35);
-  const contact={x:195,y:340};
-  const session=browserName==="chromium"?await page.context().newCDPSession(page):null;
-  if(session)await session.send("Input.dispatchTouchEvent",{type:"touchStart",touchPoints:[contact]});
-  else await page.evaluate(point=>document.querySelector("#stage")!.dispatchEvent(new PointerEvent("pointerdown",{bubbles:true,pointerType:"touch",pointerId:77,isPrimary:true,button:0,clientX:point.x,clientY:point.y})),contact);
-  await expect.poll(async()=>(await state(page)).hold.progress,{intervals:[25,50]}).toBeGreaterThan(.35);
-  await page.screenshot({path:`test-results/scroll-film-navigator/visual/${info.project.name}/mobile-hold-growth.png`});
-  await page.setViewportSize({width:844,height:390});await expect.poll(async()=>(await state(page)).commits,{intervals:[25,50]}).toBe(1);
-  expect((await state(page)).film).toBe("tree");expect((await state(page)).drawn).toBe("tree:67");
-  await expect.poll(async()=>(await state(page)).commits,{timeout:10000,intervals:[25,50]}).toBe(2);
-  if(session){await session.send("Input.dispatchTouchEvent",{type:"touchEnd",touchPoints:[]});await session.detach();}
-  else await page.evaluate(()=>window.dispatchEvent(new PointerEvent("pointerup",{pointerType:"touch",pointerId:77})));
-  const s=await state(page);expect(s.film).toBe("robotic-arm");expect(s.field.injections).toBe(0);expect(s.hold.pressed).toBe(false);expect(s.progress).toBeCloseTo(.35,2);expect(s.renderer.kind).toBe("canvas2d");
+test("Touch orientation cancels transient growth; a distinct contact earns one transition",async({page,browserName},info)=>{
+  test.skip(!isTouch(info.project.name),"Touch-only orientation case");
+  test.skip(browserName!=="chromium","Native held touch injection is available through Chromium CDP; physical Safari remains unverified");
+  await progress(page,.35);await page.evaluate(()=>window.__filmExperiment!.freeze(true));
+  const session=await page.context().newCDPSession(page);
+  const begin=async(x:number,y:number)=>session.send("Input.dispatchTouchEvent",{type:"touchStart",touchPoints:[{x,y}]});
+  const end=async()=>session.send("Input.dispatchTouchEvent",{type:"touchEnd",touchPoints:[]});
+  await begin(195,340);await page.evaluate(()=>window.__filmExperiment!.advance(1.2));
+  expect((await state(page)).hold.progress).toBeGreaterThan(.35);
+  await page.setViewportSize({width:844,height:390});expect((await state(page)).hold.phase).toBe("IDLE");expect((await state(page)).commits).toBe(0);await end();
+  await begin(420,150);await expect.poll(async()=>(await state(page)).next).toBe("tree:67");
+  await page.evaluate(()=>window.__filmExperiment!.advance(3.8));expect((await state(page)).commits).toBe(1);
+  await page.evaluate(async()=>{await window.__filmExperiment!.advance(10);await window.__filmExperiment!.advance(5);});expect((await state(page)).commits).toBe(1);await end();
+  await begin(420,150);await expect.poll(async()=>(await state(page)).next).toBe("robotic-arm:67");await page.evaluate(()=>window.__filmExperiment!.advance(3.8));expect((await state(page)).commits).toBe(2);await end();
+  const s=await state(page);expect(s.film).toBe("robotic-arm");expect(s.field.injections).toBe(0);expect(s.hold.pressed).toBe(false);expect(s.progress).toBeCloseTo(.35,2);await session.detach();
 });
 
-test("Optional WebGL failure/loss retains the full CPU interaction, including refraction",async({page})=>{
+test("GPU failure/loss selects explicit basic film mode and restoration reconstructs GPU ownership",async({page})=>{
   await page.goto("/?renderer=webgl");await ready(page);
   const initial=await state(page);
   if(initial.renderer.kind==="webgl2"){
@@ -65,6 +69,32 @@ test("Optional WebGL failure/loss retains the full CPU interaction, including re
     await page.evaluate(()=>window.__filmExperiment!.contextLoss());await expect.poll(async()=>(await state(page)).renderer.kind).toBe("canvas2d");
   }else expect(initial.renderer.acceleratedFailure).not.toBeNull();
   await progress(page,.5);await stroke(page,{x:120,y:200},{x:300,y:250},12);
-  const fallback=await state(page);expect(fallback.renderFailure).toBeNull();expect(fallback.field.active).toBe(true);expect(fallback.gpu.bytes).toBe(0);expect(fallback.drawn).toBe("robotic-arm:96");
+  const fallback=await state(page);expect(fallback.renderFailure).toBeNull();expect(fallback.field.active).toBe(false);await expect(page.locator("#quality")).toBeVisible();expect(fallback.gpu.bytes).toBe(0);expect(fallback.drawn).toBe("robotic-arm:96");
   if(initial.renderer.kind==="webgl2"){await page.evaluate(()=>window.__filmExperiment!.contextRestore());await expect.poll(async()=>(await state(page)).renderer.kind).toBe("webgl2");}
+});
+
+test("LC resize during an earned reveal explicitly cancels to the outgoing scene",async({page})=>{
+  await progress(page,.35);await page.evaluate(()=>window.__filmExperiment!.freeze(true));
+  await page.getByRole("button",{name:"Tree",exact:true}).click();await expect.poll(async()=>(await state(page)).next).toBe("tree:67");
+  for(let n=0;n<40&&(await state(page)).hold.phase!=="REVEALING";n++)await page.evaluate(()=>window.__filmExperiment!.advance(.025));expect((await state(page)).hold.phase).toBe("REVEALING");
+  await page.setViewportSize({width:900,height:700});await expect.poll(async()=>(await state(page)).hold.phase).toBe("IDLE");await expect.poll(async()=>(await state(page)).drawn).toBe("robotic-arm:67");
+  expect((await state(page)).hold.phase).toBe("IDLE");expect((await state(page)).commits).toBe(0);expect((await state(page)).progress).toBeCloseTo(.35,2);
+});
+test("LC native DPR and page-scale changes preserve mapping and reset transient growth",async({page,browserName},info)=>{
+  test.skip(browserName!=="chromium","Native DPR override uses Chromium CDP; fixed DPR contexts cover the other engines");
+  await progress(page,.5);await page.evaluate(()=>window.__filmExperiment!.freeze(true));
+  const session=await page.context().newCDPSession(page),size=page.viewportSize()!;
+  await page.getByRole("button",{name:"Tree",exact:true}).click();
+  await session.send("Emulation.setDeviceMetricsOverride",{width:size.width,height:size.height,deviceScaleFactor:3,mobile:isTouch(info.project.name)});
+  await expect.poll(async()=>(await state(page)).viewport.dpr).toBe(3);await expect.poll(async()=>(await state(page)).hold.phase).toBe("IDLE");
+  await session.send("Emulation.setPageScaleFactor",{pageScaleFactor:1.5});await expect.poll(async()=>(await state(page)).drawn).toBe("robotic-arm:96");expect((await state(page)).progress).toBeCloseTo(.5,2);
+  await session.send("Emulation.setPageScaleFactor",{pageScaleFactor:1});await session.send("Emulation.clearDeviceMetricsOverride");await session.detach();
+});
+
+test("LC switching from a fine pointer to stationary touch removes the hover core",async({page,browserName},info)=>{
+  test.skip(browserName!=="chromium"||!isTouch(info.project.name),"Native modality transition requires a touch-enabled CDP context");
+  await page.mouse.move(150,250);await expect(page.locator("#core")).toBeVisible();const injections=(await state(page)).field.injections;
+  const session=await page.context().newCDPSession(page);await session.send("Input.dispatchTouchEvent",{type:"touchStart",touchPoints:[{x:195,y:340}]});
+  await expect(page.locator("#core")).toBeHidden();expect((await state(page)).field.injections).toBe(injections);await session.send("Input.dispatchTouchEvent",{type:"touchEnd",touchPoints:[]});
+  await page.mouse.move(155,255);await expect(page.locator("#core")).toBeVisible();await page.setViewportSize({width:844,height:390});await expect(page.locator("#core")).toBeHidden();await session.detach();
 });

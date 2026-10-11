@@ -1,6 +1,7 @@
 import { readdir, readFile, mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
+import * as zlib from 'node:zlib';
 
 export const root = fileURLToPath(new URL('../', import.meta.url));
 export const output = fileURLToPath(new URL('../../../test-results/scroll-film-navigator/', import.meta.url));
@@ -8,7 +9,7 @@ export const films = ['robotic-arm', 'tree'];
 const signature = Buffer.from([137,80,78,71,13,10,26,10]);
 const table = new Uint32Array(256);
 for (let n=0;n<256;n++) { let c=n; for(let k=0;k<8;k++) c=(c&1)?0xedb88320^(c>>>1):c>>>1; table[n]=c>>>0; }
-function crc(buffer) { let c=0xffffffff; for(const b of buffer) c=table[(c^b)&255]^(c>>>8); return (c^0xffffffff)>>>0; }
+function crc(buffer) { if(zlib.crc32) return zlib.crc32(buffer); let c=0xffffffff; for(const b of buffer) c=table[(c^b)&255]^(c>>>8); return (c^0xffffffff)>>>0; }
 export function inspectPng(buffer, label, expected = [3840,2160]) {
   const fail = reason => { throw new Error(`${label}: ${reason}`); };
   if (!buffer.subarray(0,8).equals(signature)) fail('invalid PNG signature');

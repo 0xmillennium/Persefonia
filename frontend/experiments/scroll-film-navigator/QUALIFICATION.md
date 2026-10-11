@@ -1,159 +1,247 @@
-# Experiment 02 qualification
+# Experiment 02 remediation qualification
 
-This report covers the independent `frontend/experiments/scroll-film-navigator/` implementation. It does not qualify production homepage integration, the Java/JTE application or Experiment 01. Measurements are local observations, not universal device guarantees.
+Finalized 2026-10-12 (Europe/Istanbul) at the user’s instruction to stop testing. This is the isolated experiment, not production homepage integration. No additional tests were run to finalize this report; existing command logs and artifacts were read. Unfinished gates remain explicit. The supplied remediation contract supersedes incoming-film growth and repeating-hold behavior in the preserved baseline.
 
-## A. Implementation
+## A. Repository state
 
-The entry point is `index.html` / `src/main.ts`. Native document scroll maps to `round(progress * 191)`. `loader.ts` uses cancelable native image transfer followed by explicit bitmap conversion without internal blob-URL decoding; temporary source images/handlers are released at settlement. `transport.ts` owns film/progress and asynchronous presentation; its eight-image LRU allows two concurrent fetch/decode slots, aborts superseded transfers and closes obsolete/evicted bitmaps. The same-index pair is prepared before revealing the incoming film. Last valid presentation remains during loading or a controlled decode error; manual retry targets current progress.
+Initial and current branch: `feat/scroll-film-navigator`; HEAD: `a650818f71f658668f34d90b76c37f36e6101bee`. Changes remain in the working tree. No commit or push was performed. No npm dependency, package script, CI, Java/JTE, production asset, application or Experiment 01 change was introduced. The user's existing root `.gitignore` addition for `sample-site-analysis` was preserved.
 
-`input.ts` observes physical pointer velocity; `field.ts` provides bounded viscous density/velocity advection, directional shear, segment injection, spatial persistence and complete decay. `hold.ts` owns continuous countdown, growth, spatial cancellation, residual re-press, damped center retarget, readiness/coverage-gated commit and repeat grace. `material.ts` defines shared irregular coverage. Default `canvas-renderer.ts` uses two projected films, native organic clipping/rim refraction and a bounded reusable CPU displacement overlay with continuously sampled normals (an additional gradient buffer ≤216 KiB). Transparent cell-span elimination skips mathematically zero contribution without changing visible effects. Optional `renderer.ts` provides WebGL 2; absence/failure switches to the full CPU compositor. No physical GPU is required for the default experience.
+Changes cover experiment HTML/poster/CSS, Vite serving/build, both Playwright configurations, hold/controller/transport/metrics, GPU and basic/image renderers, persistent hold material, offline validation/preparation and study/capture scripts, targeted tests, README, contract and this report. The changed-file list is below; the frozen runtime/config/test/script fingerprints are in `remediation/final-source-cutoff.json`.
 
-Phone, tablet and desktop retain film identity and every interaction feature, with modality-specific native touch arbitration. Initial viewport selects a stable 960 or 1600 delivery tier; backing/sample resolutions are bounded. This is feature parity, not a claim of identical pixel density, cropping or physical-device timing. Portrait contains the entire source film, with horizontally averaged dark boundary-color extensions, rather than losing the subject to a desktop crop.
+Changed files, relative to the experiment:
 
-## B. Behavior evidence
+```text
+CONTRACT.md
+QUALIFICATION.md
+README.md
+index.html
+playwright.config.ts
+production.playwright.config.ts
+scripts/assets.mjs
+scripts/benchmark-prepare.mjs
+scripts/benchmark.mjs
+scripts/bfcache.mjs
+scripts/browser-preflight.mjs
+scripts/capture-transport.mjs
+scripts/delivery.mjs
+scripts/material-study.mjs
+scripts/media-quality.mjs
+scripts/prepare.mjs
+scripts/record.mjs
+src/canvas-renderer.ts
+src/gpu-fluid.ts
+src/hold-material.ts
+src/hold.ts
+src/image-renderer.ts
+src/input.ts
+src/main.ts
+src/material.ts
+src/metrics.ts
+src/renderer.ts
+src/style.css
+src/transport.ts
+tests/acceptance.spec.ts
+tests/built.spec.ts
+tests/composition.spec.ts
+tests/delivery.test.ts
+tests/gpu.spec.ts
+tests/hold.test.ts
+tests/motion.test.ts
+tests/network.spec.ts
+tests/performance.spec.ts
+tests/resilience.spec.ts
+tests/support.ts
+tests/transport.test.ts
+tests/visual.spec.ts
+vite.config.ts
+```
 
-| System | Executed evidence | Scope/limits |
+All 384 source PNG inventories match the preserved baseline exactly, including SHA-256 and 3840×2160 dimensions. Asset validation checks signatures/chunks/CRCs without pixel decoding. Fresh preparation additionally decoded every source through FFmpeg and fully decoded all 768 resulting derivatives before publication. Current delivery version: `04e06c899fd6b8167c4bfce861ef8e3e440289f20a7b55bc4c1c78350090db52`; source inventory hash: `b51a02afed8301ea4a1b6dede1669ba7c183175776c9499903ccc75bd7baf100`. No MP4 substitute or new creative source was used.
+
+## B. Architecture decisions
+
+Selected transport: versioned, original-time WebP q82 sequences, 960×540 and 1600×900. The image path is portable across all three engines and keeps exact source index ownership. Decoder concurrency remains two after comparing two, three and four slots; the main decoded window expands from eight to twenty images and uses direction/velocity priorities. The scheduling sweep demonstrated substantially better reverse/2× readiness with the larger directional window; increasing slots alone did not improve it. The final isolated benchmark and integrated capture are reported below separately.
+
+| Candidate | Canonical-source evidence | Decision/limits |
 | --- | --- | --- |
-| Scroll Film Transport (FT-01–10) | Source validation; mapping/race/cache/failed-decode unit cases; forward/reverse/endpoints/freeze/rapid reversals; real corrupted delivery frame and manual retry | Desired, decoded, resident, presented and draw-submitted states distinguished. No autonomous frame clock. |
-| Liquid Navigator (LN-01–08) | Timestamp velocity and rate-independent segment dosing; slow/fast geometry; connected/distant component invariants; complete expiration; browser core/trail checks; rendered pixel differences and captures | Numeric morphology is supplemented by actual images. Perceived merging/shear/material quality still needs human approval. |
-| Press-and-Hold (PH-01–13) | Continuous countdown, contraction, residual re-press/retarget, offscreen delivered coordinates, coverage/readiness gates, repeat Robot→Tree→Robot, cancel/blur/capture loss | Chromium delivers negative offscreen coordinates; Firefox/WebKit automation clamps at the viewport edge. Physical capture behavior remains to qualify. |
-| Background Transition (VC-01–05) | Matching pair held during async scrub; incoming 404 cannot reveal/commit; retry loads latest pair; organic growth/release/resume captures; continuous cycle recording | Coverage model, CPU path and optional shader share the boundary function. Pixel differences demonstrate rendering, not aesthetic approval. |
-| Input Modality | Native CDP touch contact/re-press/pan/orientation; desktop fine pointer; semantic keyboard buttons/range and visible focus; reduced motion | WebKit tap is native, held-contact injection is synthetic. Emulation does not prove physical touch, trackpad or Safari/iOS behavior. |
-| Lifecycle (LC-01–07) | Resize/progress preservation, explicit suspension/restoration, real native reload/history recovery, disposal/late decode close, optional context loss/failure, reduced motion | Actual BFCache admission, OS tab freezing and browser zoom remain qualification gaps. Lifecycle hooks exercise the application handlers, not all operating-system conditions. |
+| A: WebP image sequence | Both films, all 192 frames, two delivery tiers, complete hashes and pixel decodes | Selected; AVIF encoder/muxer unavailable in installed tools, so no invented AVIF comparison. |
+| B: indexed all-intra VP9 IVF / WebCodecs | Both 192-frame films at 960×540; packet offsets, lengths, timestamps and hashes; full FFmpeg decode; actual browser random/bidirectional accesses | Rejected for this measured implementation: larger transfer, worse cold/random readiness and less portable decoder API. This does not establish that every compressed-media implementation loses. |
+| C: offline MCI interpolation | Four actual robotic-arm/tree source spans, 640×360, 24→48 fps optical flow; original-time and added frames inspected separately | Rejected: thin robotic lines show interpolation artifacts; bounded low-resolution studies do not qualify an entire interpolated film or demonstrate a necessary benefit. No study frame enters delivery. |
 
-Source media remains immutable. Validation checks exactly 192 named 3840×2160 PNGs per film, required PNG chunk structure/bounds and all CRCs without pixel decoding, and records SHA-256 hashes. Preparation has decoded all source PNGs into one-to-one WebP delivery derivatives. CRC validation is not a proof against arbitrary malicious compressed streams.
+960 delivery: robotic arm 3,051,008 bytes and tree 11,848,676 bytes; VP9 candidates approximately 5.19 MB and 20.52 MB. Three original-time quality probes per film gave WebP PSNR 47.08–48.74 dB for the arm and 42.43–43.21 dB for the tree; VP9 48.33–48.85 and 46.03–46.55 dB. VP9's tree probes have higher PSNR at greater transfer cost. These are sample technical measurements, not equal-quality encoding claims or full-sequence perceptual approval. Both WebP tiers together total 53,565,252 bytes; only the session tier is fetched.
 
-## C. Commands and final results
+Offline preparation uses source/encoder/options identity, a process lock, temporary output, complete derivative inventory and FFmpeg decode, unchanged-source revalidation, immutable-directory publication and atomic active-manifest replacement. Reuse revalidates every hash, container, dimension and complete decode. Corruption fails closed. HTML delivers the real first-frame poster before enhancement; only eligible hold/selection starts preparing the other film.
 
-Commands below ran from `frontend/` on 2026-10-11. Results are observations; the complete gate did **not** pass.
+The primary renderer owns one WebGL2 context, two resident film textures, a changed-only hold texture and ten fluid targets. Float velocity advection, divergence, twelve Jacobi pressure passes, projection, vorticity and bounded MacCormack dye correction keep the fluid on the GPU. Velocity's longest side is 192; dye's is 512. An ordered 32-segment queue and at most 32 arc-length deposits avoid event-count dosing and preserve reversals; shear and advected pigment ratios create veins and curls. No ordinary frame performs a CPU fluid pixel loop or GPU readback. Explicit development-only readback studies remain outside ordinary performance evidence. GPU timer queries, where supported, encompass simulation, upload and composition and remain bounded to four.
 
-| Command | Observed result |
+A stalled frame advances fluid transport by at most 1/30 second while fade/expiry use actual elapsed time. Excess transport time is discarded and reported; this bounds workload but sacrifices transport fidelity during long stalls. Unlimited catch-up was not introduced without hardware evidence. Queue overflow drops old non-collinear segments explicitly instead of inventing an extrapolated path.
+
+The hold uses a persistent 192-wide signed-distance lattice with transported structure. Growth dilates it, cancellation erodes it, and retargeting advects its existing morphology. The reveal captures the effective center once, monotonically expands an aperture, preserves tinted A outside and untinted B inside, and adds a localized white front. Pair readiness belongs to the latest native scroll target. One press commits once, then stops animating until release.
+
+Cache ownership is bounded to twenty decoded bitmaps / two loads. Eviction and stale completion close their bitmaps; resident film keys pin at most two images. Same-size texture changes use `texSubImage2D`. Retained bitmap-cache estimates are 115.2 MB desktop and 41.472 MB phone. These are not total decoded-memory ceilings: two pending decodes, conversion intermediates, the native poster, CPU hold buffers, graphics/backing allocations and browser/driver overhead add to the shared system-memory budget. Primary fluid targets are already included in renderer bytes and must not be counted twice. Linux process PSS measurements are reported separately from ownership estimates. Basic Canvas2D preserves film/hold access with labeled reduced fidelity; failed graphics contexts select a semantic decoded image. Reduced motion preserves controls and scroll without spatial effects. No-JavaScript retains a visible responsive poster and semantic instructions.
+
+Fluid implementation references: [GPU Gems: fluid dynamics](https://developer.nvidia.com/gpugems/gpugems/part-vi-beyond-triangles/chapter-38-fast-fluid-dynamics-simulation-gpu), [GPU Gems 3: advection and bounded correction](https://developer.nvidia.com/gpugems/gpugems3/part-v-physics-simulation/chapter-30-real-time-simulation-and-rendering-3d-fluids). These explain techniques; rendered browser evidence determines this experiment's qualification.
+
+## C. Behavioral qualification
+
+Scroll mapping, reverse/endpoints/freeze, asynchronous race safety, progress-preserving selection and bounded cache ownership are covered by executable tests. Pixel fixture tests separately prove current-only growth, full viewport tint, center-first B, outward region ownership, localized white rim and clean B completion. Canonical footage remains the source in ordinary browser/recording/performance work.
+
+Cancellation and re-press retain both progress and the actual lattice, with coherent center retargeting. The final continuous automated 15-second wall-time contact recording was not regenerated. Earlier recordings are archived and do not qualify the final source. Earned readiness/reveal survives release; failure cancels through a bounded 12-second path. Touch movement cancels incomplete growth and preserves native pan/pinch. Native held-touch injection is Chromium CDP evidence; WebKit's tap subset is not real iOS hold qualification.
+
+Resize intentionally cancels transient growth/reveal to the outgoing scene, resets pointer sampling and rebuilds bounded targets. Short visibility suspension preserves pigment; actual elapsed absence decays/expires it. Reload/history retain film and native scroll. DPR/page-scale changes, capture loss, blur/cancel, context loss/restoration, request aborts and disposal are separately exercised. History restoration is not automatically proof of BFCache admission.
+
+Behavior is classified separately:
+
+| Concern | Qualification scope |
 | --- | --- |
-| `npm run film:typecheck && npm run film:test` | Final rerun passed; 38 tests in five files, 1.57 s for units in the pre-commit rerun. |
-| `npm run film:assets` / `npm run film:prepare` / `npm run film:build` | Executed separately and in combined gates; 384 canonical frames validated, 768 derivatives prepared/reused, isolated build passed. |
-| `npm run film:check` (then-current WebKit environment: `LIBGL_ALWAYS_SOFTWARE=true GALLIUM_DRIVER=llvmpipe LP_NUM_THREADS=0`) | Source/type/unit/assets/build passed; 98 development cases: **79 passed, 18 skipped, 1 failed** in 7.3 min. WebKit crashed in `page.goto` before the first transport case. The chained built step was not reached. Preserved `crash-diagnostic/nonthreaded-integrated-failure.{log,json}`. |
-| `npm run film:browser:built` | Final rerun with default browser configuration: **12 passed** in 39.9 s, including server build/startup. `final-built.log`. This passing run does not resolve intermittent startup faults. |
-| `npm run film:browser -- --project=firefox --grep 'FT decode failure' --repeat-each=12` | **12 passed** after the native cached-corruption retry fix, with actual refreshed requests asserted. `retry-diagnostic/fixed-repeats.log`. |
-| `DEBUG=pw:browser npm run film:browser -- --project=webkit --project=webkit-touch` (then-current non-threaded llvmpipe configuration) | **25 passed, 7 skipped**; `crash-diagnostic/nonthreaded-dev.log`. The subsequent complete gate still crashed. |
-| `DEBUG=pw:browser npm run film:browser:built -- --project=webkit-built --project=webkit-touch-built --repeat-each=5` (then-current non-threaded llvmpipe configuration) | **20 passed**; `crash-diagnostic/nonthreaded-built.log`. |
-| `GALLIUM_DRIVER=softpipe LIBGL_ALWAYS_SOFTWARE=true DEBUG=pw:browser npm run film:browser:built -- --project=webkit-built --project=webkit-touch-built --repeat-each=5` | Current implementation: **20 passed** in 3.1 min; `crash-diagnostic/softpipe-current-built.log`. |
-| `GALLIUM_DRIVER=softpipe LIBGL_ALWAYS_SOFTWARE=true DEBUG=pw:browser npm run film:browser -- --project=webkit --project=webkit-touch` | **22 passed, 7 skipped, 3 failed** in 8.3 min; `crash-diagnostic/softpipe-current-dev.log`. No observed native crash; functional/timing failures remain described below. |
-| `npm run typecheck && npm run test:unit` | Production frontend regression passed: **216 tests in 19 files**; experiment excluded by the existing root test configuration. |
-| `npm run film:record` | Final desktop and native-touch recording run completed; `final-record.log`. |
+| Scroll correctness | Exact native-geometry indexing, endpoints, reverse, freeze and asynchronous ownership are executable checks. |
+| Scroll smoothness | Captured compositor sequence and callback/readiness measurements are distinct from correctness; representative 60 Hz integrated graphics remains unverified. |
+| Navigator quality | Velocity response, persistence, advection, decay and input geometry have automated checks. Ebru topology and aesthetic quality require canonical visual review. |
+| Hold cancellation/resumption | Stored lattice identity, residual progress, coherent retargeting and countdown continuity are checked independently. |
+| Full tinted coverage | Pixel fixtures verify current A only and complete coverage before readiness/reveal. |
+| Outward reveal | Pixel fixtures verify captured-center aperture, monotonic outward ownership, tinted A outside, B inside and localized white rim. |
+| One press / one transition | Deterministic controller tests and earlier automated wall-time contact evidence exercise the latch; final-source contact recording remains unexecuted; a distinct released/re-pressed contact earns the next transition. |
+| Touch semantics | Chromium CDP exercises native contact arbitration/pan; WebKit emulation has a tap subset. Emulation does not prove physical Safari/iOS behavior. |
+| Lifecycle | Resize, visibility aging, reload/history, interruption, graphics recovery and disposal have explicit checks; actual BFCache admission has an implemented but unexecuted built probe. |
+| Accessibility | Semantic controls, visible focus, keyboard navigation, reduced motion and built no-JavaScript/failure content are tested. Manual assistive-technology and physical-device review remain separate. |
 
-Browser coverage: GPU-disabled Chromium desktop (1200×800), phone (390×844, DPR 2), tablet (768×1024, DPR 2), Firefox desktop, and Linux WebKit desktop/phone. The complete post-fix matrix passed every Chromium and Firefox case. Eighteen intentional skips separate fine-pointer tests from touch tests and restrict CDP bandwidth shaping/native held-touch injection to Chromium; no missing media or failed assertion is skipped. Browser tests run with zero automatic retries. CI configuration was updated but remote CI was not executed.
+Navigator morphology, captured continuity, physical-device accessibility and timing remain distinct from numeric solver/state correctness. Human visual approval is pending.
 
-### Diagnosed failures and qualification environment
+## D. Test evidence
 
-A preceding 98-case matrix passed 79, intentionally skipped 18 and caught one Firefox manual-retry failure. A separate 12-context diagnostic reproduced cached corrupt decoding in every context: same-URL native images failed without a new network request while a fresh query URL loaded. Explicit retry now increments delivery identity only for failed keys; successful frame identities stay unchanged. A deterministic regression verifies this scope, and the existing browser retry case now requires an actual refreshed request before recovery. Lifecycle timing metrics are also reset before restoration, avoiding a cumulative soak-timing row. The post-fix full matrix and targeted repeat results are reported above.
+Artifact root: `frontend/test-results/scroll-film-navigator/` (ignored). The final frozen-source `npm run film:check` exited 0 (21:04:42–21:24:32 UTC). Its actual chain executed `npm run film:typecheck`, `npm run film:test`, `npm run film:assets`, `npm run film:build` (including `film:prepare`), `npm run film:browser`, and `npm run film:browser:built`. Typecheck and build passed; unit tests passed 50 in seven files; all 384 source PNGs and all 768 reused derivatives passed their respective integrity and complete-derivative-decode checks. Development: 99 passed, 35 intentionally skipped, zero failed/flaky, 18.8 minutes. Built: 24 passed, zero failed/skipped, 49.5 seconds. Retries remain zero.
 
-Earlier integrated runs exposed WebKit history recovery and teardown errors. An instrumented native-history reproduction showed the outgoing pagehide handler could see and overwrite the destination entry. Inactive writes now stop, native restored scroll remains authoritative, and suspension aborts queued/pending frame work. Repeated readiness callbacks also unnecessarily restarted the same neighbor prefetch; a deterministic regression preserves it. Unminified teardown diagnostics traced a remaining access-control page error to `createImageBitmap(blob)`. Cancelable native image transfer followed by `createImageBitmap(image)` removes this internal blob-URL path, with unit cases for early transfer cancellation, late decode ownership and failure cleanup. These are separate diagnosed issues; the prefetch fix alone did not establish the cause of the blob error. Playwright 1.57 Firefox `page.reload()` discarded entry state and reported navigation type `navigate`; reload qualification uses actual browser `location.reload()`.
+| Development project | Viewport / DPR | Passed | Skipped |
+| --- | --- | ---: | ---: |
+| WebKit | 1200×800 / 1 | 17 | 5 |
+| WebKit touch | 390×844 / 2 | 12 | 10 |
+| Chromium | 1200×800 / 1 | 20 | 3 |
+| Firefox | 1200×800 / 1 | 17 | 5 |
+| Chromium touch | 390×844 / 2 | 17 | 6 |
+| Chromium tablet touch | 768×1024 / 2 | 16 | 6 |
 
-An additional intermittent WPE process crash occurred at page startup, including 2 failures in 40 repeated built desktop cases under the default Linux driver. Captured native traces show `free(): invalid pointer` / SIGABRT entering `swrast_dri.so`, and a separate SIGSEGV entering `libEGL_mesa.so.0` / `swrast_dri.so`; Mesa is 23.2.1-1ubuntu3.1~22.04.4. This locates observed native faults in the software graphics path without proving the exact underlying driver bug or attributing every historical crash to it. Text backtraces are retained in ignored `crash-diagnostic/`; large core binaries were removed.
+All six corresponding built projects passed four cases each. Skips distinguish desktop fine-pointer/pixel fixtures from touch cases, Chromium-only CDP operations and unavailable protocol coverage; they do not remove a browser project or count unexecuted physical Safari checks as passes. Performance-only cases run in the two configured Chromium projects.
 
-Single-threaded llvmpipe initially passed 20 cases, but the next integrated attempt had two startup crashes and was stopped (10 passed, 3 completed skips, one interrupted, 82 not run). The reporter includes unrun/interrupted cases in its skipped tally; they are not successful checks. That attempt is preserved as `crash-diagnostic/single-thread-integrated-failure.{log,json}`. Non-threaded llvmpipe then passed 25 development cases and 20 repeated built cases, but the next complete 98-case gate again crashed at startup. Neither passing repeat established a reliable workaround.
+Observed targeted gates: `npm run film:typecheck`; `npm run film:test` — 50 passed in seven files. Production `npm run typecheck` and `npm run test:unit` — 216 passed in nineteen files. GPU packet/advection/decay plus actual elapsed suspension: three desktop engines, six passed. Input/resize/DPR audit regressions: six passed, three modality/protocol skips. Pixel ownership/rim: all three desktop engines passed.
 
-The pinned headed GTK alternative launched, but its 32-case subset produced 14 passes, 7 skips and 11 failures. Independent geometry probes found requested 390×844 mobile emulation yielded roughly 312×675 CSS pixels with a visual-viewport offset of 168.8 px and shifted fixed content. Desktop pointer coordinates also acquired fractional error. Scale/compositing/automation variations did not correct these observations. This mode was rejected as qualification evidence; no application geometry special cases or assertion relaxations were introduced. These results do not establish a production Safari defect.
+Fresh preflight: five WebKit launches plus Chromium and Firefox passed. After an intermittent WebKit page crash during application navigation, a new 28-case investigation passed minimal, GPU app, basic app and no-JavaScript app modes (five WebKit launches and one Chromium/Firefox each per mode). One subsequent initial-navigation crash occurred in the full matrix. Its cause is not established by successful minimal pages. No browser project was removed, no native crash was reclassified as a pass, and automatic retries remain zero.
 
-An initial softpipe built repeat produced 15 passes and five phone selection timeouts. Low callback rates exposed capped hold response time: analytically stable hold expansion and retargeting now use actual visible elapsed time, with a deterministic low-callback regression. The current softpipe built repeat passed all 20 cases. Its development subset still failed three cases: navigator energy was zero at the post-stroke assertion; the controlled visual case exceeded its 180 s limit during 4.5 virtual seconds of dissipation; and phone semantic-retry commit exceeded the existing 5 s polling limit. Controlled visual advancement awaits actual RAF callbacks for each simulated step, so very low software-rendering rates can extend short virtual intervals into minutes. The log does not establish the complete cause of each remaining assertion failure, and they are retained as unresolved qualification failures.
+Prior complete and interrupted results are retained independently:
 
-All temporary driver and headed-port changes were removed from both harnesses. No automatic retries, page-error filtering or weaker assertions are retained. A final default-environment built run passed all 12 cases, but there is no reliable complete WebKit qualification or passing `film:check`. The implementation is therefore **BLOCKED** at that gate; neither the lack of a physical GPU alone nor occasional passing runs justify claiming cross-device success.
+- First complete gate: development 96 passed, 35 skipped, 3 failed. Failures were WebKit navigation crash, desktop soak timeout and a touch re-press assertion that used a fixed delay despite slower real elapsed dispatch. The last assertion now accounts for observed elapsed cancellation; the soak still requests 1,800 steps, with a measured finite 900-second timeout and workload checkpoints. No workload was shortened to obtain a pass.
+- A responsive follow-up was interrupted after 40 passes, 16 skips and one setup failure: it started a hold before the asynchronous resize handler finished. Waiting for the actual viewport and idle state resolved the targeted all-project checks (9 passes, 3 modality skips).
+- A subsequent complete development matrix passed 99 with 35 skips; its built stage passed 23 and failed one WebKit no-JS case involving an additional automation context. The test now uses the normal fixture context with JavaScript disabled and preserves the project's viewport/DPR. The standalone built rerun passed 24; it did not make the earlier failing `film:check` green.
+- The 20:48 UTC-cutoff rerun was deliberately interrupted for the bounded Local Codex findings: 65 passed, 23 skipped, one interrupted, 45 not run. It is not a passing full gate. A new GPU delayed-step setup initially passed WebKit and failed Chromium/Firefox because separate tool tasks allowed a zero-delta RAF to consume input; atomic injection plus advance passed all three engines. The assertions still require fresh pigment after the delayed step and full expiry afterward.
 
-## D. Rendered, network and performance evidence
+Exploratory failure evidence is retained: stale cache-size expectations, incorrect frozen-clock test setup and asynchronous resize-event timing were corrected without changing the asserted contract. Source edits during an earlier live test caused HMR navigation; that run is invalid qualification evidence. Built no-JavaScript assertions initially targeted `noscript`, which Playwright's text matcher excludes; the actual visible paragraph is asserted instead. The no-JavaScript loading banner was also corrected to be hidden until enhancement starts.
 
-All generated evidence is ignored under `frontend/test-results/scroll-film-navigator/`. It is intentionally absent from Git.
+## E. Visual evidence
 
-- `visual/{project}/01-initial.png` through `18-reduced-motion.png`: initial/midpoint/final/reverse, slow/fast navigator, residue/dissipation, growth/contraction/re-press, organic reveal, two cycles, portrait/tree/landscape/reduced motion. Touch projects capture applicable states plus `mobile-hold-growth.png`.
-- `visual/{project}/measurements.json`: controlled field morphology and rendered pixel differences.
-- `recordings/interaction.webm`, `timeline.json`: ordinary desktop input and temporal evidence.
-- `recordings/mobile-interaction.webm`, `mobile-timeline.json`: native CDP touch, cancel/re-press, repeated stationary hold, held orientation change and native pan.
-- `performance/{chromium,chromium-touch}/report.json`: ordinary measurements with hidden diagnostics, environment and resource samples.
-- `performance/{project}/browser-trace.json`, `trace-summary.json`: separate screenshot/raster/compositor trace workload; instrumented work excluded from ordinary timings.
-- `network/{chromium,chromium-touch,chromium-tablet-touch}/report.json`: cold-cache 1 Mbps downstream / 150 ms added latency, observed first-frame/switch readiness and transfer totals.
-- `crash-diagnostic/nonthreaded-integrated-failure.json`: preserved complete 98-case post-fix matrix; `browser-summary.json`: latest 32-case softpipe development subset, not the full matrix. `source-validation.json` and `media/manifest.json` retain source hashes and derivative options.
+Final-source visual captures exist under `visual/{project}/` and pixel-composition evidence under `composition/`. Final continuous canonical desktop/mobile recordings were not regenerated. Older recordings are archived under `remediation/pre-final-recordings/`; original baseline evidence is under `remediation/baseline/`. These older artifacts do not qualify final-source continuity.
 
-An actual Local Codex advisory run through the OpenDesign MCP inspected the implementation and supplied captures using `review-animations` and `critique-theater`. Its artifact is retained at `design-review/review.md`. Seven findings were deliberately addressed: interpolated refraction normals, idempotent/resumable semantic selection, completed-hold versus loading feedback, 44 px coarse targets, safe-area handling, uniform sampled portrait gutters, and geometry-bounded countdown placement. Added semantic-selection and continuous-ratio checks passed across all six projects. The advisory artifact reflects the pre-fix snapshot; it is not approval of the final result and did not benchmark physical hardware.
+The final isolated benchmark completed and wrote `remediation/benchmark-final/report.json` and candidate recordings. The integrated transport-capture process was stopped at the user’s request; `transport-capture/` contains partial artifacts and must not be treated as a completed gate. The final recording, checkerboard material-study and actual BFCache stages were not run. No final pixel/human approval is claimed. Quality/interpolation studies remain under `remediation/candidates/`.
 
-Default compositor screenshots were inspected directly. Controlled slow/fast/residual/dissipated captures before and after transparent-span optimization were pixel-identical (zero changed RGB pixels in each full screenshot). This pixel identity applies only to that earlier optimization. Later interpolated normals and portrait gutter changes intentionally alter pixels. Current Chromium deformation changed 31,841 pixels (9.98%) of the controlled film clip. Fresh recording samples are decoded and inspected separately; sampled frames cannot prove the absence of every transient artifact. The supplied brief is the Triptych interaction reference; its current website and underlying renderer were not independently reverse engineered. The neutral refracting material is an implementation choice, not a claim of exact reference reproduction.
+The locked analysis was read from `frontend/experiments/sample-site-analysis/triptych-current-interactive-page-analysis-locked.md`. OpenDesign Local Codex supplied an inspected midpoint critique and a partial material study. The study run ended at its usage limit; its native GLES replay captures and actual source were inspected, rather than trusting the run status. The generated page was not adopted wholesale. Native GLES replay is not browser qualification. Current shader refinements were then tested in the real browser.
 
-Fresh desktop video is 10.64 s / 1,096,553 bytes at 1200×800; native-touch video is 7.92 s / 300,259 bytes at a fixed 390×844 recording size. Timeline observations include native scrubbing, complete trail decay, early contraction/re-press, Tree commit then Robot commit under continuous hold, portrait semantic selection and reduced motion. Native-touch observations include residual re-press, two commits through a held orientation change and native pan cancellation. Decoded temporal samples were inspected for both reveals and the phone portrait growth. When the viewport becomes landscape, Playwright fits it into the fixed portrait video and pads the unused area gray; this is recording padding, not a blank application stage. Full landscape screenshots show the actual viewport. Human motion/fidelity approval remains pending.
+A subsequent independent Local Codex source review completed at run `876b5194-c235-4017-9426-7b1b219040fd`, against the 20:26 UTC cutoff. Its actual report is retained at `remediation/opendesign-final-source-review.md`. This review inspected source and metadata, explicitly not final rendered pixels. Its reversal counterexample led to the ordered queue/arc-length fix and four new unit regressions; the transported B vein channel now contributes bounded contrast. Recording fingerprints now cover all runtime TS/CSS, HTML, Vite/TypeScript configuration and the recording script. Report paths and automated-contact wording were corrected. The transport-time cap is an explicit measured tradeoff, not silently described as full real-time evolution. Performance finalization now writes completion only after the separate trace settles; its final observed result is reported below. A bounded follow-up (`5beed80e-9d0b-4f3d-aaec-d7cfdb80fdc0`, report `remediation/opendesign-bounded-followup.md`) inspected four files and an input excerpt, within a 700-word report limit. It found three additional counterexamples: subthreshold coalesced movement disappeared, long batches attenuated submitted dose, and a preceding stall could expire fresh pending input. The final corrective pass accumulates subthreshold distance with separate monotonic timestamps, conserves pre-render line dose while retaining the independent GPU concentration bound, and expires old targets while preserving fresh deposits. Fresh pigment is added after aging the existing field. Pure input regressions and an actual GPU delayed-step regression cover the counterexamples. Submitted-dose conservation is not an assertion of identical rendered mass across temporal advection, fading or concentration saturation. No generated framework, engine or creative media was adopted.
 
-### Observed software-rendering envelope (2026-10-11)
+## F. Performance evidence
 
-Host: Intel Core i7-12700H, four logical CPUs exposed, 10.38 GB RAM, Linux 6.8.0-138-generic, Node 24.16.0, Chromium 143.0.7499.4. Both Chromium configurations launch with `--disable-gpu --disable-software-rasterizer`. Default backend is Canvas 2D with CPU material compositing; no WebGL resource/timer measurements apply. Desktop starts at 1200×800 / DPR 1; phone at 390×844 / DPR 2. These are viewport emulations on this CPU, not phone hardware benchmarks.
+Host: Linux/Zorin 17 Ubuntu 22.04 in VMware, four logical CPUs labeled Intel i7-12700H, approximately 10 GB RAM, Node 24.16.0, FFmpeg 4.4.2. Browser versions: Chromium 143.0.7499.4, Firefox 144.0.2, WebKit 26.0. Chromium uses ANGLE SwiftShader Vulkan; Firefox reports Mesa/llvmpipe. Linux WebKit's exposed Apple GPU label is not evidence of physical Apple hardware. The guest exposes VMware SVGA II. Fresh default-headless, explicit SwiftShader and headful Chromium probes all report SwiftShader; this establishes the guest's actual path, not the host's hardware. No accelerated physical-device path or connected phone has been qualified.
 
-All duration columns are milliseconds. Request latency applies only to successfully draw-submitted targets; zero samples are shown as a dash.
+Integrated graphics and shared system RAM are normal deployment targets, including phones and ordinary work desktops. No discrete GPU or separate VRAM prerequisite is established. The renderer requests the browser's default power preference, uses bounded grids/backing resolution, reuses film textures and avoids inactive hold-gradient fetches. Reports account for decoded images and graphics together rather than assuming separate memory pools. Normal qualification now uses default graphics selection; `FILM_SOFTWARE_GPU=1` selects an explicit software regression. `remediation/graphics-path.json` records the three actual path probes. The primary GPU API is active; it is not a GPU-disabled test. Ordinary performance work keeps diagnostics hidden. CPU target-to-decode, upload and draw-submission timings, GPU queries, callback distributions, browser trace events, capture intervals and physical scanout are separate measurements. The in-app `frameDrops` counter counts callbacks exceeding its interval budget; it is not a count of measured display drops. Unsupported GPU timer queries mean duration is unavailable, not zero. Trace/screenshot/state inspection adds overhead and is excluded from ordinary cost claims. Soak duration is the observed wall duration of 1,800 requested RAF steps, not an invented fixed-time interval. Candidate video is 25 fps and cannot prove 48 changes/second. Integrated capture records its actual cadence and retained source identities.
 
-| Project | Workload | Independent RAF p50 / p95 / p99 | Tick JS p50 / p95 / p99 | CPU draw p95 | Target-to-draw p95 (samples) |
-| --- | --- | --- | --- | --- | --- |
-| chromium | slow-scroll | 16.7 / 16.8 / 33.3 | 0.2 / 7.2 / 8.3 | 0.2 | 39.4 (21) |
-| chromium | fast-scroll | 16.7 / 16.7 / 16.8 | 0.2 / 6.9 / 9.2 | 0.2 | 49.6 (4) |
-| chromium | reverse-scrubbing | 16.7 / 33.4 / 50.0 | 0.3 / 8.4 / 9.3 | 0.2 | 10.0 (21) |
-| chromium | dense-navigator | 16.7 / 33.3 / 33.4 | 10.3 / 11.9 / 15.3 | 10.1 | — (0) |
-| chromium | simultaneous-scroll-fluid | 16.7 / 33.4 / 50.1 | 10.1 / 15.7 / 25.1 | 9.5 | 59.8 (27) |
-| chromium | rapid-film-switches | — | 3.2 / 9.2 / 38.9 | 7.5 | 6.0 (4) |
-| chromium | cancel-repress | — | 2.9 / 5.3 / 5.3 | 2.1 | — (0) |
-| chromium | resize | — | 2.7 / 3.5 / 3.5 | 3.1 | — (0) |
-| chromium | soak-1800-raf-steps | 16.7 / 33.5 / 50.0 | 9.5 / 16.1 / 17.8 | 9.5 | 60.2 (214) |
-| chromium | suspension-restoration | — | 8.1 / 8.1 / 8.1 | 5.9 | 7.2 (1) |
-| chromium-touch | slow-scroll | 16.7 / 16.8 / 16.8 | 0.2 / 5.4 / 7.3 | 0.2 | 21.4 (31) |
-| chromium-touch | fast-scroll | 16.7 / 16.7 / 16.8 | 0.2 / 5.1 / 6.0 | 0.2 | 26.4 (5) |
-| chromium-touch | reverse-scrubbing | 16.7 / 16.8 / 16.8 | 0.2 / 5.6 / 6.4 | 0.2 | 7.2 (24) |
-| chromium-touch | dense-navigator | 16.7 / 33.3 / 33.4 | 12.5 / 14.7 / 19.3 | 11.6 | — (0) |
-| chromium-touch | simultaneous-scroll-fluid | 16.7 / 33.4 / 50.1 | 12.8 / 18.2 / 23.6 | 12.2 | 64.4 (19) |
-| chromium-touch | rapid-film-switches | — | 9.0 / 18.3 / 31.2 | 15.2 | 8.3 (4) |
-| chromium-touch | cancel-repress | — | 5.1 / 7.4 / 7.4 | 3.0 | — (0) |
-| chromium-touch | resize | — | 2.7 / 7.2 / 7.2 | 3.9 | — (0) |
-| chromium-touch | soak-1800-raf-steps | 16.7 / 33.4 / 33.4 | 12.4 / 16.6 / 18.3 | 10.9 | 61.2 (196) |
-| chromium-touch | suspension-restoration | — | 10.0 / 10.0 / 10.0 | 7.4 | 12.0 (1) |
+Process-resource sampling uses Linux `/proc` for Chrome browser, renderer, GPU-service, utility and zygote processes. CPU is expressed as percent of one core (400% corresponds to four fully occupied cores). PSS apportions shared pages; summed RSS double-counts shared mappings and is not the preferred total. PSS refreshes every five seconds. The initial observer incorrectly assumed Chromium's first command-line entry contained only an executable path; Chromium had rewritten it to include flags. Correcting prefix normalization made processes visible. Coverage therefore starts partway through the standalone desktop workload: startup peak memory was not measured. The old empty observations are preserved as a failed observer attempt, not reported as zero RAM. Process measurements include browser/driver overhead beyond application-owned caches; they are guest RAM observations, not dedicated VRAM or accelerated integrated-GPU residency measurements.
 
-- `chromium`: soak 44.91 s; explicit compositor estimate 21.22 MiB; sampled JS heap 2.33–5.50 MiB. Cache 8, peak decode concurrency 2, 3475 hits / 3344 misses / 1275 evictions; 0 obsolete completions, **0 stale presentations**, 0 load failures. Soak long tasks 0; active-RAF gap flags 792. Resize p95 25.5 ms (4 events). Restoration wall interval 43 ms (includes automation/observation). Separate trace: 96 screenshots, 96 DrawFrame events, 359 raster events with 0.250 ms p95, 217 paint events. Sampled event-listener counts: 52, 572, 255, 255, 48, 229.
-- `chromium-touch`: soak 42.60 s; explicit compositor estimate 16.17 MiB; sampled JS heap 2.41–5.96 MiB. Cache 8, peak decode concurrency 2, 4161 hits / 3338 misses / 1535 evictions; 0 obsolete completions, **0 stale presentations**, 0 load failures. Soak long tasks 0; active-RAF gap flags 743. Resize p95 27.3 ms (9 events). Restoration wall interval 44 ms (includes automation/observation). Separate trace: 102 screenshots, 101 DrawFrame events, 232 raster events with 0.491 ms p95, 288 paint events. Sampled event-listener counts: 41, 549, 236, 40, 443, 757.
+The phone performance project is a 390×844, DPR-2 touch-enabled context, with a 585×1266 bounded drawing buffer. Its synthetic fine-pointer fluid stress does not assert that touch injects pigment; native touch tests separately require no new fluid. No physical phone thermal/energy qualification is claimed.
 
-No CompositeLayers duration is exposed by either trace. The resource samples demonstrate application bitmap/decode bounds, not absence of browser/native-memory leaks. Heap, DOM and event-listener counts fluctuate with source image transfers and garbage collection; the observations do not establish a constant listener count or a leak-free process. Mixed and dense workloads show callback intervals above 16.7 ms, so universal 60 Hz is not established. Earlier optimization comparisons are historical, sequential observations; these tables reflect the latest post-fix full matrix and include subsequent visual refinements.
+The standalone `npm run film:perf` finished before shutdown: 2 passed in 9.8 minutes. Both reports have observed COMPLETE status. These tests passing establishes completion and bounded ownership, not acceptable smoothness. Desktop dense-fluid callback intervals were p50 116.6 ms / p95 150.1 ms; simultaneous scroll/fluid p50 116.7 / p95 150.1 ms. Desktop soak active intervals were p50 116.7 / p95 166.7 / maximum 399.9 ms. Touch-context soak active intervals were p50 83.3 / p95 116.7 / maximum 633.2 ms. The actual software-rendering experience is far below 60 Hz during fluid activity. Representative integrated-graphics/physical-phone performance remains unverified; a discrete GPU is not required.
 
-### Cold-cache shaped connection
+The process sampler completed 446 nonempty samples over approximately 461.8 seconds, spanning part of desktop and the subsequent touch-context run. Observed peak summed Chrome PSS was 699,128,832 bytes (approximately 667 MiB); peak CPU was 367.2% of one core. This excludes initial desktop startup and Node/Vite. The retained image-cache budgets alone (115.2 MB desktop / 41.472 MB touch) substantially understate total browser shared RAM usage. Sampling does not establish a physical-device memory ceiling or a leak-free long-duration deployment.
 
-1 Mbps downstream, 150 ms added request latency, 0.5 Mbps upstream. Transfer totals include development HTML/modules and completed media requests across the entire scenario, rather than just startup. These observations prove the complete renderer remains functional at this rate; they do not model cellular radio jitter or billing.
+The final isolated benchmark completed at 21:37:17 UTC. Directional WebP warm 2× reverse readiness was 100% in the sampled target generations, with 191 distinct frames for each film and maximum held intervals of 41.2 ms (arm) / 37.4 ms (tree). However, the alternating-target workload achieved only 32.37% / 21.99% readiness, with maximum holds of 366.8 / 428.4 ms. These are observed transport limitations, not a passed rapid-jump smoothness claim. Baseline warm 2× reverse readiness was 23.65% for each film. VP9 arm warm 2× reverse readiness was 82.16%; tree 99.17%. Local HTTP and 25 fps recordings do not qualify physical scanout, 48 fps visible continuity or mobile network conditions.
 
-| Project | First frame ready | Organic selection ready | Scenario completed bytes | Completed requests |
-| --- | --- | --- | --- | --- |
-| chromium | 4.53 s | 1.95 s | 0.765 MB | 19 |
-| chromium-touch | 4.53 s | 0.94 s | 0.570 MB | 19 |
-| chromium-tablet-touch | 4.63 s | 1.98 s | 0.765 MB | 19 |
+## G. Contract compliance matrix
 
-### Measurement interpretation
+PASS below is scoped to executed software/browser evidence, not every physical device. The following statuses are final for the stopped work session; incomplete stages retain their limits. Physical-device gaps do not waive observed failures in this guest.
 
-Workloads include slow/fast/reverse scroll, dense navigator, simultaneous fluid/scrub, four film selections, five hold cancel/re-press loops, five viewport sizes, 1800 requested RAF steps of soak and suspension/restoration. RAF count is not a fixed soak duration; actual elapsed time is recorded. Mobile performance runs also exercise fine-pointer fluid at a phone viewport to stress the full compositor, while native touch semantics have separate cases.
+| Requirement | Status | Evidence / limit |
+| --- | --- | --- |
+| FT-01: Canonical asset contract | PASS | Source/transport tests and browser evidence; physical limits above apply. |
+| FT-02: Deterministic mapping | PASS | Source/transport tests and browser evidence; physical limits above apply. |
+| FT-03: Endpoints | PASS | Source/transport tests and browser evidence; physical limits above apply. |
+| FT-04: Reverse correctness | PASS | Source/transport tests and browser evidence; physical limits above apply. |
+| FT-05: Inactivity freeze | PASS | Source/transport tests and browser evidence; physical limits above apply. |
+| FT-06: Async race safety | PASS | Source/transport tests and browser evidence; physical limits above apply. |
+| FT-07: Progress-preserving film switch | PASS | Source/transport tests and browser evidence; physical limits above apply. |
+| FT-08: Directional prefetch | PASS | Source/transport tests and browser evidence; physical limits above apply. |
+| FT-09: Velocity-aware preparation | PASS | Source/transport tests and browser evidence; physical limits above apply. |
+| FT-10: Bounded resource ownership | PASS | Source/transport tests and browser evidence; physical limits above apply. |
+| FT-11: Corrupt/missing media | PASS | Source/transport tests and browser evidence; physical limits above apply. |
+| FT-12: 1×/2× visible continuity | NOT VERIFIED | Integrated captured sequence and representative hardware remain open. |
+| FT-13: Cold-start behavior | PASS | Source/transport tests and browser evidence; physical limits above apply. |
+| FT-14: Rapid reversals | PASS | Source/transport tests and browser evidence; physical limits above apply. |
+| FT-15: Derived media correspondence | PASS | Source/transport tests and browser evidence; physical limits above apply. |
+| LN-01: Pointer-core tracking | PASS | Controlled primary GPU studies; topology/material acceptance remains open. |
+| LN-02: Velocity response | PASS | Controlled primary GPU studies; topology/material acceptance remains open. |
+| LN-03: Spatial persistence | PASS | Controlled primary GPU studies; topology/material acceptance remains open. |
+| LN-04: Natural dissipation | PASS | Controlled primary GPU studies; topology/material acceptance remains open. |
+| LN-05: No permanent aura | PASS | Controlled primary GPU studies; topology/material acceptance remains open. |
+| LN-06: Advection | PASS | Controlled primary GPU studies; topology/material acceptance remains open. |
+| LN-07: Topology | PARTIAL | Controlled primary GPU studies; topology/material acceptance remains open. |
+| LN-08: Film deformation | PARTIAL | Controlled primary GPU studies; topology/material acceptance remains open. |
+| LN-09: Input resilience | PASS | Controlled primary GPU studies; topology/material acceptance remains open. |
+| LN-10: Material-quality evidence | PARTIAL | Controlled primary GPU studies; topology/material acceptance remains open. |
+| PH-01: Eligible hold start | PASS | Controller/lattice tests, pixel ownership and browser input evidence; automated matrix passed; physical/human limits remain. |
+| PH-02: Current-film-only tint | PASS | Controller/lattice tests, pixel ownership and browser input evidence; automated matrix passed; physical/human limits remain. |
+| PH-03: Countdown continuity | PASS | Controller/lattice tests, pixel ownership and browser input evidence; automated matrix passed; physical/human limits remain. |
+| PH-04: Full coverage | PASS | Controller/lattice tests, pixel ownership and browser input evidence; automated matrix passed; physical/human limits remain. |
+| PH-05: Early release | PASS | Controller/lattice tests, pixel ownership and browser input evidence; automated matrix passed; physical/human limits remain. |
+| PH-06: Residual re-press | PASS | Controller/lattice tests, pixel ownership and browser input evidence; automated matrix passed; physical/human limits remain. |
+| PH-07: Center retargeting | PASS | Controller/lattice tests, pixel ownership and browser input evidence; automated matrix passed; physical/human limits remain. |
+| PH-08: Target readiness | PASS | Controller/lattice tests, pixel ownership and browser input evidence; automated matrix passed; physical/human limits remain. |
+| PH-09: Center-originating reveal | PASS | Controller/lattice tests, pixel ownership and browser input evidence; automated matrix passed; physical/human limits remain. |
+| PH-10: Outward progression | PASS | Controller/lattice tests, pixel ownership and browser input evidence; automated matrix passed; physical/human limits remain. |
+| PH-11: Correct region ownership | PASS | Controller/lattice tests, pixel ownership and browser input evidence; automated matrix passed; physical/human limits remain. |
+| PH-12: White boundary | PASS | Controller/lattice tests, pixel ownership and browser input evidence; automated matrix passed; physical/human limits remain. |
+| PH-13: Clean final state | PASS | Controller/lattice tests, pixel ownership and browser input evidence; automated matrix passed; physical/human limits remain. |
+| PH-14: Exactly one commit | PASS | Controller/lattice tests, pixel ownership and browser input evidence; automated matrix passed; physical/human limits remain. |
+| PH-15: Separate press required | PASS | Controller/lattice tests, pixel ownership and browser input evidence; automated matrix passed; physical/human limits remain. |
+| PH-16: Slow incoming media | PASS | Controller/lattice tests, pixel ownership and browser input evidence; automated matrix passed; physical/human limits remain. |
+| PH-17: Failed incoming media | PASS | Controller/lattice tests, pixel ownership and browser input evidence; automated matrix passed; physical/human limits remain. |
+| PH-18: Release during reveal | PASS | Controller/lattice tests, pixel ownership and browser input evidence; automated matrix passed; physical/human limits remain. |
+| PH-19: Touch movement cancel | PASS | Controller/lattice tests, pixel ownership and browser input evidence; automated matrix passed; physical/human limits remain. |
+| PH-20: Touch residual re-press | PASS | Controller/lattice tests, pixel ownership and browser input evidence; automated matrix passed; physical/human limits remain. |
+| PH-21: Input interruption | PASS | Controller/lattice tests, pixel ownership and browser input evidence; automated matrix passed; physical/human limits remain. |
 
-In-app tick timing includes CPU field/material work. `drawSubmissionMs` includes CPU pixel rasterization and native Canvas calls on the default backend; native browser composition may complete later. Successful `targetToDrawMs` samples measure request-to-command submission only; rapidly superseded targets are not latency samples. Active application RAF gaps and independent workload callback intervals are reported separately. `frameDrops` counts active RAF gaps over 25 ms, not physical display drops. Long tasks use the browser's supported PerformanceObserver. Browser trace event durations are separate instrumented observations, not photon/display latency or total GPU memory measurements.
+| Additional requirement | Status | Closure evidence |
+| --- | --- | --- |
+| Accelerated integrated/shared-memory desktop / 60 Hz / warm 2× | BLOCKED | Actual accelerated integrated graphics and captured presentation/latency under the specified workload. A discrete GPU or dedicated VRAM is not required. Software results remain separately recorded. |
+| Physical Safari/iOS stationary hold, pan, pinch, capture and orientation | NOT VERIFIED | Actual device interaction recording and failure/lifecycle checks. |
+| BFCache admission | NOT VERIFIED | A recorded `pageshow.persisted` restoration, independently of ordinary back/reload correctness. |
+| Human ebru material, mobile framing and reveal approval | PARTIAL | Inspect canonical recordings and controlled comparisons on a representative display. |
+| Final complete browser / built gate | PASS | Frozen-source `film:check` exited 0: 50 unit, 99 development passes / 35 skips, 24 built passes. Additional diagnostics and physical gaps remain independently classified. |
+| Separate performance gate | PASS | 2 completed tests, 9.8 minutes; both reports COMPLETE. Measured software fluid pacing is poor and is not a smoothness pass. |
+| Pending input across long suspension | NOT VERIFIED | Source inspection identifies a risk: pending samples have no freshness timestamp; suspension preserves them and resume can treat old queued input as fresh. The focused runtime probe was not executed. |
+| Resize during growth and earned reveal | PASS | Explicit cancellation to outgoing film; responsive intermediate-width checks and countdown bounds. |
+| Orientation / mixed pointer and touch | PASS | Chromium CDP touch; no new touch pigment, hover core suppressed; physical-device coverage remains separate. |
+| DPR / page-scale change | PASS | Chromium CDP DPR and visual page-scale overrides plus fixed-DPR touch contexts. This is not browser-toolbar zoom qualification. |
+| Native browser-toolbar zoom | NOT VERIFIED | Actual browser zoom interaction and mapping/input inspection; page-scale emulation alone does not close this row. |
+| Short/long visibility absence | PASS | Executed 150 ms and 4.4-second suspension checks: residue decays in real elapsed time and expires fully. These tests age already-rendered residue; pending input before suspension is excluded and remains an identified risk. Actual OS app switching remains a physical-device check. |
+| Reload / native back restoration | PASS | Development native reload and built native history traversal; selected film and browser-owned scroll restored. BFCache admission is a separate row. |
+| Pointer cancel / blur / lost capture | PASS | Browser interruption checks; capture loss and pointer cancel are exercised explicitly. |
+| GPU loss / restoration | PASS | Context-loss extension checks with basic fallback and reconstructed bounded GPU ownership. Missing extension is an explicit capability skip. |
+| Abort / dispose / late completion | PASS | Loader/cache regressions and browser disposal: obsolete media closed, requests aborted, RAF stopped and renderer released. |
+| Semantic/no-JS/graphics-failure content | PASS | All six built projects test visible poster/instructions and usable semantic image selection. |
+| Keyboard / reduced motion | PASS | Native keys, semantic control operation, visible focus CSS and reduced-motion film access. |
+| Manual assistive technology | NOT VERIFIED | Human screen-reader/navigation inspection; automated semantic checks do not prove it. |
+| Source/media identity | PASS | Exact baseline source inventories; fully decoded, hash-validated versioned derivatives. |
+| Production isolation / dependency boundary | PASS | Scoped working-tree inspection and production typecheck/unit regressions. |
 
-Explicit application budgets are eight decoded bitmaps, two in-flight decode slots, two projected film slots and a fixed field of at most 756 KiB. At 1600, decoded bitmap residency is ≤43.95 MiB plus a conservative ≤21.97 MiB transient pixel allowance for two temporary native sources and two converting bitmaps; at 960, ≤15.82 MiB plus ≤7.91 MiB. Temporary native sources are released on conversion. Browser decoded-image cache retention remains browser-owned, outside these application estimates. The CPU compositor separately reports estimated native surfaces/pixel arrays; browser-native backing, compositor copies, HTTP cache and process overhead are outside this estimate. Zero explicit WebGL textures does not imply zero browser graphics memory. CDP JS heap does not include all decoded/native surfaces.
+## H. Final verdict
 
-Cold-tier totals are 14,899,684 bytes (960) and 38,665,568 bytes (1600). At 1 Mbps, whole-tier transfer alone takes about 119/309 seconds. On-demand loading makes this unnecessary for startup; a few seconds cannot guarantee immediate arbitrary cold scrubbing. Preserve features and improve compression/decode/rendering based on fidelity and measured cost, rather than assuming device type identifies bandwidth or accepting feature removal.
+**NEEDS_REWORK.** The final complete automated gate passed, but completion of the task contract is not established. Software fluid pacing is poor; alternating-target benchmark readiness is low; a pending-input suspension ordering risk remains unverified; final continuous recordings/material comparison/BFCache evidence are missing; representative integrated/shared-memory hardware and human visual approval are unqualified. No production integration or deployment is authorized by this result.
 
-### Server-side work boundary
+Recommended next work, only if resumed: (1) inspect and resolve pending-input aging at suspension boundaries with one focused regression; (2) assess fluid cost and cache/shared-RAM tradeoffs on representative integrated graphics, using a short workload; (3) inspect existing captures with a human before further visual changes; (4) generate missing recordings and BFCache evidence once source is settled. Run targeted checks for each change, then at most one final complete gate. Do not repeat complete qualification for routine single-line changes.
 
-Source validation, resizing, encoding and derivative generation already happen in the reproducible build/preparation pipeline, before the browser. No client-side source conversion or 4K transfer is performed. Input-dependent field simulation/compositing remains local to retain immediate interaction without per-gesture server requests. Production content-versioned caching/delivery infrastructure is a separate integration concern; no backend/service/deployment changes are made within this independent experiment.
-
-## E. Repository footprint
-
-All implementation, source-media ignore rule, preparation scripts, configurations, tests and documentation are inside the new experiment directory. Only `frontend/package.json` (11 `film:*` scripts) and `.github/workflows/ci.yml` (experiment typecheck/unit step) are modified outside it. No dependencies or lockfile changes. No Java/JTE/production frontend/Experiment 01 changes. The user subsequently authorized committing the implementation, tests and documentation; canonical sources and generated evidence remain excluded. No push is authorized or performed.
-
-Canonical PNGs stay local under ignored `assets/frames/` (~1.5 GB). Reproducible WebP derivatives (768 files, 53.57 MB), builds, manifests, captures, videos and profiling data remain ignored. CI runs asset-independent typecheck/unit checks; ordinary checkout lacks source media, so CI does not claim media/build/browser qualification. `film:check` is the explicit full local gate.
-
-Added-file groups inside the experiment:
-
-| Group | Files |
-| --- | --- |
-| Entry/config/docs | `.gitignore`, `index.html`, `README.md`, `QUALIFICATION.md`, `vite.config.ts`, `tsconfig.json`, `vitest.config.ts`, `playwright.config.ts`, `production.playwright.config.ts` |
-| Runtime | `src/{main,transport,loader,input,field,hold,material,canvas-renderer,renderer,metrics}.ts`, `src/style.css` |
-| Media/evidence scripts | `scripts/{assets,prepare,record}.mjs` |
-| Deterministic tests | `tests/{assets,transport,loader,field,hold}.test.ts` |
-| Browser tests/helpers | `tests/{acceptance,resilience,visual,performance,network,built}.spec.ts`, `tests/{support,pixels}.ts` |
-
-## F. Qualification limits
-
-Human review must assess motion continuity, connected/separating liquid character, contour/refraction fidelity, subject framing and sample resolution across continuously varying ratios. Representative physical phone/tablet/desktop CPUs and browsers, real touch/trackpad, browser zoom, physical display latency, actual BFCache admission and varied radio/data-plan conditions still need qualification. Optional hardware WebGL can be profiled separately; the default renderer must remain GPU independent. Integration into production needs a separate authorized SSR/CSP/public-content task.
-
-**Verdict: `BLOCKED`.** The implementation, source validation, deterministic tests, latest built matrix and Chromium/Firefox development cases are complete, with inspected browser captures and temporal recordings. The required complete development gate remains unsuccessful because of intermittent native WebKit startup faults; the tested slower alternative also has unresolved assertions/timeouts. No browser failures are waived. Requalify the unchanged complete suite in a reliable WebKit environment and diagnose any remaining reproducible behavior before calling the experiment functionally complete. Human visual approval and physical-device performance remain separate requirements. No production-readiness claim is made.
+Testing and queued qualification were stopped at the user’s request. The controller was terminated and the active transport-capture child was stopped. The completed performance/benchmark commands are retained as completed; partial capture is not relabeled a pass.

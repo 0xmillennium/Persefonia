@@ -27,65 +27,53 @@ export const fragment = `#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 color;
+uniform int captureCode;
 uniform sampler2D filmA;
 uniform sampler2D filmB;
 uniform sampler2D field;
+uniform sampler2D holdField;
 uniform vec2 viewport;
 uniform vec2 fieldSize;
-uniform vec2 center;
-uniform float radius;
-uniform float time;
-uniform float reveal;
-uniform float grace;
+uniform vec2 holdSize;
+uniform float revealing;
 uniform float reduced;
 uniform float fieldActive;
+uniform float holdActive;
 uniform float portrait;
 uniform float framingA;
 uniform float framingB;
-float noise(vec2 p){float a=atan(p.y-center.y,p.x-center.x);return sin(a*3.0+time*.45)*.032+sin(a*7.0-time*.35)*.017+sin(p.x*.013+p.y*.019+time*.3)*.023+sin(p.x*.026-p.y*.012-time*.2)*.013;}
-float sdf(vec2 p){return length(p-center)+noise(p)*length(viewport)-radius;}
 vec2 filmUV(vec2 p,float framing){
-  float aspect=viewport.x/viewport.y;
-  // Portrait deliberately contains the entire 16:9 subject in a full-height material stage.
-  float displayAspect=mix(aspect,16.0/9.0,portrait);
-  vec2 scale=displayAspect>16.0/9.0?vec2(1.0,(16.0/9.0)/displayAspect):vec2(displayAspect/(16.0/9.0),1.0);
-  vec2 q=(p-.5)*scale+.5;
-  if(portrait>.5) q.y=(p.y-.5)/max(viewport.x/(16.0/9.0)/viewport.y,.01)+.5;
-  q.x+=(1.0-scale.x)*(framing-.5);
-  return q;
+ float aspect=viewport.x/viewport.y;
+ float displayAspect=mix(aspect,16.0/9.0,portrait);
+ vec2 scale=displayAspect>16.0/9.0?vec2(1.0,(16.0/9.0)/displayAspect):vec2(displayAspect/(16.0/9.0),1.0);
+ vec2 q=(p-.5)*scale+.5;
+ if(portrait>.5)q.y=(p.y-.5)/max(viewport.x/(16.0/9.0)/viewport.y,.01)+.5;
+ q.x+=(1.0-scale.x)*(framing-.5);return q;
 }
 vec3 sampleFilm(sampler2D film,vec2 p,float framing){
-  vec2 q=filmUV(p,framing);
-  vec3 edge=texture(film,clamp(q,vec2(.01),vec2(.99))).rgb;
-  if(portrait>.5 && (q.y<0.0||q.y>1.0)) return edge*.15;
-  return texture(film,clamp(q,vec2(0),vec2(1))).rgb;
+ vec2 q=filmUV(p,framing);
+ if(portrait>.5 && (q.y<0.0||q.y>1.0))return texture(film,clamp(q,vec2(.01),vec2(.99))).rgb*.15;
+ return texture(film,clamp(q,vec2(0),vec2(1))).rgb;
 }
+vec3 pigmentAt(vec2 p){vec2 size=vec2(textureSize(field,0)),q=clamp(p,vec2(0),vec2(1))*size-.5,i=floor(q),f=fract(q);return mix(mix(texture(field,(i+.5)/size).rgb,texture(field,(i+vec2(1.5,.5))/size).rgb,f.x),mix(texture(field,(i+vec2(.5,1.5))/size).rgb,texture(field,(i+1.5)/size).rgb,f.x),f.y);}
+vec3 tinted(vec3 a){return mix(a,a*vec3(.55,.93,.9)+vec3(.025,.2,.17),.48);}
 void main(){
- vec2 p=uv*viewport;
- vec4 f=vec4(.5,.5,0.0,1.0);
- vec2 gradient=vec2(0.0);
- float density=0.0;
- if(fieldActive>.5 && reduced<.5){
-   f=texture(field,uv);
-   vec2 pixel=1.0/fieldSize;
-   gradient=vec2(texture(field,uv+vec2(pixel.x,0)).b-texture(field,uv-vec2(pixel.x,0)).b,texture(field,uv+vec2(0,pixel.y)).b-texture(field,uv-vec2(0,pixel.y)).b);
-   density=smoothstep(.12,.18,f.b);
+ vec4 m=texture(holdField,uv);vec3 f=vec3(0);vec2 gradient=vec2(0),displacement=vec2(0);float density=0.0;
+ if(reduced<.5 && fieldActive>.5){
+  vec2 px=1.0/fieldSize,fluidUV=vec2(uv.x,1.0-uv.y);
+  f=pigmentAt(fluidUV);density=smoothstep(.015,.65,f.r);
+  gradient=vec2(texture(field,fluidUV+vec2(px.x,0)).r-texture(field,fluidUV-vec2(px.x,0)).r,texture(field,fluidUV-vec2(0,px.y)).r-texture(field,fluidUV+vec2(0,px.y)).r);
+  displacement=gradient*22.0/viewport;
  }
- float mask=0.0;
- float rim=0.0;
- vec2 normal=vec2(0.0);
- if(radius>=0.0 && reduced<.5){
-   float d=sdf(p);
-   mask=1.0-smoothstep(-4.0,4.0,d);
-   rim=exp(-abs(d)*.045);
-   normal=vec2(sdf(p+vec2(2,0))-sdf(p-vec2(2,0)),sdf(p+vec2(0,2))-sdf(p-vec2(0,2)))*.25;
- }
- vec2 displacement=(gradient*25.0+(f.rg-.5)*density*18.0+normal*rim*7.0)/viewport;
- vec3 image=sampleFilm(filmA,uv+displacement,framingA);
- if(reveal>.5 && mask>0.0) image=mix(image,sampleFilm(filmB,uv+displacement*.7,framingB),mask);
- // Neutral smoked-glass material; contour and directional refraction bind it to the film.
- float material=density*.46+mask*.09*(1.0-reveal)*grace;
- image=mix(image,image*.78+vec3(.16,.17,.145),material);
- image+=vec3(.12,.14,.125)*(length(gradient)*density*.8+rim*.09)*grace;
+ if(reduced<.5 && holdActive>.5){vec2 h=1.0/holdSize;vec4 left=texture(holdField,uv-vec2(h.x,0)),right=texture(holdField,uv+vec2(h.x,0)),top=texture(holdField,uv-vec2(0,h.y)),bottom=texture(holdField,uv+vec2(0,h.y));vec2 normal=revealing>.5?vec2(right.g-left.g,bottom.g-top.g):vec2(right.r-left.r,bottom.r-top.r);displacement+=normal*6.0/viewport;}
+ vec3 a=sampleFilm(filmA,uv+displacement,framingA);
+ vec3 image=mix(a,tinted(a),reduced>.5?0.0:m.r);
+ if(revealing>.5 && reduced<.5){image=mix(tinted(a),sampleFilm(filmB,uv+displacement,framingB),m.g);image=mix(image,vec3(.93,.98,.96),m.b*.8);}
+ float marble=clamp(f.g/(f.r+.001),0.0,1.0);
+ vec3 pigment=mix(vec3(.005,.25,.21),vec3(.08,.85,.69),marble);
+ float vein=clamp(f.b/(f.r+.001),0.0,1.0);pigment*=1.0-vein*.35;
+ image=mix(image,image*vec3(.35,.72,.65)+pigment*.8,density*.72);
+ image+=vec3(.13,.26,.22)*length(gradient)*density;
  color=vec4(image,1.0);
+ if(captureCode>=0 && uv.y>1.0-16.0/viewport.y && uv.x<120.0/viewport.x){int bit=int(uv.x*viewport.x)/12;int value=(captureCode>>bit)&1;color=vec4(vec3(float(value)),1.0);}
 }`;

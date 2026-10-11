@@ -3,12 +3,14 @@
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="description" content="Independent 0xmillennium interaction experiment: scroll-controlled film and liquid navigation.">
+  <meta name="film-media-version" content="__MEDIA_VERSION__">
   <title>02 / Film & Liquid — 0xmillennium</title>
   <link rel="stylesheet" href="/src/style.css">
 </head>
 <body>
   <main>
     <div id="stage" aria-label="Interactive film stage">
+      <picture id="poster-layer"><source media="(max-width: 700px)" srcset="/media/__MEDIA_VERSION__/960/robotic-arm/frame_00001.webp"><img id="poster" src="/media/__MEDIA_VERSION__/1600/robotic-arm/frame_00001.webp" width="1600" height="900" alt="Robotic arm, the opening frame of the scroll-controlled film" fetchpriority="high" decoding="async"></picture>
       <canvas id="film" aria-hidden="true"></canvas>
       <canvas id="fallback" aria-hidden="true" hidden></canvas>
       <div id="core" aria-hidden="true" hidden></div>
@@ -17,12 +19,12 @@
         <p class="identity">0xmillennium <span>Interaction studies</span></p>
         <h1>Film & liquid <span>02</span></h1>
       </header>
-      <div id="message" role="status">Preparing the first frame…</div>
+      <div id="message" role="status" hidden>Preparing the first frame…</div>
       <footer data-control>
-        <div class="instructions"><p>Scroll to move through the film.</p><p>Press and hold to change the scene. Release to retreat.</p></div>
+        <div class="instructions"><p>Scroll to move through the film.</p><p>Press and hold to change the scene. Release early to retreat.</p><p id="quality" hidden>Basic film mode. Liquid effects unavailable.</p></div>
         <div class="controls">
-          <fieldset><legend>Scene</legend><button id="robot" type="button" aria-pressed="true">Robotic arm</button><button id="tree" type="button" aria-pressed="false">Tree</button></fieldset>
-          <label class="progress">Film position <input id="progress" type="range" min="0" max="1000" step="1" value="0"><output id="frame">001 / 192</output></label>
+          <fieldset><legend>Scene</legend><button id="robot" disabled type="button" aria-pressed="true">Robotic arm</button><button id="tree" disabled type="button" aria-pressed="false">Tree</button></fieldset>
+          <label class="progress">Film position <input id="progress" disabled type="range" min="0" max="1000" step="1" value="0"><output id="frame">001 / 192</output></label>
           <button id="retry" type="button" hidden>Retry frames</button>
           <button id="debug-toggle" type="button" hidden aria-expanded="false">Diagnostics</button>
         </div>
@@ -31,7 +33,7 @@
       <pre id="debug" data-control hidden></pre>
     </div>
     <div id="scroll-range" aria-hidden="true"></div>
-    <noscript><p class="no-js">This independent interaction experiment needs JavaScript for frame selection. No production content is hosted here.</p></noscript>
+    <noscript><p class="no-js">The opening film frame is shown. Enable JavaScript to choose a scene or scroll through its frames.</p></noscript>
   </main>
   <script type="module" src="/src/main.ts"></script>
 </body>

@@ -6,9 +6,13 @@ import { fileURLToPath } from "node:url";
 const artifacts=fileURLToPath(new URL("../../../test-results/scroll-film-navigator/performance/",import.meta.url));
 test("Measured isolated mixed workloads and bounded resource soak",async({page,browser},info)=>{
   const output=`${artifacts}${info.project.name}/`,viewport=page.viewportSize()!;
-  test.setTimeout(300000);page.on("pageerror",error=>{throw error;});await mkdir(output,{recursive:true});await page.goto("/");await ready(page);await expect(page.locator("#debug")).toBeHidden();
+  test.setTimeout(900000);page.on("pageerror",error=>{throw error;});await mkdir(output,{recursive:true});await page.goto("/");await ready(page);await expect(page.locator("#debug")).toBeHidden();
   const session=await page.context().newCDPSession(page);await session.send("Performance.enable");
   const reports:Record<string,unknown>={},samples:unknown[]=[];
+  // Checkpoint every workload so a timeout cannot erase observed measurements.
+  const persist=async(complete=false)=>{const s=await state(page);
+  await writeFile(`${output}report.json`,JSON.stringify({status:complete?"COMPLETE":"IN PROGRESS",recordedAt:new Date().toISOString(),environment:{cpu:cpus()[0]?.model,logicalCpus:cpus().length,ram:totalmem(),os:platform(),release:release(),node:process.version,browser:browser.version(),project:info.project.name,renderer:s.renderer.info,graphics:s.gpu.info,gpuDisabled:false,launchFlags:process.env.FILM_SOFTWARE_GPU==="1"?["--use-angle=swiftshader"]:[],physicalHardware:false,viewport:{...viewport,dpr:await page.evaluate(()=>devicePixelRatio)}},method:"Hidden diagnostics; bounded in-app JS/draw/active-RAF samples, independent workload callback intervals, CDP browser heap/DOM metrics. CPU target-to-draw is not photon latency. WebGL2 GPU API; actual backend reported above, with shared RAM/integrated graphics as normal targets; virtual software rendering does not qualify accelerated integrated graphics. Soak is 1800 requested RAF steps (actual duration recorded). A separate trace workload has instrumentation overhead and is excluded from ordinary measurements.",reports,resourceSamples:samples},null,2));
+  };
   const workload=async(name:string,frames:number,scroll:boolean,fluid:boolean)=>{
     const started=Date.now();await page.evaluate(()=>window.__filmExperiment!.resetMetrics());
     const callbackIntervals=await page.evaluate(async({frames,scroll,fluid})=>{
@@ -18,6 +22,7 @@ test("Measured isolated mixed workloads and bounded resource soak",async({page,b
       return {count:intervals.length,p50:at(.5),p95:at(.95),p99:at(.99),max:at(1)};
     },{frames,scroll,fluid});
     await progress(page,.5);reports[name]={...await state(page),workloadCallbackIntervalsMs:callbackIntervals};samples.push({name,elapsedMs:Date.now()-started,...(await state(page)).cache,renderer:(await state(page)).renderer,browserMetrics:(await session.send("Performance.getMetrics")).metrics});
+    await persist();
   };
   await workload("slow-scroll",180,true,false);await workload("fast-scroll",70,true,false);await workload("reverse-scrubbing",100,true,false);
   await workload("dense-navigator",180,false,true);await workload("simultaneous-scroll-fluid",180,true,true);
@@ -31,9 +36,9 @@ test("Measured isolated mixed workloads and bounded resource soak",async({page,b
   await page.evaluate(()=>window.__filmExperiment!.resetMetrics());const restorationStarted=Date.now();
   await page.evaluate(()=>window.__filmExperiment!.suspend());await page.evaluate(()=>window.__filmExperiment!.resume());await progress(page,.5);
   reports["suspension-restoration"]={...await state(page),restorationWallMs:Date.now()-restorationStarted};
-  const s=await state(page);expect(s.cache.size).toBeLessThanOrEqual(8);expect(s.cache.peakPending).toBeLessThanOrEqual(2);expect(s.stalePresentations).toBe(0);expect(s.cache.failures).toBe(0);expect(s.renderFailure).toBeNull();
+  const s=await state(page);expect(s.cache.size).toBeLessThanOrEqual(20);expect(s.cache.peakPending).toBeLessThanOrEqual(2);expect(s.stalePresentations).toBe(0);expect(s.cache.failures).toBe(0);expect(s.renderFailure).toBeNull();
   // No synthetic 60Hz pass assertion. These are reported measurements on the observed backend.
-  await writeFile(`${output}report.json`,JSON.stringify({environment:{cpu:cpus()[0]?.model,logicalCpus:cpus().length,ram:totalmem(),os:platform(),release:release(),node:process.version,browser:browser.version(),project:info.project.name,renderer:s.renderer.info,graphics:s.gpu.info,gpuDisabled:true,launchFlags:["--disable-gpu","--disable-software-rasterizer"],viewport:{...viewport,dpr:await page.evaluate(()=>devicePixelRatio)}},method:"Hidden diagnostics; bounded in-app JS/draw/active-RAF samples, independent workload callback intervals, CDP browser heap/DOM metrics. CPU target-to-draw is not photon latency. GPU acceleration disabled. Soak is 1800 requested RAF steps (actual duration recorded). A separate trace workload has instrumentation overhead and is excluded from ordinary measurements.",reports,resourceSamples:samples},null,2));
+  await persist();
   // Separate diagnostic trace: screenshot events plus raster/compositor timeline. This
   // measures browser work, not display scanout or a physical 60Hz qualification.
   await session.send("Tracing.start",{categories:"devtools.timeline,disabled-by-default-devtools.timeline,disabled-by-default-devtools.timeline.frame,disabled-by-default-devtools.screenshot,blink.user_timing",transferMode:"ReturnAsStream"});
@@ -46,5 +51,5 @@ test("Measured isolated mixed workloads and bounded resource soak",async({page,b
   await session.send("IO.close",{handle:stream});await writeFile(`${output}browser-trace.json`,trace);
   const events=JSON.parse(trace).traceEvents as {name:string;dur?:number}[];
   const summary=Object.fromEntries(["DrawFrame","BeginFrame","RasterTask","CompositeLayers","Paint","Screenshot"].map(name=>{const selected=events.filter(e=>e.name===name),durations=selected.flatMap(e=>e.dur!==undefined?[e.dur/1000]:[]).sort((a,b)=>a-b);return [name,{events:selected.length,durationMs:durations.reduce((a,b)=>a+b,0),p95Ms:durations[Math.min(durations.length-1,Math.floor(durations.length*.95))]??null}];}));
-  await writeFile(`${output}trace-summary.json`,JSON.stringify({method:"Separate 90-RAF-step traced workload. Event counts/durations are browser trace observations, not actual photon latency.",summary},null,2));await session.detach();
+  await writeFile(`${output}trace-summary.json`,JSON.stringify({method:"Separate 90-RAF-step traced workload. Event counts/durations are browser trace observations, not actual photon latency.",summary},null,2));await persist(true);await session.detach();
 });

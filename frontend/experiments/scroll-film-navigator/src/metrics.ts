@@ -12,7 +12,7 @@ export class Samples {
   }
 }
 export class Metrics {
-  readonly input=new Samples();readonly decode=new Samples();
+  readonly input=new Samples();readonly decode=new Samples();readonly targetToDecode=new Samples();readonly upload=new Samples();
   readonly intervals=new Samples();readonly javascript=new Samples();readonly drawSubmission=new Samples();readonly targetToDraw=new Samples();readonly longTasks=new Samples();readonly resize=new Samples();
   frameDrops=0;
   private observer: PerformanceObserver|null=null;
@@ -21,7 +21,7 @@ export class Metrics {
       this.observer=new PerformanceObserver(list=>{for(const entry of list.getEntries())this.longTasks.add(entry.duration);});this.observer.observe({type:"longtask",buffered:false});
     }
   }
-  reset(): void {for(const s of [this.input,this.decode,this.intervals,this.javascript,this.drawSubmission,this.targetToDraw,this.longTasks,this.resize])s.reset();this.frameDrops=0;}
-  report(): object {return {inputMs:this.input.summary(),fetchDecodeMs:this.decode.summary(),intervalMs:this.intervals.summary(),javascriptMs:this.javascript.summary(),drawSubmissionMs:this.drawSubmission.summary(),targetToDrawMs:this.targetToDraw.summary(),longTaskMs:this.longTasks.summary(),resizeMs:this.resize.summary(),frameDrops:this.frameDrops};}
+  reset(): void {for(const s of [this.input,this.decode,this.targetToDecode,this.upload,this.intervals,this.javascript,this.drawSubmission,this.targetToDraw,this.longTasks,this.resize])s.reset();this.frameDrops=0;}
+  report(): object {return {inputMs:this.input.summary(),fetchDecodeMs:this.decode.summary(),targetToDecodedMs:this.targetToDecode.summary(),textureUploadMs:this.upload.summary(),intervalMs:this.intervals.summary(),javascriptMs:this.javascript.summary(),drawSubmissionMs:this.drawSubmission.summary(),targetToDrawMs:this.targetToDraw.summary(),longTaskMs:this.longTasks.summary(),resizeMs:this.resize.summary(),frameDrops:this.frameDrops};}
   dispose(): void {this.observer?.disconnect();}
 }

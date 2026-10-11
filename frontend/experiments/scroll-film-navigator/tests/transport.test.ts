@@ -56,3 +56,10 @@ describe("Frame transport",()=>{
   });
   it("LC-05 disposal closes late completed resources",async()=>{let resolve!:(image:Image)=>void;const cache=new FrameCache<Image>((_:Film)=>new Promise(r=>{resolve=r;}),4,1);cache.request([{film:"tree",index:0}]);cache.dispose();const late=image("late");resolve(late);await flush();expect(late.close).toHaveBeenCalledOnce();expect(cache.entries.size).toBe(0);});
 });
+
+it("FT-08/09 preparation follows direction and scales its bounded window with speed",async()=>{
+  const calls:number[]=[];const cache=new FrameCache<Image>(async(_film,index)=>{calls.push(index);return image(String(index));},20,2);
+  cache.request([{film:"tree",index:100}],[],{direction:-1,speed:48});await flush();await flush();
+  expect(calls[0]).toBe(100);expect(calls[1]).toBe(99);expect(calls).toContain(92);expect(calls).not.toContain(108);
+  expect(cache.entries.size).toBeLessThanOrEqual(20);expect(cache.peakPending).toBe(2);cache.dispose();
+});
