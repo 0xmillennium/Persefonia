@@ -2,7 +2,7 @@
 export class GlobeLifecycle {
   private raf = 0;
   private previous = 0;
-  private visible = true;
+  private visible = false;
   private available = true;
   private pageActive = true;
   private abort = new AbortController();

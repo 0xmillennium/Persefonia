@@ -267,3 +267,110 @@ test("built resources run under strict self-hosted CSP", async ({ page }) => {
   await expect(page.locator("#location-panel")).toHaveAttribute("data-open", "true");
   expect(origins).toEqual(new Set(["http://127.0.0.1:4281"])); expect(errors).toEqual([]);
 });
+
+test("entrance waits for visibility, suspends, pulses once and stays settled", async ({ page }) => {
+  await page.addInitScript(() => document.addEventListener("DOMContentLoaded", () => {
+    document.querySelector<HTMLElement>("#stage")!.style.marginTop = `${innerHeight * 2}px`;
+  }));
+  await page.goto("/?inspect=1");
+  await page.waitForFunction(() => !!window.__globeExperiment);
+  expect((await state(page)).submitted).toBe(0);
+  expect((await state(page)).entrance.started).toBe(false);
+  await page.locator("#stage").scrollIntoViewIfNeeded();
+  await expect.poll(async () => (await state(page)).entrance.elapsed).toBeGreaterThan(0.25);
+  expect((await state(page)).entrance.phase).toBe("scan");
+  expect(await page.locator(".marker-trace").first().evaluate(el => Number(getComputedStyle(el).opacity))).toBeGreaterThan(0);
+  await page.evaluate(() => scrollTo(0, 0));
+  await expect.poll(async () => (await state(page)).active).toBe(false);
+  const suspended = await state(page);
+  await page.waitForTimeout(150);
+  expect((await state(page)).entrance.elapsed).toBe(suspended.entrance.elapsed);
+  expect((await state(page)).submitted).toBe(suspended.submitted);
+  await page.locator("#stage").scrollIntoViewIfNeeded();
+  await expect.poll(async () => (await state(page)).entrance.phase, { intervals: [30] }).toBe("pulse");
+  expect(await page.locator(".marker-pulse").evaluate(el => Number(getComputedStyle(el).opacity))).toBeGreaterThan(0);
+  await expect.poll(async () => (await state(page)).entrance.phase).toBe("settled");
+  await expect(page.locator(".marker-pulse")).toHaveCSS("opacity", "0");
+  await page.evaluate(() => scrollTo(0, 0));
+  await expect.poll(async () => (await state(page)).active).toBe(false);
+  await page.locator("#stage").scrollIntoViewIfNeeded();
+  await expect.poll(async () => (await state(page)).active).toBe(true);
+  expect((await state(page)).entrance.phase).toBe("settled");
+});
+
+test("rendered surface contains grey ocean dots and transparent gaps inside the sphere", async ({ page }) => {
+  await ready(page);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect.poll(async () => (await state(page)).scheduled).toBe(false);
+  // One test-only readback immediately after submission, before the browser
+  // discards the default framebuffer. No readback enters the application RAF.
+  const pixels = await page.evaluate(() => new Promise<{ clear: number; grey: number; turquoise: number; total: number }>(resolve => {
+    const canvas = document.querySelector("canvas")!, gl = canvas.getContext("webgl2")!;
+    const original = gl.drawArrays;
+    gl.drawArrays = function (...args) {
+      original.apply(gl, args);
+      gl.drawArrays = original;
+      const data = new Uint8Array(canvas.width * canvas.height * 4);
+      gl.readPixels(0, 0, canvas.width, canvas.height, gl.RGBA, gl.UNSIGNED_BYTE, data);
+      const { camera } = window.__globeExperiment!.state();
+      const counts = { clear: 0, grey: 0, turquoise: 0, total: 0 };
+      for (let y = 0; y < canvas.height; y++) for (let x = 0; x < canvas.width; x++) {
+        if (Math.hypot((x / canvas.width - 0.5) * camera.width, (y / canvas.height - 0.5) * camera.height) > camera.radius * 0.85) continue;
+        counts.total++;
+        const i = (y * canvas.width + x) * 4, r = data[i]!, g = data[i + 1]!, b = data[i + 2]!;
+        if (data[i + 3] === 0) counts.clear++;
+        if (r > 4 && Math.max(r, g, b) - Math.min(r, g, b) <= 1) counts.grey++;
+        if (g > 10 && g > r * 3) counts.turquoise++;
+      }
+      resolve(counts);
+    };
+    canvas.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
+  }));
+  expect(pixels.clear / pixels.total).toBeGreaterThan(0.1);
+  expect(pixels.grey).toBeGreaterThan(100);
+  expect(pixels.turquoise).toBeGreaterThan(100);
+  expect((await state(page)).entrance.phase).toBe("settled");
+  await expect(page.locator(".marker-trace").first()).toHaveCSS("opacity", "0");
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  expect((await state(page)).entrance.phase).toBe("settled");
+});
+
+test("entrance scans actual sphere dots and manual exploration settles every transient layer", async ({ page }) => {
+  await page.addInitScript(() => {
+    const diagnostic = window as Window & { __entrancePixels?: { upper: number; lower: number } };
+    const original = WebGL2RenderingContext.prototype.drawArrays;
+    WebGL2RenderingContext.prototype.drawArrays = function (...args) {
+      original.apply(this, args);
+      const s = window.__globeExperiment?.state();
+      if (!s || diagnostic.__entrancePixels || s.entrance.elapsed < 0.35 || s.entrance.elapsed > 0.55) return;
+      WebGL2RenderingContext.prototype.drawArrays = original;
+      const pixels = new Uint8Array(this.canvas.width * this.canvas.height * 4);
+      this.readPixels(0, 0, this.canvas.width, this.canvas.height, this.RGBA, this.UNSIGNED_BYTE, pixels);
+      let upper = 0, lower = 0;
+      for (let y = 0; y < this.canvas.height; y++) for (let x = 0; x < this.canvas.width; x++) {
+        const dx = (x / this.canvas.width - 0.5) * s.camera.width;
+        const dy = (y / this.canvas.height - 0.5) * s.camera.height;
+        if (Math.hypot(dx, dy) > s.camera.radius * 0.85 || pixels[(y * this.canvas.width + x) * 4 + 3] === 0) continue;
+        // WebGL's framebuffer origin is bottom-left.
+        if (dy > s.camera.radius * 0.4) upper++;
+        if (dy < -s.camera.radius * 0.4) lower++;
+      }
+      diagnostic.__entrancePixels = { upper, lower };
+    };
+  });
+  await ready(page);
+  await page.waitForFunction(() => !!(window as Window & { __entrancePixels?: unknown }).__entrancePixels);
+  const pixels = await page.evaluate(() => (window as Window & { __entrancePixels?: { upper: number; lower: number } }).__entrancePixels!);
+  expect(pixels.upper).toBeGreaterThan(100);
+  expect(pixels.lower).toBe(0);
+  const before = (await state(page)).orientation.spin;
+  await page.locator("canvas").focus();
+  await page.keyboard.press("ArrowRight");
+  await expect.poll(async () => (await state(page)).entrance.phase).toBe("settled");
+  expect((await state(page)).orientation.spin).toBeGreaterThan(before);
+  for (const layer of [".marker-trace", ".marker-echo", ".marker-lock", ".marker-flare", ".marker-pulse", ".marker-echo-ring"]) {
+    for (const element of await page.locator(layer).all()) await expect(element).toHaveCSS("opacity", "0");
+  }
+  await expect(page.locator(".marker-core")).toHaveCSS("transform", "none");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});

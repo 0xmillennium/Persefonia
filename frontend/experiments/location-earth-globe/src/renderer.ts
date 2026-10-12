@@ -1,6 +1,7 @@
 import { vertex, fragment } from "./material";
 import { geographicPoint, orientationMatrix, type Camera, type Orientation, type Vec3 } from "./geometry";
 import { surfaceSamples } from "./sampling.mjs";
+import type { GlobeEntrance } from "./entrance";
 
 export class GlobeRenderer {
   readonly gl: WebGL2RenderingContext;
@@ -42,7 +43,7 @@ export class GlobeRenderer {
       if (!gl.getProgramParameter(this.program, gl.LINK_STATUS)) {
         throw new Error(shaders.map(s => gl.getShaderInfoLog(s)).join("\n") || "Globe shader linking failed");
       }
-      for (const name of ["orientation", "viewport", "focal", "pointSize", "hoverPoint", "hoverActive"]) {
+      for (const name of ["orientation", "viewport", "focal", "pointSize", "hoverPoint", "hoverActive", "reveal", "entranceTime", "entrancePoint"]) {
         const location = gl.getUniformLocation(this.program, name);
         if (!location) throw new Error(`Missing uniform ${name}`);
         this.uniforms.set(name, location);
@@ -59,7 +60,7 @@ export class GlobeRenderer {
       gl.vertexAttribPointer(1, 1, gl.FLOAT, false, 16, 12);
       this.count = samples.length;
       gl.enable(gl.BLEND);
-      gl.blendFunc(gl.ONE, gl.ONE);
+      gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
       gl.clearColor(0, 0, 0, 0);
     } catch (error) {
       this.dispose();
@@ -81,7 +82,7 @@ export class GlobeRenderer {
     this.gl.viewport(0, 0, width, height);
   }
 
-  draw(camera: Camera, orientation: Orientation, hover: Vec3 | null): void {
+  draw(camera: Camera, orientation: Orientation, hover: Vec3 | null, entrance: GlobeEntrance, location: Vec3): void {
     if (this.disposed) return;
     const gl = this.gl;
     gl.clear(gl.COLOR_BUFFER_BIT);
@@ -93,6 +94,9 @@ export class GlobeRenderer {
     gl.uniform1f(this.uniforms.get("pointSize")!, Math.max(1.2, camera.radius / 330 * 3.0) * this.ratio);
     gl.uniform3f(this.uniforms.get("hoverPoint")!, ...(hover ?? [0, 0, 1] as const));
     gl.uniform1f(this.uniforms.get("hoverActive")!, hover ? 1 : 0);
+    gl.uniform1f(this.uniforms.get("reveal")!, entrance.reveal);
+    gl.uniform1f(this.uniforms.get("entranceTime")!, entrance.elapsed);
+    gl.uniform3f(this.uniforms.get("entrancePoint")!, ...location);
     gl.drawArrays(gl.POINTS, 0, this.count);
     this.draws++;
   }

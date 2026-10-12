@@ -26,6 +26,11 @@ try {
     return { vendor: ext ? gl.getParameter(ext.UNMASKED_VENDOR_WEBGL) : "unavailable",
       renderer: ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : "unavailable" };
   });
+  await page.waitForFunction(() => window.__globeExperiment.state().entrance.elapsed >= 0.4);
+  await capture("entrance-scan");
+  await page.waitForFunction(() => window.__globeExperiment.state().entrance.phase === "pulse");
+  await capture("entrance-pulse");
+  await page.waitForFunction(() => window.__globeExperiment.state().entrance.phase === "settled");
   await page.locator("#pause").click();
   await page.waitForFunction(() => !window.__globeExperiment.state().scheduled);
   await capture("idle");

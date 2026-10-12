@@ -59,6 +59,13 @@ running development server. Evidence goes into ignored
   Reduced motion turns off autonomous spin and inertia while preserving
   manual exploration; the preference responds live. The panel has no
   transition in reduced motion. Escape cancels input and retracts the card.
+- First visibility reveals dots in a north-to-south sweep. Horizontal signal
+  fragments and marker echoes converge on Istanbul, a small reticle contracts,
+  then a surface ripple and two fading marker rings confirm the location. The
+  finite 3.2 s sequence suspends offscreen and never replays on re-entry. Manual
+  interaction, a revealed location card, graphics interruption, or reduced
+  motion settles it immediately. Reduced motion starts with the full surface
+  and a static marker; changing the preference does not replay the entrance.
 - No JavaScript, unavailable WebGL 2, failed geographic loading, or context
   loss retains readable Istanbul information. Inactive controls are disabled.
 
@@ -74,11 +81,14 @@ Required reference recordings are under the ignored
   About 0.25–2.75 s: card follows slowly turning geographic marker;
   about 2.75–3 s: withdrawal; 4–10 s: moving glow, edge misses, pole/edge
   approach and continued modest rotation.
+- `earth globe start effect.mp4`: 1106×808, 30 fps, 4.266633 s. About
+  0.25–0.65 s: surface appears; 0.35–1.7 s: intermittent horizontal streaks
+  around the location; 1.85–2.35 s: an expanding ring fades to a steady marker.
 - `triptych-current-interactive-page-analysis-locked.md`, Section 13:
   intrinsic-axis spin, press suspension, limited retained pitch, release
   momentum and marker proximity.
 
-Both videos were decoded and visually inspected through time-sampled
+All three videos were decoded and visually inspected through time-sampled
 sequences, with finer samples around panel withdrawal and changing pitch.
 They contain no input-event trace. Precise button timestamps, original
 engine, camera, speeds and shader equations are unknown. Exact numerical
@@ -100,7 +110,10 @@ appropriate here. Neither renderer guarantees fidelity without visual review.
 - `geometry.ts`: geographic mapping, weak perspective camera, sphere hit,
   shared `Rx(pitch) × Ry(spin)` transform and marker projection.
 - `material.ts`: compact antialiased luminous samples forming curved rows;
-  geographic land intensity, subdued ocean/rear, local front-surface falloff.
+  turquoise geographic land, visible neutral-grey ocean dots, subdued rear
+  samples and local front-surface falloff. The transparent clear and
+  premultiplied source-over blending preserve the page between samples;
+  there is no filled sphere or opaque canvas backdrop.
   Turquoise starts from Experiment 02's `.08/.85/.69` pigment family, without
   importing its material, renderer or state.
 - `orientation.ts`: unrestricted wrapped yaw, pitch ±0.85 radians, base
@@ -113,6 +126,14 @@ appropriate here. Neither renderer guarantees fidelity without visual review.
 - `location.ts` / `presentation.ts`: typed singleton location, shared
   geographic projection, perspective horizon, proximity hysteresis (32/52
   CSS px), noninteractive attached card, explicit accessible reveal.
+- `entrance.ts`: finite active-time surface/marker sequence, driven by the
+  existing RAF. Marker layers use DOM opacity/transforms, scaled with the globe;
+  settled effects stop receiving style updates. The shader sweeps the actual
+  dots and centers its brief ripple on the marker's shared world projection.
+  It uses two extra uniforms and retains one draw call and the same buffers.
+  This layered entrance is the user's authorized creative adaptation of the
+  recording, rather than a claimed exact reproduction. Once-per-page playback
+  is our lifecycle decision, since repeat-entry is not shown.
 - `lifecycle.ts`: one RAF owner, fresh clock on restoration, hidden/offscreen
   suspension, on-demand frames while static. `experiment.ts` connects modules
   and owns observers/listeners/context restoration/disposal.
@@ -156,8 +177,8 @@ camera, brightness/falloff and motion tuning remain approximations of an
 unknown original implementation. Human evaluation should concentrate on the
 actual browser and short evidence recording, not test counts alone.
 
-Final local gate (12 October 2026): 22 experiment unit checks passed; the built
-browser matrix passed 35 cases across Chromium, Firefox, Chromium touch and
+Latest local gate (12 October 2026): 25 experiment unit checks passed; the built
+browser matrix passed 47 cases across Chromium, Firefox, Chromium touch and
 WebKit, with five deliberate exclusions for input-specific cases. Typecheck,
 offline geography verification, experiment build, root frontend typecheck,
 216 existing frontend unit checks and the production frontend build passed.
@@ -167,6 +188,18 @@ after disposal. Strict CSP, fallback, responsive, reduced-motion, context
 restoration and touch scrolling checks passed. Visibility/navigation event
 coverage includes controlled browser-event simulation; a full native bfcache
 restoration and screen-reader device session were not claimed.
+
+The added browser checks exercise first visibility, offscreen entrance
+suspension, the finite pulse phase, settled re-entry and reduced-motion suppression.
+The pulse phase contains two staggered rings. A further framebuffer check
+confirms that the scan reveals upper sphere dots before lower dots; manual
+exploration clears every transient DOM layer and restores the normal marker.
+A test-only framebuffer readback verifies actual grey and turquoise pixels
+and zero-alpha gaps inside the sphere. Windowed Chrome and Brave were also
+inspected with Chrome DevTools MCP using isolated profiles with the previously
+qualified persistent GPU-blocklist override, without a SwiftShader launch
+option. A temporary page grid visibly passed through the dot gaps; it was
+only a browser inspection aid. These checks do not alter user profiles.
 
 Detailed results and environment limits are recorded in
 `.local/evidence/location-earth-globe/QUALIFICATION.md`. VMware software
