@@ -53,8 +53,8 @@ export class Hold {
     else if(this.active)this.phase="CANCELING";
   }
   reset(): void {this.phase="IDLE";this.pressed=false;this.progress=0;this.expansion=0;this.revealProgress=0;this.waiting=0;}
-  /** Returns exactly one commit when the aperture finishes. Pair readiness pauses reveal. */
-  step(seconds: number, ready: boolean, coverage: number, reduced = false): boolean {
+  /** Integrate the current gesture before changing its phase or target. */
+  advance(seconds:number):void {
     const clock=Number.isFinite(seconds)?Math.max(0,seconds):0;
     if(this.phase!=="REVEALING" && this.phase!=="SUCCESS_WAIT_RELEASE") {
       const follow=1-Math.exp(-HOLD.retargetDamping*clock);
@@ -69,6 +69,11 @@ export class Hold {
       if(this.progress===1 && this.expansion>.999)this.expansion=1;
       if(this.phase==="CANCELING" && this.progress===0 && this.expansion<.001)this.reset();
     }
+  }
+  /** Returns exactly one commit when the aperture finishes. Pair readiness pauses reveal. */
+  step(seconds: number, ready: boolean, coverage: number, reduced = false): boolean {
+    const clock=Number.isFinite(seconds)?Math.max(0,seconds):0;
+    this.advance(clock);
     if(this.phase==="COVERED_WAIT_READY") {
       this.waiting+=clock;
       if(ready && (reduced || (this.expansion===1 && coverage>=HOLD.coverageThreshold))) {

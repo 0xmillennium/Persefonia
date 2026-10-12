@@ -63,3 +63,32 @@ it("FT-08/09 preparation follows direction and scales its bounded window with sp
   expect(calls[0]).toBe(100);expect(calls[1]).toBe(99);expect(calls).toContain(92);expect(calls).not.toContain(108);
   expect(cache.entries.size).toBeLessThanOrEqual(20);expect(cache.peakPending).toBe(2);cache.dispose();
 });
+
+it("Latest uncached target preempts a speculative transfer that remains inside lookahead",async()=>{
+  const calls:number[]=[],signals=new Map<number,AbortSignal>();
+  const cache=new FrameCache<Image>((_film,index,signal)=>{
+    calls.push(index);signals.set(index,signal);
+    if(index===100||index===99)return Promise.resolve(image(String(index)));
+    return new Promise((_resolve,reject)=>signal.addEventListener("abort",()=>reject(new DOMException("Aborted","AbortError")),{once:true}));
+  },20,2);
+  try{
+    cache.request([{film:"tree",index:100}]);await flush();
+    cache.request([{film:"tree",index:100}],["tree:100"],{direction:1,speed:48});await flush();
+    expect(cache.pending).toBe(2);expect(calls).toContain(102);
+    cache.request([{film:"tree",index:99}],["tree:100"],{direction:1,speed:48});await flush();
+    expect(calls).toContain(99);expect(signals.get(102)!.aborted).toBe(true);
+    expect(cache.get("tree:99")).toBeDefined();expect(cache.peakPending).toBe(2);
+  }finally{cache.dispose();}
+});
+
+it("Ordinary forward traversal retains ahead work rather than repeatedly starving transfers",async()=>{
+  const signals=new Map<number,AbortSignal>();
+  const cache=new FrameCache<Image>((_film,index,signal)=>{signals.set(index,signal);return index===100?Promise.resolve(image("100")):new Promise(()=>{});},20,2);
+  try{
+    cache.request([{film:"tree",index:100}]);await flush();
+    cache.request([{film:"tree",index:100}],["tree:100"],{direction:1,speed:48});await flush();
+    expect(signals.has(102)).toBe(true);
+    cache.request([{film:"tree",index:103}],["tree:100"],{direction:1,speed:48});await flush();
+    expect(signals.get(101)!.aborted).toBe(false);expect(signals.get(102)!.aborted).toBe(false);
+  }finally{cache.dispose();}
+});

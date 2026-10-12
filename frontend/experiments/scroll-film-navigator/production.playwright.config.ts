@@ -13,5 +13,5 @@ export default defineConfig({
     {name:"chromium-touch-built",use:{browserName:"chromium",channel:"chromium",launchOptions,viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true}},
     {name:"chromium-tablet-touch-built",use:{browserName:"chromium",channel:"chromium",launchOptions,viewport:{width:768,height:1024},deviceScaleFactor:2,isMobile:true,hasTouch:true}}
   ],
-  webServer:{cwd:fileURLToPath(new URL("../..",import.meta.url)),command:"npm run film:build && npx vite preview --config experiments/scroll-film-navigator/vite.config.ts",url:"http://127.0.0.1:4181",timeout:180_000,reuseExistingServer:false}
+  webServer:{cwd:fileURLToPath(new URL("../..",import.meta.url)),command:"npm run film:preflight -- --built && npx vite preview --config experiments/scroll-film-navigator/vite.config.ts",url:"http://127.0.0.1:4181",timeout:30_000,reuseExistingServer:false}
 });

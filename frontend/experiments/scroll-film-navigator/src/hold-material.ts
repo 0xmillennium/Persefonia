@@ -18,6 +18,8 @@ export class HoldMaterial {
   private previousCenter:Point={x:0,y:0};
   private initialized=false;
   private revealing=false;
+  private lastPhase="";private lastExpansion=-1;private lastX=NaN;private lastY=NaN;
+  private lastReveal=-1;private lastRevealX=NaN;private lastRevealY=NaN;
   coverage=0;area=0;revision=0;generations=0;
   constructor(readonly stageWidth:number,readonly stageHeight:number,resolution=192) {
     this.width=resolution;this.height=Math.min(256,Math.max(48,Math.round(resolution*stageHeight/stageWidth)));
@@ -36,6 +38,9 @@ export class HoldMaterial {
   }
   step(hold:Hold):void {
     if(!hold.animating){if(this.initialized)this.clear();return;}
+    if(this.lastPhase===hold.phase&&this.lastExpansion===hold.expansion&&this.lastX===hold.center.x&&this.lastY===hold.center.y&&this.lastReveal===hold.revealProgress&&this.lastRevealX===hold.revealCenter.x&&this.lastRevealY===hold.revealCenter.y)return;
+    this.lastPhase=hold.phase;this.lastExpansion=hold.expansion;this.lastX=hold.center.x;this.lastY=hold.center.y;
+    this.lastReveal=hold.revealProgress;this.lastRevealX=hold.revealCenter.x;this.lastRevealY=hold.revealCenter.y;
     const w=this.stageWidth,h=this.stageHeight,diagonal=Math.hypot(w,h);
     if(!this.initialized) {
       this.generations++;this.initialized=true;this.previousCenter={...hold.center};this.previousRadius=0;
@@ -72,11 +77,12 @@ export class HoldMaterial {
       const mask=hold.expansion<=0?0:1-smooth(-softness,softness,this.distances[i]!);
       const d=this.revealTerrain[i]!-radius,reveal=radius<0?0:1-smooth(-softness,softness,d);
       const rim=radius<0?0:Math.exp(-Math.abs(d)/(softness*1.8));
-      const j=i*4;this.pixels[j]=Math.round(mask*255);this.pixels[j+1]=Math.round(reveal*255);this.pixels[j+2]=Math.round(rim*255);this.pixels[j+3]=255;
+      const growthRim=hold.phase==="REVEALING"||hold.expansion<=0?0:Math.exp(-Math.abs(this.distances[i]!)/(softness*1.8))*(.85+this.structure[i]!*.15);
+      const j=i*4;this.pixels[j]=Math.round(mask*255);this.pixels[j+1]=Math.round(reveal*255);this.pixels[j+2]=Math.round(rim*255);this.pixels[j+3]=Math.round(clamp(growthRim)*255);
       if(mask>.995)covered++;if(mask>.5)area++;
     }
     this.coverage=covered/this.distances.length;this.area=area;this.revision++;
   }
-  clear():void {this.pixels.fill(0);this.distances.fill(1e6);this.previousRadius=0;this.initialized=false;this.revealing=false;this.coverage=0;this.area=0;this.revision++;}
+  clear():void {this.pixels.fill(0);this.distances.fill(1e6);this.previousRadius=0;this.initialized=false;this.revealing=false;this.lastPhase="";this.coverage=0;this.area=0;this.revision++;}
   get bytes():number {return this.distances.byteLength+this.scratch.byteLength+this.scratchStructure.byteLength+this.revealTerrain.byteLength+this.structure.byteLength+this.pixels.byteLength;}
 }

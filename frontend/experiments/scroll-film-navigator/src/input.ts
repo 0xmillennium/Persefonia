@@ -1,7 +1,8 @@
 import type { Modality, Point } from "./hold";
+import { PIGMENT } from "./pigment";
 export interface MotionSample extends Point { vx: number; vy: number; speed: number; distance: number }
 export function motionSplat(sample:MotionSample):{radius:number;dose:number} {
-  const radius=24-14*Math.max(0,Math.min(1,sample.speed/1800));
+  const radius=PIGMENT.slowRadius-(PIGMENT.slowRadius-PIGMENT.fastRadius)*Math.max(0,Math.min(1,sample.speed/1800));
   // Conserve the submitted line dose even when a long batch uses all 32 splats.
   // The GPU still bounds local pigment concentration independently.
   return {radius,dose:sample.distance/radius*.7};
@@ -38,26 +39,30 @@ export function resampleMotion(samples:readonly MotionSample[],maximum=32):Motio
   }
   return result;
 }
-/** Event timestamps, not event counts, define speed. Duplicate/coincident observations are ignored. */
+/** Event timestamps define speed. Rounded clocks must not erase path geometry;
+ * equal-time movement reuses the last valid interval as a bounded estimate. */
 export class PointerObserver {
   private last: (Point & {time:number}) | null = null;
   private latestTime:number|null=null;
+  private interval=1/60;
   modality: Modality = "mouse";
   observe(x: number,y: number,time: number): MotionSample | null {
     if(!Number.isFinite(x+y+time)) return null;
     const old=this.last;
-    if(this.latestTime!==null&&time<=this.latestTime)return null;
+    if(this.latestTime!==null&&time<this.latestTime)return null;
     const gap=this.latestTime===null?Infinity:time-this.latestTime;
     this.latestTime=time;
     if(!old||gap>750){this.last={x,y,time};return null;}
     const distance=Math.hypot(x-old.x,y-old.y);
     if(distance<0.1) return null;
     this.last={x,y,time};
-    const dt=Math.max((time-old.time)/1000,0.001);
+    const elapsed=(time-old.time)/1000;
+    const dt=elapsed>0?Math.max(elapsed,0.001):this.interval;
+    if(elapsed>0)this.interval=dt;
     const speed=Math.min(distance/dt,4500);
     return {x,y,vx:(x-old.x)/distance*speed,vy:(y-old.y)/distance*speed,speed,distance};
   }
-  reset(): void { this.last=null;this.latestTime=null; }
+  reset(): void { this.last=null;this.latestTime=null;this.interval=1/60; }
 }
 export function eligible(button: number, primary: boolean, excluded: boolean, point: Point, width: number, height: number): boolean {
   return button===0 && primary && !excluded && point.x>=0 && point.y>=0 && point.x<=width && point.y<=height;

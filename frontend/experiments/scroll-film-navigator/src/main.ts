@@ -1,5 +1,6 @@
 import { FrameCache, TraversalEstimator, FilmTransport, keyFor, otherFilm, FILMS, scrollAt, type Film, type FrameKey } from "./transport";
 import { Hold, type Modality } from "./hold";
+import { HoldClock } from "./hold-clock";
 import { GpuFluid } from "./gpu-fluid";
 import { LiquidField } from "./field";
 import { PointerObserver, eligible } from "./input";
@@ -9,6 +10,8 @@ import { ImageRenderer } from "./image-renderer";
 import { CanvasRenderer } from "./canvas-renderer";
 import { Metrics } from "./metrics";
 import { loadBitmap } from "./loader";
+import { WheelCalibration } from "./wheel";
+import { themeFor } from "./theme";
 
 const element=<T extends HTMLElement>(id: string)=>document.getElementById(id) as T;
 const stage=element("stage"), canvas=element<HTMLCanvasElement>("film"), fallback=element<HTMLCanvasElement>("fallback");
@@ -16,6 +19,7 @@ const core=element("core"),countdown=element<HTMLOutputElement>("countdown"),mes
 const slider=element<HTMLInputElement>("progress"), frame=element("frame"),selection=element("selection"),debug=element("debug");
 const robot=element<HTMLButtonElement>("robot"),tree=element<HTMLButtonElement>("tree"),retry=element<HTMLButtonElement>("retry"),debugToggle=element<HTMLButtonElement>("debug-toggle");
 const transport=new FilmTransport(),hold=new Hold(),pointer=new PointerObserver(),metrics=new Metrics();
+const wheel=new WheelCalibration();
 const motion=matchMedia("(prefers-reduced-motion: reduce)");
 // Tier is stable for this session. Resize cannot churn decoded/GPU resources or request generations.
 const poster=element<HTMLImageElement>("poster"),posterLayer=element("poster-layer");
@@ -48,10 +52,11 @@ const cache=new FrameCache<ImageBitmap>(async (film,index,signal,attempt)=>{
 
 function range(): number {return document.documentElement.scrollHeight-window.innerHeight;}
 function state(): object {return {
-  film:transport.film,progress:transport.progress,desired:transport.desired,presented:transport.presented,drawn:drawnKey,next:presentedNext,
+  film:transport.film,theme:themeFor(transport.film),progress:transport.progress,desired:transport.desired,presented:transport.presented,drawn:drawnKey,next:presentedNext,
   uploaded:renderer?.residentKeys??[],presentationEvidence:"draw submission; captured video/trace is evaluated separately",version:transport.version,commits:transport.commits,hold:{phase:hold.phase,revealProgress:hold.revealProgress,revealCenter:{...hold.revealCenter},material:{bytes:material.bytes,area:material.area,coverage:material.coverage,generations:material.generations,revision:material.revision},progress:hold.progress,expansion:hold.expansion,center:{...hold.center},target:{...hold.target},countdown:hold.countdown,pressed:hold.pressed,cycles:hold.cycles,coverage:coverageValue},
   frameStages:{desired:keyFor(transport.film,transport.desired),scheduled:cache.scheduledKeys,decoding:cache.decodingKeys,decoded:[...cache.entries.keys()],uploaded:renderer?.residentKeys??[],drawSubmitted:drawnKey},
-  modality:pointer.modality,core:{visible:pointerVisible,x:`${core.dataset.x??""}px`,y:`${core.dataset.y??""}px`},field:{backend:field instanceof GpuFluid?"gpu-fluid":"basic",passes:field instanceof GpuFluid?field.passes:0,droppedSamples:field instanceof GpuFluid?field.droppedSamples:0,transportSecondsDiscarded:field instanceof GpuFluid?field.transportSecondsDiscarded:0,active:field.active,energyEvidence:field instanceof GpuFluid?"last explicit inspection readback; not a live per-frame metric":"CPU fallback sample",energy:field.energy,peak:field.peak,injections:field.injections,bytes:field.bytes},
+  navigator:{available:(renderer instanceof Renderer||renderer instanceof CanvasRenderer)&&!motion.matches,reason:motion.matches?"reduced-motion":renderer instanceof Renderer?null:renderer instanceof CanvasRenderer?"compatibility-material":"graphics-fallback"},
+  modality:pointer.modality,core:{visible:pointerVisible,x:`${core.dataset.x??""}px`,y:`${core.dataset.y??""}px`},field:{backend:field instanceof GpuFluid?"gpu-fluid":"basic",pendingSamples:field instanceof GpuFluid?field.pendingSamples:0,passes:field instanceof GpuFluid?field.passes:0,droppedSamples:field instanceof GpuFluid?field.droppedSamples:0,transportSecondsDiscarded:field instanceof GpuFluid?field.transportSecondsDiscarded:0,active:field.active,energyEvidence:field instanceof GpuFluid?"last explicit inspection readback; not a live per-frame metric":"CPU fallback sample",energy:field.energy,peak:field.peak,injections:field.injections,bytes:field.bytes},
   cache:{size:cache.entries.size,limit:cache.limit,pending:cache.pending,queued:cache.queued,peakPending:cache.peakPending,bytes:cache.bytes,hits:cache.hits,misses:cache.misses,evictions:cache.evictions,staleCompletions:cache.staleCompletions,failures:cache.failures,error:cache.error},
   capture:{id:gestureId,expected:captureExpected,owned:gestureId!==null&&stage.hasPointerCapture(gestureId)},
   renderer:{kind:renderer?.kind??null,bytes:renderer?.bytes??0,uploads:renderer?.uploads??0,draws:renderer?.draws??0,info:renderer?.info??null,acceleratedFailure},
@@ -112,9 +117,15 @@ function drawFallback(image: ImageBitmap): void {
   const w=image.width*scale,h=image.height*scale;
   ctx.drawImage(image,(width-w)*(transport.film==="robotic-arm"?.56:.5),(height-h)*.5,w,h);
 }
-function wake(): void {if(!raf&&!disposed&&!suspended){lastTime=0;raf=requestAnimationFrame(tick);}}
+const holdClock=new HoldClock();
+let settledDraw=false;
+function settleHold():void {if(!(import.meta.env.DEV&&testingFrozen))holdClock.beforeEvent(hold,performance.now());}
+function wake(): void {if(!raf&&!disposed&&!suspended){lastTime=0;settledDraw=true;raf=requestAnimationFrame(tick);}}
 function tick(now:number): void {
   raf=0;if(disposed||suspended)return;
+  // A new stroke may arrive while the prior idle redraw is already queued.
+  // Arm settlement from observed activity, not only from the first wake call.
+  settledDraw=settledDraw||field.active||hold.animating;
   const start=performance.now(),elapsed=import.meta.env.DEV&&testingFrozen?testingDelta:lastTime?(now-lastTime)/1000:1/60;
   testingDelta=0;
   if(lastTime){metrics.intervals.add(now-lastTime);if(now-lastTime>25)metrics.frameDrops++;}
@@ -142,7 +153,8 @@ function tick(now:number): void {
     }
   } else if(active) {drawFallback(active);submittedKey=activeKey;}
   // Readiness belongs to the latest target, independently of the elapsed hold clock.
-  const commit=hold.step(elapsed,paired,coverageValue,reduced);
+  const holdElapsed=import.meta.env.DEV&&testingFrozen?elapsed:holdClock.frame(now);
+  const commit=hold.step(holdElapsed,paired,coverageValue,reduced);
   material.step(hold);coverageValue=material.coverage;reveal=hold.phase==="REVEALING"&&!reduced;
   if(commit) {
     // The outgoing draw was already fully covered, so exchanging texture ownership is continuous.
@@ -161,10 +173,18 @@ function tick(now:number): void {
     drawnKey=transport.presented;metrics.targetToDraw.add(performance.now()-requestStarted);
   }
   updateControls(now);metrics.javascript.add(performance.now()-start);
-  if(field.active||hold.animating)raf=requestAnimationFrame(tick);else {lastTime=0;durable();}
+  if(field.active||hold.animating)raf=requestAnimationFrame(tick);
+  // WebKit can retain the preceding WebGL canvas image when the final update
+  // immediately stops RAF. Redraw the settled scene once, then release the loop.
+  else if(settledDraw){settledDraw=false;raf=requestAnimationFrame(tick);}
+  else {lastTime=0;holdClock.reset();durable();}
 }
 function updateControls(now:number): void {
-  element("quality").hidden=renderer instanceof Renderer;
+  // Stable theme follows the committed film, including history restoration.
+  // Growing/canceled holds and the mixed-film reveal keep the outgoing theme.
+  document.documentElement.dataset.theme=themeFor(transport.film);
+  const quality=element("quality");quality.hidden=renderer instanceof Renderer&&!motion.matches;
+  quality.textContent=motion.matches?"Reduced motion: liquid effects disabled. Film controls remain available.":renderer instanceof CanvasRenderer?"Compatibility liquid material.":"Basic film mode. Liquid effects unavailable.";
   slider.value=String(Math.round(transport.progress*1000));frame.textContent=`${String(transport.desired+1).padStart(3,"0")} / 192`;
   robot.setAttribute("aria-pressed",String(transport.film===FILMS[0]));tree.setAttribute("aria-pressed",String(transport.film===FILMS[1]));
   const label=transport.film==="robotic-arm"?"Robotic arm":"Tree";
@@ -203,15 +223,16 @@ function releaseCapture(): void {
   const id=gestureId;gestureId=null;captureExpected=false;
   if(id!==null&&stage.hasPointerCapture(id))stage.releasePointerCapture(id);
 }
-function interrupt(): void {hold.release();releaseCapture();pointer.reset();core.hidden=true;pointerVisible=false;wake();}
+function interrupt(): void {settleHold();hold.release();releaseCapture();pointer.reset();core.hidden=true;pointerVisible=false;wake();}
 function resize(): void {
   const start=performance.now();width=window.innerWidth;height=window.innerHeight;countdownBounds=null;
   pointer.reset();core.hidden=true;pointerVisible=false;
-  hold.reset();material=new HoldMaterial(width,height);releaseCapture();field.clear();try{renderer?.resize(width,height);}catch(error){acceleratedFailure=String(error);renderer?.dispose();initializeCanvas();}
+  hold.reset();holdClock.reset();material=new HoldMaterial(width,height);releaseCapture();field.clear();try{renderer?.resize(width,height);}catch(error){acceleratedFailure=String(error);renderer?.dispose();initializeCanvas();}
   field=renderer instanceof Renderer?renderer.fluid!:new LiquidField(width,height);
   if(!(renderer instanceof CanvasRenderer)){fallback.width=width;fallback.height=height;}syncScroll();metrics.resize.add(performance.now()-start);
 }
 function selectFilm(film:Film): void {
+  settleHold();
   if(film===transport.film){hold.cancel();interrupt();return;}
   releaseCapture();hold.select({x:width*.5,y:height*.5});pointer.modality="keyboard";
   requestSignature="";requestFrames();wake();
@@ -220,6 +241,7 @@ stage.addEventListener("pointerdown",event=>{
   const excluded=!!(event.target as Element).closest("[data-control],button,input,label,a");
   const point={x:event.clientX,y:event.clientY};
   if(!eligible(event.button,event.isPrimary,excluded,point,width,height)||gestureId!==null||suspended)return;
+  settleHold();
   const modality=event.pointerType as Modality;pointer.modality=modality;
   if(modality==="touch"){pointer.reset();core.hidden=true;pointerVisible=false;}
   if(hold.press(point,modality)) {
@@ -234,7 +256,7 @@ window.addEventListener("pointermove",event=>{
     // Some engines drop pending capture before dispatching got/lostpointercapture.
     // Verify ownership on the next physical packet as well as listening for loss.
     if(captureExpected&&!stage.hasPointerCapture(event.pointerId))interrupt();
-    else {hold.move({x:event.clientX,y:event.clientY});if(!hold.pressed)releaseCapture();wake();}
+    else {settleHold();hold.move({x:event.clientX,y:event.clientY});if(!hold.pressed)releaseCapture();wake();}
   }
   pointer.modality=event.pointerType as Modality;
   if(event.pointerType==="touch") {pointer.reset();core.hidden=true;pointerVisible=false;return;}
@@ -243,7 +265,7 @@ window.addEventListener("pointermove",event=>{
   core.hidden=!visible||motion.matches;pointerVisible=visible&&!motion.matches;
   core.style.transform=`translate(${event.clientX}px, ${event.clientY}px) translate(-50%, -50%)`;
   core.dataset.x=String(event.clientX);core.dataset.y=String(event.clientY);
-  if(!visible||motion.matches||!(renderer instanceof Renderer)) {pointer.reset();return;}
+  if(!visible||motion.matches||!(renderer instanceof Renderer||renderer instanceof CanvasRenderer)) {pointer.reset();return;}
   const inputStart=performance.now();
   const coalesced=event.getCoalescedEvents?.();
   const samples=coalesced?.length?coalesced:[event];
@@ -256,6 +278,14 @@ stage.addEventListener("lostpointercapture",event=>{if(event.pointerId===gesture
 stage.addEventListener("pointerleave",()=>{core.hidden=true;pointerVisible=false;pointer.reset();},events);
 window.addEventListener("blur",interrupt,events);
 window.addEventListener("scroll",syncScroll,{...events,passive:true});
+stage.addEventListener("wheel",event=>{
+  if(disposed||suspended||event.defaultPrevented||!event.cancelable||(event.target as Element).closest("[data-control],button,input,label,a"))return;
+  const top=wheel.target(event,window.scrollY,range());
+  if(top===null)return;
+  // Only calibrated vertical scene input is consumed; native scroll remains the
+  // sole timeline. Continuous input, controls, touch, keys and scrollbars are native.
+  event.preventDefault();window.scrollTo({top,behavior:"instant"});
+},{...events,passive:false});
 window.addEventListener("resize",resize,events);
 window.addEventListener("orientationchange",resize,events);
 slider.addEventListener("input",()=>window.scrollTo({top:Number(slider.value)/1000*range(),behavior:"instant"}),events);
@@ -267,9 +297,10 @@ function suspend(): void {
   // Never replace history from an outgoing/inactive document.
   if(!suspended)suspendedAt=performance.now();
   suspended=true;if(persistenceTimer)clearTimeout(persistenceTimer);persistenceTimer=0;
-  cache.suspend();if(raf)cancelAnimationFrame(raf);raf=0;lastTime=0;
+  cache.suspend();if(raf)cancelAnimationFrame(raf);raf=0;lastTime=0;holdClock.reset();settledDraw=false;
   if(renderer instanceof ImageRenderer)renderer.suspend();
-  hold.reset();material.clear();releaseCapture();pointer.reset();core.hidden=true;pointerVisible=false;
+  field.discardPending();
+  hold.reset();material.clear();releaseCapture();pointer.reset();wheel.reset();core.hidden=true;pointerVisible=false;
 }
 function resume(): void {if(disposed||!suspended)return;const elapsed=(performance.now()-suspendedAt)/1000;suspended=false;lastTime=0;field.step(elapsed);restore(true);}
 document.addEventListener("visibilitychange",()=>document.hidden?suspend():resume(),events);
@@ -285,14 +316,16 @@ function dispose(): void {
   if(disposed)return;suspend();if(persistenceTimer)clearTimeout(persistenceTimer);persistenceTimer=0;disposed=true;abortEvents.abort();cache.dispose();renderer?.dispose();renderer=null;metrics.dispose();field.clear();
 }
 if(import.meta.env.DEV) {
+  const settled=async()=>{while(raf&&!field.active&&!hold.animating)await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));};
   debugToggle.hidden=false;
   debugToggle.addEventListener("click",()=>{debug.hidden=!debug.hidden;debugToggle.setAttribute("aria-expanded",String(!debug.hidden));wake();},events);
   // Dev-only deterministic inspection and lifecycle testing; stripped from production artifacts.
-  Object.assign(window,{__filmExperiment:{state,freeze:(frozen:boolean)=>{testingFrozen=frozen;testingDelta=0;wake();},advance:async(seconds:number)=>{
+  Object.assign(window,{__filmExperiment:{state,freeze:(frozen:boolean)=>{testingFrozen=frozen;testingDelta=0;holdClock.reset();wake();},advance:async(seconds:number)=>{
     if(!testingFrozen || !Number.isFinite(seconds) || seconds<0 || seconds>10)throw new Error("Freeze first; advance 0–10 seconds");
     const count=hold.phase==="SUCCESS_WAIT_RELEASE"||(!hold.animating&&(!field.active||seconds>=4.2))?1:Math.ceil(seconds*60);
     for(let i=0;i<count;i++){testingDelta=seconds/count;wake();await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));}
-  },resetMetrics:()=>metrics.reset(),clearFluid:()=>{field.clear();pointer.reset();wake();},fieldMetrics:()=>field.metrics(),dispose,
+    await settled();
+  },resetMetrics:()=>metrics.reset(),clearFluid:async()=>{field.clear();pointer.reset();wake();await settled();},fieldMetrics:()=>field.metrics(),dispose,
     suspend,resume,contextLoss:()=>{contextControl=renderer instanceof Renderer?renderer.gl.getExtension("WEBGL_lose_context"):null;contextControl?.loseContext();},
     contextRestore:()=>contextControl?.restoreContext()
   }});

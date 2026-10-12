@@ -18,6 +18,14 @@ describe("Physical hold and outward reveal",()=>{
   it("Reduced-motion selection retains readiness and one-commit gates",()=>{const h=new Hold();h.select({x:10,y:10});expect(h.step(.1,false,0,true)).toBe(false);h.step(.1,true,0,true);expect(h.step(.01,true,0,true)).toBe(true);expect(h.cycles).toBe(1);});
 });
 describe("Persistent spatial material",()=>{
+  it("keeps growth light localized at the stored liquid boundary",()=>{
+    const h=new Hold(),m=new HoldMaterial(1200,800,96);h.press({x:400,y:350},"mouse");
+    for(let n=0;n<72;n++){h.step(1/60,false,m.coverage);m.step(h);}
+    let rim=0,interior=0,outside=0;
+    for(let i=0;i<m.pixels.length;i+=4){if(m.pixels[i+3]!>100){rim++;expect(Math.abs(m.distances[i/4]!)).toBeLessThan(20);}if(m.pixels[i]===255&&m.pixels[i+3]===0)interior++;if(m.pixels[i]===0&&m.pixels[i+3]===0)outside++;}
+    expect(rim).toBeGreaterThan(0);expect(interior).toBeGreaterThan(rim);expect(outside).toBeGreaterThan(rim);
+  });
+
   const step=(h:Hold,m:HoldMaterial,t:number,ready=false)=>{for(let n=0;n<Math.ceil(t*60);n++){h.step(1/60,ready,m.coverage);m.step(h);}};
   it("PH-04 full coverage includes portrait and offscreen origins",()=>{for(const [w,height] of [[1200,800],[390,844],[800,1200]])for(const center of [{x:10,y:10},{x:-400,y:1000},{x:w!/2,y:height!/2}]){const h=new Hold(),m=new HoldMaterial(w!,height!,48);h.press(center,"mouse");step(h,m,3.6);expect(m.coverage).toBe(1);expect(h.phase).toBe("COVERED_WAIT_READY");}});
   it("PH-06 actual lattice identity and morphology survive contraction/re-press",()=>{const h=new Hold(),m=new HoldMaterial(1200,800,48);h.press({x:250,y:300},"mouse");step(h,m,1.5);const area=m.area;h.release();step(h,m,.1);expect(m.area).toBeLessThan(area);const before=m.distances.slice(),generation=m.generations;h.press({x:800,y:400},"mouse");m.step(h);expect(m.distances).toEqual(before);expect(m.generations).toBe(generation);step(h,m,.2);expect(m.generations).toBe(1);expect(m.area).toBeGreaterThan(0);});

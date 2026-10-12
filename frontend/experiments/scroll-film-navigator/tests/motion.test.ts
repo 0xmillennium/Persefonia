@@ -2,14 +2,23 @@ import { describe,it,expect } from "vitest";
 import { queueMotion,resampleMotion,motionSplat,PointerObserver,type MotionSample } from "../src/input";
 const segment=(x:number,distance:number,direction=1):MotionSample=>({x,y:0,distance,vx:direction*100,vy:0,speed:100});
 describe("Bounded ordered motion geometry",()=>{
+  it("preserves path geometry when the browser rounds successive movement timestamps",()=>{
+    const observer=new PointerObserver();observer.observe(0,0,100);
+    const moves=[observer.observe(20,0,100),observer.observe(40,0,100),observer.observe(20,0,100)];
+    expect(moves.every(sample=>sample!==null)).toBe(true);
+    expect(moves.reduce((total,sample)=>total+(sample?.distance??0),0)).toBe(60);
+    expect(moves.at(-1)?.vx).toBeLessThan(0);
+    expect(observer.observe(20,0,100)).toBeNull();
+    expect(observer.observe(100,0,99)).toBeNull();
+  });
   it("accumulates tiny coalesced movement instead of erasing slow strokes",()=>{
     const distance=(packets:number)=>{const observer=new PointerObserver();let total=0;observer.observe(0,0,0);for(let n=1;n<=packets;n++)total+=observer.observe(n*10/packets,0,n*200/packets)?.distance??0;return total;};
     expect(distance(200)).toBeGreaterThan(9.8);expect(distance(50)).toBeGreaterThan(9.8);
     expect(Math.abs(distance(200)-distance(50))).toBeLessThan(.11);
   });
-  it("retains monotonic timestamp and inactivity rules while accumulating input",()=>{
+  it("rejects backward timestamps and respects inactivity while accumulating input",()=>{
     const observer=new PointerObserver();observer.observe(0,0,0);observer.observe(.05,0,1);
-    expect(observer.observe(10,0,1)).toBeNull();expect(observer.observe(10,0,.5)).toBeNull();
+    expect(observer.observe(.05,0,1)).toBeNull();expect(observer.observe(10,0,.5)).toBeNull();
     expect(observer.observe(.2,0,2)?.distance).toBeCloseTo(.2);
     expect(observer.observe(10,0,1000)).toBeNull();expect(observer.observe(10.2,0,1002)?.distance).toBeCloseTo(.2);
   });

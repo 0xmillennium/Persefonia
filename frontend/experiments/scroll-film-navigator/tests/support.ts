@@ -6,10 +6,11 @@ export interface State {
   field:{active:boolean;energy:number;peak:number;injections:number};
   cache:{size:number;limit:number;pending:number;queued:number;bytes:number;peakPending:number;failures:number;staleCompletions:number;evictions:number;error:string|null};
   core:{x:string;y:string;visible:boolean}; reduced:boolean; renderFailure:string|null; reveal:boolean;suspended:boolean;disposed:boolean;scheduled:boolean;stalePresentations:number;
+  navigator:{available:boolean;reason:string|null};
   metrics:Record<string,unknown>;gpu:{info:unknown;bytes:number;uploads:number;draws:number;samples:number[]};
   renderer:{kind:string|null;bytes:number;acceleratedFailure:string|null;info:unknown};
 }
-declare global {interface Window {__filmExperiment?:{state():State;freeze(frozen:boolean):void;advance(seconds:number):Promise<void>;resetMetrics():void;clearFluid():void;fieldMetrics():{mass:number;area:number;varianceX:number;varianceY:number;components:number};suspend():void;resume():void;dispose():void;contextLoss():void;contextRestore():void}}}
+declare global {interface Window {__filmExperiment?:{state():State;freeze(frozen:boolean):void;advance(seconds:number):Promise<void>;resetMetrics():void;clearFluid():Promise<void>;fieldMetrics():{mass:number;area:number;varianceX:number;varianceY:number;components:number};suspend():void;resume():void;dispose():void;contextLoss():void;contextRestore():void}}}
 export const state=(page:Page)=>page.evaluate(()=>window.__filmExperiment!.state());
 export async function ready(page:Page):Promise<void> {await expect.poll(async()=>(await state(page)).drawn).toBe("robotic-arm:0");}
 export async function progress(page:Page,p:number):Promise<void> {

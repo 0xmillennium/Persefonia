@@ -2,11 +2,11 @@ import { test,expect } from "@playwright/test";
 import { state,ready,isTouch } from "./support";
 import { pixels } from "./pixels";
 const sample=(png:Buffer,x:number,y:number)=>{const p=pixels(png),i=(Math.floor(y)*p.width+Math.floor(x))*p.channels;return Array.from(p.data.subarray(i,i+3));};
-test("PH pixel ownership: current-only tint, full coverage, center-origin outward aperture and one commit",async({page},info)=>{
+for(const basic of [false,true])test(`PH ${basic?"compatibility":"GPU"} pixel ownership: current-only tint, full coverage, center-origin outward aperture and one commit`,async({page},info)=>{
   test.skip(isTouch(info.project.name),"Desktop pixel fixture; separate touch interaction tests use canonical media.");
   // Small distinguishable films are isolated compositor fixtures, never delivery replacements.
   await page.route("**/*.webp*",async route=>{const blue=route.request().url().includes('/tree/');await route.fulfill({contentType:"image/svg+xml",body:`<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540"><rect width="960" height="540" fill="${blue?'#1638df':'#df3016'}"/><text x="20" y="60" font-size="40" fill="white">${blue?'B':'A'}</text></svg>`});});
-  await page.goto("/");await ready(page);expect((await state(page)).renderer.kind).toBe("webgl2");await page.evaluate(()=>window.__filmExperiment!.freeze(true));
+  await page.goto(basic?"/?renderer=basic":"/");await ready(page);expect((await state(page)).renderer.kind).toBe(basic?"canvas2d":"webgl2");await page.evaluate(()=>window.__filmExperiment!.freeze(true));
   const advance=(seconds:number)=>page.evaluate(t=>window.__filmExperiment!.advance(t),seconds);
   await page.mouse.move(400,320);await page.mouse.down();await advance(1.1);
   const growth=await page.screenshot();const inside=sample(growth,450,360),outside=sample(growth,1100,550);

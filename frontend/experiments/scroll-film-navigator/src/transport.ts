@@ -23,6 +23,7 @@ export class FrameCache<T extends Decoded> {
   private disposed = false;
   private suspended = false;
   private targets: readonly {film: Film; index: number}[] = [];
+  private direction:1|-1=1;
   hits = 0; misses = 0; evictions = 0; staleCompletions = 0; failures = 0;
   peakPending = 0;
   error: string | null = null;
@@ -38,7 +39,7 @@ export class FrameCache<T extends Decoded> {
     if(this.disposed) return;
     this.suspended=false;
     if(targets.length>2 || presented.length>2) throw new Error("At most two film targets/residents are supported");
-    this.targets=targets;
+    const previousTargets=this.targets;this.targets=targets;
     this.pinned = new Set([...presented, ...targets.map(t=>keyFor(t.film,t.index))]);
     const work=targets.map((target,priority)=>({...target,priority}));
     const ahead=hint?Math.min(10,Math.max(2,Math.ceil(Math.abs(hint.speed)*.18))):1;
@@ -54,6 +55,18 @@ export class FrameCache<T extends Decoded> {
     const prepared=[...unique.values()].slice(0,available),wanted=new Set(prepared.map(t=>keyFor(t.film,t.index)));
     this.queue=this.queue.filter(r=>wanted.has(r.key));
     for(const r of this.inFlight.values())if(!wanted.has(r.key)&&!this.pinned.has(r.key))r.controller.abort();
+    // A wanted speculative neighbor can still block a new film/reversal/jump.
+    // Ordinary traversal must keep useful ahead work: repeatedly preempting it
+    // when decode lags the scroll clock can starve every forthcoming frame.
+    // Retain bounded decode ownership until abort/decode settlement; preempt only
+    // enough unpinned transfers to admit missing current targets, never residents.
+    const urgent=targets.some(t=>{const previous=previousTargets.find(p=>p.film===t.film);return !previous||Math.abs(t.index-previous.index)>Math.max(2,ahead)||(t.index-previous.index)*this.direction<0;});
+    this.direction=hint?.direction??this.direction;
+    const missing=urgent?targets.filter(t=>{const key=keyFor(t.film,t.index);return !this.entries.has(key)&&!this.inFlight.has(key)&&!this.failed.has(key);}).length:0;
+    const settling=[...this.inFlight.values()].filter(r=>r.controller.signal.aborted).length;
+    let needed=Math.max(0,missing-(this.concurrency-this.inFlight.size+settling));
+    const speculative=[...this.inFlight.values()].filter(r=>!this.pinned.has(r.key)&&!r.controller.signal.aborted).sort((a,b)=>b.priority-a.priority);
+    for(const r of speculative){if(needed--<=0)break;r.controller.abort();}
     for(const target of prepared)this.enqueue(target.film,target.index,target.priority);
     this.queue.sort((a,b)=>a.priority-b.priority);
     this.evict(); this.pump();

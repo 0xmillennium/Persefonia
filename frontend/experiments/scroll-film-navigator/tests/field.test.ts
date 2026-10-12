@@ -1,5 +1,5 @@
 import { describe,it,expect } from "vitest";
-import { LiquidField } from "../src/field";
+import { LiquidField,FIELD } from "../src/field";
 import { PointerObserver,eligible } from "../src/input";
 function path(speed:number,events=60):LiquidField {const f=new LiquidField(1200,800);const total=800;for(let n=1;n<=events;n++){const distance=total/events;f.inject({x:100+total*n/events,y:400,vx:speed,vy:0,speed,distance});f.step(distance/speed);}return f;}
 describe("Liquid field and pointer sampling",()=>{
@@ -9,6 +9,20 @@ describe("Liquid field and pointer sampling",()=>{
   it("LN-06 connected wakes merge and distant islands remain distinct",()=>{const f=new LiquidField(1200,800);const inject=(x:number)=>f.inject({x,y:400,vx:200,vy:0,speed:200,distance:20});inject(200);inject(600);f.step(.016);expect(f.metrics().components).toBe(2);for(let x=220;x<600;x+=15)inject(x);f.step(.016);expect(f.metrics().components).toBe(1);});
   it("LN-08 event-rate-independent segment dosing has comparable field mass",()=>{const a=path(1200,60).metrics(),b=path(1200,120).metrics();expect(b.mass/a.mass).toBeGreaterThan(.8);expect(b.mass/a.mass).toBeLessThan(1.3);});
   it("LC-03 expired trails never return after suspended time",()=>{const f=path(1200);f.step(30);expect(f.energy).toBe(0);expect(f.active).toBe(false);});
-  it("bounds storage, clamps invalid input and resets cleanly",()=>{const f=new LiquidField(390,844);expect(f.bytes).toBeLessThan(800000);f.inject({x:NaN,y:1,vx:1,vy:0,speed:1,distance:1});expect(f.injections).toBe(0);f.clear();expect(f.metrics().area).toBe(0);});
+  it("transports independent pigment channels after release without adding input",()=>{
+    const f=new LiquidField(1200,800);f.inject({x:600,y:400,vx:1200,vy:0,speed:1200,distance:180});f.step(1/60);
+    const before=f.pigment.slice(),initial=f.energy;let bands=0,veins=0;
+    for(let i=0;i<before.length;i+=3){bands+=before[i+1]!;veins+=before[i+2]!;}
+    expect(bands).toBeGreaterThan(0);expect(veins).toBeGreaterThan(0);expect(veins).toBeLessThan(bands);
+    for(let i=0;i<12;i++)f.step(1/60);
+    expect(f.injections).toBe(1);expect(f.energy).toBeLessThan(initial);expect(f.pigment).not.toEqual(before);
+    expect(f.pigment.every(Number.isFinite)).toBe(true);
+  });
+  it("discards queued compatibility motion on suspension and retains fresh input after a stall",()=>{
+    const f=new LiquidField(1200,800);const sample={x:600,y:400,vx:500,vy:0,speed:500,distance:100};
+    f.inject(sample);f.discardPending();f.step(.02);expect(f.energy).toBe(0);
+    f.inject(sample);f.step(10);expect(f.energy).toBeGreaterThan(0);f.step(4.5);expect(f.active).toBe(false);
+  });
+  it("bounds three-channel compatibility storage, clamps invalid input and resets cleanly",()=>{const f=new LiquidField(390,844);expect(f.bytes).toBeLessThan(FIELD.maxBytes);f.inject({x:NaN,y:1,vx:1,vy:0,speed:1,distance:1});expect(f.injections).toBe(0);f.clear();expect(f.metrics().area).toBe(0);});
   it("PH input eligibility excludes secondary, nonprimary, controls and out-of-stage starts",()=>{expect(eligible(0,true,false,{x:20,y:20},1200,800)).toBe(true);for(const [button,primary,excluded,point] of [[2,true,false,{x:20,y:20}],[0,false,false,{x:20,y:20}],[0,true,true,{x:20,y:20}],[0,true,false,{x:-1,y:20}]]as const)expect(eligible(button,primary,excluded,point,1200,800)).toBe(false);});
 });

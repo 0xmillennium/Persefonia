@@ -1,4 +1,6 @@
 import type { Point } from "./hold";
+import { PIGMENT } from "./pigment";
+import { HOLD_OPTICS } from "./hold-optics";
 export function radiusFor(progress: number, center: Point, width: number,height: number): number {
   if(progress<=0) return -1;
   const far=Math.max(Math.hypot(center.x,center.y),Math.hypot(width-center.x,center.y),Math.hypot(center.x,height-center.y),Math.hypot(width-center.x,height-center.y));
@@ -55,25 +57,29 @@ vec3 sampleFilm(sampler2D film,vec2 p,float framing){
  if(portrait>.5 && (q.y<0.0||q.y>1.0))return texture(film,clamp(q,vec2(.01),vec2(.99))).rgb*.15;
  return texture(film,clamp(q,vec2(0),vec2(1))).rgb;
 }
-vec3 pigmentAt(vec2 p){vec2 size=vec2(textureSize(field,0)),q=clamp(p,vec2(0),vec2(1))*size-.5,i=floor(q),f=fract(q);return mix(mix(texture(field,(i+.5)/size).rgb,texture(field,(i+vec2(1.5,.5))/size).rgb,f.x),mix(texture(field,(i+vec2(.5,1.5))/size).rgb,texture(field,(i+1.5)/size).rgb,f.x),f.y);}
-vec3 tinted(vec3 a){return mix(a,a*vec3(.55,.93,.9)+vec3(.025,.2,.17),.48);}
+vec3 pigmentAt(vec2 p){return texture(field,p).rgb;}
+vec3 tinted(vec3 a){return mix(a,a*vec3(.55,.93,.9)+vec3(.025,.2,.17),${HOLD_OPTICS.tintStrength});}
 void main(){
  vec4 m=texture(holdField,uv);vec3 f=vec3(0);vec2 gradient=vec2(0),displacement=vec2(0);float density=0.0;
  if(reduced<.5 && fieldActive>.5){
   vec2 px=1.0/fieldSize,fluidUV=vec2(uv.x,1.0-uv.y);
   f=pigmentAt(fluidUV);density=smoothstep(.015,.65,f.r);
-  gradient=vec2(texture(field,fluidUV+vec2(px.x,0)).r-texture(field,fluidUV-vec2(px.x,0)).r,texture(field,fluidUV-vec2(0,px.y)).r-texture(field,fluidUV+vec2(0,px.y)).r);
-  displacement=gradient*22.0/viewport;
+  // Interpolate optical slopes as well as pigment so refraction does not
+  // jump between simulation texels. RGBA16F dye uses hardware LINEAR reads.
+  gradient=vec2(pigmentAt(fluidUV+vec2(px.x,0)).r-pigmentAt(fluidUV-vec2(px.x,0)).r,pigmentAt(fluidUV-vec2(0,px.y)).r-pigmentAt(fluidUV+vec2(0,px.y)).r);
+  displacement=clamp(gradient*${PIGMENT.refraction}.0,vec2(-${PIGMENT.maxRefraction}.0),vec2(${PIGMENT.maxRefraction}.0))/viewport;
  }
- if(reduced<.5 && holdActive>.5){vec2 h=1.0/holdSize;vec4 left=texture(holdField,uv-vec2(h.x,0)),right=texture(holdField,uv+vec2(h.x,0)),top=texture(holdField,uv-vec2(0,h.y)),bottom=texture(holdField,uv+vec2(0,h.y));vec2 normal=revealing>.5?vec2(right.g-left.g,bottom.g-top.g):vec2(right.r-left.r,bottom.r-top.r);displacement+=normal*6.0/viewport;}
+ if(reduced<.5 && holdActive>.5){vec2 h=1.0/holdSize;vec4 left=texture(holdField,uv-vec2(h.x,0)),right=texture(holdField,uv+vec2(h.x,0)),top=texture(holdField,uv-vec2(0,h.y)),bottom=texture(holdField,uv+vec2(0,h.y));vec2 slope=(revealing>.5?vec2(right.g-left.g,bottom.g-top.g):vec2(right.r-left.r,bottom.r-top.r))*holdSize/viewport;vec2 normal=slope/max(length(slope),.00001);float edge=revealing>.5?m.b:m.a;displacement+=normal*${HOLD_OPTICS.refraction}.0*edge/viewport;}
  vec3 a=sampleFilm(filmA,uv+displacement,framingA);
  vec3 image=mix(a,tinted(a),reduced>.5?0.0:m.r);
  if(revealing>.5 && reduced<.5){image=mix(tinted(a),sampleFilm(filmB,uv+displacement,framingB),m.g);image=mix(image,vec3(.93,.98,.96),m.b*.8);}
+ else if(reduced<.5 && holdActive>.5){image=mix(image,vec3(.78,1.0,.94),m.a*${HOLD_OPTICS.rimStrength});}
  float marble=clamp(f.g/(f.r+.001),0.0,1.0);
  vec3 pigment=mix(vec3(.005,.25,.21),vec3(.08,.85,.69),marble);
  float vein=clamp(f.b/(f.r+.001),0.0,1.0);pigment*=1.0-vein*.35;
- image=mix(image,image*vec3(.35,.72,.65)+pigment*.8,density*.72);
- image+=vec3(.13,.26,.22)*length(gradient)*density;
+ // Absorption is a convex blend, not added light: pale films must not clip.
+ image=mix(image,mix(image*vec3(.35,.72,.65),pigment,.65),density*${PIGMENT.opacity});
+ image=mix(image,vec3(.22,.76,.65),min(length(gradient)*.16,.12)*density);
  color=vec4(image,1.0);
  if(captureCode>=0 && uv.y>1.0-16.0/viewport.y && uv.x<120.0/viewport.x){int bit=int(uv.x*viewport.x)/12;int value=(captureCode>>bit)&1;color=vec4(vec3(float(value)),1.0);}
 }`;

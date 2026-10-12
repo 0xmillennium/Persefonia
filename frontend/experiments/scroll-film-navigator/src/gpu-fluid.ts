@@ -1,5 +1,6 @@
 import { clamp } from "./transport";
 import { queueMotion,resampleMotion,motionSplat,type MotionSample } from "./input";
+import { PIGMENT,pigmentSeed } from "./pigment";
 interface Target { texture:WebGLTexture; framebuffer:WebGLFramebuffer; width:number; height:number }
 type Pair = [Target,Target];
 const vertex=`#version 300 es
@@ -19,7 +20,7 @@ const bodies:Record<string,string>={
   advect:`vec2 v=linearSample(velocity,uv).xy;vec2 back=uv-dt*v/size;result=linearSample(source,back)*decay;`,
   correct:`vec2 back=uv-dt*linearSample(velocity,uv).xy/size,grid=vec2(textureSize(auxiliary,0)),cell=floor(back*grid-.5);vec4 a=texture(auxiliary,(cell+.5)/grid),b=texture(auxiliary,(cell+vec2(1.5,.5))/grid),c=texture(auxiliary,(cell+vec2(.5,1.5))/grid),d=texture(auxiliary,(cell+1.5)/grid);vec4 lo=min(min(a,b),min(c,d)),hi=max(max(a,b),max(c,d));vec4 corrected=texture(source,uv)+.5*(texture(auxiliary,uv)-texture(reverseField,uv));result=clamp(corrected,lo,hi)*decay;`,
   splat:`vec2 v=texture(source,uv).xy;for(int i=0;i<32;i++){if(i>=splatCount)break;vec2 offset=(uv-splats[i].xy)*viewport;float weight=exp(-dot(offset,offset)/(splats[i].z*splats[i].z));vec2 tangent=normalize(forces[i]+vec2(.00001));vec2 normal=vec2(-tangent.y,tangent.x);float across=dot(offset,normal)/splats[i].z;v+=(forces[i]+tangent*length(forces[i])*.65*across)*weight*splats[i].w;}result=vec4(v,0,0);`,
-  pigment:`vec3 d=texture(source,uv).rgb;for(int i=0;i<32;i++){if(i>=splatCount)break;vec2 offset=(uv-splats[i].xy)*viewport;float weight=exp(-dot(offset,offset)/(splats[i].z*splats[i].z));vec2 tangent=normalize(forces[i]+vec2(.00001)),normal=vec2(-tangent.y,tangent.x);float across=dot(offset,normal);float band=.5+.5*sin(across*.64+sin(across*.21)*1.6);float vein=pow(.5+.5*sin(across*1.12+band*2.),10.);d+=vec3(weight,weight*band,weight*vein)*splats[i].w;}result=vec4(min(d,vec3(3)),0);`,
+  pigment:`vec3 d=texture(source,uv).rgb;for(int i=0;i<32;i++){if(i>=splatCount)break;vec2 offset=(uv-splats[i].xy)*viewport;vec2 tangent=normalize(forces[i]+vec2(.00001)),normal=vec2(-tangent.y,tangent.x);float across=dot(offset,normal),along=dot(offset,tangent),r=splats[i].z,len=r+((${PIGMENT.slowRadius}.0-r)/${PIGMENT.slowRadius-PIGMENT.fastRadius}.0)*${PIGMENT.wakeLength}.0;float weight=exp(-along*along/(len*len)-across*across/(r*r));vec2 p=vec2(uv.x,1.-uv.y)*viewport;${pigmentSeed}d+=vec3(weight,weight*band,weight*vein)*splats[i].w;}result=vec4(min(d,vec3(3)),0);`,
   curl:`vec2 h=1./size;float c=.5*(texture(velocity,uv+vec2(h.x,0)).y-texture(velocity,uv-vec2(h.x,0)).y-texture(velocity,uv+vec2(0,h.y)).x+texture(velocity,uv-vec2(0,h.y)).x);result=vec4(c,0,0,0);`,
   confine:`vec2 h=1./size;float c=texture(auxiliary,uv).r;vec2 g=.5*vec2(abs(texture(auxiliary,uv+vec2(0,h.y)).r)-abs(texture(auxiliary,uv-vec2(0,h.y)).r),abs(texture(auxiliary,uv+vec2(h.x,0)).r)-abs(texture(auxiliary,uv-vec2(h.x,0)).r));g=g/(length(g)+.0001);vec2 v=texture(velocity,uv).xy+vec2(g.x,-g.y)*c*dt*24.;vec2 neighbors=(texture(velocity,uv+vec2(h.x,0)).xy+texture(velocity,uv-vec2(h.x,0)).xy+texture(velocity,uv+vec2(0,h.y)).xy+texture(velocity,uv-vec2(0,h.y)).xy)*.25;result=vec4(clamp(mix(v,neighbors,min(dt*.15,.08)),vec2(-240),vec2(240)),0,0);`,
   divergence:`vec2 h=1./size;vec2 l=texture(velocity,uv-vec2(h.x,0)).xy,r=texture(velocity,uv+vec2(h.x,0)).xy,b=texture(velocity,uv-vec2(0,h.y)).xy,t=texture(velocity,uv+vec2(0,h.y)).xy;result=vec4(.5*(r.x-l.x+t.y-b.y),0,0,0);`,
@@ -49,7 +50,7 @@ export class GpuFluid {
     try{
       for(const [name,body] of Object.entries(bodies))this.programs.set(name,this.compile(header+`void main(){${body}}`));
       this.velocity=[this.target(this.velocityWidth,this.velocityHeight),this.target(this.velocityWidth,this.velocityHeight)];
-      this.dye=[this.target(this.width,this.height),this.target(this.width,this.height)];this.dyeScratch=[this.target(this.width,this.height),this.target(this.width,this.height)];
+      this.dye=[this.target(this.width,this.height,true),this.target(this.width,this.height,true)];this.dyeScratch=[this.target(this.width,this.height,true),this.target(this.width,this.height,true)];
       this.pressure=[this.target(this.velocityWidth,this.velocityHeight),this.target(this.velocityWidth,this.velocityHeight)];
       this.divergence=this.target(this.velocityWidth,this.velocityHeight);this.curl=this.target(this.velocityWidth,this.velocityHeight);this.clear();
     }catch(error){this.dispose();throw error;}
@@ -58,10 +59,12 @@ export class GpuFluid {
     const gl=this.gl,shaders:WebGLShader[]=[],p=gl.createProgram();if(!p)throw new Error("Fluid program allocation failed");
     try{for(const [kind,source] of [[gl.VERTEX_SHADER,vertex],[gl.FRAGMENT_SHADER,fragment]] as const){const s=gl.createShader(kind);if(!s)throw new Error("Fluid shader allocation failed");shaders.push(s);gl.shaderSource(s,source);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(s)??"Fluid compile failed");gl.attachShader(p,s);}gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(p)??"Fluid link failed");return p;}catch(error){gl.deleteProgram(p);throw error;}finally{for(const s of shaders)gl.deleteShader(s);}
   }
-  private target(width:number,height:number):Target{
+  private target(width:number,height:number,linear=false):Target{
     const gl=this.gl,texture=gl.createTexture(),framebuffer=gl.createFramebuffer();if(!texture||!framebuffer){if(texture)gl.deleteTexture(texture);if(framebuffer)gl.deleteFramebuffer(framebuffer);throw new Error("Fluid target allocation failed");}
     const target={texture,framebuffer,width,height};this.targets.push(target);
-    gl.bindTexture(gl.TEXTURE_2D,texture);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+    // RGBA16F is filterable in WebGL2. Pressure/velocity retain exact grid
+    // reads; dye uses hardware interpolation for continuous optical slopes.
+    gl.bindTexture(gl.TEXTURE_2D,texture);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,linear?gl.LINEAR:gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,linear?gl.LINEAR:gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
     gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA16F,width,height,0,gl.RGBA,gl.HALF_FLOAT,null);gl.bindFramebuffer(gl.FRAMEBUFFER,framebuffer);gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,texture,0);
     if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE)throw new Error("Fluid framebuffer incomplete");return target;
   }
@@ -81,6 +84,8 @@ export class GpuFluid {
     this.active=true;this.injections++;
     if(queueMotion(this.samples,{...sample}))this.droppedSamples++;
   }
+  // Suspension invalidates unconsumed input, never the already rendered field.
+  discardPending():void{this.samples=[];}
   step(elapsed:number):void{
     if(!this.active||this.disposed)return;
     const aged=this.age+Math.max(0,elapsed),fresh=this.samples.length>0;
@@ -94,12 +99,12 @@ export class GpuFluid {
     // One bounded transport step prevents catch-up spirals on constrained devices.
     // Excess transport time is deliberately discarded; wall time owns fade/expiry.
     this.transportSecondsDiscarded+=Math.max(0,elapsed-dt);
-    this.pass("advect",this.velocity[1],this.velocity[0],this.velocity[0],undefined,{dt,decay:Math.exp(-1.1*elapsed)});this.velocity.reverse();
+    this.pass("advect",this.velocity[1],this.velocity[0],this.velocity[0],undefined,{dt,decay:Math.exp(-PIGMENT.drag*elapsed)});this.velocity.reverse();
     this.splatCount=0;
     for(const sample of resampleMotion(this.samples)){
       const {radius,dose}=motionSplat(sample),i=this.splatCount++;
         this.splats.set([sample.x/this.stageWidth,1-sample.y/this.stageHeight,radius,dose],i*4);
-        this.forces.set([sample.vx/this.stageWidth*this.velocityWidth*.14,-sample.vy/this.stageHeight*this.velocityHeight*.14],i*2);
+        this.forces.set([sample.vx/this.stageWidth*this.velocityWidth*PIGMENT.force,-sample.vy/this.stageHeight*this.velocityHeight*PIGMENT.force],i*2);
     }
     if(this.splatCount){this.pass("splat",this.velocity[1],this.velocity[0]);this.velocity.reverse();}
     this.samples=[];
@@ -110,7 +115,7 @@ export class GpuFluid {
     // Bounded MacCormack correction preserves transported veins without creating new extrema.
     this.pass("advect",this.dyeScratch[0],this.dye[0],this.velocity[0],undefined,{dt,decay:1});
     this.pass("advect",this.dyeScratch[1],this.dyeScratch[0],this.velocity[0],undefined,{dt:-dt,decay:1});
-    this.pass("correct",this.dye[1],this.dyeScratch[0],this.velocity[0],this.dye[0],{dt,decay:Math.exp(-1.05*elapsed)});this.dye.reverse();
+    this.pass("correct",this.dye[1],this.dyeScratch[0],this.velocity[0],this.dye[0],{dt,decay:Math.exp(-PIGMENT.fade*elapsed)});this.dye.reverse();
     // Fresh dye arrives after aging/transporting the existing pigment.
     if(this.splatCount){this.pass("pigment",this.dye[1],this.dye[0]);this.dye.reverse();}
     gl.bindFramebuffer(gl.FRAMEBUFFER,null);
