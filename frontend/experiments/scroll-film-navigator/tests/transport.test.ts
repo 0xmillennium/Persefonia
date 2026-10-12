@@ -59,7 +59,9 @@ describe("Frame transport",()=>{
 
 it("FT-08/09 preparation follows direction and scales its bounded window with speed",async()=>{
   const calls:number[]=[];const cache=new FrameCache<Image>(async(_film,index)=>{calls.push(index);return image(String(index));},20,2);
-  cache.request([{film:"tree",index:100}],[],{direction:-1,speed:48});await flush();await flush();
+  cache.request([{film:"tree",index:100}],[],{direction:-1,speed:48});
+  for(let n=0;n<20&&(cache.pending||cache.queued);n++)await flush();
+  expect(cache.pending).toBe(0);expect(cache.queued).toBe(0);
   expect(calls[0]).toBe(100);expect(calls[1]).toBe(99);expect(calls).toContain(92);expect(calls).not.toContain(108);
   expect(cache.entries.size).toBeLessThanOrEqual(20);expect(cache.peakPending).toBe(2);cache.dispose();
 });
@@ -74,22 +76,26 @@ it("Latest uncached target preempts a speculative transfer that remains inside l
   try{
     cache.request([{film:"tree",index:100}]);await flush();
     cache.request([{film:"tree",index:100}],["tree:100"],{direction:1,speed:48});await flush();
+    // Fill the second slot with exact-current work, rather than assuming two
+    // speculative loads may monopolize both slots under the repaired policy.
+    cache.request([{film:"tree",index:102}],["tree:100"],{direction:1,speed:48});await flush();
     expect(cache.pending).toBe(2);expect(calls).toContain(102);
     cache.request([{film:"tree",index:99}],["tree:100"],{direction:1,speed:48});await flush();
-    expect(calls).toContain(99);expect(signals.get(102)!.aborted).toBe(true);
+    expect(calls).toContain(99);expect(signals.get(101)!.aborted).toBe(true);
     expect(cache.get("tree:99")).toBeDefined();expect(cache.peakPending).toBe(2);
   }finally{cache.dispose();}
 });
 
-it("Ordinary forward traversal retains ahead work rather than repeatedly starving transfers",async()=>{
+it("Ordinary forward traversal retains ahead work while the uncached current target receives reserved capacity",async()=>{
   const signals=new Map<number,AbortSignal>();
   const cache=new FrameCache<Image>((_film,index,signal)=>{signals.set(index,signal);return index===100?Promise.resolve(image("100")):new Promise(()=>{});},20,2);
   try{
     cache.request([{film:"tree",index:100}]);await flush();
     cache.request([{film:"tree",index:100}],["tree:100"],{direction:1,speed:48});await flush();
-    expect(signals.has(102)).toBe(true);
+    expect(cache.decodingKeys).toEqual(["tree:101"]);
     cache.request([{film:"tree",index:103}],["tree:100"],{direction:1,speed:48});await flush();
-    expect(signals.get(101)!.aborted).toBe(false);expect(signals.get(102)!.aborted).toBe(false);
+    expect(signals.get(101)!.aborted).toBe(false);expect(signals.get(103)!.aborted).toBe(false);
+    expect(cache.decodingKeys).toEqual(["tree:101","tree:103"]);expect(cache.peakPending).toBe(2);
   }finally{cache.dispose();}
 });
 

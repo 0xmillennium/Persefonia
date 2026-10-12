@@ -10,7 +10,8 @@ export const keyFor = (film: Film, index: number): FrameKey => `${film}:${index}
 export interface PreparationHint { direction: 1|-1; speed: number }
 export interface Decoded { width: number; height: number; close(): void }
 export interface Loader<T extends Decoded> { (film: Film, index: number, signal: AbortSignal, attempt: number): Promise<T> }
-interface Request { key: FrameKey; film: Film; index: number; priority: number; attempt: number; controller: AbortController }
+interface Request { key: FrameKey; film: Film; index: number; priority: number; attempt: number; controller: AbortController; id:number; lane?:"current"|"speculative" }
+export interface PreparationEvent {stage:string;key:FrameKey;time:number;id:number;priority:number;current:boolean;active:FrameKey[];aborted:boolean;lane?:"current"|"speculative"}
 
 /** Bounded decoded LRU and bounded latest-target work queue. Renderer owns two presentation slots separately. */
 export class FrameCache<T extends Decoded> {
@@ -24,11 +25,13 @@ export class FrameCache<T extends Decoded> {
   private suspended = false;
   private targets: readonly {film: Film; index: number}[] = [];
   private direction:1|-1=1;
+  private urgent=false;
   private readinessSeconds=0;
+  private requestId=0;
   hits = 0; misses = 0; evictions = 0; staleCompletions = 0; failures = 0;
   peakPending = 0;
   error: string | null = null;
-  constructor(private loader: Loader<T>, readonly limit = 8, readonly concurrency = 2, private changed: () => void = () => {}) {
+  constructor(private loader: Loader<T>, readonly limit = 8, readonly concurrency = 2, private changed: () => void = () => {},private observe?:(event:PreparationEvent)=>void) {
     if(limit < 4 || concurrency < 1 || concurrency > limit) throw new Error("Invalid cache budget");
   }
   get(key: FrameKey): T | undefined {
@@ -58,19 +61,20 @@ export class FrameCache<T extends Decoded> {
     const available=Math.max(targets.length,this.limit-presented.filter(key=>!unique.has(key)).length);
     const prepared=[...unique.values()].slice(0,available),wanted=new Set(prepared.map(t=>keyFor(t.film,t.index)));
     this.queue=this.queue.filter(r=>wanted.has(r.key));
-    for(const r of this.inFlight.values())if(!wanted.has(r.key)&&!this.pinned.has(r.key))r.controller.abort();
+    for(const r of this.inFlight.values())if(!wanted.has(r.key)&&!this.pinned.has(r.key))this.cancel(r);
     // A wanted speculative neighbor can still block a new film/reversal/jump.
     // Ordinary traversal must keep useful ahead work: repeatedly preempting it
     // when decode lags the scroll clock can starve every forthcoming frame.
     // Retain bounded decode ownership until abort/decode settlement; preempt only
     // enough unpinned transfers to admit missing current targets, never residents.
     const urgent=targets.some(t=>{const previous=previousTargets.find(p=>p.film===t.film);return !previous||Math.abs(t.index-previous.index)>Math.max(2,ahead)||(t.index-previous.index)*this.direction<0;});
+    if(urgent)this.urgent=true;
     this.direction=hint?.direction??this.direction;
     const missing=urgent?targets.filter(t=>{const key=keyFor(t.film,t.index);return !this.entries.has(key)&&!this.inFlight.has(key)&&!this.failed.has(key);}).length:0;
     const settling=[...this.inFlight.values()].filter(r=>r.controller.signal.aborted).length;
     let needed=Math.max(0,missing-(this.concurrency-this.inFlight.size+settling));
     const speculative=[...this.inFlight.values()].filter(r=>!this.pinned.has(r.key)&&!r.controller.signal.aborted).sort((a,b)=>b.priority-a.priority);
-    for(const r of speculative){if(needed--<=0)break;r.controller.abort();}
+    for(const r of speculative){if(needed--<=0)break;this.cancel(r);}
     for(const target of prepared)this.enqueue(target.film,target.index,target.priority);
     this.queue.sort((a,b)=>a.priority-b.priority);
     this.evict(); this.pump();
@@ -80,25 +84,53 @@ export class FrameCache<T extends Decoded> {
     if(this.entries.has(key)) { this.hits++; return; }
     const queued=this.queue.find(r=>r.key===key);if(queued){queued.priority=priority;return;}
     if(this.failed.has(key) || this.inFlight.has(key)) return;
-    this.misses++; this.queue.push({key,film,index,priority,attempt:this.retryAttempts.get(key)??0,controller:new AbortController()});
+    this.misses++;const r={key,film,index,priority,attempt:this.retryAttempts.get(key)??0,controller:new AbortController(),id:++this.requestId};this.queue.push(r);this.event(r,"queued");
   }
+  private event(r:Request,stage:string):void {
+    if(this.observe)this.observe({stage,key:r.key,time:performance.now(),id:r.id,priority:r.priority,current:this.targets.some(t=>keyFor(t.film,t.index)===r.key),active:[...this.inFlight.keys()],aborted:r.controller.signal.aborted,lane:r.lane});
+  }
+  private cancel(r:Request):void {if(!r.controller.signal.aborted){r.controller.abort();this.event(r,"cancel");}}
   private pump(): void {
     while(!this.disposed && !this.suspended && this.inFlight.size<this.concurrency && this.queue.length) {
-      const r=this.queue.shift()!; this.inFlight.set(r.key,r);
+      const current=this.queue.filter(r=>this.targets.some(t=>keyFor(t.film,t.index)===r.key));
+      if(!current.length)this.urgent=false;
+      // Preserve admission roles until settlement. A current request becoming
+      // old must not turn both lanes into a pipeline of already-late targets.
+      // One lane services the latest target; the other can finish useful ahead
+      // work. Canceled operations still count against actual concurrency.
+      const ownedCurrent=[...this.inFlight.values()].some(r=>r.lane==="current"&&!r.controller.signal.aborted);
+      const speculative=[...this.inFlight.values()].filter(r=>r.lane==="speculative").length;
+      const prediction=speculative<this.concurrency-1?this.queue.find(r=>!current.includes(r)):undefined;
+      // Paired preparation must not fill both slots with one film while the
+      // other film's latest target waits. Include older owned work in fairness.
+      const owned=(film:Film)=>[...this.inFlight.values()].filter(r=>r.film===film).length;
+      current.sort((a,b)=>owned(a.film)-owned(b.film)||a.priority-b.priority);
+      // With one film and a productive current-owned operation still running,
+      // keep the prediction lane productive. Exact-current work receives the
+      // next current-lane settlement, rather than perpetually replacing ahead
+      // work with another target that cannot finish before traversal passes it.
+      const r=!this.urgent&&this.targets.length===1&&ownedCurrent&&prediction?prediction:current[0]??prediction;
+      if(!r)break;
+      r.lane=current.includes(r)?"current":"speculative";
+      this.queue.splice(this.queue.indexOf(r),1);this.inFlight.set(r.key,r);
+      if(current.length===1&&r===current[0])this.urgent=false;
+      this.event(r,"admitted");
       const started=performance.now();
       this.peakPending=Math.max(this.peakPending,this.inFlight.size);
       void this.loader(r.film,r.index,r.controller.signal,r.attempt).then(image=>{
-        if(this.disposed || r.controller.signal.aborted) { image.close(); this.staleCompletions++; return; }
+        if(this.disposed || r.controller.signal.aborted) { image.close(); this.staleCompletions++;this.event(r,"obsolete"); return; }
         const elapsed=Math.max(0,(performance.now()-started)/1000);
         this.readinessSeconds=this.readinessSeconds?this.readinessSeconds*.75+elapsed*.25:elapsed;
-        this.entries.set(r.key,image); this.evict();
+        this.entries.set(r.key,image); this.evict();this.event(r,"ready");
       }).catch((error: unknown)=>{
+        this.event(r,r.controller.signal.aborted?"aborted":"failed");
         if(!r.controller.signal.aborted && !this.disposed) {
           this.failures++; this.error=`${r.key}: ${String(error)}`; this.failed.add(r.key);
           // At most 384 possible keys. Explicit retry, rather than hot-looping broken frames.
         }
       }).finally(()=>{
         this.inFlight.delete(r.key);
+        this.event(r,"settled");
         if(!this.disposed && !this.suspended) {
           for(const [priority,target] of this.targets.entries()) this.enqueue(target.film,target.index,priority);
           this.queue.sort((a,b)=>a.priority-b.priority);
@@ -113,7 +145,7 @@ export class FrameCache<T extends Decoded> {
       if(!this.pinned.has(key)) { this.entries.delete(key); image.close(); this.evictions++; }
     }
   }
-  suspend(): void { this.suspended=true; this.queue=[]; for(const r of this.inFlight.values())r.controller.abort(); }
+  suspend(): void { this.suspended=true; this.queue=[]; for(const r of this.inFlight.values())this.cancel(r); }
   retry(): void {
     // Native image caches can retain a corrupt decode by URL even after the source
     // recovers. Only explicit retries of failed keys get a fresh delivery identity.
@@ -125,7 +157,7 @@ export class FrameCache<T extends Decoded> {
   get scheduledKeys(): FrameKey[] { return [...this.inFlight.keys(),...this.queue.map(r=>r.key)]; }
   get decodingKeys(): FrameKey[] { return [...this.inFlight.keys()]; }
   get bytes(): number { let n=0; for(const image of this.entries.values()) n+=image.width*image.height*4; return n; }
-  dispose(): void { this.disposed=true; for(const r of this.inFlight.values()) r.controller.abort(); this.queue=[]; this.targets=[]; for(const image of this.entries.values()) image.close(); this.entries.clear(); this.pinned.clear(); this.failed.clear(); this.retryAttempts.clear(); }
+  dispose(): void { this.disposed=true; for(const r of this.inFlight.values()) this.cancel(r); this.queue=[]; this.targets=[]; for(const image of this.entries.values()) image.close(); this.entries.clear(); this.pinned.clear(); this.failed.clear(); this.retryAttempts.clear(); }
 }
 
 /** Async availability does not own desired state. Presentation can only acknowledge current target. */

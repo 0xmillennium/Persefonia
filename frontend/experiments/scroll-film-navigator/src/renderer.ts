@@ -21,6 +21,7 @@ export class Renderer {
   width=1; height=1;fluid:GpuFluid|null=null;
   private holdSize=[0,0];private holdRevision=-1;private material:HoldMaterial|null=null;
   private frameQuery:WebGLQuery|null=null;
+  private backendInfo:{vendor:unknown;renderer:unknown}|null=null;
   disposed=false;
   constructor(readonly canvas: HTMLCanvasElement,private captureIdentity=false) {
     const gl=canvas.getContext("webgl2",{alpha:false,antialias:false,preserveDrawingBuffer:false,powerPreference:"default"});
@@ -109,6 +110,11 @@ export class Renderer {
   get residentKeys(): FrameKey[] {return this.keys.filter((key):key is FrameKey=>key!==null);}
   get bytes(): number {return this.disposed?0:this.textureBytes[0]!+this.textureBytes[1]!+(this.fluid?.bytes??0)+this.holdSize[0]!*this.holdSize[1]!*4+this.canvas.width*this.canvas.height*4;}
   get textureCount():number{return this.disposed?0:this.textures.length+(this.fluid?.textures??0);}
-  get info(): object {const ext=this.gl.getExtension("WEBGL_debug_renderer_info");return {vendor:ext?this.gl.getParameter(ext.UNMASKED_VENDOR_WEBGL):this.gl.getParameter(this.gl.VENDOR),renderer:ext?this.gl.getParameter(ext.UNMASKED_RENDERER_WEBGL):this.gl.getParameter(this.gl.RENDERER),buffer:[this.canvas.width,this.canvas.height],gpuTimer:!!this.timer};}
+  get info(): object {
+    // Backend identity is fixed for this renderer instance. Repeated diagnostic
+    // inspection must not synchronously query the GPU during scroll/decode work.
+    if(!this.backendInfo){const ext=this.gl.getExtension("WEBGL_debug_renderer_info");this.backendInfo={vendor:ext?this.gl.getParameter(ext.UNMASKED_VENDOR_WEBGL):this.gl.getParameter(this.gl.VENDOR),renderer:ext?this.gl.getParameter(ext.UNMASKED_RENDERER_WEBGL):this.gl.getParameter(this.gl.RENDERER)};}
+    return {...this.backendInfo,buffer:[this.canvas.width,this.canvas.height],gpuTimer:!!this.timer};
+  }
   dispose(): void {if(this.disposed)return;this.disposed=true;if(this.frameQuery){if(!this.gl.isContextLost())this.gl.endQuery(this.timer!.TIME_ELAPSED_EXT);this.gl.deleteQuery(this.frameQuery);this.frameQuery=null;}this.fluid?.dispose();this.fluid=null;for(const q of this.queries)this.gl.deleteQuery(q);this.queries=[];for(const tex of this.textures)this.gl.deleteTexture(tex);this.textures=[];this.gl.deleteProgram(this.program);this.keys=[null,null];this.textureBytes=[0,0];}
 }

@@ -8,7 +8,7 @@ import { HoldMaterial } from "./hold-material";
 import { Renderer } from "./renderer";
 import { ImageRenderer } from "./image-renderer";
 import { CanvasRenderer } from "./canvas-renderer";
-import { Metrics } from "./metrics";
+import { Metrics,DeliveryTimeline } from "./metrics";
 import { loadBitmap } from "./loader";
 import { WheelCalibration } from "./wheel";
 import { themeFor } from "./theme";
@@ -26,6 +26,7 @@ const poster=element<HTMLImageElement>("poster"),posterLayer=element("poster-lay
 const mediaVersion=document.querySelector<HTMLMetaElement>('meta[name="film-media-version"]')!.content;
 const tier=window.innerWidth<=700?960:1600;
 const traversal=new TraversalEstimator();
+const delivery=import.meta.env.DEV&&new URLSearchParams(location.search).has("delivery")?new DeliveryTimeline():null;
 let width=window.innerWidth,height=window.innerHeight,field:LiquidField|GpuFluid=new LiquidField(width,height),material=new HoldMaterial(width,height);
 let contextControl: WEBGL_lose_context|null=null;
 let renderer: Renderer|CanvasRenderer|ImageRenderer|null=null,renderFailure: string|null=null,acceleratedFailure:string|null=null,disposed=false,suspended=document.hidden;
@@ -40,17 +41,27 @@ const abortEvents=new AbortController();
 const events={signal:abortEvents.signal};
 const cache=new FrameCache<ImageBitmap>(async (film,index,signal,attempt)=>{
   const start=performance.now();
+  const key=keyFor(film,index),observe=delivery?(stage:string)=>delivery.record({stage,key}):undefined;
   let bitmap:ImageBitmap;
   if(film==="robotic-arm"&&index===0&&attempt===0){
+    observe?.("image-start");
     await poster.decode();if(signal.aborted)throw new DOMException("Aborted","AbortError");
-    bitmap=await createImageBitmap(poster);if(signal.aborted){bitmap.close();throw new DOMException("Aborted","AbortError");}
-  }else bitmap=await loadBitmap(`/media/${mediaVersion}/${tier}/${film}/frame_${String(index+1).padStart(5,"0")}.webp${attempt?`?retry=${attempt}`:""}`,signal);
+    observe?.("image-ready");observe?.("bitmap-start");bitmap=await createImageBitmap(poster);observe?.("bitmap-ready");if(signal.aborted){bitmap.close();throw new DOMException("Aborted","AbortError");}
+  }else bitmap=await loadBitmap(`/media/${mediaVersion}/${tier}/${film}/frame_${String(index+1).padStart(5,"0")}.webp${attempt?`?retry=${attempt}`:""}`,signal,observe);
   metrics.decode.add(performance.now()-start);
   if(film===transport.film&&index===transport.desired&&decodedVersion!==transport.version){decodedVersion=transport.version;metrics.targetToDecode.add(performance.now()-requestStarted);}
   return bitmap;
-},20,2,()=>{requestSignature="";requestFrames();wake();});
+},20,2,()=>{requestSignature="";requestFrames();wake();},delivery?event=>delivery.record({...event,version:transport.version}):undefined);
 
 function range(): number {return document.documentElement.scrollHeight-window.innerHeight;}
+function rendererInfo():object|null {
+  if(!delivery)return renderer?.info??null;
+  const start=performance.now(),info=renderer?.info??null;delivery.record({stage:"info-read",duration:performance.now()-start});return info;
+}
+function metricReport():object {
+  if(!delivery)return metrics.report();
+  const start=performance.now(),report=metrics.report();delivery.record({stage:"metric-read",duration:performance.now()-start});return report;
+}
 function state(): object {return {
   film:transport.film,theme:themeFor(transport.film),progress:transport.progress,desired:transport.desired,presented:transport.presented,drawn:drawnKey,next:presentedNext,
   uploaded:renderer?.residentKeys??[],presentationEvidence:"draw submission; captured video/trace is evaluated separately",version:transport.version,commits:transport.commits,hold:{phase:hold.phase,revealProgress:hold.revealProgress,revealCenter:{...hold.revealCenter},material:{bytes:material.bytes,area:material.area,coverage:material.coverage,generations:material.generations,revision:material.revision},progress:hold.progress,expansion:hold.expansion,center:{...hold.center},target:{...hold.target},countdown:hold.countdown,pressed:hold.pressed,cycles:hold.cycles,coverage:coverageValue},
@@ -59,9 +70,9 @@ function state(): object {return {
   modality:pointer.modality,core:{visible:pointerVisible,x:`${core.dataset.x??""}px`,y:`${core.dataset.y??""}px`},field:{backend:field instanceof GpuFluid?"gpu-fluid":"basic",pendingSamples:field instanceof GpuFluid?field.pendingSamples:0,passes:field instanceof GpuFluid?field.passes:0,droppedSamples:field instanceof GpuFluid?field.droppedSamples:0,transportSecondsDiscarded:field instanceof GpuFluid?field.transportSecondsDiscarded:0,active:field.active,energyEvidence:field instanceof GpuFluid?"last explicit inspection readback; not a live per-frame metric":"CPU fallback sample",energy:field.energy,peak:field.peak,injections:field.injections,bytes:field.bytes},
   cache:{size:cache.entries.size,limit:cache.limit,pending:cache.pending,queued:cache.queued,peakPending:cache.peakPending,bytes:cache.bytes,hits:cache.hits,misses:cache.misses,evictions:cache.evictions,staleCompletions:cache.staleCompletions,failures:cache.failures,error:cache.error},
   capture:{id:gestureId,expected:captureExpected,owned:gestureId!==null&&stage.hasPointerCapture(gestureId)},
-  renderer:{kind:renderer?.kind??null,bytes:renderer?.bytes??0,uploads:renderer?.uploads??0,draws:renderer?.draws??0,info:renderer?.info??null,acceleratedFailure},
-  gpu:{bytes:renderer instanceof Renderer?renderer.bytes:0,textures:renderer instanceof Renderer?renderer.textureCount:0,uploads:renderer instanceof Renderer?renderer.uploads:0,draws:renderer instanceof Renderer?renderer.draws:0,queriesBound:4,info:renderer instanceof Renderer?renderer.info:null,samples:renderer instanceof Renderer?renderer.gpuSamples:[]},
-  stalePresentations:transport.stalePresentations,reveal,renderFailure,historyFailure,persistencePending:!!persistenceTimer,tier,mediaVersion,reduced:motion.matches,suspended,disposed,scheduled:!!raf,metrics:metrics.report(),viewport:{width,height,dpr:devicePixelRatio}
+  renderer:{kind:renderer?.kind??null,bytes:renderer?.bytes??0,uploads:renderer?.uploads??0,draws:renderer?.draws??0,info:rendererInfo(),acceleratedFailure},
+  gpu:{bytes:renderer instanceof Renderer?renderer.bytes:0,textures:renderer instanceof Renderer?renderer.textureCount:0,uploads:renderer instanceof Renderer?renderer.uploads:0,draws:renderer instanceof Renderer?renderer.draws:0,queriesBound:4,info:renderer instanceof Renderer?rendererInfo():null,samples:renderer instanceof Renderer?renderer.gpuSamples:[]},
+  stalePresentations:transport.stalePresentations,reveal,renderFailure,historyFailure,persistencePending:!!persistenceTimer,tier,mediaVersion,reduced:motion.matches,suspended,disposed,scheduled:!!raf,metrics:metricReport(),viewport:{width,height,dpr:devicePixelRatio}
 };}
 function durable(force=false): void {
   if(disposed||suspended||document.hidden)return;
@@ -91,7 +102,9 @@ function requestFrames(): void {
   const targets=[{film:transport.film,index:transport.desired}];
   if(hold.preparing)targets.push({film:otherFilm(transport.film),index:transport.desired});
   const signature=targets.map(t=>keyFor(t.film,t.index)).join("|")+`:${traversal.direction}:${Math.ceil(traversal.speed*.18)}`;
-  if(transport.version!==observedVersion){observedVersion=transport.version;requestStarted=performance.now();if(cache.entries.has(keyFor(transport.film,transport.desired))){decodedVersion=transport.version;metrics.targetToDecode.add(0);}}
+  if(transport.version!==observedVersion){observedVersion=transport.version;requestStarted=performance.now();
+    delivery?.record({stage:"selected",key:keyFor(transport.film,transport.desired),version:transport.version,cacheHit:cache.entries.has(keyFor(transport.film,transport.desired)),active:cache.decodingKeys,queued:cache.scheduledKeys.filter(key=>!cache.decodingKeys.includes(key)),scrollY:window.scrollY,range:range()});
+    if(cache.entries.has(keyFor(transport.film,transport.desired))){decodedVersion=transport.version;metrics.targetToDecode.add(0);}}
   if(signature===requestSignature)return;
   requestSignature=signature;
   cache.request(targets,renderer?.residentKeys??(transport.presented?[transport.presented]:[]),traversal.hint);
@@ -123,6 +136,7 @@ function settleHold():void {if(!(import.meta.env.DEV&&testingFrozen))holdClock.b
 function wake(): void {if(!raf&&!disposed&&!suspended){lastTime=0;settledDraw=true;raf=requestAnimationFrame(tick);}}
 function tick(now:number): void {
   raf=0;if(disposed||suspended)return;
+  delivery?.record({stage:"raf",callback:now,key:keyFor(transport.film,transport.desired),version:transport.version,cacheHit:cache.entries.has(keyFor(transport.film,transport.desired))});
   // A new stroke may arrive while the prior idle redraw is already queued.
   // Arm settlement from observed activity, not only from the first wake call.
   settledDraw=settledDraw||field.active||hold.animating;
@@ -142,8 +156,8 @@ function tick(now:number): void {
   if(renderer) {
     try {
       const uploadStarted=performance.now();
-      if(active&&(hold.phase!=="REVEALING"||paired)) {renderer.upload(0,activeKey,active);submittedKey=activeKey;}
-      if(paired) {renderer.upload(1,nextKey,next!);presentedNext=nextKey;reveal=hold.phase==="REVEALING"&&!reduced;}
+      if(active&&(hold.phase!=="REVEALING"||paired)) {const changed=renderer.residentKeys[0]!==activeKey;renderer.upload(0,activeKey,active);submittedKey=activeKey;if(changed)delivery?.record({stage:"upload",key:activeKey,slot:0,version:transport.version});}
+      if(paired) {const changed=renderer.residentKeys[1]!==nextKey;renderer.upload(1,nextKey,next!);presentedNext=nextKey;reveal=hold.phase==="REVEALING"&&!reduced;if(changed)delivery?.record({stage:"upload",key:nextKey,slot:1,version:transport.version});}
       else if(hold.phase!=="REVEALING") {presentedNext=null;reveal=false;}
       metrics.upload.add(performance.now()-uploadStarted);
     } catch(error) {
@@ -167,6 +181,7 @@ function tick(now:number): void {
   catch(error){renderFailure=String(error);renderer?.dispose();renderer=null;hold.reset();field.clear();releaseCapture();fallback.width=width;fallback.height=height;fallback.hidden=false;canvas.hidden=true;const plain=commit?next:active;if(plain){drawFallback(plain);submittedKey=keyFor(transport.film,transport.desired);}}
   if(renderer instanceof ImageRenderer)submittedKey=renderer.presentedKey===keyFor(transport.film,transport.desired)?renderer.presentedKey:null;
   if(submittedKey)transport.present(submittedKey);
+  delivery?.record({stage:"draw-submitted",key:renderer?.residentKeys[0]??drawnKey,desired:keyFor(transport.film,transport.desired),version:transport.version,accepted:!!submittedKey});
   metrics.drawSubmission.add(performance.now()-submit);
   if(transport.presented && !renderFailure && !(renderer instanceof ImageRenderer))posterLayer.hidden=true;
   if(transport.presented===keyFor(transport.film,transport.desired)&&drawnKey!==transport.presented) {
@@ -327,7 +342,8 @@ if(import.meta.env.DEV) {
     await settled();
   },resetMetrics:()=>metrics.reset(),clearFluid:async()=>{field.clear();pointer.reset();wake();await settled();},fieldMetrics:()=>field.metrics(),dispose,
     suspend,resume,contextLoss:()=>{contextControl=renderer instanceof Renderer?renderer.gl.getExtension("WEBGL_lose_context"):null;contextControl?.loseContext();},
-    contextRestore:()=>contextControl?.restoreContext()
+    contextRestore:()=>contextControl?.restoreContext(),
+    delivery:()=>delivery?.snapshot()??null,markDelivery:(stage:string,details:Record<string,unknown>={})=>delivery?.record({...details,stage})
   }});
 }
 initializeRenderer();restore();

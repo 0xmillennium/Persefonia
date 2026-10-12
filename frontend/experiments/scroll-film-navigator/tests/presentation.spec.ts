@@ -26,7 +26,7 @@ test("Native scroll presents ready frames forward/reverse and stops without a pl
   await expect.poll(async()=>{const s=await state(page);return !s.scheduled&&s.cache.pending===0;}).toBe(true);
   const stop=await state(page);await page.waitForTimeout(250);const after=await state(page);
   expect(after.desired).toBe(stop.desired);expect(after.drawn).toBe(stop.drawn);expect(after.scheduled).toBe(false);expect(after.stalePresentations).toBe(0);await displayed(page,10);
-  const directory=fileURLToPath(new URL("../../../test-results/scroll-film-navigator/stabilization/",import.meta.url));await mkdir(directory,{recursive:true});await writeFile(`${directory}presentation-${info.project.name}.json`,JSON.stringify({method:"Native scroll geometry; small ready SVG frame fixtures served as image responses; actual screenshot color identities. Readiness includes polling/screenshot IPC, not decoder-only latency or physical scanout.",samples,stop,after},null,2));
+  const directory=fileURLToPath(new URL(`../../../test-results/scroll-film-navigator/${process.env.FILM_REPORT_LABEL??"stabilization"}/`,import.meta.url));await mkdir(directory,{recursive:true});await writeFile(`${directory}presentation-${info.project.name}.json`,JSON.stringify({method:"Native scroll geometry; small ready SVG frame fixtures served as image responses; actual screenshot color identities. Readiness includes polling/screenshot IPC, not decoder-only latency or physical scanout.",samples,stop,after},null,2));
 });
 
 test("Delayed target retains the valid image and redraws on decode without further scroll",async({page},info)=>{
@@ -38,4 +38,23 @@ test("Delayed target retains the valid image and redraws on decode without furth
   await expect.poll(()=>requested).toBe(true);await expect.poll(async()=>(await state(page)).desired).toBe(96);
   expect((await state(page)).drawn).toBe("robotic-arm:0");await displayed(page,0);
   release();await expect.poll(async()=>(await state(page)).drawn).toBe("robotic-arm:96");await displayed(page,96);expect((await state(page)).stalePresentations).toBe(0);
+});
+
+test("Repeated diagnostics avoid synchronous backend queries and retain live buffer dimensions",async({page})=>{
+  await page.goto("/");await ready(page);
+  expect((await state(page)).renderer.kind).toBe("webgl2");
+  const queries=await page.evaluate(()=>{
+    const canvas=document.querySelector<HTMLCanvasElement>("canvas")!,gl=canvas.getContext("webgl2")!;
+    const ext=gl.getExtension("WEBGL_debug_renderer_info"),keys=new Set<number|undefined>([gl.VENDOR,gl.RENDERER,ext?.UNMASKED_VENDOR_WEBGL,ext?.UNMASKED_RENDERER_WEBGL]);
+    const original=gl.getParameter.bind(gl);let count=0;
+    gl.getParameter=(key:number)=>{if(keys.has(key))count++;return original(key);};
+    try{for(let n=0;n<12;n++)window.__filmExperiment!.state();return count;}finally{gl.getParameter=original;}
+  });
+  expect(queries).toBe(0);
+  await page.setViewportSize({width:1000,height:700});
+  await expect.poll(()=>page.evaluate(()=>{
+    const canvas=document.querySelector<HTMLCanvasElement>("canvas")!;
+    const info=window.__filmExperiment!.state().renderer.info as {buffer:number[]};
+    return info.buffer[0]===canvas.width&&info.buffer[1]===canvas.height&&innerWidth===1000;
+  })).toBe(true);
 });

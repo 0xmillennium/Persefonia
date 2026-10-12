@@ -1,6 +1,6 @@
 # Experiment 02 remediation qualification
 
-> Current stabilization results and task-specific acceptance are recorded separately in [STABILIZATION.md](STABILIZATION.md). The historical findings below are preserved and are not final-source qualification.
+> Current delivery continuation and task-specific acceptance are in [DELIVERY.md](DELIVERY.md). The preceding stabilization is recorded separately in [STABILIZATION.md](STABILIZATION.md). The historical findings below are preserved and are not final-source qualification.
 
 > Historical remediation evidence follows. The later bounded finalization started from `fa3aefe8b79a14751c47ddfb178783627a48fb3b`, not the revision below. Consult [HOLD.md](HOLD.md) for the latest hold refinement and qualification stop, [NAVIGATOR.md](NAVIGATOR.md) for the preceding navigator checkpoint, [FOLLOWUP.md](FOLLOWUP.md) for approved background delivery, and [FINALIZATION.md](FINALIZATION.md) for unresolved transport/performance findings. Results below must not be attributed to the new working tree.
 
