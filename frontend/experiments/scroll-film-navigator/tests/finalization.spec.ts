@@ -106,5 +106,10 @@ test("Film theme settles at commit, survives cancellation and has readable surfa
   });
   for(const entry of contrast)expect(entry.minimum).toBeGreaterThanOrEqual(4.5);
   await page.screenshot({path:`${artifacts}theme-light-${info.project.name}.png`});
-  await page.evaluate(()=>window.__filmExperiment!.freeze(false));await page.reload();await expect(root).toHaveAttribute("data-theme","light");
+  await page.evaluate(()=>window.__filmExperiment!.freeze(false));
+  // Match the native reload used by acceptance/built restoration cases:
+  // Playwright 1.57 Firefox page.reload() can create a fresh navigation entry.
+  await Promise.all([page.waitForNavigation(),page.evaluate(()=>location.reload())]);
+  expect(await page.evaluate(()=>(performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming).type)).toBe("reload");
+  await expect(root).toHaveAttribute("data-theme","light");
 });

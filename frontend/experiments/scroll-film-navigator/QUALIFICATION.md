@@ -1,5 +1,7 @@
 # Experiment 02 remediation qualification
 
+> Current stabilization results and task-specific acceptance are recorded separately in [STABILIZATION.md](STABILIZATION.md). The historical findings below are preserved and are not final-source qualification.
+
 > Historical remediation evidence follows. The later bounded finalization started from `fa3aefe8b79a14751c47ddfb178783627a48fb3b`, not the revision below. Consult [HOLD.md](HOLD.md) for the latest hold refinement and qualification stop, [NAVIGATOR.md](NAVIGATOR.md) for the preceding navigator checkpoint, [FOLLOWUP.md](FOLLOWUP.md) for approved background delivery, and [FINALIZATION.md](FINALIZATION.md) for unresolved transport/performance findings. Results below must not be attributed to the new working tree.
 
 Finalized 2026-10-12 (Europe/Istanbul) at the user’s instruction to stop testing. This is the isolated experiment, not production homepage integration. No additional tests were run to finalize this report; existing command logs and artifacts were read. Unfinished gates remain explicit. The supplied remediation contract supersedes incoming-film growth and repeating-hold behavior in the preserved baseline.

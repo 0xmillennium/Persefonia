@@ -24,6 +24,7 @@ export class FrameCache<T extends Decoded> {
   private suspended = false;
   private targets: readonly {film: Film; index: number}[] = [];
   private direction:1|-1=1;
+  private readinessSeconds=0;
   hits = 0; misses = 0; evictions = 0; staleCompletions = 0; failures = 0;
   peakPending = 0;
   error: string | null = null;
@@ -42,10 +43,13 @@ export class FrameCache<T extends Decoded> {
     const previousTargets=this.targets;this.targets=targets;
     this.pinned = new Set([...presented, ...targets.map(t=>keyFor(t.film,t.index))]);
     const work=targets.map((target,priority)=>({...target,priority}));
-    const ahead=hint?Math.min(10,Math.max(2,Math.ceil(Math.abs(hint.speed)*.18))):1;
+    // Prepare the neighbor that can finish before scroll reaches it. Always
+    // prioritize the exact current target; this changes decode order only.
+    const lead=hint?Math.min(10,Math.max(1,Math.ceil(Math.abs(hint.speed)*this.readinessSeconds))):1;
+    const ahead=hint?Math.min(10,Math.max(2,Math.ceil(Math.abs(hint.speed)*.18),lead+1)):1;
     const behind=hint?Math.min(4,ahead):0,direction=hint?.direction??1;
     for(let distance=1;distance<=Math.max(ahead,behind);distance++)for(const [filmOrder,target] of targets.entries()) {
-      if(distance<=ahead)work.push({film:target.film,index:clamp(target.index+distance*direction,0,191),priority:10+distance*2+filmOrder});
+      if(distance<=ahead)work.push({film:target.film,index:clamp(target.index+distance*direction,0,191),priority:10+Math.abs(distance-lead)*2+filmOrder});
       if(distance<=behind)work.push({film:target.film,index:clamp(target.index-distance*direction,0,191),priority:40+distance*2+filmOrder});
     }
     const unique=new Map<FrameKey,typeof work[number]>();
@@ -81,9 +85,12 @@ export class FrameCache<T extends Decoded> {
   private pump(): void {
     while(!this.disposed && !this.suspended && this.inFlight.size<this.concurrency && this.queue.length) {
       const r=this.queue.shift()!; this.inFlight.set(r.key,r);
+      const started=performance.now();
       this.peakPending=Math.max(this.peakPending,this.inFlight.size);
       void this.loader(r.film,r.index,r.controller.signal,r.attempt).then(image=>{
         if(this.disposed || r.controller.signal.aborted) { image.close(); this.staleCompletions++; return; }
+        const elapsed=Math.max(0,(performance.now()-started)/1000);
+        this.readinessSeconds=this.readinessSeconds?this.readinessSeconds*.75+elapsed*.25:elapsed;
         this.entries.set(r.key,image); this.evict();
       }).catch((error: unknown)=>{
         if(!r.controller.signal.aborted && !this.disposed) {

@@ -16,7 +16,7 @@ try{
   const deadline=Date.now()+15000;while(true){try{if((await fetch(url)).ok)break;}catch{}if(Date.now()>deadline)throw new Error('Review server unavailable');await new Promise(r=>setTimeout(r,100));}
   browser=await chromium.launch({channel:'chromium',...(process.env.FILM_SOFTWARE_GPU==='1'?{args:['--use-angle=swiftshader']}:{})});context=await browser.newContext({viewport:{width:1200,height:800},reducedMotion:'no-preference',recordVideo:{dir:directory,size:{width:1200,height:800}}});
   const page=await context.newPage(),timeline=[],started=Date.now();
-  const mark=async(name)=>{timeline.push({name,elapsedMs:Date.now()-started,state:await page.evaluate(()=>window.__filmExperiment.state())});await page.screenshot({path:`${directory}${name}.png`});};
+  const mark=async(name,capture=true)=>{timeline.push({name,elapsedMs:Date.now()-started,state:await page.evaluate(()=>window.__filmExperiment.state())});if(capture)await page.screenshot({path:`${directory}${name}.png`});};
   await page.goto(renderer==='basic'?`${url}/?renderer=basic`:url);await page.waitForFunction(()=>window.__filmExperiment?.state().drawn==='robotic-arm:0');
   if((await page.evaluate(()=>window.__filmExperiment.state().renderer.kind))!==(renderer==='basic'?'canvas2d':'webgl2'))throw new Error('Requested review material unavailable');
   await mark('01-dark-initial');await page.mouse.move(600,300);
@@ -29,8 +29,9 @@ try{
     ['06-crossing',12,n=>[600+250*Math.sin(n*Math.PI/8),350+130*Math.sin(n*Math.PI/4)]]
   ]){for(let n=0;n<=16;n++){const [x,y]=curve(n);await page.mouse.move(x,y);await page.waitForTimeout(interval);}await mark(name);}
   await page.waitForFunction(()=>!window.__filmExperiment.state().field.active);await mark('07-decayed');
-  await page.mouse.move(450,340);await page.mouse.down();await page.waitForTimeout(1000);await mark('08-early-growth');await page.mouse.up();await page.waitForTimeout(180);await mark('09-contracting');
+  await page.mouse.move(450,340);await page.mouse.down();await page.waitForTimeout(1000);await mark('08-early-growth');await page.mouse.up();await page.waitForTimeout(180);await mark('09-contracting',false);
   await page.mouse.move(650,320);await page.mouse.down();await mark('10-repress');
+  if(timeline.at(-1).state.hold.progress<=0)throw new Error('Capture missed residual re-press; evidence is incomplete');
   await page.waitForFunction(()=>window.__filmExperiment.state().hold.phase==='REVEALING',{},{timeout:15000});await mark('11-outward-reveal');
   await page.waitForFunction(()=>window.__filmExperiment.state().commits===1);await mark('12-light-settled');await page.waitForTimeout(3200);await mark('13-long-press-single-commit');await page.mouse.up();
   for(let n=0;n<=20;n++){await page.mouse.move(220+n*32,350+65*Math.sin(n*.3));await page.waitForTimeout(24);}await mark('14-tree-navigator');

@@ -92,3 +92,21 @@ it("Ordinary forward traversal retains ahead work rather than repeatedly starvin
     expect(signals.get(101)!.aborted).toBe(false);expect(signals.get(102)!.aborted).toBe(false);
   }finally{cache.dispose();}
 });
+
+it.each([110,230])("Measured %dms decoding prepares future targets before native traversal reaches them",async(delay)=>{
+  vi.useFakeTimers({toFake:["setTimeout","clearTimeout","performance"]});
+  const cache=new FrameCache<Image>((film,index)=>new Promise(resolve=>setTimeout(()=>resolve(image(keyFor(film,index))),delay)),20,2);
+  try{
+    let ready=0;
+    for(let index=0;index<96;index++){
+      cache.request([{film:"tree",index}],[],{direction:1,speed:24});
+      await vi.advanceTimersByTimeAsync(1000/24);
+      // Availability never changes the target; only that exact target can present.
+      if(cache.get(keyFor("tree",index)))ready++;
+    }
+    // Detect complete decode starvation, not an invented frame-rate/hold-time SLA.
+    // Actual readiness and visible hold durations are measured in the browser.
+    expect(ready).toBeGreaterThan(0);
+    expect(cache.entries.size).toBeLessThanOrEqual(20);expect(cache.peakPending).toBe(2);
+  }finally{cache.dispose();await vi.runAllTimersAsync();vi.useRealTimers();}
+});

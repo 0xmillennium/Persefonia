@@ -1,6 +1,8 @@
 # Experiment 02 — scroll film & liquid navigator
 
-An isolated interaction experiment for **0xmillennium**. [CONTRACT.md](CONTRACT.md) records the earlier remediation contract; the 12 October finalization assignment supersedes obsolete behavior. Current hold refinement, event timing, browser gate and new video evidence are in [HOLD.md](HOLD.md). The preceding navigator material checkpoint is [NAVIGATOR.md](NAVIGATOR.md). Approved charcoal delivery is recorded in [FOLLOWUP.md](FOLLOWUP.md). The first checkpoint is retained in [FINALIZATION.md](FINALIZATION.md), with historical qualification in [QUALIFICATION.md](QUALIFICATION.md). This does not integrate the experiment into the production homepage.
+An isolated interaction experiment for **0xmillennium**. Current bounded engineering and qualification results are in [STABILIZATION.md](STABILIZATION.md). [CONTRACT.md](CONTRACT.md) records the earlier remediation contract; the 12 October stabilization assignment supersedes obsolete behavior and approves the current navigator, wheel sensitivity and charcoal background. Hold refinement and its earlier qualification stop remain in [HOLD.md](HOLD.md). The preceding navigator material checkpoint is [NAVIGATOR.md](NAVIGATOR.md). Approved charcoal delivery is recorded in [FOLLOWUP.md](FOLLOWUP.md). The first checkpoint is retained in [FINALIZATION.md](FINALIZATION.md), with historical qualification in [QUALIFICATION.md](QUALIFICATION.md). This does not integrate the experiment into the production homepage.
+
+Current local verdict: **NEEDS_REWORK**. Functional closure passes with the explicit inconclusive Linux VM WebKit limitation; sustained-scroll image delivery still has unresolved visible holds. The closure report preserves the strict gate failure and records the scoped follow-up results separately.
 
 Native document scroll selects `round(progress × 191)` from one of two immutable 192-frame PNG sequences. There is no autoplay or playback clock. Film selection preserves normalized progress. The locked Triptych analysis informs liquid navigation and the outward reveal; its autoplay, four films and repeating hold are deliberately superseded by the task contract.
 
@@ -26,6 +28,7 @@ npm run film:perf:soak       # explicit extended workloads + 1,800-step enduranc
 npm run film:record:focused # short V1 desktop evidence, port 4192
 npm run film:record          # explicit broader canonical desktop/touch campaign
 npm run film:check           # frozen-source functional gate; build once if stale
+DEBUG=pw:browser node experiments/scroll-film-navigator/scripts/webkit-diagnose.mjs # four layers, three fresh launches each
 node experiments/scroll-film-navigator/scripts/browser-preflight.mjs
 node experiments/scroll-film-navigator/scripts/benchmark-prepare.mjs
 node experiments/scroll-film-navigator/scripts/media-quality.mjs
@@ -43,6 +46,8 @@ Final sequence: approve media → prepare/validate once → freeze source → `f
 
 Prefer a test-owned server. `FILM_REUSE_SERVER=1` is an explicit local convenience for a stable known server; HMR, restart and interruption can invalidate a reused session. Do not run media preparation or other browser studies concurrently with performance measurements. Run full matrices only after source freeze, and never use full qualification or soak for routine edits.
 
+The functional gate runs every development/built project independently and writes `stabilization/gate/summary.json` plus a separate `gate-<project>.json` reporter result. Strict WebKit qualification is the default. WebKit stops its own project after the first failure; the other projects continue. Required-project failures and missing reporter results fail the combined gate. After an explicitly documented inconclusive Linux VM native crash, `FILM_WEBKIT_POLICY=vm-inconclusive` and `FILM_WEBKIT_EVIDENCE=<classification-json>` can make only WebKit navigation-crash results non-blocking. The JSON must carry `classification: "INCONCLUSIVE — LINUX VM WEBKIT"` and `nativeLog`; assertion failures stay blocking. This option is never enabled automatically and never labels a crash as a pass. WebKit project definitions remain available for later CI.
+
 ## Scroll calibration and themes
 
 The 4,200 px native range remains compact for touch, scrollbar and keyboard navigation. On the scene alone, `WheelCalibration` maps common 120 px or three-line vertical wheel units to `range / 191` pixels. Magnitude and a fractional remainder handle multi-unit, line and rapid input; one DOM event is not assumed to equal one detent. Nonquantized continuous input keeps its burst native for 180 ms. Horizontal, page, modifier/zoom input and controls remain native. Physical detents cannot be identified universally: a large isolated quantized trackpad packet can be mistaken for a wheel, and OS/browser wheel settings require calibration. Physical mouse verification remains distinct from synthetic browser wheel coverage.
@@ -58,6 +63,8 @@ HTML contains a real responsive first-frame poster before JavaScript. Opening-fr
 The main decoded window owns at most 20 bitmaps and two concurrent loads. Direction and observed traversal speed adjust preparation priority; neither changes scroll progress. Aborted/stale completions cannot replace a newer target, and evicted bitmaps are closed. The two resident film textures pin their cache-owned bitmaps. Stable-size updates use `texSubImage2D`; film switching exchanges texture ownership. Draw submission is reported separately from captured compositor pixels and physical screen presentation.
 
 A missing current target may preempt an unpinned speculative transfer after a film change, direction reversal or large jump. Ordinary traversal retains useful ahead transfers. An aborted transfer continues to occupy its bounded slot until settlement, including nonabortable bitmap decoding; cancellation cannot create unbounded concurrent ownership.
+
+Speculative decode priority uses observed successful load time and native traversal speed to prepare a farther-ahead neighbor before scroll reaches it. The exact current target keeps first priority; lookahead remains capped at ten, cache ownership at twenty and loads at two. This changes preparation order only. It does not interpolate frames, drive presentation, select a substitute frame, or advance the film after scrolling stops. Slow VM decoding and capture can still produce long visible holds; see the current report for measured limits.
 
 ## Rendering and fallbacks
 

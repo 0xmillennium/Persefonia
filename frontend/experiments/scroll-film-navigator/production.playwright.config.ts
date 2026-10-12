@@ -1,9 +1,11 @@
 import { defineConfig } from "@playwright/test";
 import { fileURLToPath } from "node:url";
 const launchOptions=process.env.FILM_SOFTWARE_GPU==="1"?{args:["--use-angle=swiftshader"]}:{};
+const label=process.env.FILM_REPORT_LABEL??"built-summary";
+if(!/^[a-zA-Z0-9-]+$/.test(label))throw new Error("Invalid film report label");
 export default defineConfig({
   testDir:"./tests",testMatch:"built.spec.ts",workers:1,retries:0,timeout:60_000,
-  outputDir:"../../test-results/scroll-film-navigator/built",reporter:[["list"]],
+  outputDir:`../../test-results/scroll-film-navigator/${process.env.FILM_REPORT_LABEL??"built"}`,reporter:[["list"],["json",{outputFile:fileURLToPath(new URL(`../../test-results/scroll-film-navigator/${label}.json`,import.meta.url))}]],
   use:{baseURL:"http://127.0.0.1:4181",viewport:{width:1200,height:800},screenshot:"only-on-failure",trace:"off"},
   projects:[
     {name:"webkit-built",use:{browserName:"webkit"}},

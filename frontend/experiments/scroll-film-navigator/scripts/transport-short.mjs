@@ -15,9 +15,10 @@ const server=spawn(process.execPath,['node_modules/vite/bin/vite.js','--config',
 const summary=values=>{values.sort((a,b)=>a-b);const at=p=>values[Math.min(values.length-1,Math.floor(values.length*p))]??null;return {count:values.length,p50:at(.5),p95:at(.95),max:at(1)};};
 try{
   const deadline=Date.now()+15000;while(true){try{if((await fetch(url)).ok)break;}catch{}if(Date.now()>deadline)throw new Error('Transport server unavailable');await new Promise(r=>setTimeout(r,100));}
-  browser=await chromium.launch({channel:'chromium'});const page=await browser.newPage({viewport:{width:1200,height:800}}),session=await page.context().newCDPSession(page);
+  const launchFlags=process.env.FILM_SOFTWARE_GPU==='1'?['--use-angle=swiftshader']:[];
+  browser=await chromium.launch({channel:'chromium',args:launchFlags});const page=await browser.newPage({viewport:{width:1200,height:800}}),session=await page.context().newCDPSession(page);
   await page.goto(`${url}/?capture=1`);await page.waitForFunction(()=>window.__filmExperiment?.state().drawn==='robotic-arm:0');
-  const environment=await page.evaluate(()=>window.__filmExperiment.state());if(environment.renderer.kind!=='webgl2')throw new Error('Capture requires primary renderer');
+  const environment=await page.evaluate(()=>window.__filmExperiment.state());await writeFile(`${directory}startup.json`,JSON.stringify(environment,null,2));if(environment.renderer.kind!=='webgl2')throw new Error(`Capture requires primary renderer: ${JSON.stringify(environment.renderer)}`);
   const traverse=async(duration,direction,alternating=false)=>page.evaluate(async({duration,direction,alternating})=>{
     const start=performance.now(),samples=[];let n=0;
     while(true){await new Promise(r=>requestAnimationFrame(r));const fraction=Math.min(1,(performance.now()-start)/duration);
@@ -46,6 +47,6 @@ try{
     console.log(JSON.stringify({name,captures:frames.length,unique:report.uniqueCapturedFrames,maxHeld,intervals:report.captureIntervalsMs}));
   }
   if(before!==await sourceFingerprint())throw new Error('Source changed during transport capture');
-  await writeFile(`${directory}report.json`,JSON.stringify({method:'One robotic-arm HTTP context, initial 2x warm traversal, native RAF scroll mapping. CDP JPEG compositor pixels carry source identity. A bounded decoded window is warm progressively, not a fully resident film. Capture overhead/cadence may undersample 24/48fps and does not prove display scanout. No fluid or physical-device qualification in this transport-only study.',sourceFingerprint:before,browser:browser.version(),environment,reports},null,2));
+  await writeFile(`${directory}report.json`,JSON.stringify({method:'One robotic-arm HTTP context, initial 2x warm traversal, native RAF scroll mapping. CDP JPEG compositor pixels carry source identity. A bounded decoded window is warm progressively, not a fully resident film. Capture overhead/cadence may undersample 24/48fps and does not prove display scanout. No fluid or physical-device qualification in this transport-only study.',sourceFingerprint:before,browser:browser.version(),launchFlags,environment,reports},null,2));
   await session.detach();
 }finally{await browser?.close();server.kill('SIGTERM');}

@@ -69,7 +69,10 @@ test("GPU failure/loss selects explicit basic film mode and restoration reconstr
     await page.evaluate(()=>window.__filmExperiment!.contextLoss());await expect.poll(async()=>(await state(page)).renderer.kind).toBe("canvas2d");
   }else expect(initial.renderer.acceleratedFailure).not.toBeNull();
   await progress(page,.5);await stroke(page,{x:120,y:200},{x:300,y:250},12);
-  const fallback=await state(page);expect(fallback.renderFailure).toBeNull();expect(fallback.field.active).toBe(false);await expect(page.locator("#quality")).toBeVisible();expect(fallback.gpu.bytes).toBe(0);expect(fallback.drawn).toBe("robotic-arm:96");
+  const fallback=await state(page);expect(fallback.renderFailure).toBeNull();expect(fallback.field.active).toBe(true);expect(fallback.navigator.available).toBe(true);await expect(page.locator("#quality")).toBeVisible();expect(fallback.gpu.bytes).toBe(0);expect(fallback.drawn).toBe("robotic-arm:96");
+  // Compatibility now paints the approved material; inactivity belongs to
+  // settled decay, rather than the frame immediately following a stroke.
+  await expect.poll(async()=>{const s=await state(page);return !s.field.active&&!s.scheduled;},{timeout:8000}).toBe(true);
   if(initial.renderer.kind==="webgl2"){await page.evaluate(()=>window.__filmExperiment!.contextRestore());await expect.poll(async()=>(await state(page)).renderer.kind).toBe("webgl2");}
 });
 

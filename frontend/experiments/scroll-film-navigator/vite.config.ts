@@ -18,7 +18,8 @@ export default defineConfig({
       const index=Number(match[4]);if(index<1||index>192){res.statusCode=404;res.end();return;}
       const path=`${media}${match[1]}/${match[2]}/${match[3]}/frame_${match[4]}.webp`;
       try{const info=await stat(path);res.setHeader("Content-Type","image/webp");res.setHeader("Content-Length",info.size);res.setHeader("Cache-Control","public, max-age=31536000, immutable");createReadStream(path).pipe(res);}catch{res.statusCode=404;res.end("Missing versioned delivery frame; run film:prepare");}
-    });},
-    async closeBundle(){const active=await manifest();const destination=`${root}../../dist/scroll-film-navigator/media`;await cp(`${media}${active.identity}`,`${destination}/${active.identity}`,{recursive:true});await cp(`${media}manifest.json`,`${destination}/manifest.json`);await writeFile(`${root}../../dist/scroll-film-navigator/build-receipt.json`,JSON.stringify({sourceFingerprint:await sourceFingerprint()}));}
+    });}
+  },{name:"experiment-build-receipt",apply:"build",
+    async writeBundle(){const active=await manifest();const destination=`${root}../../dist/scroll-film-navigator/media`;await cp(`${media}${active.identity}`,`${destination}/${active.identity}`,{recursive:true});await cp(`${media}manifest.json`,`${destination}/manifest.json`);await writeFile(`${root}../../dist/scroll-film-navigator/build-receipt.json`,JSON.stringify({sourceFingerprint:await sourceFingerprint()}));}
   }]
 });
