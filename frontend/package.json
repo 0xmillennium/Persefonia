@@ -42,7 +42,14 @@
     "globe:test": "vitest run --config experiments/location-earth-globe/vitest.config.ts",
     "globe:build": "node experiments/location-earth-globe/scripts/geography.mjs --check && vite build --config experiments/location-earth-globe/vite.config.ts",
     "globe:browser": "playwright test --config experiments/location-earth-globe/playwright.config.ts",
-    "globe:check": "npm run globe:typecheck && npm run globe:test && npm run globe:build"
+    "globe:check": "npm run globe:typecheck && npm run globe:test && npm run globe:build",
+    "effects:dev": "vite --config experiments/identity-effects/vite.config.ts",
+    "effects:preview": "vite preview --config experiments/identity-effects/vite.config.ts",
+    "effects:geometry": "node experiments/identity-effects/generate-static.mjs",
+    "effects:typecheck": "tsc --noEmit -p experiments/identity-effects/tsconfig.json",
+    "effects:build": "node experiments/identity-effects/generate-static.mjs --check && vite build --config experiments/identity-effects/vite.config.ts",
+    "effects:browser": "playwright test --config experiments/identity-effects/playwright.config.ts",
+    "effects:check": "npm run effects:typecheck && npm run effects:build"
   },
   "devDependencies": {
     "@playwright/test": "1.57.0",
