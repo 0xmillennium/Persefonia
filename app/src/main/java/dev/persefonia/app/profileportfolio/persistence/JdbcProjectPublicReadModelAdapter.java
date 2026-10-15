@@ -31,7 +31,7 @@ public class JdbcProjectPublicReadModelAdapter implements ProjectPublicReadModel
     public List<ProjectSummaryRow> listListedProjects(ContentLanguage language) {
         Objects.requireNonNull(language, "language");
         List<ProjectCardRow> cards = projectCards("""
-                SELECT projects.id,
+                SELECT projects.id, projects.cover_asset_id,
                        localizations.slug,
                        localizations.title,
                        localizations.summary
@@ -86,7 +86,7 @@ public class JdbcProjectPublicReadModelAdapter implements ProjectPublicReadModel
     public List<ProjectSummaryRow> listFeaturedProjects(ContentLanguage language, int limit) {
         Objects.requireNonNull(language, "language");
         List<ProjectCardRow> cards = projectCards("""
-                SELECT projects.id,
+                SELECT projects.id, projects.cover_asset_id,
                        localizations.slug,
                        localizations.title,
                        localizations.summary
@@ -108,7 +108,7 @@ public class JdbcProjectPublicReadModelAdapter implements ProjectPublicReadModel
                 resultSet.getObject("id", UUID.class),
                 resultSet.getString("title"),
                 resultSet.getString("summary"),
-                resultSet.getString("slug")));
+                resultSet.getString("slug"), resultSet.getString("cover_asset_id")));
     }
 
     private List<ProjectSummaryRow> summaryRows(List<ProjectCardRow> cards) {
@@ -124,7 +124,7 @@ public class JdbcProjectPublicReadModelAdapter implements ProjectPublicReadModel
                         card.summary(),
                         card.slug(),
                         tagIdsByProject.getOrDefault(card.projectId(), Set.of()),
-                        technologiesByProject.getOrDefault(card.projectId(), List.of())))
+                        technologiesByProject.getOrDefault(card.projectId(), List.of()), java.util.Optional.ofNullable(card.coverAssetId())))
                 .toList();
     }
 
@@ -217,7 +217,7 @@ public class JdbcProjectPublicReadModelAdapter implements ProjectPublicReadModel
         return available;
     }
 
-    private record ProjectCardRow(UUID projectId, String title, String summary, String slug) {
+    private record ProjectCardRow(UUID projectId, String title, String summary, String slug, String coverAssetId) {
     }
 
     private record ProjectTagRow(UUID projectId, TagId tagId) {

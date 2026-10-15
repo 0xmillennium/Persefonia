@@ -1,6 +1,6 @@
 import { readFile, mkdir, writeFile, rename, rm, mkdtemp, copyFile } from 'node:fs/promises';
 import { execFileSync, spawn } from 'node:child_process';
-import { validate, root, output, films } from './assets.mjs';
+import { validate, root, output, films, sourceSequence } from './assets.mjs';
 import { hash, inventory, runFfmpeg } from './delivery.mjs';
 import { preparation } from './media-config.mjs';
 import { sourceMetadata } from './preflight.mjs';
@@ -24,7 +24,8 @@ try {
     console.log(`PASS: reused ${identity}; all 768 hashes, dimensions, correspondence indices and complete pixel decodes verified.`);
   }else{
     temporary=await mkdtemp(`${media}/.preparing-`);
-    const render=spawn('python3',[operator,'--output',temporary,'--quality',String(preparation.roboticArm.quality)],{stdio:'inherit',env:{...process.env,OPENBLAS_NUM_THREADS:'1'}});
+    const arm=sourceSequence('robotic-arm');
+    const render=spawn('python3',[operator,'--source',arm.folder,'--digits',String(arm.digits),'--output',temporary,'--quality',String(preparation.roboticArm.quality)],{stdio:'inherit',env:{...process.env,OPENBLAS_NUM_THREADS:'1'}});
     await new Promise((resolve,reject)=>{render.on('error',reject);render.on('exit',code=>code===0?resolve():reject(new Error(`Background rendering failed: ${code}`)));});
     for(const width of contract.tiers)for(const film of films){
       if(film==='robotic-arm')continue;
@@ -34,7 +35,10 @@ try {
         const name=`frame_${String(index).padStart(5,'0')}.webp`,original=`${media}/${existing.identity}/${width}/${film}/${name}`;
         if(hash(await readFile(original))!==existing.entries[`${width}/${film}`]?.[index-1]?.sha256)throw new Error(`Reusable tree derivative changed: ${original}`);
         await copyFile(original,`${folder}/${name}`);
-      }else await runFfmpeg(['-y','-threads','2','-framerate','24','-start_number','1','-i',`${root}assets/frames/${film}/frame_%05d.png`,'-frames:v','192','-vf',`scale=${width}:-1:flags=lanczos`,'-c:v','libwebp','-quality',String(contract.quality),'-threads','2',`${folder}/frame_%05d.webp`]);
+      }else {
+        const input=sourceSequence(film);
+        await runFfmpeg(['-y','-threads','2','-framerate','24','-start_number','1','-i',`${input.folder}/frame_%0${input.digits}d.png`,'-frames:v','192','-vf',`scale=${width}:-1:flags=lanczos`,'-c:v','libwebp','-quality',String(contract.quality),'-threads','2',`${folder}/frame_%05d.webp`]);
+      }
     }
     const entries=await inventory(temporary,contract.tiers,films);
     const after=await validate();if(hash(JSON.stringify(after))!==contract.sourceHash)throw new Error('Canonical source identity changed during preparation');

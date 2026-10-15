@@ -1,4 +1,4 @@
-// Finite first-visible reveal. Time advances only through the scene's RAF owner.
+// Finite scene-entry reveal. Time advances only through the scene's RAF owner.
 export class GlobeEntrance {
   static readonly duration = 3.2;
   elapsed = 0;
@@ -8,6 +8,11 @@ export class GlobeEntrance {
     if (reduced) { this.finish(); return; }
     this.started = true;
     this.elapsed = Math.min(GlobeEntrance.duration, this.elapsed + Math.max(0, seconds));
+  }
+  reset(reduced = false): void {
+    this.elapsed = 0;
+    this.started = false;
+    if (reduced) this.finish();
   }
   finish(): void { this.elapsed = GlobeEntrance.duration; }
   get moving(): boolean { return this.elapsed < GlobeEntrance.duration; }

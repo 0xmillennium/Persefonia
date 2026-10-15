@@ -9,7 +9,8 @@
     "noImplicitOverride": true,
     "noEmit": true,
     "isolatedModules": true,
-    "types": []
+    "allowJs": true,
+    "types": ["vite/client"]
   },
   "include": ["src"]
 }

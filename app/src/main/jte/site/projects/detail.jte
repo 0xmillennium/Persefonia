@@ -1,5 +1,6 @@
 @import dev.persefonia.webpublic.projects.PublicProjectDetailPage
 @param PublicProjectDetailPage page
+@param String publicNavigationScriptPath = null
 <!doctype html>
 <html lang="${page.htmlLanguage()}">
 <head>
@@ -14,7 +15,7 @@
         @template.site.components.robotsMeta(false)
     @endif
     @template.site.components.openGraphTags("website", page.project().title(), page.project().summary(), page.canonicalUrl())
-    @template.site.components.standardPublicStyles(page.stylesheetPaths())
+    @template.site.components.standardPublicStyles(page.stylesheetPaths(), publicNavigationScriptPath)
     @template.site.components.feedDiscoveryLink()
 </head>
 <body>

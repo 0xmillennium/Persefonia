@@ -13,7 +13,7 @@ import org.springframework.stereotype.Repository;
 @Repository
 public class JdbcPublicHomepageContentQueryAdapter implements PublicHomepageContentQueryService {
     private static final String SQL = """
-            SELECT title, summary, public_url
+            SELECT title, summary, public_url, source_entity_id
             FROM discovery.discoverable_resources
             WHERE source_context = 'CONTENT_PUBLISHING'
               AND source_type = 'CONTENT_ITEM'
@@ -56,6 +56,7 @@ public class JdbcPublicHomepageContentQueryAdapter implements PublicHomepageCont
                         .addValue("resourceTypes", resourceTypes.stream().map(Enum::name).toList())
                         .addValue("limit", limit),
                 (row, number) -> new PublicHomepageContentEntry(
-                        row.getString("title"), row.getString("summary"), row.getString("public_url")));
+                        row.getString("title"), row.getString("summary"), row.getString("public_url"),
+                        java.util.Optional.of(java.util.UUID.fromString(row.getString("source_entity_id")))));
     }
 }

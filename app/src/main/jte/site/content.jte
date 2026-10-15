@@ -2,6 +2,7 @@
 @import dev.persefonia.webpublic.content.PublicContentPage
 @import dev.persefonia.webpublic.content.PublicContentTranslationLinkView
 @param PublicContentPage page
+@param String publicNavigationScriptPath = null
 <!doctype html>
 <html lang="${page.htmlLanguage()}">
 <head>
@@ -15,7 +16,7 @@
     <meta property="article:published_time" content="${page.publishedAtIso()}">
     <meta property="article:modified_time" content="${page.updatedAtIso()}">
     @template.site.components.robotsMeta(page.noindex())
-    @template.site.components.standardPublicStyles(page.stylesheetPaths())
+    @template.site.components.standardPublicStyles(page.stylesheetPaths(), publicNavigationScriptPath)
     @template.site.components.feedDiscoveryLink()
 </head>
 <body>

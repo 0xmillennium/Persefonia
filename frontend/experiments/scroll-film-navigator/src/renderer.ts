@@ -4,7 +4,7 @@ import type { LiquidField } from "./field";
 import type { HoldMaterial } from "./hold-material";
 import type { Hold } from "./hold";
 import type { FrameKey, Film } from "./transport";
-export interface Scene { field: LiquidField|GpuFluid; material: HoldMaterial; hold: Hold; time: number; reveal: boolean; reduced: boolean; current: Film; next: Film }
+export interface Scene { field: LiquidField|GpuFluid; material: HoldMaterial; hold: Hold; time: number; reveal: boolean; reduced: boolean; current: Film; next: Film; aperture?: readonly [number, number, number, number, number]; filmBounds?: readonly [number, number, number, number]; imageOpacity?: number }
 interface TimerExtension { TIME_ELAPSED_EXT: number; GPU_DISJOINT_EXT: number }
 export class Renderer {
   readonly kind="webgl2";
@@ -13,6 +13,7 @@ export class Renderer {
   private textures: WebGLTexture[] = [];
   private keys: (FrameKey|null)[] = [null,null];
   private textureBytes = [0,0];
+  private sheetSize = [0,0];
   private uniforms = new Map<string,WebGLUniformLocation|null>();
   private timer: TimerExtension|null=null;
   private queries: WebGLQuery[]=[];
@@ -23,8 +24,8 @@ export class Renderer {
   private frameQuery:WebGLQuery|null=null;
   private backendInfo:{vendor:unknown;renderer:unknown}|null=null;
   disposed=false;
-  constructor(readonly canvas: HTMLCanvasElement,private captureIdentity=false) {
-    const gl=canvas.getContext("webgl2",{alpha:false,antialias:false,preserveDrawingBuffer:false,powerPreference:"default"});
+  constructor(readonly canvas: HTMLCanvasElement,private captureIdentity=false, private transparent=false) {
+    const gl=canvas.getContext("webgl2",{alpha:this.transparent,antialias:false,preserveDrawingBuffer:false,powerPreference:"default"});
     if(!gl) throw new Error("WebGL 2 unavailable; basic fallback selected");
     this.gl=gl;
     const compile=(type:number,source:string) => {
@@ -42,7 +43,7 @@ export class Renderer {
     } finally {for(const shader of shaders)gl.deleteShader(shader);}
     if(!gl.getProgramParameter(program,gl.LINK_STATUS)) {const error=gl.getProgramInfoLog(program);gl.deleteProgram(program);throw new Error(`Program: ${error}`);}
     this.program=program; gl.useProgram(program);
-    for(let i=0;i<4;i++) {
+    for(let i=0;i<5;i++) {
       const tex=gl.createTexture(); if(!tex) {this.dispose();throw new Error("Texture allocation failed");}
       this.textures.push(tex); gl.activeTexture(gl.TEXTURE0+i); gl.bindTexture(gl.TEXTURE_2D,tex);
       gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
@@ -51,6 +52,7 @@ export class Renderer {
     }
     this.timer=gl.getExtension("EXT_disjoint_timer_query_webgl2") as TimerExtension|null;
     gl.uniform1i(this.uniform("filmA"),0); gl.uniform1i(this.uniform("filmB"),1); gl.uniform1i(this.uniform("field"),2);gl.uniform1i(this.uniform("holdField"),3);
+    gl.uniform1i(this.uniform("sheet"),4);
   }
   private uniform(name: string): WebGLUniformLocation|null {
     if(!this.uniforms.has(name)) this.uniforms.set(name,this.gl.getUniformLocation(this.program,name));
@@ -73,12 +75,27 @@ export class Renderer {
     this.keys[slot]=key; this.textureBytes[slot]=image.width*image.height*4; this.uploads++;
   }
   swap(): void { [this.textures[0],this.textures[1]]=[this.textures[1]!,this.textures[0]!]; [this.keys[0],this.keys[1]]=[this.keys[1]!,this.keys[0]!]; [this.textureBytes[0],this.textureBytes[1]]=[this.textureBytes[1]!,this.textureBytes[0]!]; }
+  setSheet(image: ImageBitmap): void {
+    const gl=this.gl;
+    gl.activeTexture(gl.TEXTURE4);gl.bindTexture(gl.TEXTURE_2D,this.textures[4]!);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,image);
+    if(gl.getError()!==gl.NO_ERROR)throw new Error("Hero sheet texture upload failed");
+    this.sheetSize=[image.width,image.height];
+  }
+  get hasSheet(): boolean {return this.sheetSize[0]!>0;}
   draw(scene: Scene): boolean {
     const gl=this.gl;if(this.disposed||gl.isContextLost())return false;
     gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.viewport(0,0,this.canvas.width,this.canvas.height);
     gl.useProgram(this.program);
-    for(let i=0;i<4;i++) {gl.activeTexture(gl.TEXTURE0+i);gl.bindTexture(gl.TEXTURE_2D,this.textures[i]!);}
-    gl.uniform2f(this.uniform("viewport"),this.width,this.height); gl.uniform2f(this.uniform("fieldSize"),scene.field.width,scene.field.height);gl.uniform2f(this.uniform("holdSize"),scene.material.width,scene.material.height);
+    for(let i=0;i<5;i++) {gl.activeTexture(gl.TEXTURE0+i);gl.bindTexture(gl.TEXTURE_2D,this.textures[i]!);}
+    gl.uniform2f(this.uniform("sheetSize"),this.sheetSize[0]!,this.sheetSize[1]!);
+    gl.uniform2f(this.uniform("viewport"),this.width,this.height);
+    const aperture=scene.aperture??[0,0,this.width,this.height,0];
+    gl.uniform4f(this.uniform("aperture"),aperture[0],aperture[1],aperture[2],aperture[3]);
+    gl.uniform1f(this.uniform("apertureRadius"),aperture[4]);
+    const filmBounds=scene.filmBounds??[0,0,0,0];
+    gl.uniform4f(this.uniform("filmBounds"),filmBounds[0],filmBounds[1],filmBounds[2],filmBounds[3]);
+    gl.uniform1f(this.uniform("imageOpacity"),scene.imageOpacity??1); gl.uniform2f(this.uniform("fieldSize"),scene.field.width,scene.field.height);gl.uniform2f(this.uniform("holdSize"),scene.material.width,scene.material.height);
     gl.activeTexture(gl.TEXTURE2);gl.bindTexture(gl.TEXTURE_2D,this.fluid!.texture);
     gl.activeTexture(gl.TEXTURE3);gl.bindTexture(gl.TEXTURE_2D,this.textures[3]!);
     if(this.material!==scene.material||this.holdRevision!==scene.material.revision){
@@ -108,7 +125,7 @@ export class Renderer {
     }
   }
   get residentKeys(): FrameKey[] {return this.keys.filter((key):key is FrameKey=>key!==null);}
-  get bytes(): number {return this.disposed?0:this.textureBytes[0]!+this.textureBytes[1]!+(this.fluid?.bytes??0)+this.holdSize[0]!*this.holdSize[1]!*4+this.canvas.width*this.canvas.height*4;}
+  get bytes(): number {return this.disposed?0:this.textureBytes[0]!+this.textureBytes[1]!+this.sheetSize[0]!*this.sheetSize[1]!*4+(this.fluid?.bytes??0)+this.holdSize[0]!*this.holdSize[1]!*4+this.canvas.width*this.canvas.height*4;}
   get textureCount():number{return this.disposed?0:this.textures.length+(this.fluid?.textures??0);}
   get info(): object {
     // Backend identity is fixed for this renderer instance. Repeated diagnostic

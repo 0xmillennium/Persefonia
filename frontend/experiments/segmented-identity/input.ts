@@ -1,5 +1,6 @@
 import type { PointerSample } from "./core";
 import { PointerPath } from "./pointer-path";
+import type { Vec } from "./math";
 
 type HoverObservation = Pick<PointerEvent, "pointerType" | "isPrimary" | "isTrusted" | "buttons" | "pressure" | "width" | "height">;
 export function acceptsHover(event: HoverObservation): boolean {
@@ -20,8 +21,11 @@ export class InputAdapter {
   private readonly abort = new AbortController();
   get pending(): boolean { return this.path.pending; }
   get droppedSamples(): number { return this.path.dropped; }
-  constructor(private readonly svg: SVGSVGElement, enabled: () => boolean, private readonly wake: () => void = () => {}) {
-    svg.addEventListener("pointermove", e => {
+  constructor(private readonly svg: SVGSVGElement, enabled: () => boolean, private readonly wake: () => void = () => {},
+    private readonly viewport?: { origin: () => Vec }) {
+    const target = viewport ? window : svg;
+    target.addEventListener("pointermove", (event: Event) => {
+      const e = event as PointerEvent;
       this.lastPointer = { x: e.clientX, y: e.clientY };
       if (e.pointerType === "touch") this.lastTouch = this.lastPointer;
       if (!acceptsHover(e) || this.reduced.matches || !enabled()) return;
@@ -29,12 +33,14 @@ export class InputAdapter {
       const coalesced = e.getCoalescedEvents?.() ?? [];
       this.observe(coalesced.length ? coalesced : [e]);
     }, { signal: this.abort.signal });
-    for (const type of ["pointerdown", "pointerup"] as const) svg.addEventListener(type, e => {
+    for (const type of ["pointerdown", "pointerup"] as const) target.addEventListener(type, (event: Event) => {
+      const e = event as PointerEvent;
       if (e.pointerType === "touch") {
         this.deactivate(); this.lastTouch = { x: e.clientX, y: e.clientY };
       }
     }, { signal: this.abort.signal });
-    svg.addEventListener("mousemove", e => {
+    target.addEventListener("mousemove", (event: Event) => {
+      const e = event as MouseEvent;
       // Some desktop bridges expose only compatibility mouse events after a
       // touch. Do not duplicate pointer observations or replay synthetic touch
       // mouse events. Known touch coordinates allow for integer rounding.
@@ -48,7 +54,7 @@ export class InputAdapter {
       this.observe([e]);
     }, { signal: this.abort.signal });
     for (const event of ["pointerleave", "pointercancel", "mouseleave"])
-      svg.addEventListener(event, () => this.deactivate(), { signal: this.abort.signal });
+      (viewport ? document.documentElement : svg).addEventListener(event, () => this.deactivate(), { signal: this.abort.signal });
     this.reduced.addEventListener("change", () => this.deactivate(), { signal: this.abort.signal });
     window.addEventListener("blur", () => this.deactivate(), { signal: this.abort.signal });
   }
@@ -56,9 +62,10 @@ export class InputAdapter {
     const matrix = this.svg.getScreenCTM();
     if (!matrix) return;
     const inverse = matrix.inverse();
+    const origin = this.viewport?.origin() ?? { x: 0, y: 0 };
     for (const event of events) {
       const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(inverse);
-      this.path.push({ x: point.x, y: point.y, active: true, elapsedSeconds: this.previousTimestamp === undefined
+      this.path.push({ x: point.x-origin.x, y: point.y-origin.y, active: true, elapsedSeconds: this.previousTimestamp === undefined
         ? undefined : Math.max(.001, (event.timeStamp - this.previousTimestamp) / 1000) });
       this.previousTimestamp = event.timeStamp;
     }

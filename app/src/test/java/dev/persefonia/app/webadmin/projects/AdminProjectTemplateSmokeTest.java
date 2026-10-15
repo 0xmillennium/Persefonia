@@ -47,7 +47,7 @@ class AdminProjectTemplateSmokeTest {
                 .andExpect(content().string(containsString("<form method=\"post\" action=\"/admin/projects\">")))
                 .andExpect(content().string(containsString("Problem")))
                 .andExpect(content().string(containsString("value=\"EXPERIMENT\" selected")))
-                .andExpect(content().string(not(containsString("coverAssetId"))))
+                .andExpect(content().string(containsString("name=\"coverAssetId\"")))
                 .andExpect(content().string(not(containsString("/publish"))))
                 .andExpect(content().string(not(containsString("/archive"))))
                 .andExpect(content().string(not(containsString("/delete"))))
@@ -60,14 +60,17 @@ class AdminProjectTemplateSmokeTest {
                         .param("trSlug", "sample-project")
                         .param("trTitle", "Sample Project")
                         .param("trSummary", "Summary")
-                        .param("trProblem", "Problem body"))
+                        .param("trProblem", "Problem body")
+                        .param("coverAssetId", "9f483f9b-3d54-42cc-9ce9-ffdd4dcfc747"))
                 .andExpect(status().is3xxRedirection());
 
         var project = projects.all().getFirst();
+        org.assertj.core.api.Assertions.assertThat(project.coverAssetId()).get()
+                .extracting(asset -> asset.value().toString()).isEqualTo("9f483f9b-3d54-42cc-9ce9-ffdd4dcfc747");
         mockMvc.perform(get("/admin/projects/" + project.id().value() + "/edit").with(owner))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Sample Project")))
                 .andExpect(content().string(containsString("Problem body")))
-                .andExpect(content().string(not(containsString("coverAssetId"))));
+                .andExpect(content().string(containsString("value=\"9f483f9b-3d54-42cc-9ce9-ffdd4dcfc747\"")));
     }
 }

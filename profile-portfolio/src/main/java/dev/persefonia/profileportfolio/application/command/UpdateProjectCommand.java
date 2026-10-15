@@ -17,7 +17,13 @@ public record UpdateProjectCommand(
         List<ProjectLocalizationInput> localizations,
         List<ProjectTechnologyInput> technologies,
         List<ProjectLinkInput> links,
-        Instant requestedAt) {
+        Instant requestedAt,
+        String coverAssetId) {
+    public UpdateProjectCommand(PortfolioCommandActor actor, UUID projectId, String status, String visibility,
+            boolean featured, Integer sortOrder, Set<UUID> tagIds, List<ProjectLocalizationInput> localizations,
+            List<ProjectTechnologyInput> technologies, List<ProjectLinkInput> links, Instant requestedAt) {
+        this(actor, projectId, status, visibility, featured, sortOrder, tagIds, localizations, technologies, links, requestedAt, null);
+    }
     public UpdateProjectCommand {
         tagIds = Set.copyOf(tagIds == null ? Set.of() : tagIds);
         localizations = List.copyOf(localizations == null ? List.of() : localizations);

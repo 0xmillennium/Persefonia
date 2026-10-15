@@ -1,7 +1,11 @@
 /** One material identity for GPU and compatibility rendering; CSS-pixel units. */
-export const PIGMENT={slowRadius:48,fastRadius:14,wakeLength:24,force:.3,fade:1.05,drag:1.1,refraction:40,maxRefraction:24,opacity:.68};
+export const PIGMENT={slowRadius:52,fastRadius:18,wakeLength:30,force:.42,fade:.95,drag:1.1,refraction:100,maxRefraction:96,opacity:.72};
 export function absorbedPigment(source:number,pigment:number,absorption:number):number {
   return source*absorption*.35+pigment*.65;
+}
+export function illuminatedPigment(source:number,pigment:number,absorption:number,light:number):number {
+  const body=absorbedPigment(source,pigment,absorption),screen=1-(1-source)*(1-pigment);
+  return body+(screen-body)*light;
 }
 export function pigmentBands(x:number,y:number,across:number):[number,number] {
   const bend=Math.sin(x*.019+y*.027)*2.4+Math.sin(x*.041-y*.017)*.9;

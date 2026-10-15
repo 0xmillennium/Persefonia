@@ -186,6 +186,15 @@ public final class Project {
             List<ProjectLocalization> localizations,
             ContentLanguage defaultLanguage,
             Instant now) {
+        updateDetails(status, visibility, featured, sortOrder, tagIds, technologies,
+                links, localizations, defaultLanguage, now, coverAssetId);
+    }
+
+    public void updateDetails(
+            ProjectStatus status, ProjectVisibility visibility, boolean featured, SortOrder sortOrder,
+            Set<TagId> tagIds, List<ProjectTechnology> technologies, List<ProjectLink> links,
+            List<ProjectLocalization> localizations, ContentLanguage defaultLanguage, Instant now,
+            AssetId coverAssetId) {
         this.status = Objects.requireNonNull(status, "status");
         this.visibility = Objects.requireNonNull(visibility, "visibility");
         this.featured = featured;
@@ -196,6 +205,7 @@ public final class Project {
         this.localizations = List.copyOf(Objects.requireNonNull(localizations, "localizations"));
         validateStructuralInvariants();
         validateFeaturedEligibility(defaultLanguage);
+        this.coverAssetId = coverAssetId;
         markUpdated(now);
     }
 

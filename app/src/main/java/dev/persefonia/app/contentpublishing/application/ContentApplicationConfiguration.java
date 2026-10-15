@@ -227,8 +227,8 @@ class ContentApplicationConfiguration {
     @Bean
     PublicContentBySourceQueryHandler publicContentBySourceQueryHandler(
             ContentItemRepository contentItems,
-            ContentPublicRouteFactory routeFactory) {
-        return new PublicContentBySourceQueryHandler(contentItems, routeFactory);
+            ContentPublicRouteFactory routeFactory, ContentTagVocabularyPort vocabulary) {
+        return new PublicContentBySourceQueryHandler(contentItems, routeFactory, vocabulary);
     }
 
     @Bean

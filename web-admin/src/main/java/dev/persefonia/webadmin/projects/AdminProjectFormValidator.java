@@ -34,6 +34,12 @@ public final class AdminProjectFormValidator {
                 errors.add(new AdminProjectFieldError("sortOrder", "Sort order must be a number."));
             }
         }
+        if (!form.getCoverAssetId().isBlank()) {
+            try { UUID.fromString(form.getCoverAssetId().trim()); }
+            catch (IllegalArgumentException exception) {
+                errors.add(new AdminProjectFieldError("coverAssetId", "Attach a valid media image asset UUID."));
+            }
+        }
         validateLocalization(errors, "tr", form.isTrEnabled(), form.getTrSlug(), form.getTrTitle(), form.getTrSummary());
         validateLocalization(errors, "en", form.isEnEnabled(), form.getEnSlug(), form.getEnTitle(), form.getEnSummary());
         validateTechnologies(errors, form.getTechnologies());

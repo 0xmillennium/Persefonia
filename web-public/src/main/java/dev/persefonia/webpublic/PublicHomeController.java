@@ -1,5 +1,12 @@
 package dev.persefonia.webpublic;
 
+import org.springframework.beans.factory.ObjectProvider;
+import dev.persefonia.medialibrary.application.publicview.PublicImageAssetQueryService;
+import dev.persefonia.medialibrary.application.publicview.PublicImageVariantView;
+import dev.persefonia.contentpublishing.application.service.PublicContentBySourceQueryHandler;
+import dev.persefonia.contentpublishing.application.query.PublicContentBySourceQuery;
+import java.util.LinkedHashMap;
+
 import dev.persefonia.profileportfolio.application.query.PublicHomepageSettingsView;
 import dev.persefonia.discovery.application.contract.DiscoveryLanguage;
 import dev.persefonia.discovery.application.index.PublicHomepageContentEntry;
@@ -35,6 +42,8 @@ public class PublicHomeController {
     private final PublicInsightsObservationGateway insights;
     private final PublicContentResponseHeaders responseHeaders;
     private final String ownerAlias;
+    private final ObjectProvider<PublicImageAssetQueryService> images;
+    private final PublicContentBySourceQueryHandler contentGallery;
 
     public PublicHomeController(
             FrontendAssetResolver assetResolver,
@@ -45,7 +54,9 @@ public class PublicHomeController {
             PublicCanonicalUrlFactory canonicalUrlFactory,
             PublicInsightsObservationGateway insights,
             PublicContentResponseHeaders responseHeaders,
-            @Value("${site.owner-alias}") String ownerAlias) {
+            @Value("${site.owner-alias}") String ownerAlias,
+            ObjectProvider<PublicImageAssetQueryService> images,
+            PublicContentBySourceQueryHandler contentGallery) {
         this.assetResolver = Objects.requireNonNull(assetResolver, "assetResolver");
         this.settings = Objects.requireNonNull(settings, "settings");
         this.profiles = Objects.requireNonNull(profiles, "profiles");
@@ -55,6 +66,8 @@ public class PublicHomeController {
         this.insights = Objects.requireNonNull(insights, "insights");
         this.responseHeaders = Objects.requireNonNull(responseHeaders, "responseHeaders");
         this.ownerAlias = ownerAlias;
+        this.images = Objects.requireNonNull(images);
+        this.contentGallery = Objects.requireNonNull(contentGallery);
     }
 
     @GetMapping("/")
@@ -73,6 +86,23 @@ public class PublicHomeController {
         List<PublicHomepageContentEntry> researchHighlights = homepage.promoteResearchHighlights()
                 ? homepageContent.latestResearch(language, homepage.researchHighlightLimit())
                 : List.of();
+        var covers = new LinkedHashMap<String,
+                PublicImageVariantView>();
+        // Media storage is optional in the supported test/development configuration.
+        var imageQuery = images.getIfAvailable();
+        if (imageQuery != null) {
+            homepageFeaturedProjects.forEach(project -> project.coverAssetId()
+                    .flatMap(id -> imageQuery.findVariant(id, "medium"))
+                    .ifPresent(image -> covers.put(project.publicUrl(), image)));
+        }
+        var tags = new LinkedHashMap<String, List<String>>();
+        latestWriting.forEach(entry -> entry.sourceId()
+                .flatMap(id -> contentGallery.galleryMetadata(new PublicContentBySourceQuery(id, entry.publicUrl())))
+                .ifPresent(metadata -> {
+                    tags.put(entry.publicUrl(), metadata.tags());
+                    if (imageQuery != null) metadata.coverAssetId().flatMap(id -> imageQuery.findVariant(id, "medium"))
+                            .ifPresent(image -> covers.put(entry.publicUrl(), image));
+                }));
         model.addAttribute("page", new PublicHomeViewModel(
                 homepage.siteName(),
                 pageTitle(homepage),
@@ -89,6 +119,8 @@ public class PublicHomeController {
                 homepage.promoteResearchHighlights(),
                 latestWriting,
                 researchHighlights,
+                covers,
+                tags,
                 assetResolver.scriptPath(FRONTEND_ENTRY),
                 assetResolver.stylesheetPaths(FRONTEND_ENTRY)));
         return "site/home";

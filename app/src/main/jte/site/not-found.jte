@@ -1,5 +1,6 @@
 @import dev.persefonia.webpublic.content.PublicNotFoundPage
 @param PublicNotFoundPage page
+@param String publicNavigationScriptPath = null
 <!doctype html>
 <html lang="en">
 <head>
@@ -7,7 +8,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${page.title()}</title>
     @template.site.components.robotsMeta(page.noindex())
-    @template.site.components.standardPublicStyles(page.stylesheetPaths())
+    @template.site.components.standardPublicStyles(page.stylesheetPaths(), publicNavigationScriptPath)
 </head>
 <body>
     <a class="skip-link" href="#main-content">Skip to main content</a>

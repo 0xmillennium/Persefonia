@@ -13,8 +13,11 @@ export const PHYSICS = Object.freeze({ homeStiffness: 12, linearDamping: 3.2,
   angularDamping: 3.6, restitution: .08, navigatorRadius: 10,
   navigatorSpeedLimit: 720, solverIterations: 10, recoveryIterations: 20, microsteps: 4,
   contactMargin: .16, solidTolerance: .3, restError: .002, restSpeed: .002, restAngularSpeed: .0001 });
-export const navigatorTransfer = (speed: number): number =>
-  PHYSICS.navigatorSpeedLimit * Math.tanh(Math.max(0, speed) / PHYSICS.navigatorSpeedLimit);
+export const navigatorTransfer = (speed: number, limit: number = PHYSICS.navigatorSpeedLimit): number =>
+  limit * Math.tanh(Math.max(0, speed) / limit);
+export type PhysicsResponse = Readonly<{
+  homeStiffness: number; linearDamping: number; angularDamping: number; restitution: number; navigatorSpeedLimit: number;
+}>;
 
 export type FragmentGeometry = Readonly<{
   id: string; vertices: readonly Vec[]; parts: readonly (readonly Vec[])[]; anchors: readonly Vec[];
@@ -57,6 +60,7 @@ type ForecastJob = { search: GroupForecast; poses: { id: string; position: Vec; 
     navigator: { position: Vec; active: boolean }; permissions: string; potential: number; center: Vec; velocity: Vec; walls: string; validating: boolean };
 
 export class PhysicsCore {
+  readonly response: PhysicsResponse;
   readonly bodies: readonly Body[];
   readonly permissions: CollisionPermissions;
   readonly navigator = { position: { x: -100, y: -100 }, velocity: { x: 0, y: 0 }, active: false };
@@ -77,7 +81,11 @@ export class PhysicsCore {
   private navigatorPath: readonly Vec[] = [];
   readonly forecastWork = { started: 0, cancelled: 0, completed: 0, simulatedSteps: 0 };
 
-  constructor(geometry: readonly FragmentGeometry[], options: { width?: number; height?: number; deadlock?: boolean; eventHistoryLimit?: number; forecastPermissions?: CollisionPermissions } = {}) {
+  constructor(geometry: readonly FragmentGeometry[], options: { width?: number; height?: number; response?: Partial<PhysicsResponse>; deadlock?: boolean; eventHistoryLimit?: number; forecastPermissions?: CollisionPermissions } = {}) {
+    this.response = Object.freeze({ ...PHYSICS, ...options.response });
+    if (![this.response.homeStiffness, this.response.navigatorSpeedLimit].every(v => Number.isFinite(v) && v > 0)
+      || ![this.response.linearDamping, this.response.angularDamping, this.response.restitution].every(v => Number.isFinite(v) && v >= 0)
+      || this.response.restitution > 1) throw new Error("Invalid physics response");
     this.width = options.width ?? 960; this.height = options.height ?? 620;
     if (![this.width, this.height].every(v => Number.isFinite(v) && v > 0)) throw new Error("Invalid stage dimensions");
     if (new Set(geometry.map(g => g.id)).size !== geometry.length) throw new Error("Duplicate fragment IDs");
@@ -109,7 +117,7 @@ export class PhysicsCore {
   }
   homeForce(b: Body): { acceleration: Vec; torque: number } {
     let force: Vec = { x: 0, y: 0 }, torque = 0;
-    const coefficient = b.geometry.mass * PHYSICS.homeStiffness / b.geometry.anchors.length;
+    const coefficient = b.geometry.mass * this.response.homeStiffness / b.geometry.anchors.length;
     const home = this.home(b), c = Math.cos(b.angle), s = Math.sin(b.angle);
     for (const a of b.geometry.anchors) {
       const r = { x: a.x * c - a.y * s, y: a.x * s + a.y * c };
@@ -118,7 +126,7 @@ export class PhysicsCore {
       force = add(force, f); torque += cross(r, f);
     }
     return { acceleration: mul(force, 1 / b.geometry.mass),
-      torque: torque + orientationBias(b.angle, b.geometry.inertia, PHYSICS.homeStiffness) };
+      torque: torque + orientationBias(b.angle, b.geometry.inertia, this.response.homeStiffness) };
   }
   loadFixture(fixtures: readonly BodyFixture[]): void {
     if (this.step !== 0) throw new Error("Fixtures require a fresh simulation");
@@ -146,7 +154,7 @@ export class PhysicsCore {
     if (relative >= 0) return;
     const inverseMass = 1 / a.geometry.mass + (b ? 1 / b.geometry.mass : 0)
       + cross(ra, c.normal) ** 2 / a.geometry.inertia + (b ? cross(rb, c.normal) ** 2 / b.geometry.inertia : 0);
-    const j = -(1 + PHYSICS.restitution) * relative / inverseMass;
+    const j = -(1 + this.response.restitution) * relative / inverseMass;
     this.impulse(a, mul(c.normal, -j), c.point);
     if (b) this.impulse(b, mul(c.normal, j), c.point);
   }
@@ -276,7 +284,7 @@ export class PhysicsCore {
     this.navigatorOrigin = { ...this.navigator.position };
     this.navigatorPath = stroke?.points ?? [];
     const rawSpeed = length(delta) / observedInterval;
-    this.navigator.velocity = mul(delta, navigatorTransfer(rawSpeed) / (length(delta) || 1));
+    this.navigator.velocity = mul(delta, navigatorTransfer(rawSpeed, this.response.navigatorSpeedLimit) / (length(delta) || 1));
     // Fixed 120Hz external clock; body motion remains at <=1/480s. Scalar
     // fixtures sample at <=2 units; live strokes cap subdivisions and cast the
     // longer legs instead of imposing a replay speed on the user's pointer.
@@ -295,7 +303,7 @@ export class PhysicsCore {
       this.navigator.position = stroke ? desired : add(this.navigator.position, mul(travel, Math.min(1, 2 / (length(travel) || 1))));
       if (legs?.length) {
         const last = legs.at(-1)!;
-        this.navigator.velocity = mul(last.delta, navigatorTransfer(length(last.delta) / last.elapsedSeconds) / (length(last.delta) || 1));
+        this.navigator.velocity = mul(last.delta, navigatorTransfer(length(last.delta) / last.elapsedSeconds, this.response.navigatorSpeedLimit) / (length(last.delta) || 1));
       }
       this.account("home", () => {
         for (const b of this.bodies) {
@@ -306,8 +314,8 @@ export class PhysicsCore {
       });
       this.account("damping", () => {
         this.bodies.forEach(b => {
-          b.velocity = mul(b.velocity, Math.exp(-PHYSICS.linearDamping * dt));
-          b.angularVelocity *= Math.exp(-PHYSICS.angularDamping * dt);
+          b.velocity = mul(b.velocity, Math.exp(-this.response.linearDamping * dt));
+          b.angularVelocity *= Math.exp(-this.response.angularDamping * dt);
           b.position = add(b.position, mul(b.velocity, dt)); b.angle += b.angularVelocity * dt;
         });
       });
@@ -317,7 +325,7 @@ export class PhysicsCore {
           // legs apply bounded momentum at every crossed body's first entry;
           // they do not drag a body across a fast stroke's entire distance.
           if (length(sub(leg.end, leg.start)) <= POINTER_STROKE.spacing) continue;
-          const velocity = mul(leg.delta, navigatorTransfer(length(leg.delta) / leg.elapsedSeconds) / (length(leg.delta) || 1));
+          const velocity = mul(leg.delta, navigatorTransfer(length(leg.delta) / leg.elapsedSeconds, this.response.navigatorSpeedLimit) / (length(leg.delta) || 1));
           for (const b of this.bodies) {
             const c = circleCast(this.vertices(b), leg.start, leg.end, PHYSICS.navigatorRadius);
             if (!c) continue;
@@ -383,7 +391,7 @@ export class PhysicsCore {
     let potential = 0, scale = 0, power = 0, powerDerivative = 0;
     for (const { b, anchors } of rows) {
       let force: Vec = { x: 0, y: 0 }, torque = 0;
-      const coefficient = b.geometry.mass * PHYSICS.homeStiffness / anchors.length;
+      const coefficient = b.geometry.mass * this.response.homeStiffness / anchors.length;
       let curvature = 0;
       const velocity = sub(b.velocity, meanVelocity);
       for (const a of anchors) {
@@ -394,12 +402,12 @@ export class PhysicsCore {
         force = add(force, f); torque += cross(r, f);
         if (progress) curvature += coefficient * (dot(anchorVelocity, anchorVelocity) + dot(error, r) * b.angularVelocity ** 2);
       }
-      scale += (dot(force, force) / b.geometry.mass + torque ** 2 / b.geometry.inertia) / (2 * PHYSICS.homeStiffness);
+      scale += (dot(force, force) / b.geometry.mass + torque ** 2 / b.geometry.inertia) / (2 * this.response.homeStiffness);
       power += dot(force, velocity) + torque * b.angularVelocity;
       if (progress) {
         const response = this.homeForce(b);
-        powerDerivative += dot(force, sub(response.acceleration, mul(velocity, PHYSICS.linearDamping)))
-          + torque * (response.torque / b.geometry.inertia - PHYSICS.angularDamping * b.angularVelocity) - curvature;
+        powerDerivative += dot(force, sub(response.acceleration, mul(velocity, this.response.linearDamping)))
+          + torque * (response.torque / b.geometry.inertia - this.response.angularDamping * b.angularVelocity) - curvature;
       }
     }
     // Remove only common translation from the home objective. A fragment pair
@@ -466,7 +474,7 @@ export class PhysicsCore {
     const states = this.permissions.snapshot(), step = this.step;
     const navigator = { position: { ...this.navigator.position }, active: this.navigator.active };
     const create = (keys: readonly string[]): ForecastBranch => {
-      const copy = new PhysicsCore(this.bodies.map(b => b.geometry), { width: this.width, height: this.height,
+      const copy = new PhysicsCore(this.bodies.map(b => b.geometry), { width: this.width, height: this.height, response: this.response,
         forecastPermissions: CollisionPermissions.forPrediction(FIXED_DT, states, keys, step, keys.length ? request.members : []) });
       for (const fixture of fixtures) {
         const b = copy.bodies.find(b => b.geometry.id === fixture.id)!;
@@ -491,7 +499,7 @@ export class PhysicsCore {
   private navigatorRelevant(members: readonly string[], points: readonly Vec[]): boolean {
     return this.bodies.filter(b => members.includes(b.geometry.id)).some(b => {
       const radius = Math.max(...b.geometry.vertices.map(length)) + PHYSICS.navigatorRadius
-        + FORECAST.maximumTranslationDrift + PHYSICS.navigatorSpeedLimit * FORECAST.horizonSteps * FIXED_DT;
+        + FORECAST.maximumTranslationDrift + this.response.navigatorSpeedLimit * FORECAST.horizonSteps * FIXED_DT;
       return points.some((point, index) => {
         const end = points[index + 1] ?? point, delta = sub(end, point);
         const t = Math.max(0, Math.min(1, dot(sub(b.position, point), delta) / (dot(delta, delta) || 1)));

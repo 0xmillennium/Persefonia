@@ -145,3 +145,23 @@ INSERT INTO portfolio.active_cv_documents
 SELECT md5('browser-cv-' || language)::uuid, '00000000-0000-0000-0000-000000000801', language,
        '10000000-0000-0000-0000-0000000000c1', 'Fixture CV', now(), now(), now()
 FROM (VALUES ('EN'), ('TR')) AS languages(language);
+
+-- Gallery cover uses the supplied hero derivative as test-only author-selected media.
+-- browserCheck creates these files in its disposable storage root.
+INSERT INTO media.assets
+    (id, original_filename, stored_filename, storage_path, content_type, file_extension,
+     size_bytes, checksum, kind, visibility, image_width, image_height, decorative,
+     processing_status, created_at, updated_at, version)
+VALUES ('10000000-0000-0000-0000-0000000000c2', 'browser-cover.webp', 'browser-cover.webp',
+        'original/browser-cover.webp', 'image/webp', 'webp', 299892,
+        'eaa782e7a0ccf61b45137480fcabbb50493bbdf512f3b21d3d05785970f2874c',
+        'IMAGE', 'PUBLIC', 1920, 1072, true, 'PROCESSED', now(), now(), 0);
+INSERT INTO media.asset_variants
+    (id, asset_id, name, width, height, content_type, size_bytes, storage_path, checksum, created_at)
+VALUES ('10000000-0000-0000-0000-0000000000c3', '10000000-0000-0000-0000-0000000000c2',
+        'medium', 1920, 1072, 'image/webp', 299892, 'variants/browser-cover.webp',
+        'eaa782e7a0ccf61b45137480fcabbb50493bbdf512f3b21d3d05785970f2874c', now());
+UPDATE portfolio.projects SET cover_asset_id='10000000-0000-0000-0000-0000000000c2'
+WHERE id=md5('browser-project-1')::uuid;
+UPDATE publishing.content_items SET og_image_asset_id='10000000-0000-0000-0000-0000000000c2'
+WHERE slug='fixture-writing-3';

@@ -102,7 +102,7 @@ final class PublicCvMockMvcSupport {
             return (model, request, response) -> {
                 response.setContentType("text/html;charset=UTF-8");
                 StringOutput output = new StringOutput();
-                templateEngine.render(viewName + ".jte", model.get("page"), output);
+                templateEngine.render(viewName + ".jte", new java.util.HashMap<String, Object>(model), output);
                 response.getWriter().write(output.toString());
             };
         }

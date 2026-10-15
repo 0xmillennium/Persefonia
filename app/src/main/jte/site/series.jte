@@ -1,6 +1,7 @@
 @import dev.persefonia.webpublic.series.PublicSeriesEntryView
 @import dev.persefonia.webpublic.series.PublicSeriesPage
 @param PublicSeriesPage page
+@param String publicNavigationScriptPath = null
 <!doctype html>
 <html lang="${page.htmlLanguage()}">
 <head>
@@ -10,7 +11,7 @@
     <meta name="description" content="${page.description().isBlank() ? page.title() : page.description()}">
     @template.site.components.canonicalLink(page.canonicalUrl())
     @template.site.components.robotsMeta(page.noindex())
-    @template.site.components.standardPublicStyles(page.stylesheetPaths())
+    @template.site.components.standardPublicStyles(page.stylesheetPaths(), publicNavigationScriptPath)
     @template.site.components.feedDiscoveryLink()
 </head>
 <body>

@@ -47,13 +47,12 @@ def protection(source):
 def versions():
     return {"pillow": PIL.__version__, "numpy": np.__version__, "opencv": cv2.__version__, "webp": features.version("webp")}
 
-def render(folder, quality):
-    root = pathlib.Path(__file__).resolve().parents[1]
+def render(folder, quality, source_folder, digits):
     for width in [960, 1600]:
         (folder/str(width)/"robotic-arm").mkdir(parents=True, exist_ok=True)
     records = []
     for index in range(1, 193):
-        path = root/f"assets/frames/robotic-arm/frame_{index:05d}.png"
+        path = source_folder/f"frame_{index:0{digits}d}.png"
         raw = subprocess.run(["ffmpeg", "-v", "error", "-threads", "2", "-i", str(path), "-vf", "scale=1600:900:flags=lanczos", "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], check=True, capture_output=True).stdout
         source = np.frombuffer(raw, np.uint8).reshape(900, 1600, 3)
         alpha = protection(source)
@@ -74,10 +73,12 @@ if __name__ == "__main__":
     parser.add_argument("--versions", action="store_true")
     parser.add_argument("--output", type=pathlib.Path)
     parser.add_argument("--quality", type=int, default=96)
+    parser.add_argument("--source", type=pathlib.Path)
+    parser.add_argument("--digits", type=int, choices=[4, 5])
     args = parser.parse_args()
     if args.versions:
         print(json.dumps(versions()))
-    elif args.output:
-        render(args.output, args.quality)
+    elif args.output and args.source and args.digits:
+        render(args.output, args.quality, args.source, args.digits)
     else:
-        parser.error("--versions or --output required")
+        parser.error("--versions or --output with --source and --digits required")

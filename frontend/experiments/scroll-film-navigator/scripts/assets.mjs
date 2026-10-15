@@ -2,10 +2,15 @@ import { readdir, readFile, mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import * as zlib from 'node:zlib';
+import { sources } from './media-config.mjs';
 
 export const root = fileURLToPath(new URL('../', import.meta.url));
 export const output = fileURLToPath(new URL('../../../test-results/scroll-film-navigator/', import.meta.url));
 export const films = ['robotic-arm', 'tree'];
+export function sourceSequence(film, directory = `${root}assets/frames`) {
+  const {directory:folder,digits}=sources[film];
+  return {folder:`${directory}/${folder}`,digits,names:Array.from({length:192},(_,i)=>`frame_${String(i+1).padStart(digits,'0')}.png`)};
+}
 const signature = Buffer.from([137,80,78,71,13,10,26,10]);
 const table = new Uint32Array(256);
 for (let n=0;n<256;n++) { let c=n; for(let k=0;k<8;k++) c=(c&1)?0xedb88320^(c>>>1):c>>>1; table[n]=c>>>0; }
@@ -38,10 +43,9 @@ export function inspectPng(buffer, label, expected = [3840,2160]) {
 export async function validate(directory = `${root}assets/frames`) {
   const manifest={version:1,frames:192,width:3840,height:2160,films:{}};
   for(const film of films) {
-    const folder=`${directory}/${film}`;
+    const {folder,names:expected}=sourceSequence(film,directory);
     const names=(await readdir(folder)).filter(n=>n.toLowerCase().endsWith('.png')).sort();
-    const expected=Array.from({length:192},(_,i)=>`frame_${String(i+1).padStart(5,'0')}.png`);
-    if(names.length!==192 || names.some((n,i)=>n!==expected[i])) throw new Error(`${film}: expected exactly consecutive frame_00001.png–frame_00192.png; found ${names.length} PNGs`);
+    if(names.length!==192 || names.some((n,i)=>n!==expected[i])) throw new Error(`${film}: expected exactly consecutive ${expected[0]}–${expected.at(-1)} in ${folder}; found ${names.length} PNGs`);
     manifest.films[film]={};
     for(const name of names) manifest.films[film][name]=inspectPng(await readFile(`${folder}/${name}`),`${film}/${name}`);
   }

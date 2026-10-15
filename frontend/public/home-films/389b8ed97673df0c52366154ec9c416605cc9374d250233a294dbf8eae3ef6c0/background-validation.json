@@ -1,0 +1,1175 @@
+{
+  "config": {
+    "version": 2,
+    "width": 1600,
+    "background": [
+      10,
+      12,
+      13
+    ],
+    "foregroundContrast": 12,
+    "foregroundLuma": 45,
+    "matte": "continuous squared plate contrast; no expanded binary mask"
+  },
+  "versions": {
+    "pillow": "11.1.0",
+    "numpy": "2.4.4",
+    "opencv": "4.11.0",
+    "webp": "1.3.2"
+  },
+  "quality": 96,
+  "records": [
+    {
+      "index": 1,
+      "protectedFraction": 0.008289583333333333,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8722333333333333
+    },
+    {
+      "index": 2,
+      "protectedFraction": 0.010634722222222222,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8661569444444445
+    },
+    {
+      "index": 3,
+      "protectedFraction": 0.012503472222222221,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8610944444444445
+    },
+    {
+      "index": 4,
+      "protectedFraction": 0.014052083333333333,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8536694444444445
+    },
+    {
+      "index": 5,
+      "protectedFraction": 0.014558333333333333,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8511479166666667
+    },
+    {
+      "index": 6,
+      "protectedFraction": 0.014491666666666667,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8509909722222222
+    },
+    {
+      "index": 7,
+      "protectedFraction": 0.014478472222222222,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8509083333333334
+    },
+    {
+      "index": 8,
+      "protectedFraction": 0.014279861111111111,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8491819444444444
+    },
+    {
+      "index": 9,
+      "protectedFraction": 0.01413125,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.84996875
+    },
+    {
+      "index": 10,
+      "protectedFraction": 0.014055555555555556,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8505319444444445
+    },
+    {
+      "index": 11,
+      "protectedFraction": 0.01385625,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8537618055555556
+    },
+    {
+      "index": 12,
+      "protectedFraction": 0.013803472222222222,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8520118055555556
+    },
+    {
+      "index": 13,
+      "protectedFraction": 0.013764583333333334,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8524805555555556
+    },
+    {
+      "index": 14,
+      "protectedFraction": 0.01373125,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8521451388888889
+    },
+    {
+      "index": 15,
+      "protectedFraction": 0.013760416666666667,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8528722222222223
+    },
+    {
+      "index": 16,
+      "protectedFraction": 0.013698611111111111,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8515527777777778
+    },
+    {
+      "index": 17,
+      "protectedFraction": 0.01365486111111111,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8520291666666666
+    },
+    {
+      "index": 18,
+      "protectedFraction": 0.01368611111111111,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8518479166666667
+    },
+    {
+      "index": 19,
+      "protectedFraction": 0.013846527777777777,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8535972222222222
+    },
+    {
+      "index": 20,
+      "protectedFraction": 0.014093055555555555,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8521236111111111
+    },
+    {
+      "index": 21,
+      "protectedFraction": 0.014443055555555556,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8524270833333333
+    },
+    {
+      "index": 22,
+      "protectedFraction": 0.01465,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8504701388888889
+    },
+    {
+      "index": 23,
+      "protectedFraction": 0.014918055555555556,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8503256944444444
+    },
+    {
+      "index": 24,
+      "protectedFraction": 0.0152625,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8494020833333333
+    },
+    {
+      "index": 25,
+      "protectedFraction": 0.015480555555555555,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8500777777777778
+    },
+    {
+      "index": 26,
+      "protectedFraction": 0.015702777777777777,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8495597222222222
+    },
+    {
+      "index": 27,
+      "protectedFraction": 0.01567638888888889,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8525305555555556
+    },
+    {
+      "index": 28,
+      "protectedFraction": 0.01573611111111111,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.85276875
+    },
+    {
+      "index": 29,
+      "protectedFraction": 0.015640277777777777,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8522493055555556
+    },
+    {
+      "index": 30,
+      "protectedFraction": 0.015608333333333333,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8520784722222222
+    },
+    {
+      "index": 31,
+      "protectedFraction": 0.015625,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8526798611111112
+    },
+    {
+      "index": 32,
+      "protectedFraction": 0.01562361111111111,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8506909722222222
+    },
+    {
+      "index": 33,
+      "protectedFraction": 0.01562361111111111,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8522951388888889
+    },
+    {
+      "index": 34,
+      "protectedFraction": 0.015602083333333334,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8518666666666667
+    },
+    {
+      "index": 35,
+      "protectedFraction": 0.015394444444444445,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8557972222222222
+    },
+    {
+      "index": 36,
+      "protectedFraction": 0.015415277777777778,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8551465277777778
+    },
+    {
+      "index": 37,
+      "protectedFraction": 0.015310416666666667,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8555201388888889
+    },
+    {
+      "index": 38,
+      "protectedFraction": 0.015209722222222222,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8554104166666666
+    },
+    {
+      "index": 39,
+      "protectedFraction": 0.015492361111111111,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8560069444444445
+    },
+    {
+      "index": 40,
+      "protectedFraction": 0.015718055555555555,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8543625
+    },
+    {
+      "index": 41,
+      "protectedFraction": 0.015669444444444444,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8555097222222222
+    },
+    {
+      "index": 42,
+      "protectedFraction": 0.015640972222222223,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8566479166666666
+    },
+    {
+      "index": 43,
+      "protectedFraction": 0.015544444444444444,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8576611111111111
+    },
+    {
+      "index": 44,
+      "protectedFraction": 0.016724305555555555,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8563347222222222
+    },
+    {
+      "index": 45,
+      "protectedFraction": 0.017947916666666668,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.85695
+    },
+    {
+      "index": 46,
+      "protectedFraction": 0.020788194444444446,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8553576388888889
+    },
+    {
+      "index": 47,
+      "protectedFraction": 0.021627777777777777,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8552006944444445
+    },
+    {
+      "index": 48,
+      "protectedFraction": 0.023174305555555556,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.85226875
+    },
+    {
+      "index": 49,
+      "protectedFraction": 0.02547361111111111,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8514472222222222
+    },
+    {
+      "index": 50,
+      "protectedFraction": 0.026836805555555555,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8514916666666666
+    },
+    {
+      "index": 51,
+      "protectedFraction": 0.027172222222222223,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8435722222222222
+    },
+    {
+      "index": 52,
+      "protectedFraction": 0.028379861111111113,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8423916666666666
+    },
+    {
+      "index": 53,
+      "protectedFraction": 0.030679166666666667,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8380826388888889
+    },
+    {
+      "index": 54,
+      "protectedFraction": 0.04175277777777778,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8316381944444444
+    },
+    {
+      "index": 55,
+      "protectedFraction": 0.04477291666666667,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.82976875
+    },
+    {
+      "index": 56,
+      "protectedFraction": 0.047314583333333333,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8255416666666666
+    },
+    {
+      "index": 57,
+      "protectedFraction": 0.049881944444444444,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8240756944444444
+    },
+    {
+      "index": 58,
+      "protectedFraction": 0.05188611111111111,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8226354166666666
+    },
+    {
+      "index": 59,
+      "protectedFraction": 0.05232083333333333,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8071944444444444
+    },
+    {
+      "index": 60,
+      "protectedFraction": 0.05428263888888889,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8063166666666667
+    },
+    {
+      "index": 61,
+      "protectedFraction": 0.05537013888888889,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8042590277777778
+    },
+    {
+      "index": 62,
+      "protectedFraction": 0.05889722222222222,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8017638888888889
+    },
+    {
+      "index": 63,
+      "protectedFraction": 0.059831944444444445,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8017416666666667
+    },
+    {
+      "index": 64,
+      "protectedFraction": 0.06095763888888889,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7967819444444444
+    },
+    {
+      "index": 65,
+      "protectedFraction": 0.06247152777777778,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7969555555555555
+    },
+    {
+      "index": 66,
+      "protectedFraction": 0.06378819444444445,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7962152777777778
+    },
+    {
+      "index": 67,
+      "protectedFraction": 0.06427361111111111,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7970243055555556
+    },
+    {
+      "index": 68,
+      "protectedFraction": 0.06667083333333333,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8008381944444445
+    },
+    {
+      "index": 69,
+      "protectedFraction": 0.06866111111111112,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8000895833333334
+    },
+    {
+      "index": 70,
+      "protectedFraction": 0.07150138888888889,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7991319444444445
+    },
+    {
+      "index": 71,
+      "protectedFraction": 0.0724125,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7974451388888889
+    },
+    {
+      "index": 72,
+      "protectedFraction": 0.07402986111111111,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7938951388888889
+    },
+    {
+      "index": 73,
+      "protectedFraction": 0.07530069444444444,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7950020833333333
+    },
+    {
+      "index": 74,
+      "protectedFraction": 0.07575416666666666,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7958902777777778
+    },
+    {
+      "index": 75,
+      "protectedFraction": 0.07604444444444444,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7984201388888889
+    },
+    {
+      "index": 76,
+      "protectedFraction": 0.07652291666666666,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8011083333333333
+    },
+    {
+      "index": 77,
+      "protectedFraction": 0.07723125,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7998472222222223
+    },
+    {
+      "index": 78,
+      "protectedFraction": 0.07789861111111111,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7999763888888889
+    },
+    {
+      "index": 79,
+      "protectedFraction": 0.07800625,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8007104166666666
+    },
+    {
+      "index": 80,
+      "protectedFraction": 0.07804444444444444,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7939263888888889
+    },
+    {
+      "index": 81,
+      "protectedFraction": 0.07777777777777778,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7950930555555555
+    },
+    {
+      "index": 82,
+      "protectedFraction": 0.07777986111111111,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7955888888888889
+    },
+    {
+      "index": 83,
+      "protectedFraction": 0.0778375,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7978111111111111
+    },
+    {
+      "index": 84,
+      "protectedFraction": 0.07796180555555556,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8011826388888889
+    },
+    {
+      "index": 85,
+      "protectedFraction": 0.07796944444444444,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8000784722222222
+    },
+    {
+      "index": 86,
+      "protectedFraction": 0.0780375,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7980236111111111
+    },
+    {
+      "index": 87,
+      "protectedFraction": 0.07809166666666667,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7987388888888889
+    },
+    {
+      "index": 88,
+      "protectedFraction": 0.07828194444444445,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7924527777777778
+    },
+    {
+      "index": 89,
+      "protectedFraction": 0.07834513888888889,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7938173611111111
+    },
+    {
+      "index": 90,
+      "protectedFraction": 0.07854722222222223,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7942243055555556
+    },
+    {
+      "index": 91,
+      "protectedFraction": 0.08245208333333333,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8041673611111111
+    },
+    {
+      "index": 92,
+      "protectedFraction": 0.08248888888888889,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8033243055555556
+    },
+    {
+      "index": 93,
+      "protectedFraction": 0.08255833333333333,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.80244375
+    },
+    {
+      "index": 94,
+      "protectedFraction": 0.08248888888888889,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7988666666666666
+    },
+    {
+      "index": 95,
+      "protectedFraction": 0.08248263888888889,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7996173611111111
+    },
+    {
+      "index": 96,
+      "protectedFraction": 0.08249027777777777,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8002881944444444
+    },
+    {
+      "index": 97,
+      "protectedFraction": 0.08258888888888889,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8029111111111111
+    },
+    {
+      "index": 98,
+      "protectedFraction": 0.08248958333333334,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8053631944444445
+    },
+    {
+      "index": 99,
+      "protectedFraction": 0.08252361111111112,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8040576388888889
+    },
+    {
+      "index": 100,
+      "protectedFraction": 0.08251597222222222,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8044104166666667
+    },
+    {
+      "index": 101,
+      "protectedFraction": 0.08260416666666667,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8041215277777778
+    },
+    {
+      "index": 102,
+      "protectedFraction": 0.0825625,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8009520833333333
+    },
+    {
+      "index": 103,
+      "protectedFraction": 0.08257083333333333,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8007513888888889
+    },
+    {
+      "index": 104,
+      "protectedFraction": 0.0825625,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8024097222222222
+    },
+    {
+      "index": 105,
+      "protectedFraction": 0.08262013888888889,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8024
+    },
+    {
+      "index": 106,
+      "protectedFraction": 0.08252222222222222,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8031180555555556
+    },
+    {
+      "index": 107,
+      "protectedFraction": 0.08251805555555555,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8023944444444444
+    },
+    {
+      "index": 108,
+      "protectedFraction": 0.08245555555555556,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8023590277777778
+    },
+    {
+      "index": 109,
+      "protectedFraction": 0.08244583333333333,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8030798611111111
+    },
+    {
+      "index": 110,
+      "protectedFraction": 0.08219097222222223,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7977020833333334
+    },
+    {
+      "index": 111,
+      "protectedFraction": 0.08206111111111111,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7981048611111111
+    },
+    {
+      "index": 112,
+      "protectedFraction": 0.08183263888888889,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7988055555555555
+    },
+    {
+      "index": 113,
+      "protectedFraction": 0.08164513888888889,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8017638888888889
+    },
+    {
+      "index": 114,
+      "protectedFraction": 0.08166944444444445,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8026402777777778
+    },
+    {
+      "index": 115,
+      "protectedFraction": 0.08167430555555556,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8028145833333333
+    },
+    {
+      "index": 116,
+      "protectedFraction": 0.08172708333333334,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.80285625
+    },
+    {
+      "index": 117,
+      "protectedFraction": 0.0818076388888889,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8032145833333333
+    },
+    {
+      "index": 118,
+      "protectedFraction": 0.08171944444444444,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7978194444444444
+    },
+    {
+      "index": 119,
+      "protectedFraction": 0.08159791666666667,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7991888888888888
+    },
+    {
+      "index": 120,
+      "protectedFraction": 0.08133541666666666,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8003381944444444
+    },
+    {
+      "index": 121,
+      "protectedFraction": 0.08109305555555556,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8017555555555556
+    },
+    {
+      "index": 122,
+      "protectedFraction": 0.08062222222222222,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8030472222222222
+    },
+    {
+      "index": 123,
+      "protectedFraction": 0.08041041666666666,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8030902777777778
+    },
+    {
+      "index": 124,
+      "protectedFraction": 0.07977152777777778,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8032902777777777
+    },
+    {
+      "index": 125,
+      "protectedFraction": 0.07934166666666667,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8029819444444445
+    },
+    {
+      "index": 126,
+      "protectedFraction": 0.07837430555555555,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8006041666666667
+    },
+    {
+      "index": 127,
+      "protectedFraction": 0.07811736111111112,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.802225
+    },
+    {
+      "index": 128,
+      "protectedFraction": 0.07749097222222222,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8038166666666666
+    },
+    {
+      "index": 129,
+      "protectedFraction": 0.07717152777777778,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8039284722222222
+    },
+    {
+      "index": 130,
+      "protectedFraction": 0.0763826388888889,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8066715277777777
+    },
+    {
+      "index": 131,
+      "protectedFraction": 0.07559722222222222,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.806825
+    },
+    {
+      "index": 132,
+      "protectedFraction": 0.07475277777777778,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8073840277777777
+    },
+    {
+      "index": 133,
+      "protectedFraction": 0.07405694444444444,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8064722222222223
+    },
+    {
+      "index": 134,
+      "protectedFraction": 0.07304930555555555,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8054
+    },
+    {
+      "index": 135,
+      "protectedFraction": 0.0724375,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8044243055555556
+    },
+    {
+      "index": 136,
+      "protectedFraction": 0.072225,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8053
+    },
+    {
+      "index": 137,
+      "protectedFraction": 0.07295625,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.78221875
+    },
+    {
+      "index": 138,
+      "protectedFraction": 0.07256736111111112,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7826222222222222
+    },
+    {
+      "index": 139,
+      "protectedFraction": 0.07163055555555556,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.78325625
+    },
+    {
+      "index": 140,
+      "protectedFraction": 0.07137638888888889,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7829868055555556
+    },
+    {
+      "index": 141,
+      "protectedFraction": 0.07117916666666667,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7819770833333334
+    },
+    {
+      "index": 142,
+      "protectedFraction": 0.07070208333333333,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7801576388888889
+    },
+    {
+      "index": 143,
+      "protectedFraction": 0.07033541666666666,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7804861111111111
+    },
+    {
+      "index": 144,
+      "protectedFraction": 0.07018541666666667,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7822145833333334
+    },
+    {
+      "index": 145,
+      "protectedFraction": 0.07031388888888888,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7816020833333334
+    },
+    {
+      "index": 146,
+      "protectedFraction": 0.07028263888888889,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7849298611111111
+    },
+    {
+      "index": 147,
+      "protectedFraction": 0.07033541666666666,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7856944444444445
+    },
+    {
+      "index": 148,
+      "protectedFraction": 0.07035208333333333,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.78594375
+    },
+    {
+      "index": 149,
+      "protectedFraction": 0.07050486111111111,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.78474375
+    },
+    {
+      "index": 150,
+      "protectedFraction": 0.07047916666666666,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7844138888888889
+    },
+    {
+      "index": 151,
+      "protectedFraction": 0.070575,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7843923611111111
+    },
+    {
+      "index": 152,
+      "protectedFraction": 0.07041875,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7853868055555555
+    },
+    {
+      "index": 153,
+      "protectedFraction": 0.07044722222222222,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7863305555555555
+    },
+    {
+      "index": 154,
+      "protectedFraction": 0.07028958333333334,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7899201388888889
+    },
+    {
+      "index": 155,
+      "protectedFraction": 0.07045,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7900736111111111
+    },
+    {
+      "index": 156,
+      "protectedFraction": 0.07043333333333333,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7908854166666667
+    },
+    {
+      "index": 157,
+      "protectedFraction": 0.07061875,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7889166666666667
+    },
+    {
+      "index": 158,
+      "protectedFraction": 0.07026805555555556,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7885055555555556
+    },
+    {
+      "index": 159,
+      "protectedFraction": 0.07030833333333333,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7887291666666667
+    },
+    {
+      "index": 160,
+      "protectedFraction": 0.07018541666666667,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7897854166666667
+    },
+    {
+      "index": 161,
+      "protectedFraction": 0.07022152777777778,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7937534722222223
+    },
+    {
+      "index": 162,
+      "protectedFraction": 0.07017291666666667,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7967
+    },
+    {
+      "index": 163,
+      "protectedFraction": 0.07025069444444444,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7971895833333333
+    },
+    {
+      "index": 164,
+      "protectedFraction": 0.07030208333333333,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7978305555555556
+    },
+    {
+      "index": 165,
+      "protectedFraction": 0.07059930555555556,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7959965277777777
+    },
+    {
+      "index": 166,
+      "protectedFraction": 0.07038402777777777,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7959708333333333
+    },
+    {
+      "index": 167,
+      "protectedFraction": 0.07022777777777778,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7957388888888889
+    },
+    {
+      "index": 168,
+      "protectedFraction": 0.07021458333333333,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7961944444444444
+    },
+    {
+      "index": 169,
+      "protectedFraction": 0.07013958333333334,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7973256944444445
+    },
+    {
+      "index": 170,
+      "protectedFraction": 0.07017430555555555,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7988069444444444
+    },
+    {
+      "index": 171,
+      "protectedFraction": 0.07031180555555555,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7990715277777778
+    },
+    {
+      "index": 172,
+      "protectedFraction": 0.07039097222222222,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.79940625
+    },
+    {
+      "index": 173,
+      "protectedFraction": 0.07066597222222222,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7973694444444445
+    },
+    {
+      "index": 174,
+      "protectedFraction": 0.070325,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7977861111111111
+    },
+    {
+      "index": 175,
+      "protectedFraction": 0.07023125,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7978701388888889
+    },
+    {
+      "index": 176,
+      "protectedFraction": 0.07011319444444444,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7987965277777778
+    },
+    {
+      "index": 177,
+      "protectedFraction": 0.07025555555555556,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7984923611111111
+    },
+    {
+      "index": 178,
+      "protectedFraction": 0.07025347222222222,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.79933125
+    },
+    {
+      "index": 179,
+      "protectedFraction": 0.07040208333333334,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7996881944444444
+    },
+    {
+      "index": 180,
+      "protectedFraction": 0.07051527777777777,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8003395833333333
+    },
+    {
+      "index": 181,
+      "protectedFraction": 0.07074097222222223,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7984673611111112
+    },
+    {
+      "index": 182,
+      "protectedFraction": 0.07048402777777778,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7984527777777778
+    },
+    {
+      "index": 183,
+      "protectedFraction": 0.07040694444444444,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7984659722222223
+    },
+    {
+      "index": 184,
+      "protectedFraction": 0.07038194444444444,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7986958333333334
+    },
+    {
+      "index": 185,
+      "protectedFraction": 0.07057430555555555,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7979243055555556
+    },
+    {
+      "index": 186,
+      "protectedFraction": 0.07049930555555556,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.79961875
+    },
+    {
+      "index": 187,
+      "protectedFraction": 0.07056180555555555,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7994770833333333
+    },
+    {
+      "index": 188,
+      "protectedFraction": 0.07065902777777777,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7997083333333334
+    },
+    {
+      "index": 189,
+      "protectedFraction": 0.07086666666666666,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7982291666666667
+    },
+    {
+      "index": 190,
+      "protectedFraction": 0.07075277777777778,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.7992548611111111
+    },
+    {
+      "index": 191,
+      "protectedFraction": 0.0706076388888889,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8000069444444444
+    },
+    {
+      "index": 192,
+      "protectedFraction": 0.07061527777777778,
+      "protectedPixelsExact": true,
+      "nearFlatBackgroundFraction": 0.8009027777777777
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 import type { Scene } from "./renderer";
 import type { FrameKey } from "./transport";
 import { LiquidField } from "./field";
-import { PIGMENT,absorbedPigment } from "./pigment";
+import { PIGMENT,illuminatedPigment } from "./pigment";
 import { HOLD_OPTICS } from "./hold-optics";
 import { clamp } from "./transport";
 const surface=()=>{const canvas=document.createElement("canvas"),context=canvas.getContext("2d");if(!context)throw new Error("Canvas unavailable");return {canvas,context};};
@@ -116,7 +116,7 @@ export class CanvasRenderer {
     const left=Math.max(0,Math.floor((minX-2)/fw*w)),right=Math.min(w,Math.ceil((maxX+3)/fw*w));
     const top=Math.max(0,Math.floor((minY-2)/fh*h)),bottom=Math.min(h,Math.ceil((maxY+3)/fh*h));
     const smooth=(low:number,high:number,value:number)=>{const t=clamp((value-low)/(high-low));return t*t*(3-2*t);};
-    const absorption=[.35,.72,.65],dark=[.005,.25,.21],light=[.08,.85,.69],highlight=[.22,.76,.65];
+    const absorption=[.35,.72,.65],dark=[.01,.35,.31],light=[.32,.95,.79],crestColor=[.62,1,.92],highlight=[.66,1,.94];
     const held=scene.hold.animating&&!scene.reduced,revealing=scene.hold.phase==="REVEALING",m=scene.material,channel=revealing?1:0;
     if(held&&revealing){const slot=this.slots[1]!;slot.pixels??=slot.context.getImageData(0,0,w,h);}
     const mask=(x:number,y:number,c:number)=>{
@@ -132,8 +132,10 @@ export class CanvasRenderer {
         const a=rowA+ix,b=rowA+next,c=rowB+ix,d=rowB+next,wa=(1-wx)*(1-wy),wb=wx*(1-wy),wc=(1-wx)*wy,wd=wx*wy;
         const densityValue=dye[a*3]!*wa+dye[b*3]!*wb+dye[c*3]!*wc+dye[d*3]!*wd;if(densityValue<=.003)continue;
         const gx=gradients[a*2]!*wa+gradients[b*2]!*wb+gradients[c*2]!*wc+gradients[d*2]!*wd,gy=gradients[a*2+1]!*wa+gradients[b*2+1]!*wb+gradients[c*2+1]!*wc+gradients[d*2+1]!*wd;
-        const density=smooth(.015,.65,densityValue),marble=clamp((dye[a*3+1]!*wa+dye[b*3+1]!*wb+dye[c*3+1]!*wc+dye[d*3+1]!*wd)/(densityValue+.001)),vein=clamp((dye[a*3+2]!*wa+dye[b*3+2]!*wb+dye[c*3+2]!*wc+dye[d*3+2]!*wd)/(densityValue+.001)),shine=Math.min(Math.hypot(gx,gy)*.16,.12)*density,index=(y*w+x)*4;
-        let dx=clamp(gx*PIGMENT.refraction,-PIGMENT.maxRefraction,PIGMENT.maxRefraction),dy=clamp(gy*PIGMENT.refraction,-PIGMENT.maxRefraction,PIGMENT.maxRefraction),coverage=0,edge=0;
+        const band=dye[a*3+1]!*wa+dye[b*3+1]!*wb+dye[c*3+1]!*wc+dye[d*3+1]!*wd,veins=dye[a*3+2]!*wa+dye[b*3+2]!*wb+dye[c*3+2]!*wc+dye[d*3+2]!*wd;
+        const density=smooth(.008,.5,densityValue),marble=clamp(band/(densityValue+.001)),vein=clamp(veins/(densityValue+.001)),crest=clamp(Math.hypot(gx,gy)*.9),shine=crest*density*.3,illumination=clamp(.62+marble*.3-vein*.22,.4,.9),index=(y*w+x)*4;
+        const bendX=(gx+(band-densityValue*.5)*.55)*PIGMENT.refraction,bendY=(gy+(veins-densityValue*.2)*.55)*PIGMENT.refraction,limit=1/Math.sqrt(1+(bendX*bendX+bendY*bendY)/(PIGMENT.maxRefraction*PIGMENT.maxRefraction));
+        let dx=bendX*limit,dy=bendY*limit,coverage=0,edge=0;
         if(held){
           const mx=(x+.5)/w*m.width-.5,my=(y+.5)/h*m.height-.5;coverage=mask(mx,my,channel);edge=mask(mx,my,revealing?2:3);
           if(edge>.003){const hx=(mask(mx+1,my,channel)-mask(mx-1,my,channel))*m.width/this.width,hy=(mask(mx,my+1,channel)-mask(mx,my-1,channel))*m.height/this.height,length=Math.max(Math.hypot(hx,hy),.00001);dx+=hx/length*HOLD_OPTICS.refraction*edge;dy+=hy/length*HOLD_OPTICS.refraction*edge;}
@@ -148,7 +150,7 @@ export class CanvasRenderer {
             else color+=(tinted-color)*coverage;
             const rim=revealing?HOLD_OPTICS.revealRimColor[k]!:HOLD_OPTICS.rimColor[k]!;color+=(rim-color)*edge*(revealing?.8:HOLD_OPTICS.rimStrength);
           }
-          const pigment=(dark[k]!+(light[k]!-dark[k]!)*marble)*(1-vein*.35),shaded=color+(absorbedPigment(color,pigment,absorption[k]!)-color)*density*PIGMENT.opacity;
+          const base=dark[k]!+(light[k]!-dark[k]!)*marble,pigment=(base+(crestColor[k]!-base)*crest*.45)*(1-vein*.3),shaded=color+(illuminatedPigment(color,pigment,absorption[k]!,illumination)-color)*density*PIGMENT.opacity;
           output.data[index+k]=Math.round(clamp(shaded+(highlight[k]!-shaded)*shine)*255);
         }
         output.data[index+3]=Math.round(smooth(.003,.015,densityValue)*255);

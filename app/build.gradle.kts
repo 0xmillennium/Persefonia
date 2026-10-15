@@ -195,6 +195,13 @@ val viteBuild by tasks.registering(Exec::class) {
     commandLine("npm", "run", "build")
     inputs.dir(frontendDirectory.dir("src"))
     inputs.dir(frontendDirectory.dir("public"))
+    inputs.dir(frontendDirectory.dir("scripts"))
+    inputs.dir(frontendDirectory.dir("experiments/segmented-identity"))
+    inputs.dir(frontendDirectory.dir("experiments/scroll-film-navigator/src"))
+    inputs.dir(frontendDirectory.dir("experiments/scroll-film-navigator/scripts"))
+    inputs.dir(frontendDirectory.dir("experiments/identity-effects/src"))
+    inputs.dir(frontendDirectory.dir("experiments/location-earth-globe/src"))
+    inputs.dir(frontendDirectory.dir("experiments/location-earth-globe/assets"))
     inputs.files(
         frontendDirectory.file("package.json"),
         frontendDirectory.file("vite.config.ts")

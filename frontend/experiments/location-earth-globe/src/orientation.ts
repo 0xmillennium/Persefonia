@@ -17,6 +17,11 @@ export class GlobeOrientation implements Orientation {
   get angularSpeed(): number { return this.pressed ? 0 : this.baseSpeed + this.excessSpeed; }
   get moving(): boolean { return !this.pressed && (this.baseSpeed !== 0 || Math.abs(this.excessSpeed) > 0.0001); }
 
+  reset(): void {
+    this.pitch = MOTION.initialPitch;
+    this.spin = MOTION.initialSpin;
+    this.interrupt();
+  }
   press(): void { this.pressed = true; this.excessSpeed = 0; }
   drag(yaw: number, pitch: number): void {
     this.spin = wrapAngle(this.spin + yaw);

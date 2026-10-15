@@ -34,7 +34,7 @@ class PublicHomeChaptersTest {
     }
 
     @Test
-    void homepageRendersSevenSemanticChaptersAndPublicContentWithoutJavaScript() throws Exception {
+    void homepageRendersCurrentScenesAndPublicContentWithoutObsoleteExperiments() throws Exception {
         content.setContent(
                 List.of(new PublicHomepageContentEntry(
                         "A real article", "Published summary", "/en/articles/real-article")),
@@ -44,15 +44,17 @@ class PublicHomeChaptersTest {
         String html = mockMvc.perform(get("/")).andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
-        for (String id : List.of("identity", "work", "writing", "research", "architecture", "about", "contact")) {
+        for (String id : List.of("identity", "work", "writing", "contact")) {
             assertThat(html).contains("id=\"" + id + "\"");
         }
         assertThat(html).contains("<h1 id=\"identity-title\" class=\"home-masthead\">0xmillennium");
         assertThat(html).contains("href=\"#work\"", "href=\"#writing\"", "href=\"/contact\"");
-        assertThat(html).contains("href=\"/en/articles/real-article\"", "href=\"/en/research/real-study\"");
-        assertThat(html).contains("A real article", "A real study");
+        assertThat(html).contains("href=\"/en/articles/real-article\"");
+        assertThat(html).contains("A real article");
+        assertThat(html).doesNotContain("A real study", "id=\"research\"", "id=\"architecture\"", "id=\"about\"",
+                "href=\"#about\"", "href=\"#architecture\"", "class=\"film-controls\"",
+                "data-film-switch", "data-film-retry", "id=\"find-location\"", "id=\"tilt-up\"", "id=\"pause\"");
         assertThat(html).contains("class=\"home-cinema__image\" aria-hidden=\"true\"");
-        assertThat(html).contains("class=\"home-layer\"", "Spring MVC", "PostgreSQL");
         assertThat(html).doesNotContain("[Published article title]", "[Published research title]", "ref. pending");
     }
 }

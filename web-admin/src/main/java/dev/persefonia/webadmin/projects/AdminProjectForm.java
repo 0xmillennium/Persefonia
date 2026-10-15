@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public final class AdminProjectForm {
+    private String coverAssetId = "";
     private String status = "EXPERIMENT";
     private String visibility = "PRIVATE";
     private boolean featured;
@@ -40,6 +41,8 @@ public final class AdminProjectForm {
     private String links = "";
     private List<String> tagIds = new ArrayList<>();
 
+    public String getCoverAssetId() { return coverAssetId; }
+    public void setCoverAssetId(String value) { coverAssetId = value == null ? "" : value; }
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status == null ? "" : status; }
     public String getVisibility() { return visibility; }

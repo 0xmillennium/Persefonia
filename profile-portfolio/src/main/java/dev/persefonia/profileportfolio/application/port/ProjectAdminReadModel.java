@@ -29,7 +29,13 @@ public interface ProjectAdminReadModel {
             List<AdminProjectTechnologyView> technologies,
             List<AdminProjectLinkView> links,
             Instant updatedAt,
-            long version) {
+            long version,
+            String coverAssetId) {
+        public ProjectAdminDetails(UUID id, String status, String visibility, boolean featured, Integer sortOrder,
+                Set<TagId> tagIds, List<AdminProjectLocalizationView> localizations,
+                List<AdminProjectTechnologyView> technologies, List<AdminProjectLinkView> links, Instant updatedAt, long version) {
+            this(id, status, visibility, featured, sortOrder, tagIds, localizations, technologies, links, updatedAt, version, null);
+        }
         public ProjectAdminDetails {
             tagIds = Set.copyOf(tagIds);
             localizations = List.copyOf(localizations);

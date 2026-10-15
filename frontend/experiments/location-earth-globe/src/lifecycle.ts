@@ -4,6 +4,7 @@ export class GlobeLifecycle {
   private previous = 0;
   private visible = false;
   private available = true;
+  private sceneActive = true;
   private pageActive = true;
   private abort = new AbortController();
   private observer: IntersectionObserver;
@@ -21,7 +22,7 @@ export class GlobeLifecycle {
     });
     this.observer.observe(element);
   }
-  get active(): boolean { return !this.disposed && this.visible && this.available && this.pageActive && !document.hidden; }
+  get active(): boolean { return !this.disposed && this.visible && this.available && this.sceneActive && this.pageActive && !document.hidden; }
   get scheduled(): boolean { return this.raf !== 0; }
   request(): void {
     if (!this.active || this.raf) return;
@@ -41,6 +42,7 @@ export class GlobeLifecycle {
     else { this.stop(); this.interrupted(); }
   }
   setAvailable(value: boolean): void { this.available = value; this.reconcile(); }
+  setSceneActive(value: boolean): void { if(value===this.sceneActive)return;this.sceneActive=value;this.reconcile(); }
   private stop(): void { cancelAnimationFrame(this.raf); this.raf = 0; this.previous = 0; }
   dispose(): void {
     if (this.disposed) return;

@@ -177,7 +177,8 @@ class AdminProjectTestConfiguration {
                                     link.sortOrder().value()))
                             .toList(),
                     project.updatedAt(),
-                    project.version().value()));
+                    project.version().value(),
+                    project.coverAssetId().map(id -> id.value().toString()).orElse(null)));
         }
     }
 

@@ -1,6 +1,7 @@
 @import dev.persefonia.webpublic.search.PublicSearchPage
 @import dev.persefonia.webpublic.search.PublicSearchResultItem
 @param PublicSearchPage page
+@param String publicNavigationScriptPath = null
 <!doctype html>
 <html lang="en">
 <head>
@@ -11,7 +12,7 @@
     @template.site.components.canonicalLink(page.canonicalUrl())
     <meta name="robots" content="noindex, follow">
     @template.site.components.openGraphTags("website", "Search", "Search public content and projects.", page.canonicalUrl())
-    @template.site.components.standardPublicStyles(page.stylesheetPaths())
+    @template.site.components.standardPublicStyles(page.stylesheetPaths(), publicNavigationScriptPath)
     @template.site.components.feedDiscoveryLink()
 </head>
 <body>

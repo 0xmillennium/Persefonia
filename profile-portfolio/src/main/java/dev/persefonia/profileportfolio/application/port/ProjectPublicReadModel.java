@@ -23,7 +23,12 @@ public interface ProjectPublicReadModel {
             String summary,
             String slug,
             Set<TagId> tagIds,
-            List<PublicProjectTechnologyView> technologies) {
+            List<PublicProjectTechnologyView> technologies,
+            Optional<String> coverAssetId) {
+        public ProjectSummaryRow(String title, String summary, String slug, Set<TagId> tagIds,
+                List<PublicProjectTechnologyView> technologies) {
+            this(title, summary, slug, tagIds, technologies, Optional.empty());
+        }
         public ProjectSummaryRow {
             tagIds = Set.copyOf(tagIds);
             technologies = List.copyOf(technologies);

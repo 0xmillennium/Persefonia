@@ -89,6 +89,11 @@ export class LocationPresentation {
     this.flare.style.transform = `scale(${0.45 + acquired * 0.4})`;
     this.entranceSettled = !entrance.moving;
   }
+  resetEntrance(): void {
+    this.entranceSettled = false;
+    this.clear();
+    this.marker.style.opacity = "0";
+  }
   clear(): void {
     this.pinned = false; this.proximity.clear(); this.marker.hidden = true;
     this.panel.dataset.open = "false"; this.panel.setAttribute("aria-hidden", "true");

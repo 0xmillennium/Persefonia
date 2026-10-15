@@ -16,7 +16,13 @@ public record CreateProjectCommand(
         List<ProjectLocalizationInput> localizations,
         List<ProjectTechnologyInput> technologies,
         List<ProjectLinkInput> links,
-        Instant requestedAt) {
+        Instant requestedAt,
+        String coverAssetId) {
+    public CreateProjectCommand(PortfolioCommandActor actor, String status, String visibility,
+            boolean featured, Integer sortOrder, Set<UUID> tagIds, List<ProjectLocalizationInput> localizations,
+            List<ProjectTechnologyInput> technologies, List<ProjectLinkInput> links, Instant requestedAt) {
+        this(actor, status, visibility, featured, sortOrder, tagIds, localizations, technologies, links, requestedAt, null);
+    }
     public CreateProjectCommand {
         tagIds = Set.copyOf(tagIds == null ? Set.of() : tagIds);
         localizations = List.copyOf(localizations == null ? List.of() : localizations);

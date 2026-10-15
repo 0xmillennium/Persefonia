@@ -24,7 +24,7 @@ export function transformPoint(point: Vec3, orientation: Orientation): Vec3 {
 }
 
 export function cameraFor(width: number, height: number): Camera {
-  const radius = Math.min(width, height) * 0.435;
+  const radius = Math.min(width, height) * 0.42;
   return { width, height, radius, focal: radius * Math.sqrt(CAMERA_DISTANCE ** 2 - 1) };
 }
 

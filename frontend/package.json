@@ -49,7 +49,9 @@
     "effects:typecheck": "tsc --noEmit -p experiments/identity-effects/tsconfig.json",
     "effects:build": "node experiments/identity-effects/generate-static.mjs --check && vite build --config experiments/identity-effects/vite.config.ts",
     "effects:browser": "playwright test --config experiments/identity-effects/playwright.config.ts",
-    "effects:check": "npm run effects:typecheck && npm run effects:build"
+    "effects:check": "npm run effects:typecheck && npm run effects:build",
+    "home:media": "node scripts/home-media.mjs",
+    "home:films:publish": "node scripts/publish-home-films.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.57.0",

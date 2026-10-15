@@ -1,5 +1,10 @@
 package dev.persefonia.webpublic;
 
+import dev.persefonia.medialibrary.application.publicview.PublicImageVariantView;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
+
 import dev.persefonia.profileportfolio.application.query.PublicProfileSummaryView;
 import dev.persefonia.profileportfolio.application.query.PublicFeaturedProjectView;
 import dev.persefonia.discovery.application.index.PublicHomepageContentEntry;
@@ -22,15 +27,30 @@ public record PublicHomeViewModel(
         boolean promoteResearchHighlights,
         List<PublicHomepageContentEntry> latestWriting,
         List<PublicHomepageContentEntry> researchHighlights,
+        Map<String, PublicImageVariantView> galleryCovers,
+        Map<String, List<String>> galleryTags,
         String scriptPath,
         List<String> stylesheetPaths) {
     public PublicHomeViewModel {
+        galleryCovers = Map.copyOf(galleryCovers);
+        galleryTags = galleryTags.entrySet().stream().collect(Collectors.toUnmodifiableMap(
+                Map.Entry::getKey, entry -> List.copyOf(entry.getValue())));
         profile = profile == null ? Optional.empty() : profile;
         featuredProjects = List.copyOf(featuredProjects);
         latestWriting = List.copyOf(latestWriting);
         researchHighlights = List.copyOf(researchHighlights);
-        java.util.Objects.requireNonNull(canonicalUrl, "canonicalUrl");
-        java.util.Objects.requireNonNull(featuredProjectsTitle, "featuredProjectsTitle");
+        Objects.requireNonNull(canonicalUrl, "canonicalUrl");
+        Objects.requireNonNull(featuredProjectsTitle, "featuredProjectsTitle");
         stylesheetPaths = List.copyOf(stylesheetPaths);
+    }
+
+    public Optional<PublicImageVariantView> projectNavigationCover() {
+        return featuredProjects.stream().map(project -> galleryCovers.get(project.publicUrl()))
+                .filter(Objects::nonNull).findFirst();
+    }
+
+    public Optional<PublicImageVariantView> writingNavigationCover() {
+        return latestWriting.stream().map(entry -> galleryCovers.get(entry.publicUrl()))
+                .filter(Objects::nonNull).findFirst();
     }
 }

@@ -8,7 +8,8 @@ export default defineConfig({
   timeout: 60_000,
   expect: { timeout: 8_000 },
   reporter: [["list"], ["html", { outputFolder: "playwright-report", open: "never" }]],
-  outputDir: "test-results",
+  // Keep the approved experiment media cache outside Playwright's cleanup root.
+  outputDir: "test-results/browser",
   use: {
     baseURL: process.env.PERSEFONIA_BROWSER_URL ?? "http://127.0.0.1:18080",
     browserName: "chromium",

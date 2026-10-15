@@ -1,7 +1,9 @@
 import { defineConfig } from "vite";
+import { homeMedia } from "./scripts/home-media-plugin";
 
 export default defineConfig({
   base: "/assets/",
+  plugins: [homeMedia()],
   server: {
     host: "127.0.0.1"
   },
@@ -28,6 +30,15 @@ export default defineConfig({
       output: {
         codeSplitting: {
           groups: [
+            {
+              // Keep the shared Vite dynamic-import helper independent of
+              // diagram vendors; otherwise homepage globe imports pull Mermaid in.
+              name(id: string) {
+                return id.includes("vite/preload-helper") ? "runtime-preload" : null;
+              },
+              priority: 100,
+              minSize: 0
+            },
             {
               name(id: string) {
                 const match = id.match(

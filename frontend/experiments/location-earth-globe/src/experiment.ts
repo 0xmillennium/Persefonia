@@ -22,10 +22,12 @@ export class GlobeExperiment {
   private location: LocationPresentation;
   private failure: string | null = null;
   private submitted = 0;
+  private sceneActive = false;
   private lastResources = { buffers: 0, programs: 0, vaos: 0, bytes: 0 };
   disposed = false;
 
-  constructor(private stage: HTMLElement, private mask: Uint8Array) {
+  constructor(private stage: HTMLElement, private mask: Uint8Array, private diagnostics = true,
+    private controlsRoot: ParentNode = stage.parentElement ?? stage) {
     this.canvas = stage.querySelector<HTMLCanvasElement>("canvas")!;
     this.renderer = new GlobeRenderer(this.canvas, mask);
     this.location = new LocationPresentation(stage);
@@ -67,19 +69,20 @@ export class GlobeExperiment {
     window.addEventListener("resize", () => this.measure(), options);
     this.canvas.addEventListener("keydown", () => this.entrance.finish(), options);
     this.reduced.addEventListener("change", () => this.preferences(), options);
-    const pause = document.querySelector<HTMLButtonElement>("#pause")!;
-    pause.addEventListener("click", () => {
+    const pause = this.controlsRoot.querySelector<HTMLButtonElement>("#pause");
+    const toggleRotation = () => {
       this.entrance.finish();
       this.input.cancel(); this.orientation.paused = !this.orientation.paused;
       this.preferences();
-    }, options);
+    };
+    pause?.addEventListener("click", toggleRotation, options);
     for (const [id, amount] of [["tilt-up", -0.12], ["tilt-down", 0.12]] as const) {
-      document.querySelector<HTMLButtonElement>(`#${id}`)!.addEventListener("click", () => {
+      this.controlsRoot.querySelector<HTMLButtonElement>(`#${id}`)?.addEventListener("click", () => {
         this.entrance.finish();
         this.input.cancel(); this.orientation.drag(0, amount); this.invalidate();
       }, options);
     }
-    document.querySelector<HTMLButtonElement>("#find-location")!.addEventListener("click", () => {
+    const findLocation = () => {
       this.entrance.finish();
       this.input.cancel();
       this.orientation.pitch = 0.3;
@@ -88,6 +91,14 @@ export class GlobeExperiment {
       this.preferences();
       this.location.pinned = true;
       this.invalidate();
+    };
+    this.controlsRoot.querySelector<HTMLButtonElement>("#find-location")?.addEventListener("click", findLocation, options);
+    this.canvas.addEventListener("keydown", event => {
+      if (event.key !== " " && event.key !== "Home") return;
+      event.preventDefault();
+      if (event.repeat) return;
+      if (event.key === "Home") findLocation();
+      else toggleRotation();
     }, options);
     document.addEventListener("keydown", e => {
       if (e.key === "Escape") { this.entrance.finish(); this.location.clear(); this.invalidate(); }
@@ -97,7 +108,7 @@ export class GlobeExperiment {
     this.controlsAvailable(true);
     // Opt-in lifecycle probes for this isolated experiment. state() and RAF
     // perform no WebGL metadata queries or pixel readback.
-    if (import.meta.env.DEV || new URLSearchParams(location.search).has("inspect")) {
+    if (this.diagnostics && (import.meta.env.DEV || new URLSearchParams(location.search).has("inspect"))) {
       const contextProbe = this.renderer.gl.getExtension("WEBGL_lose_context");
       window.__globeExperiment = {
         state: () => this.state(), dispose: () => this.dispose(),
@@ -118,17 +129,20 @@ export class GlobeExperiment {
     this.input.cancel();
     this.orientation.reduced = this.reduced.matches;
     if (this.orientation.reduced) this.entrance.finish();
-    const pause = document.querySelector<HTMLButtonElement>("#pause")!;
-    pause.disabled = this.orientation.reduced;
-    pause.setAttribute("aria-pressed", String(this.orientation.paused || this.orientation.reduced));
-    pause.textContent = this.orientation.reduced ? "Rotation off (reduced motion)" :
-      this.orientation.paused ? "Resume rotation" : "Pause rotation";
+    const pause = this.controlsRoot.querySelector<HTMLButtonElement>("#pause");
+    if (pause) {
+      pause.disabled = this.orientation.reduced;
+      pause.setAttribute("aria-pressed", String(this.orientation.paused || this.orientation.reduced));
+      pause.textContent = this.orientation.reduced ? "Rotation off (reduced motion)" :
+        this.orientation.paused ? "Resume rotation" : "Pause rotation";
+    }
     this.invalidate();
   }
   private invalidate(): void { if (!this.disposed) this.lifecycle?.request(); }
   private controlsAvailable(available: boolean): void {
-    for (const control of document.querySelectorAll<HTMLButtonElement>(".controls button")) control.disabled = !available;
-    if (available) document.querySelector<HTMLButtonElement>("#pause")!.disabled = this.orientation.reduced;
+    for (const control of this.controlsRoot.querySelectorAll<HTMLButtonElement>(".controls button")) control.disabled = !available;
+    const pause = this.controlsRoot.querySelector<HTMLButtonElement>("#pause");
+    if (available && pause) pause.disabled = this.orientation.reduced;
   }
   private draw(seconds: number): boolean {
     if (!this.renderer || this.disposed) return false;
@@ -151,6 +165,18 @@ export class GlobeExperiment {
     this.controlsAvailable(false);
     this.stage.dataset.ready = "false";
     this.stage.querySelector<HTMLElement>("#fallback")!.textContent = `Istanbul, Türkiye. ${message}`;
+  }
+  active(value: boolean): void {
+    if (this.disposed) return;
+    if (value && !this.sceneActive) {
+      this.input.cancel();
+      this.hover = null;
+      this.orientation.reset();
+      this.entrance.reset(this.reduced.matches);
+      this.location.resetEntrance();
+    }
+    this.sceneActive = value;
+    this.lifecycle.setSceneActive(value);
   }
   state() {
     return { orientation: { pitch: this.orientation.pitch, spin: this.orientation.spin,

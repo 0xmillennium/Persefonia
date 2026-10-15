@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { GlobeEntrance } from "../src/entrance";
 
-describe("finite first-visible entrance", () => {
+describe("finite scene-entry entrance", () => {
   it("reveals the surface, scans the marker, then emits one fading pulse", () => {
     const entrance = new GlobeEntrance();
     expect(entrance.started).toBe(false);
@@ -24,7 +24,7 @@ describe("finite first-visible entrance", () => {
     expect(regular.elapsed).toBeCloseTo(irregular.elapsed);
     expect(regular.phase).toBe(irregular.phase);
   });
-  it("settles immediately on interaction or reduced motion and never replays", () => {
+  it("settles immediately on interaction or reduced motion until explicitly reset", () => {
     for (const reduced of [false, true]) {
       const entrance = new GlobeEntrance();
       entrance.step(0.2, reduced);
@@ -35,4 +35,19 @@ describe("finite first-visible entrance", () => {
       expect(entrance.moving).toBe(false);
     }
   });
+  it("restarts a completed entrance for another scene visit and keeps reduced motion static", () => {
+    const entrance = new GlobeEntrance();
+    entrance.step(4, false);
+    expect(entrance.phase).toBe("settled");
+    entrance.reset();
+    expect(entrance.started).toBe(false);
+    expect(entrance.reveal).toBe(0);
+    entrance.step(0.575, false);
+    expect(entrance.reveal).toBeCloseTo(0.5);
+    expect(entrance.phase).toBe("scan");
+    entrance.reset(true);
+    expect(entrance.reveal).toBe(1);
+    expect(entrance.moving).toBe(false);
+  });
+
 });

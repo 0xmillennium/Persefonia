@@ -1,6 +1,7 @@
 @import dev.persefonia.profileportfolio.application.query.PublicProjectCardView
 @import dev.persefonia.webpublic.projects.PublicProjectListingPage
 @param PublicProjectListingPage page
+@param String publicNavigationScriptPath = null
 <!doctype html>
 <html lang="${page.htmlLanguage()}">
 <head>
@@ -11,7 +12,7 @@
     @template.site.components.canonicalLink(page.canonicalUrl())
     @template.site.components.robotsMeta(page.noindex())
     @template.site.components.openGraphTags("website", page.title(), page.copy().projectsMetaDescription(), page.canonicalUrl())
-    @template.site.components.standardPublicStyles(page.stylesheetPaths())
+    @template.site.components.standardPublicStyles(page.stylesheetPaths(), publicNavigationScriptPath)
     @template.site.components.feedDiscoveryLink()
 </head>
 <body>

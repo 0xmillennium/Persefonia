@@ -1,15 +1,14 @@
 import { readFile, readdir, stat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { root, output, films } from './assets.mjs';
+import { root, output, films, sourceSequence } from './assets.mjs';
 import { hash } from './delivery.mjs';
 import { preparation } from './media-config.mjs';
 
 export async function sourceMetadata() {
   const result={};
   for(const film of films){
-    const folder=`${root}assets/frames/${film}`;
+    const {folder,names:expected}=sourceSequence(film);
     const names=(await readdir(folder)).filter(n=>n.toLowerCase().endsWith('.png')).sort();
-    const expected=Array.from({length:192},(_,i)=>`frame_${String(i+1).padStart(5,'0')}.png`);
     if(JSON.stringify(names)!==JSON.stringify(expected))throw new Error(`${film}: canonical source inventory changed`);
     result[film]=await Promise.all(names.map(async name=>{const s=await stat(`${folder}/${name}`);return {name,bytes:s.size,mtimeMs:s.mtimeMs};}));
   }
