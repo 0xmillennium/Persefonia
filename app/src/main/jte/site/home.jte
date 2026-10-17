@@ -1,6 +1,7 @@
 @import dev.persefonia.webpublic.PublicHomeViewModel
 @param PublicHomeViewModel page
 @param String publicNavigationScriptPath = null
+@param java.util.List<dev.persefonia.webpublic.navigation.PublicNavigationLink> navigationLinks = java.util.List.of()
 <!doctype html>
 <html class="home-document" lang="${page.defaultLanguage().toLowerCase(java.util.Locale.ROOT)}">
 <head>
@@ -22,12 +23,12 @@
 <body class="home-body">
     <a class="skip-link" href="#main-content">${page.copy().skipLink()}</a>
     <header class="home-nav">
-        <div class="home-brand" data-compact-identity><button type="button" aria-label="Inspect 0xmillennium identity"><span class="identity-plane">@template.site.components.compactIdentity("nav-identity")</span><span class="floor-shadow"></span></button></div>
+        <div class="home-brand" data-compact-identity><button type="button" aria-label="Inspect 0xmillennium identity" disabled><span class="identity-plane">@template.site.components.compactIdentity("nav-identity")</span><span class="floor-shadow"></span></button></div>
         <a class="home-sitename" href="/" data-site-name>${page.ownerAlias().toUpperCase(java.util.Locale.ROOT)}</a>
         <button class="home-menu-toggle" type="button" data-menu-toggle aria-label="Open menu" aria-controls="home-mobile-menu" aria-expanded="false" hidden><span aria-hidden="true"></span><span aria-hidden="true"></span></button>
         <nav aria-label="${page.copy().primaryNavigation()}">
-            <a href="#work"><span data-nav-label>${page.copy().projects()}</span>@if(page.projectNavigationCover().isPresent())<span class="nav-media" aria-hidden="true"><img src="${page.projectNavigationCover().get().url()}" alt="" width="${page.projectNavigationCover().get().width()}" height="${page.projectNavigationCover().get().height()}" loading="lazy" decoding="async"></span>@endif</a>
-            <a href="#writing"><span data-nav-label>${page.copy().writing()}</span>@if(page.writingNavigationCover().isPresent())<span class="nav-media" aria-hidden="true"><img src="${page.writingNavigationCover().get().url()}" alt="" width="${page.writingNavigationCover().get().width()}" height="${page.writingNavigationCover().get().height()}" loading="lazy" decoding="async"></span>@endif</a>
+            <a href="#work"><span data-nav-label>${page.copy().projects()}</span>@if(page.projectNavigationCover().isPresent())<span class="nav-media" aria-hidden="true">@template.site.components.homeCover(page.projectNavigationCover().get(), "(max-width: 960px) 42vw, (min-width: 1375px) 330px, 24vw")</span>@endif</a>
+            <a href="#writing"><span data-nav-label>${page.copy().writing()}</span>@if(page.writingNavigationCover().isPresent())<span class="nav-media" aria-hidden="true">@template.site.components.homeCover(page.writingNavigationCover().get(), "(max-width: 960px) 42vw, (min-width: 1375px) 330px, 24vw")</span>@endif</a>
             <a class="home-nav__contact" href="/contact"><span class="nav-contact-window"><span class="nav-contact-track"><span>${page.copy().contact()}</span><span aria-hidden="true">${page.copy().contact()}</span></span></span></a>
         </nav>
     </header>
@@ -37,22 +38,21 @@
             <nav aria-label="${page.copy().primaryNavigation()}"><a href="#work"><span data-nav-label>${page.copy().projects()}</span></a><a href="#writing"><span data-nav-label>${page.copy().writing()}</span></a><a href="/contact"><span data-nav-label>${page.copy().contact()}</span></a></nav>
         </div>
     </dialog>
-    <main id="main-content" class="homepage" tabindex="-1" data-home-v2 aria-keyshortcuts="F" aria-describedby="film-instructions">
-        <p id="film-instructions" class="sr-only">Hold the background to change film, or press F while the main content is focused. Repeat to retry if a film is unavailable.</p>
+    <main id="main-content" class="homepage" tabindex="-1" data-home-v2>
+        <p id="film-instructions" lang="en" class="sr-only" hidden>Hold the background to change film, or press F while the main content is focused. Repeat to retry if a film is unavailable.</p>
         <div class="home-environment" aria-hidden="true">
             <picture class="home-cinema__image" aria-hidden="true"><source media="(max-aspect-ratio: 4/5)" srcset="/assets/cloudy-turquoise-portrait-0283c0cd2e89.webp"><img src="/assets/cloudy-turquoise-desktop-af63954b8f41.webp" alt="" width="1920" height="1072" fetchpriority="high" data-hero-image></picture>
-            <img class="film-fallback" data-film-fallback alt="" hidden>
             <canvas class="home-film" data-film-canvas aria-hidden="true"></canvas>
         </div>
         <section class="home-scene home-identity" id="identity" data-scene="hero" aria-labelledby="identity-title">
-            <div class="scene-face hero-face"><h1 id="identity-title" class="home-masthead">${page.ownerAlias()}</h1><h2 class="hero-statement"><span class="hero-writing-row"><span class="hero-writing-text">Clarity is</span></span><span class="hero-writing-row"><em class="hero-writing-text">engineered</em></span></h2><p class="hero-scroll">Scroll to explore</p></div>
+            <div class="scene-face hero-face"><h1 id="identity-title" class="home-masthead">${page.ownerAlias()}</h1><h2 class="hero-statement" lang="en"><span class="hero-writing-row"><span class="hero-writing-text">Clarity is</span></span><span class="hero-writing-row"><em class="hero-writing-text">engineered</em></span></h2><p class="hero-scroll" lang="en">Scroll to explore</p></div>
         </section>
-        <section class="home-scene" data-scene="statements" aria-label="Perspective"><div class="scene-face statement-face"><div class="statement-top statement-slot"><p class="statement-copy" data-second-writing><span class="statement-row"><span class="statement-word"><span class="statement-word-slot"><span class="statement-word-text">Curious</span></span></span> <span class="statement-word"><span class="statement-word-slot"><span class="statement-word-text">by</span></span></span> <span class="statement-word"><span class="statement-word-slot"><span class="statement-word-text">nature</span></span></span></span><span class="statement-row"><span class="statement-word"><span class="statement-word-slot"><span class="statement-word-text">Engineering</span></span></span> <span class="statement-word"><span class="statement-word-slot"><span class="statement-word-text">by</span></span></span> <span class="statement-word"><span class="statement-word-slot"><span class="statement-word-text">choice</span></span></span></span></p></div></div></section>
-        <section class="home-scene" data-scene="capabilities" aria-label="Areas of focus"><div class="scene-face capability-face"><p class="home-overline">Areas of focus</p><ol class="capabilities"><li><span>AI Systems</span></li><li><span>Cloud Infrastructure</span></li><li><span>Backend Engineering</span></li><li><span>DevOps &amp; Automation</span></li></ol></div></section>
+        <section class="home-scene" data-scene="statements" aria-label="Perspective"><div class="scene-face statement-face"><div class="statement-top statement-slot"><p class="statement-copy" lang="en" data-second-writing><span class="statement-row"><span class="statement-word"><span class="statement-word-slot"><span class="statement-word-text">Curious</span></span></span> <span class="statement-word"><span class="statement-word-slot"><span class="statement-word-text">by</span></span></span> <span class="statement-word"><span class="statement-word-slot"><span class="statement-word-text">nature</span></span></span></span><span class="statement-row"><span class="statement-word"><span class="statement-word-slot"><span class="statement-word-text">Engineering</span></span></span> <span class="statement-word"><span class="statement-word-slot"><span class="statement-word-text">by</span></span></span> <span class="statement-word"><span class="statement-word-slot"><span class="statement-word-text">choice</span></span></span></span></p></div></div></section>
+        <section class="home-scene" data-scene="capabilities" aria-label="Areas of focus"><div class="scene-face capability-face" lang="en"><p class="home-overline">Areas of focus</p><ol class="capabilities"><li><span>AI Systems</span></li><li><span>Cloud Infrastructure</span></li><li><span>Backend Engineering</span></li><li><span>DevOps &amp; Automation</span></li></ol></div></section>
         <section class="home-scene" data-scene="breath" aria-label="Space to think"><div class="scene-face breath-face" aria-hidden="true"></div></section>
-        <section class="home-scene" data-scene="mark" aria-label="0xmillennium identity"><div class="scene-face mark-face"><p class="brand-statement"><span><span>Made to think</span></span><span><span>Built to work</span></span></p><div class="physical-identity" data-physical-identity data-input-owner>@template.site.components.physicalIdentity()</div></div></section>
+        <section class="home-scene" data-scene="mark" aria-label="0xmillennium identity"><div class="scene-face mark-face"><p class="brand-statement" lang="en"><span><span>Made to think</span></span><span><span>Built to work</span></span></p><div class="physical-identity" data-physical-identity data-input-owner>@template.site.components.physicalIdentity()</div></div></section>
         <section class="home-scene home-gallery" data-scene="gallery" aria-labelledby="gallery-title"><div class="scene-face gallery-face">
-            <h2 id="gallery-title"><span class="gallery-writing-slot"><span class="gallery-writing-rise">Building systems</span></span> <span class="gallery-writing-slot"><em class="gallery-writing-rise">worth explaining</em></span></h2>
+            <h2 id="gallery-title" lang="en"><span class="gallery-writing-slot"><span class="gallery-writing-rise">Building systems</span></span> <span class="gallery-writing-slot"><em class="gallery-writing-rise">worth explaining</em></span></h2>
             <fieldset class="gallery-instrument" data-input-owner><legend>${page.copy().collections()}</legend>
                 <div class="tuner-reveal-slot"><button class="collection-tuner" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="collection-options" aria-label="${page.copy().collections()}">
                     <span class="tuner-scale" aria-hidden="true"></span><span class="tuner-marker" aria-hidden="true"></span>
@@ -73,7 +73,7 @@
                     @for(int i = 0; i < page.featuredProjects().size(); i++)
                         <li class="home-projects__item gallery-card">
                             <article class="home-project"><div class="gallery-cover"><span class="gallery-cover__fallback" aria-hidden="true">0x<span>${String.format(java.util.Locale.ROOT, "%02d", i + 1)}</span></span>@if(page.galleryCovers().containsKey(page.featuredProjects().get(i).publicUrl()))
-                            <img src="${page.galleryCovers().get(page.featuredProjects().get(i).publicUrl()).url()}" alt="" width="${page.galleryCovers().get(page.featuredProjects().get(i).publicUrl()).width()}" height="${page.galleryCovers().get(page.featuredProjects().get(i).publicUrl()).height()}" loading="lazy" decoding="async">
+                            @template.site.components.homeCover(page.galleryCovers().get(page.featuredProjects().get(i).publicUrl()), "100vw")
                             @endif<h3 class="gallery-card__title"><a href="${page.featuredProjects().get(i).publicUrl()}" title="${page.featuredProjects().get(i).title()}"><span><span class="gallery-card__name">${page.featuredProjects().get(i).title()}</span></span></a></h3></div>
                                 <span class="home-project__number" aria-hidden="true">${String.format(java.util.Locale.ROOT, "%02d", i + 1)}</span>
                                 <div class="home-project__body">
@@ -110,7 +110,7 @@
                     <ol class="home-writing__list gallery-group">
                         @for(int i = 0; i < collection.entries().size(); i++)
                         <li class="gallery-card"><article><div class="gallery-cover"><span class="gallery-cover__fallback" aria-hidden="true">${collection.id().equals("research") ? "R" : collection.id().equals("notes") ? "N" : "Aa"}<span>${String.format(java.util.Locale.ROOT, "%02d", i + 1)}</span></span>@if(page.galleryCovers().containsKey(collection.entries().get(i).publicUrl()))
-                            <img src="${page.galleryCovers().get(collection.entries().get(i).publicUrl()).url()}" alt="" width="${page.galleryCovers().get(collection.entries().get(i).publicUrl()).width()}" height="${page.galleryCovers().get(collection.entries().get(i).publicUrl()).height()}" loading="lazy" decoding="async">
+                            @template.site.components.homeCover(page.galleryCovers().get(collection.entries().get(i).publicUrl()), "100vw")
                             @endif<h3 class="gallery-card__title"><a href="${collection.entries().get(i).publicUrl()}" title="${collection.entries().get(i).title()}"><span><span class="gallery-card__name">${collection.entries().get(i).title()}</span></span></a></h3></div>
                             <p>${collection.entries().get(i).summary()}</p>
                             @if(page.galleryTags().containsKey(collection.entries().get(i).publicUrl()) && !page.galleryTags().get(collection.entries().get(i).publicUrl()).isEmpty())
@@ -136,7 +136,7 @@
         <section class="home-scene home-contact" id="contact" data-scene="location" aria-labelledby="contact-title"><div class="scene-face location-face">
             <div class="location-links"><h2 id="contact-title" class="sr-only">${page.copy().contactTitle()}</h2><nav aria-label="Explore"><a href="/${page.defaultLanguage().toLowerCase(java.util.Locale.ROOT)}/projects">${page.copy().projects()}</a><a href="/search">${page.copy().writing()}</a><a href="/contact">${page.copy().contact()}</a></nav><p>Istanbul, Türkiye</p><a class="contact-entry" href="/contact">${page.copy().getInTouch()} ↗</a></div>
             <div class="location-system">    <div class="location-globe" data-input-owner>
-      <canvas role="img" id="globe" aria-label="Interactive Earth. Use arrow keys to rotate and tilt." aria-describedby="globe-instructions" tabindex="0"></canvas>
+      <canvas role="img" id="globe" aria-label="Interactive Earth. Use arrow keys to rotate and tilt." aria-describedby="globe-instructions" tabindex="-1"></canvas>
       <span id="marker" aria-hidden="true" hidden>
         <span class="marker-core"></span>
         <span class="marker-signal">
@@ -157,11 +157,12 @@
     </div>
     <p id="globe-instructions" class="sr-only">Drag to turn and tilt. On touch screens, swipe horizontally to turn and scroll vertically. When the globe is focused, use arrow keys to turn and tilt, Space to pause or resume rotation, and Home to find Istanbul.</p>
 </div>
-            <div class="location-strip"><span>${page.ownerAlias()} / Persefonia</span><a href="/search">${page.copy().searchPublished()}</a><a href="#identity">${page.copy().backToTop()} ↑</a></div>
+            <div class="location-strip"><span>${page.ownerAlias()} / Persefonia</span><a href="/search">${page.copy().searchPublished()}</a>@for(var link : navigationLinks)<a lang="en" href="${link.url()}">${link.label()}</a>@endfor<a href="#identity">${page.copy().backToTop()} ↑</a></div>
         </div></section>
         <div class="home-staircase" aria-hidden="true" data-scene-wipe><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-        <span data-film-status hidden></span>
-        <output data-hold-countdown class="hold-countdown" aria-live="polite" hidden></output>
+        <span data-film-status lang="en" hidden></span>
+        <output class="sr-only" data-film-notice lang="en" role="status" aria-live="polite"></output>
+        <output data-hold-countdown class="hold-countdown" lang="en" aria-live="polite" hidden></output>
     </main>
     <div class="home-loader" data-home-loader hidden role="status" aria-label="Preparing homepage"><div class="loader-sheet" aria-hidden="true"></div><div class="loader-aperture"></div><div data-loading-identity><button tabindex="-1" type="button" aria-hidden="true"><span class="identity-plane">@template.site.components.compactIdentity("loading-identity")</span><span class="floor-shadow"></span></button></div><output data-loading-progress>0 / 3</output><p>0xmillennium</p><div class="home-staircase" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
     <script type="module" src="${page.scriptPath()}"></script>

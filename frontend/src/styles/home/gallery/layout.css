@@ -1,0 +1,101 @@
+@media (min-width: 761px) and (min-height: 601px) {
+  [data-home-v2][data-enhanced='true'] .gallery-face {
+    padding-top: 13svh;
+    --card-width: min(24vw, 350px);
+  }
+
+  [data-home-v2][data-enhanced='true'] .gallery-face h2 {
+    font-size: clamp(34px, 3.6vw, 60px);
+  }
+
+  [data-home-v2][data-enhanced='true'] .gallery-space {
+    margin-top: 12px;
+    height: 45svh;
+  }
+}
+
+[data-home-v2][data-enhanced='true'] .gallery-card article {
+  background: var(--paper);
+  padding-bottom: 20px;
+}
+
+[data-home-v2][data-enhanced='true'] .gallery-card h3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+[data-home-v2][data-enhanced='true'] .gallery-card:not([data-front='true']) h3 {
+  color: var(--muted);
+}
+
+[data-home-v2][data-enhanced='true'] .gallery-card:not([data-front='true']) .home-project__tags {
+  visibility: hidden;
+}
+
+/* Transparent category planes must not intercept the recessed cards' hit regions. */
+
+[data-home-v2][data-enhanced='true'] .gallery-category {
+  pointer-events: none;
+}
+
+[data-home-v2][data-enhanced='true'] .gallery-card {
+  pointer-events: auto;
+}
+
+.gallery-cover {
+  position: relative;
+}
+
+.gallery-cover img {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+@media (max-height: 600px) {
+  [data-home-v2][data-enhanced='true'] .gallery-face {
+    padding-top: 84px !important;
+    --card-width: min(32vw, 260px);
+  }
+
+  [data-home-v2][data-enhanced='true'] .gallery-face h2 {
+    font-size: clamp(22px, 6.5svh, 34px);
+    text-align: left;
+    max-width: 17ch;
+  }
+
+  [data-home-v2][data-enhanced='true'] .gallery-space {
+    height: 54svh;
+  }
+
+  [data-home-v2][data-enhanced='true'] .gallery-card .gallery-cover {
+    height: 22svh;
+    aspect-ratio: auto;
+  }
+
+  [data-home-v2][data-enhanced='true'] .gallery-card .home-project__number,
+  [data-home-v2][data-enhanced='true'] .gallery-card .home-writing__number {
+    margin: 6px 0 4px !important;
+  }
+
+  [data-home-v2][data-enhanced='true'] .gallery-card h3 {
+    font-size: 16px;
+    margin: 4px 0 !important;
+  }
+
+  [data-home-v2][data-enhanced='true'] .gallery-card h3 a {
+    padding-block: 3px;
+  }
+
+  [data-home-v2][data-enhanced='true'] .gallery-card .home-project__tags {
+    font-size: 9px;
+    margin-top: 6px !important;
+    gap: 6px;
+  }
+
+  [data-home-v2][data-enhanced='true'] .gallery-card article {
+    padding-bottom: 12px;
+  }
+}

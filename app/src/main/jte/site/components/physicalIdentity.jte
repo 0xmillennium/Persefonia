@@ -1,4 +1,4 @@
-<!-- Approved Experiment 01 eight-piece geometry; no redraw. -->
+<!-- Generated from the canonical identity; run npm run identity:generate. -->
 <svg class="stage" viewBox="320 90 320 440" role="img" aria-labelledby="mark-title mark-description">
       <title id="mark-title">Segmented 0x identity</title>
       <desc id="mark-description">One unified symbol made of eight independent three-corner fragments. The surrounding negative space forms a zero; straight diagonal channels through the core form an x.</desc>

@@ -1,0 +1,122 @@
+.statement-face {
+  display: block;
+}
+
+.statement-top {
+  font-size: clamp(32px, 4vw, 66px);
+  line-height: 1.12;
+  letter-spacing: -0.035em;
+}
+
+.home-body .statement-copy {
+  font-weight: 500;
+  color: var(--film-ink, var(--ink));
+}
+
+.statement-row {
+  display: block;
+}
+
+.statement-word,
+.statement-word-slot,
+.statement-word-text {
+  display: inline-block;
+  vertical-align: baseline;
+}
+
+.statement-word-slot {
+  overflow: hidden;
+  line-height: 0.95;
+  padding-bottom: 0.15em;
+  margin-bottom: -0.15em;
+}
+
+.statement-word-text {
+  white-space: nowrap;
+}
+
+.second-writing-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+[data-home-v2][data-film='tree'] {
+  --film-ink: var(--paper);
+}
+
+.capabilities {
+  --capability-step: 10%;
+  --capability-step-limit: 10%;
+  --capability-last-width: 9.18em;
+  font-size: clamp(27px, 4.8vw, 80px);
+  line-height: 1.2;
+  letter-spacing: -0.04em;
+  margin-top: 50px !important;
+}
+
+.capabilities li {
+  overflow: hidden;
+  line-height: 1;
+  padding-bottom: 0.15em;
+  margin-bottom: -0.15em;
+}
+
+.capabilities li:nth-child(2) {
+  margin-left: var(--capability-step);
+}
+
+.capabilities li:nth-child(3) {
+  margin-left: calc(var(--capability-step) * 2);
+}
+
+.capabilities li:nth-child(4) {
+  margin-left: calc(var(--capability-step) * 3);
+}
+
+.capabilities li > span {
+  display: block;
+}
+
+.capabilities .rolling-letters--proportional,
+.location-links .rolling-letters--proportional,
+.home-menu .rolling-letters--proportional {
+  display: inline;
+  letter-spacing: inherit;
+}
+
+.capabilities .rolling-word,
+.location-links .rolling-word,
+.home-menu .rolling-word {
+  display: inline-flex;
+  vertical-align: top;
+  letter-spacing: normal;
+}
+
+@media (any-hover: hover) {
+  .capabilities li > span:has(.rolling-word:hover),
+  .location-links nav a:has(.rolling-word:hover) {
+    color: var(--accent);
+  }
+
+  [data-home-v2][data-film='tree'] .capabilities li > span:has(.rolling-word:hover) {
+    color: #076357;
+  }
+}
+
+.breath-face {
+  display: grid;
+  place-items: center;
+  min-height: 35vh;
+  color: var(--accent);
+  font:
+    20px 'IBM Plex Mono',
+    monospace;
+}
+
+[data-home-v2][data-enhanced='true'][data-reduced='false'][data-film='waterfall']
+  :is(.statement-copy, .capabilities, .brand-statement) {
+  -webkit-text-stroke: 1.5px var(--paper);
+  paint-order: stroke fill;
+}

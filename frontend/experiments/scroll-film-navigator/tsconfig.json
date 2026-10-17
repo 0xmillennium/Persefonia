@@ -1,5 +1,0 @@
-{
-  "extends": "../../tsconfig.json",
-  "compilerOptions": { "types": ["vite/client", "node"], "skipLibCheck": true, "noUnusedLocals": true, "noUnusedParameters": true, "allowJs": true },
-  "include": ["*.ts", "src/**/*.ts", "tests/**/*.ts", "scripts/assets.mjs"]
-}

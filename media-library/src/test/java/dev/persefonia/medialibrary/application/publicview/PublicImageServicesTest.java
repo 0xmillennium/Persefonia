@@ -39,6 +39,35 @@ class PublicImageServicesTest {
     private static final Instant NOW = Instant.parse("2026-06-18T10:00:00Z");
 
     @Test
+    void responsiveLookupChecksEligibilityOnceAndOmitsOnlyMissingStoredCandidates() {
+        Asset original = processed(AssetVisibility.PUBLIC, DecorativeImageFlag.informative(), AltText.of("Cover"));
+        AssetVariant medium = new AssetVariant(
+                AssetVariantId.newId(), VariantName.MEDIUM, PixelWidth.of(960), PixelHeight.of(600),
+                ContentTypeName.of("image/png"), FileSize.of(10), StoragePath.of("variants/medium.png"), null,
+                Checksum.of("medium"), NOW);
+        Asset asset = Asset.processedImage(original.id(), original.originalFilename(), original.storedFilename(),
+                original.storagePath(), null, original.contentType(), original.fileExtension(), original.sizeBytes(),
+                original.checksum(), AssetVisibility.PUBLIC, ImageDimensions.of(1600, 1000), AltText.of("Cover"),
+                DecorativeImageFlag.informative(), List.of(medium, original.variants().getFirst()), List.of(), NOW);
+        var reads = new java.util.concurrent.atomic.AtomicInteger();
+        AssetRepository repository = new AssetRepository() {
+            public Asset save(Asset value) { throw new UnsupportedOperationException(); }
+            public Optional<Asset> findById(AssetId id) { reads.incrementAndGet(); return Optional.of(asset); }
+            public Optional<Asset> findByChecksum(Checksum checksum) { return Optional.empty(); }
+        };
+        FakeStorage storage = new FakeStorage();
+        var query = new PublicImageAssetQueryService(repository, storage);
+        assertThat(query.findVariants(asset.id().value().toString(), List.of("medium", "thumbnail", "large")))
+                .extracting(PublicImageVariantView::width).containsExactly(320, 960);
+        assertThat(reads).hasValue(1);
+        assertThat(storage.opens).isEqualTo(2);
+        assertThat(storage.closes).isEqualTo(2);
+        storage.missingPath = medium.storagePath().value();
+        assertThat(query.findVariants(asset.id().value().toString(), List.of("medium", "thumbnail")))
+                .extracting(PublicImageVariantView::width).containsExactly(320);
+    }
+
+    @Test
     void publicProcessedInformativeVariantReturnsSafeViewAndContent() throws Exception {
         Asset asset = processed(AssetVisibility.PUBLIC, DecorativeImageFlag.informative(), AltText.of("Portrait"));
         FakeStorage storage = new FakeStorage();
@@ -153,12 +182,18 @@ class PublicImageServicesTest {
 
     private static final class FakeStorage implements AssetStoragePort {
         private boolean missing;
+        private String missingPath = "";
+        private int opens;
+        private int closes;
 
         @Override public InputStream openStored(StoragePath storagePath) {
-            if (missing) {
+            opens++;
+            if (missing || storagePath.value().equals(missingPath)) {
                 throw new StorageWriteException("missing");
             }
-            return new ByteArrayInputStream("variant".getBytes());
+            return new ByteArrayInputStream("variant".getBytes()) {
+                @Override public void close() { closes++; }
+            };
         }
         @Override public StagedAssetObject stageOriginal(OriginalAssetStagingRequest request) {
             throw new UnsupportedOperationException();

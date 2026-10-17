@@ -127,7 +127,7 @@ class CiWorkflowContractTest {
 
     @Test
     void automationFailsBeforeApplicationInfrastructureStarts() {
-        assertThat(workflow.jobs()).containsOnlyKeys("automation", "verify", "gate");
+        assertThat(workflow.jobs()).containsOnlyKeys("automation", "verify", "browser", "gate");
         Map<String, Object> automation = workflow.job("automation");
         Map<String, Object> verify = workflow.job("verify");
         assertThat(WorkflowDocument.map(automation.get("permissions")))
@@ -137,6 +137,10 @@ class CiWorkflowContractTest {
         assertThat(automation).doesNotContainKeys("services");
         assertThat(automation.get("needs")).isNull();
         assertThat(verify.get("needs")).isEqualTo("automation");
+        assertThat(workflow.job("browser").get("needs")).isEqualTo("verify");
+        assertThat(workflow.job("browser")).doesNotContainKeys("services", "environment");
+        assertThat(WorkflowDocument.map(workflow.job("browser").get("permissions")))
+                .containsExactlyInAnyOrderEntriesOf(Map.of("contents", "read"));
         assertThat(WorkflowDocument.map(verify.get("services"))).containsKeys("postgres", "redis");
         List<String> names = workflow.steps("automation").stream().map(WorkflowDocument::map)
                 .map(step -> (String) step.get("name")).toList();
@@ -152,50 +156,50 @@ class CiWorkflowContractTest {
     }
 
     @Test
-    void verifyRequiresHomepageBrowserQualification() {
+    void browserMatrixRequiresTheVerifiedArtifactAndAllQualificationSteps() {
         assertBrowserQualification(workflow);
-        WorkflowDocument missing = openCi();
-        WorkflowDocument.list(missing.job("verify").get("steps")).removeIf(step ->
-                "Qualify homepage in Chromium".equals(WorkflowDocument.map(step).get("name")));
-        assertThatThrownBy(() -> assertBrowserQualification(missing)).isInstanceOf(AssertionError.class);
-        WorkflowDocument withoutChromium = openCi();
-        WorkflowDocument.list(withoutChromium.job("verify").get("steps")).removeIf(step ->
-                "Install Playwright Chromium dependencies".equals(WorkflowDocument.map(step).get("name")));
-        assertThatThrownBy(() -> assertBrowserQualification(withoutChromium)).isInstanceOf(AssertionError.class);
+        for (String name : List.of("Download verified BootJar", "Stage verified browser artifact",
+                "Install browser matrix", "Qualify production homepage and browser matrix")) {
+            WorkflowDocument missing = openCi();
+            WorkflowDocument.list(missing.job("browser").get("steps")).removeIf(step ->
+                    name.equals(WorkflowDocument.map(step).get("name")));
+            assertThatThrownBy(() -> assertBrowserQualification(missing)).isInstanceOf(AssertionError.class);
+        }
         WorkflowDocument reordered = openCi();
-        List<Object> steps = WorkflowDocument.list(reordered.job("verify").get("steps"));
-        int browserIndex = stepIndex(steps, "Qualify homepage in Chromium");
+        List<Object> steps = WorkflowDocument.list(reordered.job("browser").get("steps"));
+        int browserIndex = stepIndex(steps, "Qualify production homepage and browser matrix");
         Collections.swap(steps, browserIndex, browserIndex - 1);
         assertThatThrownBy(() -> assertBrowserQualification(reordered)).isInstanceOf(AssertionError.class);
         WorkflowDocument bypassed = openCi();
-        bypassed.step("verify", "Qualify homepage in Chromium").put("run", "cd frontend && npm run test:browser");
+        bypassed.step("browser", "Qualify production homepage and browser matrix")
+                .put("run", "cd frontend && npm run test:browser");
         assertThatThrownBy(() -> assertBrowserQualification(bypassed)).isInstanceOf(AssertionError.class);
+        WorkflowDocument missingViewport = openCi();
+        WorkflowDocument.list(WorkflowDocument.map(WorkflowDocument.map(
+                missingViewport.job("browser").get("strategy")).get("matrix")).get("include"))
+                .removeIf(value -> "mobile-390".equals(WorkflowDocument.map(value).get("project")));
+        assertThatThrownBy(() -> assertBrowserQualification(missingViewport)).isInstanceOf(AssertionError.class);
     }
 
     @Test
-    void verifyRequiresSegmentedIdentityQualification() {
-        assertIdentityQualification(workflow);
-        for (String name : List.of("Check segmented identity sources and deterministic physics",
-                "Install identity browser matrix", "Qualify segmented identity browsers and release lifecycle")) {
-            WorkflowDocument missing = openCi();
-            WorkflowDocument.list(missing.job("verify").get("steps")).removeIf(step ->
-                    name.equals(WorkflowDocument.map(step).get("name")));
-            assertThatThrownBy(() -> assertIdentityQualification(missing)).isInstanceOf(AssertionError.class);
-        }
+    void verifyRequiresProductionFrontendQualification() {
+        assertProductionFrontendQualification(workflow);
+        WorkflowDocument missing = openCi();
+        WorkflowDocument.list(missing.job("verify").get("steps")).removeIf(step ->
+                "Verify production frontend ownership and generated assets".equals(WorkflowDocument.map(step).get("name")));
+        assertThatThrownBy(() -> assertProductionFrontendQualification(missing)).isInstanceOf(AssertionError.class);
     }
 
-    private static void assertIdentityQualification(WorkflowDocument ci) {
+    private static void assertProductionFrontendQualification(WorkflowDocument ci) {
         assertThat(ci.steps("verify").stream().map(WorkflowDocument::map)
                 .map(step -> (String) step.get("name")))
-                .containsSubsequence("Qualify homepage in Chromium",
-                        "Check segmented identity sources and deterministic physics", "Install identity browser matrix",
-                        "Qualify segmented identity browsers and release lifecycle", "Set up Temurin Java 21");
-        assertThat(ci.step("verify", "Check segmented identity sources and deterministic physics").get("run"))
-                .asString().contains("npm run identity:check");
-        assertThat(ci.step("verify", "Install identity browser matrix").get("run"))
-                .asString().contains("playwright install --with-deps firefox webkit");
-        assertThat(ci.step("verify", "Qualify segmented identity browsers and release lifecycle").get("run"))
-                .asString().contains("npm run identity:browser", "npm run identity:browser:built");
+                .containsSubsequence("Build and test", "Verify production frontend ownership and generated assets",
+                        "Set up Temurin Java 21", "Verify Java 21 compatibility", "Upload browser qualification input");
+        assertThat(ci.step("verify", "Build and test").get("run"))
+                .asString().contains("applicationCheck", ":app:bootJar");
+        assertThat(ci.step("verify", "Verify production frontend ownership and generated assets").get("run"))
+                .asString().contains("npm run check:boundaries", "npm run check:generated", "npm run format:check");
+        assertBrowserQualification(ci);
     }
 
     private static int stepIndex(List<Object> steps, String name) {
@@ -206,26 +210,56 @@ class CiWorkflowContractTest {
     }
 
     private static void assertBrowserQualification(WorkflowDocument ci) {
-        assertThat(ci.steps("verify").stream().map(WorkflowDocument::map)
+        assertThat(ci.job("browser").get("needs")).isEqualTo("verify");
+        Map<String, Object> strategy = WorkflowDocument.map(ci.job("browser").get("strategy"));
+        assertThat(strategy.get("fail-fast")).isEqualTo(false);
+        var matrix = WorkflowDocument.list(WorkflowDocument.map(strategy.get("matrix")).get("include"));
+        assertThat(matrix.stream().map(WorkflowDocument::map)).containsExactlyInAnyOrder(
+                Map.of("name", "desktop", "suite", "chromium", "project", "desktop-1440"),
+                Map.of("name", "tablet", "suite", "chromium", "project", "tablet-834"),
+                Map.of("name", "mobile", "suite", "chromium", "project", "mobile-390"),
+                Map.of("name", "firefox-webkit", "suite", "cross", "project", "*"));
+        assertThat(ci.steps("browser").stream().map(WorkflowDocument::map)
                 .map(step -> (String) step.get("name")))
-                .containsSubsequence("Set up Node 22", "Build and test", "Verify BootJar",
-                        "Install Playwright Chromium dependencies", "Qualify homepage in Chromium",
-                        "Set up Temurin Java 21", "Verify Java 21 compatibility");
-        assertThat(ci.step("verify", "Qualify homepage in Chromium").get("run"))
-                .asString().contains(":app:browserCheck");
+                .containsSubsequence("Set up Temurin Java 21", "Set up Node 22", "Download verified BootJar",
+                        "Stage verified browser artifact", "Install browser matrix",
+                        "Qualify production homepage and browser matrix");
+        var input = ci.step("verify", "Upload browser qualification input");
+        assertThat(input).doesNotContainKey("if");
+        assertThat(WorkflowDocument.map(input.get("with")))
+                .containsEntry("name", "persefonia-browser-input-${{ github.sha }}")
+                .containsEntry("if-no-files-found", "error");
+        assertThat((String) ci.step("browser", "Download verified BootJar").get("uses"))
+                .startsWith("actions/download-artifact@");
+        assertThat(WorkflowDocument.map(ci.step("browser", "Download verified BootJar").get("with")))
+                .containsEntry("name", "persefonia-browser-input-${{ github.sha }}")
+                .containsEntry("path", "app/build/ci");
+        String stage = (String) ci.step("browser", "Stage verified browser artifact").get("run");
+        assertThat(stage).contains("sha256sum --check persefonia.jar.sha256",
+                "cp app/build/ci/persefonia.jar app/build/libs/persefonia.jar",
+                "BOOT-INF/classes/static/assets/.vite/manifest.json");
+        assertThat(stage.indexOf("sha256sum --check")).isLessThan(stage.indexOf("cp app/build/ci"));
+        assertThat(ci.step("browser", "Install browser matrix").get("run"))
+                .asString().contains("npm ci", "playwright install --with-deps --no-shell chromium firefox webkit");
+        var qualification = ci.step("browser", "Qualify production homepage and browser matrix");
+        assertThat(qualification.get("run")).asString()
+                .contains("bash scripts/browser/check.sh --project \"$BROWSER_PROJECT\"");
+        assertThat(WorkflowDocument.map(qualification.get("env")))
+                .containsEntry("PERSEFONIA_BROWSER_SUITE", "${{ matrix.suite }}")
+                .containsEntry("BROWSER_PROJECT", "${{ matrix.project }}");
     }
 
     @Test
-    void stableGateRequiresBothResultsAndHasNoRepositoryOrSecretAccess() {
+    void stableGateRequiresAllResultsAndHasNoRepositoryOrSecretAccess() {
         Map<String, Object> gate = workflow.job("gate");
-        assertThat(WorkflowDocument.list(gate.get("needs"))).containsExactlyInAnyOrder("automation", "verify");
+        assertThat(WorkflowDocument.list(gate.get("needs"))).containsExactlyInAnyOrder("automation", "verify", "browser");
         assertThat(gate.get("if")).isEqualTo("always()");
         assertThat(WorkflowDocument.map(gate.get("permissions"))).isEmpty();
         assertThat(gate).doesNotContainKeys("services", "environment");
         assertThat(workflow.steps("gate")).hasSize(1);
         Map<String, Object> step = WorkflowDocument.map(workflow.steps("gate").getFirst());
         assertThat(step).doesNotContainKeys("uses", "secrets");
-        assertThat(WorkflowDocument.map(step.get("env"))).containsKeys("AUTOMATION_RESULT", "VERIFY_RESULT");
-        assertThat((String) step.get("run")).contains("$AUTOMATION_RESULT", "$VERIFY_RESULT", "success");
+        assertThat(WorkflowDocument.map(step.get("env"))).containsKeys("AUTOMATION_RESULT", "VERIFY_RESULT", "BROWSER_RESULT");
+        assertThat((String) step.get("run")).contains("$AUTOMATION_RESULT", "$VERIFY_RESULT", "$BROWSER_RESULT", "success");
     }
 }

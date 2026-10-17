@@ -1,8 +1,0 @@
-import { expect,it } from "vitest";
-import { webpDimensions } from "../scripts/delivery.mjs";
-it("FT-15 delivery validation rejects truncated WebP containers and derives actual dimensions",()=>{
-  const bytes=Buffer.alloc(30);bytes.write("RIFF");bytes.writeUInt32LE(22,4);bytes.write("WEBP",8);bytes.write("VP8X",12);bytes.writeUInt32LE(10,16);bytes.writeUIntLE(959,24,3);bytes.writeUIntLE(539,27,3);
-  expect(webpDimensions(bytes)).toEqual([960,540]);expect(()=>webpDimensions(bytes.subarray(0,29))).toThrow("truncated");
-  const missing=Buffer.from(bytes);missing.write("FAKE",12);expect(()=>webpDimensions(missing)).toThrow("Missing");
-  const damaged=Buffer.from(bytes);damaged.writeUInt32LE(999,16);expect(()=>webpDimensions(damaged)).toThrow("Truncated");
-});

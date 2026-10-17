@@ -7,8 +7,11 @@ import dev.persefonia.webpublic.content.PublicContentResponseHeaders;
 import dev.persefonia.webpublic.content.PublicContentViewModelFactory;
 import dev.persefonia.webpublic.insights.PublicInsightSurface;
 import dev.persefonia.webpublic.insights.PublicInsightsObservationGateway;
+import dev.persefonia.webpublic.navigation.PublicRelatedLinks;
 import jakarta.servlet.http.HttpServletResponse;
+import java.util.LinkedHashMap;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
@@ -18,6 +21,7 @@ import org.springframework.web.servlet.ModelAndView;
 
 @Controller
 public final class PublicProjectDetailController {
+    private final PublicRelatedLinks relatedLinks;
     private static final String MAIN_FRONTEND_ENTRY = "src/main.ts";
 
     private final PublicProjectRouteParser routeParser;
@@ -29,6 +33,7 @@ public final class PublicProjectDetailController {
     private final PublicInsightsObservationGateway insights;
 
     public PublicProjectDetailController(
+            PublicRelatedLinks relatedLinks,
             PublicProjectRouteParser routeParser,
             DiscoveryPublicProjectRouteResolver routeResolver,
             PublicProjectDetailQueryService projects,
@@ -36,6 +41,7 @@ public final class PublicProjectDetailController {
             PublicContentResponseHeaders responseHeaders,
             PublicContentViewModelFactory contentViewModelFactory,
             PublicInsightsObservationGateway insights) {
+        this.relatedLinks = relatedLinks;
         this.routeParser = Objects.requireNonNull(routeParser, "routeParser");
         this.routeResolver = Objects.requireNonNull(routeResolver, "routeResolver");
         this.projects = Objects.requireNonNull(projects, "projects");
@@ -92,7 +98,15 @@ public final class PublicProjectDetailController {
                 route.noindex(),
                 PublicProjectPageCopy.forLanguage(route.language()),
                 assetResolver.stylesheetPaths(MAIN_FRONTEND_ENTRY),
-                project));
+                project)).addObject("tagLinks", tagLinks(project, route.language().toLowerCase(Locale.ROOT)));
+    }
+
+    private Map<String, String> tagLinks(PublicProjectDetailView project, String language) {
+        var presenter = relatedLinks;
+        var links = new LinkedHashMap<String, String>();
+        project.tags().forEach(tag -> presenter.tag(language, tag.name(), tag.slug())
+                .ifPresent(link -> links.put(tag.slug(), link.url())));
+        return Map.copyOf(links);
     }
 
     private ModelAndView notFound(HttpServletResponse response) {

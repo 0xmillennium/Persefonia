@@ -18,7 +18,7 @@ The `automation-tests` module owns repository automation, workflow, delivery, an
 
 Static source verification is a separate layer. The repository locks actionlint and ShellCheck release artifacts by version and SHA-256, verifies downloads before extraction, then runs actionlint with inline ShellCheck, `bash -n`, and ShellCheck on tracked automation sources. Parsed workflow tests enforce repository-specific policy; executable tests enforce machine protocols and script behavior. Registry, native container, host, and public-ingress qualification remain integration and acceptance layers in the trusted delivery pipeline.
 
-CI runs Automation before application Verify. Gate evaluates both job results and is the intended stable required check (`CI / Gate`). Delivery and RC deployment continue to consume only the qualified outputs of the existing CI and Delivery workflow chain. GitHub branch-protection settings remain external to this repository and must be verified through the GitHub interface or API.
+CI runs Automation before application Verify. Browser qualification follows Verify in an isolated viewport/engine matrix, using the same checksum-verified BootJar rather than rebuilding the application or repeating its deterministic physics suites. Each matrix leg owns its fixture application/database; local browser checks can still run the complete matrix in sequence. Gate evaluates Automation, Verify, and the complete browser matrix and is the intended stable required check (`CI / Gate`). Delivery and RC deployment continue to consume only the qualified outputs of the existing CI and Delivery workflow chain. GitHub branch-protection settings remain external to this repository and must be verified through the GitHub interface or API.
 
 ## Consequences
 

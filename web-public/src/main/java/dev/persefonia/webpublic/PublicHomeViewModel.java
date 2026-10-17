@@ -1,15 +1,12 @@
 package dev.persefonia.webpublic;
 
-import dev.persefonia.medialibrary.application.publicview.PublicImageVariantView;
+import dev.persefonia.discovery.application.index.PublicHomepageContentEntry;
+import dev.persefonia.profileportfolio.application.query.PublicFeaturedProjectView;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.stream.Collectors;
-
-import dev.persefonia.profileportfolio.application.query.PublicProfileSummaryView;
-import dev.persefonia.profileportfolio.application.query.PublicFeaturedProjectView;
-import dev.persefonia.discovery.application.index.PublicHomepageContentEntry;
-import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 public record PublicHomeViewModel(
         String siteName,
@@ -19,7 +16,6 @@ public record PublicHomeViewModel(
         String ownerAlias,
         String canonicalUrl,
         PublicHomePageCopy copy,
-        Optional<PublicProfileSummaryView> profile,
         boolean promoteFeaturedProjects,
         List<PublicFeaturedProjectView> featuredProjects,
         String featuredProjectsTitle,
@@ -29,7 +25,7 @@ public record PublicHomeViewModel(
         List<PublicHomepageContentEntry> articles,
         List<PublicHomepageContentEntry> notes,
         List<PublicHomepageContentEntry> researchHighlights,
-        Map<String, PublicImageVariantView> galleryCovers,
+        Map<String, PublicHomeCoverView> galleryCovers,
         Map<String, List<String>> galleryTags,
         String scriptPath,
         List<String> stylesheetPaths) {
@@ -37,7 +33,6 @@ public record PublicHomeViewModel(
         galleryCovers = Map.copyOf(galleryCovers);
         galleryTags = galleryTags.entrySet().stream().collect(Collectors.toUnmodifiableMap(
                 Map.Entry::getKey, entry -> List.copyOf(entry.getValue())));
-        profile = profile == null ? Optional.empty() : profile;
         featuredProjects = List.copyOf(featuredProjects);
         latestWriting = List.copyOf(latestWriting);
         articles = List.copyOf(articles);
@@ -58,12 +53,12 @@ public record PublicHomeViewModel(
                 new WritingCollection("research", copy.research(), copy.researchEmpty(), promoteResearchHighlights, researchHighlights));
     }
 
-    public Optional<PublicImageVariantView> projectNavigationCover() {
+    public Optional<PublicHomeCoverView> projectNavigationCover() {
         return featuredProjects.stream().map(project -> galleryCovers.get(project.publicUrl()))
                 .filter(Objects::nonNull).findFirst();
     }
 
-    public Optional<PublicImageVariantView> writingNavigationCover() {
+    public Optional<PublicHomeCoverView> writingNavigationCover() {
         return latestWriting.stream().map(entry -> galleryCovers.get(entry.publicUrl()))
                 .filter(Objects::nonNull).findFirst();
     }

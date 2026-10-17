@@ -10,7 +10,11 @@
     "noEmit": true,
     "isolatedModules": true,
     "allowJs": true,
-    "types": ["vite/client"]
+    "types": ["vite/client"],
+    "resolveJsonModule": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "skipLibCheck": true
   },
-  "include": ["src"]
+  "files": []
 }

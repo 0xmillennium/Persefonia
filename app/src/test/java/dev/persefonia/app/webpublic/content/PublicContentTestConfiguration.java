@@ -1,11 +1,11 @@
 package dev.persefonia.app.webpublic.content;
 
 import dev.persefonia.app.contentpublishing.application.InMemoryContentReadModelAdapter;
+import dev.persefonia.contentpublishing.domain.model.series.port.SeriesRepository;
+import dev.persefonia.contentpublishing.domain.translation.port.TranslationGroupRepository;
 import dev.persefonia.discovery.application.contract.DiscoveryLanguage;
 import dev.persefonia.discovery.application.index.PublicHomepageContentEntry;
 import dev.persefonia.discovery.application.index.PublicHomepageContentQueryService;
-import dev.persefonia.contentpublishing.domain.model.series.port.SeriesRepository;
-import dev.persefonia.contentpublishing.domain.translation.port.TranslationGroupRepository;
 import dev.persefonia.webpublic.FrontendAssetResolver;
 import java.util.List;
 import org.springframework.beans.factory.ObjectProvider;
@@ -14,6 +14,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
 
+@org.springframework.context.annotation.Import({dev.persefonia.app.webpublic.series.PublicSeriesTestConfiguration.class,
+        dev.persefonia.app.TestPublicRouteResolutionConfiguration.class})
 @TestConfiguration(proxyBeanMethods = false)
 @Profile("public-content-mvc-test")
 public class PublicContentTestConfiguration {
@@ -21,12 +23,6 @@ public class PublicContentTestConfiguration {
     @Primary
     PublicContentTestRepository publicContentTestRepository() {
         return new PublicContentTestRepository();
-    }
-
-    @Bean
-    @Primary
-    InMemoryPublicRouteResolver publicContentTestRouteResolver() {
-        return new InMemoryPublicRouteResolver();
     }
 
     @Bean

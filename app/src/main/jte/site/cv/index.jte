@@ -1,6 +1,7 @@
 @import dev.persefonia.webpublic.cv.PublicCvPage
 @param PublicCvPage page
 @param String publicNavigationScriptPath = null
+@param java.util.List<dev.persefonia.webpublic.navigation.PublicNavigationLink> navigationLinks = java.util.List.of()
 <!doctype html>
 <html lang="${page.language()}">
 <head>
@@ -16,6 +17,7 @@
 </head>
 <body>
     <a class="skip-link" href="#main-content">Skip to main content</a>
+    @template.site.components.publicHeader("/" + page.language().toLowerCase(java.util.Locale.ROOT) + "/projects", "")
     <main id="main-content" class="public-page public-page--cv">
         <section aria-labelledby="cv-title">
             <h1 id="cv-title">${page.title()}</h1>
@@ -49,5 +51,6 @@
             <a href="${page.downloadPath()}">Download ${page.displayFilename()}</a>
         </section>
     </main>
+    @template.site.components.publicFooter(navigationLinks)
 </body>
 </html>

@@ -1,11 +1,14 @@
 package dev.persefonia.webpublic.content;
 
+import dev.persefonia.contentpublishing.application.query.PublicContentBySourceQuery;
 import dev.persefonia.contentpublishing.application.query.PublicContentLookupResult;
 import dev.persefonia.contentpublishing.application.service.PublicContentBySourceQueryHandler;
 import dev.persefonia.contentpublishing.application.service.PublicTranslationLinkQueryService;
 import dev.persefonia.webpublic.insights.PublicInsightSurface;
 import dev.persefonia.webpublic.insights.PublicInsightsObservationGateway;
+import dev.persefonia.webpublic.navigation.PublicRelatedLinks;
 import jakarta.servlet.http.HttpServletResponse;
+import java.util.Locale;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -14,6 +17,7 @@ import org.springframework.web.servlet.ModelAndView;
 
 @Controller
 public final class PublicContentController {
+    private final PublicRelatedLinks relatedLinks;
     private final PublicContentRouteParser routeParser;
     private final DiscoveryPublicContentRouteResolver routeResolver;
     private final PublicContentBySourceQueryHandler queryHandler;
@@ -23,6 +27,7 @@ public final class PublicContentController {
     private final PublicInsightsObservationGateway insights;
 
     public PublicContentController(
+            PublicRelatedLinks relatedLinks,
             PublicContentRouteParser routeParser,
             DiscoveryPublicContentRouteResolver routeResolver,
             PublicContentBySourceQueryHandler queryHandler,
@@ -30,6 +35,7 @@ public final class PublicContentController {
             PublicContentViewModelFactory viewModelFactory,
             PublicContentResponseHeaders responseHeaders,
             PublicInsightsObservationGateway insights) {
+        this.relatedLinks = relatedLinks;
         this.routeParser = routeParser;
         this.routeResolver = routeResolver;
         this.queryHandler = queryHandler;
@@ -74,7 +80,11 @@ public final class PublicContentController {
             return new ModelAndView(
                     "site/content",
                     "page",
-                    viewModelFactory.contentPage(found.page(), translationLinkQueryService.linksFor(found.page())));
+                    viewModelFactory.contentPage(found.page(), translationLinkQueryService.linksFor(found.page())))
+                    .addObject("relatedLinks", relatedLinks.content(
+                            new PublicContentBySourceQuery(
+                                    found.page().contentId().value(), found.page().canonicalPath().value()),
+                            found.page().language().name().toLowerCase(Locale.ROOT)));
         }
         return notFound(response);
     }

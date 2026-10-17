@@ -3,6 +3,8 @@
 @import dev.persefonia.webpublic.content.PublicContentTranslationLinkView
 @param PublicContentPage page
 @param String publicNavigationScriptPath = null
+@param java.util.List<dev.persefonia.webpublic.navigation.PublicNavigationLink> navigationLinks = java.util.List.of()
+@param java.util.List<dev.persefonia.webpublic.navigation.PublicNavigationLink> relatedLinks = java.util.List.of()
 <!doctype html>
 <html lang="${page.htmlLanguage()}">
 <head>
@@ -21,6 +23,7 @@
 </head>
 <body>
     <a class="skip-link" href="#main-content">Skip to main content</a>
+    @template.site.components.publicHeader("/" + page.htmlLanguage() + "/projects", "")
     <main id="main-content" class="public-page">
         <article class="public-article">
             <header class="public-article__header">
@@ -55,6 +58,11 @@
                     </ol>
                 </nav>
             @endif
+            @if(!relatedLinks.isEmpty())
+                <nav class="public-translations" aria-label="Related collections"><ul>
+                    @for(var link : relatedLinks)<li><a href="${link.url()}">${link.label()}</a></li>@endfor
+                </ul></nav>
+            @endif
             <section class="public-content">
                 $unsafe{page.renderedHtml()}
             </section>
@@ -63,5 +71,6 @@
     @if(page.mermaidScriptPath().isPresent())
         <script type="module" src="${page.mermaidScriptPath().get()}"></script>
     @endif
+    @template.site.components.publicFooter(navigationLinks)
 </body>
 </html>

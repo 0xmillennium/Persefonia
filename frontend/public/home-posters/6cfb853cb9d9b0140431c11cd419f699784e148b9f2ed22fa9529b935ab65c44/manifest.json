@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "sourceIdentity": "389b8ed97673df0c52366154ec9c416605cc9374d250233a294dbf8eae3ef6c0",
+  "sourceManifestHash": "5cb1a2c1553d87e710c1c0626dba0e9b1b574b2e9309f012be766f3d833fd5ba",
+  "tiers": [
+    960,
+    1600
+  ],
+  "films": [
+    "robotic-arm",
+    "tree"
+  ],
+  "poses": {
+    "opening": 0,
+    "final": 191
+  },
+  "publication": "Unchanged qualified WebP poses",
+  "identity": "6cfb853cb9d9b0140431c11cd419f699784e148b9f2ed22fa9529b935ab65c44",
+  "entries": [
+    {
+      "name": "960/robotic-arm/opening.webp",
+      "bytes": 4860,
+      "sha256": "d1d3f039f58379bc49c970a1c430722a4105874938c7b7ffce03ff2c6f96bc5f",
+      "width": 960,
+      "height": 540
+    },
+    {
+      "name": "960/robotic-arm/final.webp",
+      "bytes": 29404,
+      "sha256": "fb6eca7a305f1b9210ce1c5f9e1b5aecec231e6fce26ae115d19a3c6329c65b5",
+      "width": 960,
+      "height": 540
+    },
+    {
+      "name": "960/tree/opening.webp",
+      "bytes": 52082,
+      "sha256": "14ecfd76519d6a069489a51de3e34ee845ee3003ff5c9d92f2f524a864070c57",
+      "width": 960,
+      "height": 540
+    },
+    {
+      "name": "960/tree/final.webp",
+      "bytes": 69672,
+      "sha256": "0c721c97c188a189eb7fb96670faa5f467faa84645d19a7d4a956cfe65b61124",
+      "width": 960,
+      "height": 540
+    },
+    {
+      "name": "1600/robotic-arm/opening.webp",
+      "bytes": 10732,
+      "sha256": "80577306f4cb9bfc3a01c5c65d134910314ac70a2474bb54efc8d59007b305fe",
+      "width": 1600,
+      "height": 900
+    },
+    {
+      "name": "1600/robotic-arm/final.webp",
+      "bytes": 73322,
+      "sha256": "20c11c6c7419e93c4475e9143ad3da4e6127b176e5862561b93b0a88bbb87061",
+      "width": 1600,
+      "height": 900
+    },
+    {
+      "name": "1600/tree/opening.webp",
+      "bytes": 137922,
+      "sha256": "c4fd8ff58cceb28ef1020dbfee61eafbbf09d1f14f4a259629ea0750f66363ad",
+      "width": 1600,
+      "height": 900
+    },
+    {
+      "name": "1600/tree/final.webp",
+      "bytes": 179568,
+      "sha256": "b784a1fb1da30838ac2a0dc5423f7ea219e4f3bf6bbd0686925c1bc3cdaa00f0",
+      "width": 1600,
+      "height": 900
+    }
+  ]
+}

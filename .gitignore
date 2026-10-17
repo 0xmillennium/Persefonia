@@ -104,8 +104,6 @@ frontend/node_modules/
 frontend/dist/
 frontend/playwright-report/
 frontend/test-results/
-frontend/experiments/sample-site-analysis
-frontend/experiments/site-analysis
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

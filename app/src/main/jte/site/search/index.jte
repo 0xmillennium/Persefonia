@@ -2,6 +2,7 @@
 @import dev.persefonia.webpublic.search.PublicSearchResultItem
 @param PublicSearchPage page
 @param String publicNavigationScriptPath = null
+@param java.util.List<dev.persefonia.webpublic.navigation.PublicNavigationLink> navigationLinks = java.util.List.of()
 <!doctype html>
 <html lang="en">
 <head>
@@ -17,6 +18,7 @@
 </head>
 <body>
     <a class="skip-link" href="#main-content">Skip to main content</a>
+    @template.site.components.publicHeader("/" + "en" + "/projects", "search")
     <main id="main-content" class="public-page">
         <header>
             <h1>Search</h1>
@@ -67,5 +69,6 @@
             @endif
         @endif
     </main>
+    @template.site.components.publicFooter(navigationLinks)
 </body>
 </html>

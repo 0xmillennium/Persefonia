@@ -166,19 +166,26 @@ val npmRunTypecheck by tasks.registering(Exec::class) {
     workingDir(frontendDirectory)
     commandLine("npm", "run", "typecheck")
     inputs.dir(frontendDirectory.dir("src"))
+    inputs.dir(frontendDirectory.dir("scripts"))
+    inputs.dir(frontendDirectory.dir("e2e"))
     inputs.files(
         frontendDirectory.file("package.json"),
-        frontendDirectory.file("tsconfig.json")
+        frontendDirectory.file("tsconfig.json"),
+        frontendDirectory.file("tsconfig.app.json"),
+        frontendDirectory.file("tsconfig.tooling.json"),
+        frontendDirectory.file("tsconfig.tests.json")
     )
 }
 
 val npmRunUnitTest by tasks.registering(Exec::class) {
     group = "verification"
-    description = "Runs pure frontend unit tests."
+    description = "Runs all frontend unit tests, including deterministic physics stress pipelines."
     dependsOn(npmCi)
     workingDir(frontendDirectory)
-    commandLine("npm", "run", "test:unit")
+    commandLine("npm", "run", "test:unit:all")
     inputs.dir(frontendDirectory.dir("src"))
+    inputs.dir(frontendDirectory.dir("scripts"))
+    inputs.dir(frontendDirectory.dir("e2e"))
     inputs.files(
         frontendDirectory.file("package.json"),
         frontendDirectory.file("vitest.config.ts")
@@ -196,12 +203,6 @@ val viteBuild by tasks.registering(Exec::class) {
     inputs.dir(frontendDirectory.dir("src"))
     inputs.dir(frontendDirectory.dir("public"))
     inputs.dir(frontendDirectory.dir("scripts"))
-    inputs.dir(frontendDirectory.dir("experiments/segmented-identity"))
-    inputs.dir(frontendDirectory.dir("experiments/scroll-film-navigator/src"))
-    inputs.dir(frontendDirectory.dir("experiments/scroll-film-navigator/scripts"))
-    inputs.dir(frontendDirectory.dir("experiments/identity-effects/src"))
-    inputs.dir(frontendDirectory.dir("experiments/location-earth-globe/src"))
-    inputs.dir(frontendDirectory.dir("experiments/location-earth-globe/assets"))
     inputs.files(
         frontendDirectory.file("package.json"),
         frontendDirectory.file("vite.config.ts")

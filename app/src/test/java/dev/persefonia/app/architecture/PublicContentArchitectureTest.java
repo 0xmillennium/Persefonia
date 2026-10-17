@@ -24,11 +24,12 @@ import org.junit.jupiter.api.Test;
 
 class PublicContentArchitectureTest {
     @Test
-    void publicContentControllerUsesOnlyRouteParserQueryHandlerAndViewFactory() {
+    void publicContentControllerUsesOnlyPublicQueriesAndPresentationCollaborators() {
         assertThat(PublicContentController.class.getDeclaredConstructors())
                 .singleElement()
                 .satisfies(constructor -> assertThat(constructor.getParameterTypes())
                         .containsExactly(
+                                dev.persefonia.webpublic.navigation.PublicRelatedLinks.class,
                                 PublicContentRouteParser.class,
                                 DiscoveryPublicContentRouteResolver.class,
                                 PublicContentBySourceQueryHandler.class,
@@ -41,7 +42,7 @@ class PublicContentArchitectureTest {
     @Test
     void webPublicContentDoesNotDependOnPersistenceInfrastructureOrAppComposition() {
         noClasses()
-                .that().resideInAPackage("dev.persefonia.webpublic.content..")
+                .that().resideInAnyPackage("dev.persefonia.webpublic.content..", "dev.persefonia.webpublic.navigation..")
                 .should().dependOnClassesThat().resideInAnyPackage(
                         "dev.persefonia.app..",
                         "dev.persefonia.contentpublishing.domain.content.port..",
@@ -113,8 +114,8 @@ class PublicContentArchitectureTest {
 
     @Test
     void publicFrontendKeepsMermaidOutOfGlobalBundle() throws Exception {
-        String mainEntry = Files.readString(Path.of("../frontend/src/main.ts"));
-        String mermaidEntry = Files.readString(Path.of("../frontend/src/mermaid-loader.ts"));
+        String mainEntry = Files.readString(Path.of("../frontend/src/main.ts")).replace('\'', '"');
+        String mermaidEntry = Files.readString(Path.of("../frontend/src/mermaid-loader.ts")).replace('\'', '"');
 
         assertThat(mainEntry).doesNotContain("mermaid");
         assertThat(mermaidEntry).contains("from \"mermaid\"");

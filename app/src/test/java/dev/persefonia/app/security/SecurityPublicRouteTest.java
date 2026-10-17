@@ -60,6 +60,32 @@ class SecurityPublicRouteTest {
     }
 
     @Test
+    void publicHeadRequestsReturnMetadataWithoutAuthenticationOrBody() throws Exception {
+        for (String path : List.of("/", "/robots.txt", "/search", "/contact",
+                viteAssetResolver.scriptPath(FRONTEND_ENTRY))) {
+            HttpResponse<String> response = head(path);
+            assertEquals(200, response.statusCode(), path);
+            assertTrue(response.headers().firstValue("Content-Type").isPresent(), path);
+            assertEquals("", response.body(), path);
+            assertEquals(get(path).headers().firstValue("Cache-Control"),
+                    response.headers().firstValue("Cache-Control"), path);
+        }
+        for (String path : viteAssetResolver.stylesheetPaths(FRONTEND_ENTRY)) {
+            assertEquals(200, head(path).statusCode(), path);
+        }
+        assertEquals(404, head("/media/assets/00000000-0000-0000-0000-000000000000/variants/thumbnail")
+                .statusCode());
+    }
+
+    @Test
+    void headDoesNotExposeProtectedOrUnregisteredRoutes() throws Exception {
+        for (String path : List.of("/admin", "/admin/media", "/search/anything",
+                "/media/assets/00000000-0000-0000-0000-000000000000/original")) {
+            assertNotSuccessful(head(path));
+        }
+    }
+
+    @Test
     void unsafeRequestsAreNotPublic() throws Exception {
         assertNotSuccessful(post("/"));
         assertNotSuccessful(post("/search"));
@@ -131,6 +157,14 @@ class SecurityPublicRouteTest {
         assertFalse(securityConfiguration.contains("\"/feed.xml/**\""));
         assertFalse(securityConfiguration.contains("\"/rss.xml\""));
         assertFalse(securityConfiguration.contains("\"/atom.xml\""));
+    }
+
+    private HttpResponse<String> head(String path) throws Exception {
+        HttpRequest request = HttpRequest.newBuilder(
+                        URI.create("http://127.0.0.1:" + applicationPort + path))
+                .method("HEAD", HttpRequest.BodyPublishers.noBody())
+                .build();
+        return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
     }
 
     private HttpResponse<String> get(String path) throws Exception {

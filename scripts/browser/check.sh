@@ -2,13 +2,18 @@
 set -euo pipefail
 
 project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-artifact_dir="$project_root/app/build/browser"
+browser_suite="${PERSEFONIA_BROWSER_SUITE:-all}"
+case "$browser_suite" in
+  all|chromium|cross) ;;
+  *) printf 'Unknown browser suite: %s\n' "$browser_suite" >&2; exit 2 ;;
+esac
+artifact_dir="${PERSEFONIA_BROWSER_ARTIFACT_DIR:-$project_root/app/build/browser}"
 mkdir -p "$artifact_dir"
 media_dir="$artifact_dir/media"
 mkdir -p "$media_dir/original"
 mkdir -p "$media_dir/variants"
-cp "$project_root/frontend/public/nebula_169_4K-3c1eea0fe4fd.webp" "$media_dir/original/browser-cover.webp"
-cp "$project_root/frontend/public/nebula_169_4K-3c1eea0fe4fd.webp" "$media_dir/variants/browser-cover.webp"
+cp "$project_root/frontend/e2e/fixtures/media/cover.webp" "$media_dir/original/browser-cover.webp"
+cp "$project_root/frontend/e2e/fixtures/media/cover.webp" "$media_dir/variants/browser-cover.webp"
 printf '%s\n' '%PDF-1.4' '1 0 obj << /Type /Catalog >> endobj' '%%EOF' > "$media_dir/original/browser-cv.pdf"
 container_name="persefonia-browser-$RANDOM-$$"
 postgres_image="${POSTGRES_IMAGE:-postgres:17.11-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73}"
@@ -62,9 +67,14 @@ for _ in $(seq 1 90); do
 done
 curl --fail --silent "$PERSEFONIA_BROWSER_URL/robots.txt" > /dev/null
 docker exec -i "$container_name" psql --set ON_ERROR_STOP=1 -U persefonia_browser -d persefonia_browser \
-  < "$project_root/frontend/e2e/fixture.sql" > "$artifact_dir/fixture.log"
+  < "$project_root/frontend/e2e/fixtures/content.sql" > "$artifact_dir/fixture.log"
 (
   cd "$project_root/frontend"
-  npx playwright install --no-shell chromium
-  npm run test:browser
+  npx playwright install --no-shell chromium firefox webkit
+  if [[ "$browser_suite" != cross ]]; then
+    npm run test:browser -- "$@"
+  fi
+  if [[ "$browser_suite" != chromium ]]; then
+    npm run test:browser:cross -- "$@"
+  fi
 )

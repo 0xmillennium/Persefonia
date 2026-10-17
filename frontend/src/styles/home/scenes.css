@@ -1,0 +1,194 @@
+/* Enhancement replaces scene presentation only; SSR retains every publication and route. */
+
+[data-home-v2][data-enhanced='true'] .home-scene {
+  padding: 0;
+  min-height: 0;
+  height: 170svh;
+}
+
+[data-home-v2][data-enhanced='true'] [data-scene='hero'] {
+  height: var(--first-writing-distance, 420svh);
+}
+
+[data-home-v2][data-enhanced='true'] [data-scene='statements'] {
+  height: var(--statement-writing-distance, 170svh);
+}
+
+[data-home-v2][data-enhanced='true'] [data-scene='capabilities'] {
+  height: var(--writing-distance, 220svh);
+}
+
+[data-home-v2][data-enhanced='true'] [data-scene='breath'] {
+  height: var(--writing-gap, 55svh);
+}
+
+[data-home-v2][data-enhanced='true'] [data-scene='mark'] {
+  height: var(--writing-distance, 200svh);
+}
+
+[data-home-v2][data-enhanced='true'] [data-scene='gallery'] {
+  height: calc(
+    var(--gallery-distance, 4) * 100svh + var(--gallery-entry-distance, 0px) +
+      var(--gallery-tail-distance, 0px)
+  );
+}
+
+[data-home-v2][data-enhanced='true'] [data-scene='location'] {
+  height: 200svh;
+}
+
+[data-home-v2][data-enhanced='true'] .scene-face {
+  position: fixed;
+  inset: 0;
+  height: 100svh;
+  padding: 130px var(--gutter) 80px;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+[data-home-v2][data-enhanced='true'] .scene-face[data-visible='true'] {
+  visibility: visible;
+  pointer-events: auto;
+}
+
+[data-home-v2][data-enhanced='true'][data-reduced='false']
+  :is(.hero-face, .statement-face, .capability-face, .breath-face, .mark-face) {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+[data-home-v2][data-enhanced='true'] .home-environment {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100svh;
+  overflow: visible;
+  background: var(--paper);
+  z-index: -1;
+}
+
+.home-body:has([data-enhanced='true']) .home-nav {
+  position: fixed;
+  transform: translateZ(0);
+}
+
+[data-home-v2][data-enhanced='true'] .hero-face {
+  padding-top: 24svh;
+}
+
+[data-home-v2][data-enhanced='true'] .hero-statement {
+  margin-top: 8svh !important;
+}
+
+[data-home-v2][data-enhanced='true'] .hero-scroll {
+  position: absolute;
+  bottom: 9svh;
+}
+
+[data-home-v2][data-enhanced='true'] .statement-face {
+  display: flex;
+  align-items: center;
+  padding-block: 100px;
+}
+
+.statement-top {
+  position: relative;
+}
+
+[data-home-v2][data-enhanced='true'] .statement-top {
+  width: max-content;
+  max-width: 100%;
+}
+
+[data-home-v2][data-enhanced='true'] .capability-face {
+  padding-top: 26svh;
+  color: var(--film-ink, var(--ink));
+}
+
+[data-home-v2][data-enhanced='true'][data-reduced='false'] .capability-face {
+  /* Tree frame 192: sky–sea boundary at approximately 82.4% of the 16:9 image. */
+  --third-writing-horizon: calc(50svh + max(32.4svh, 18.225vw));
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding-top: 90px;
+  padding-bottom: max(
+    60px,
+    calc(100svh - var(--third-writing-horizon) + clamp(18px, 2.5svh, 28px))
+  );
+}
+
+[data-home-v2][data-enhanced='true'][data-reduced='false'] .capability-face .capabilities {
+  --capability-trunk: calc(70vw - max(2.2vw, 3.911111svh));
+  --capability-clearance: clamp(18px, 1.6vw, 28px);
+  --capability-step: clamp(
+    0px,
+    calc(
+      (
+          var(--capability-trunk) - var(--gutter) - var(--capability-last-width) -
+            var(--capability-clearance)
+        ) /
+        3
+    ),
+    var(--capability-step-limit)
+  );
+}
+
+[data-home-v2][data-enhanced='true'][data-reduced='false'] .capabilities li:nth-child(4) {
+  max-width: calc(
+    var(--capability-trunk) - var(--gutter) - var(--capability-step) * 3 -
+      var(--capability-clearance)
+  );
+  text-align: right;
+}
+
+.capability-face .home-overline {
+  margin-bottom: 30px;
+}
+
+.capability-face .capabilities {
+  margin-top: 0 !important;
+}
+
+[data-home-v2][data-enhanced='true'] .breath-face {
+  display: grid;
+  place-items: center;
+}
+
+[data-home-v2][data-enhanced='true'] .mark-face {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0;
+  align-content: center;
+  color: var(--film-ink, var(--ink));
+}
+
+[data-home-v2][data-enhanced='true'] .brand-statement {
+  width: 100%;
+  font-size: clamp(26px, 3.3vw, 54px);
+}
+
+[data-home-v2][data-enhanced='true'] .physical-identity {
+  width: 100%;
+  max-width: 300px;
+  justify-self: center;
+}
+
+[data-home-v2][data-enhanced='true'][data-reduced='false'] .physical-identity {
+  transform: translateX(-15vw);
+}
+
+[data-home-v2][data-enhanced='true'] .physical-identity svg {
+  fill: currentColor;
+  touch-action: pan-y pinch-zoom;
+  user-select: none;
+}
+
+@media (min-width: 961px) {
+  [data-home-v2][data-enhanced='true'][data-reduced='false'][data-film='robotic-arm']
+    .capability-face
+    .capabilities {
+    --capability-trunk: 52vw;
+  }
+}

@@ -1,17 +1,17 @@
 package dev.persefonia.app.web;
 
-import dev.persefonia.profileportfolio.application.port.ProjectPublicReadModel;
 import dev.persefonia.discovery.application.contract.DiscoveryLanguage;
 import dev.persefonia.discovery.application.index.PublicHomepageContentEntry;
 import dev.persefonia.discovery.application.index.PublicHomepageContentQueryService;
+import dev.persefonia.profileportfolio.application.port.ProjectPublicReadModel;
 import dev.persefonia.profileportfolio.domain.common.ContentLanguage;
-import dev.persefonia.profileportfolio.domain.project.ProjectId;
-import dev.persefonia.profileportfolio.domain.project.ProjectSlug;
 import dev.persefonia.profileportfolio.domain.profile.PersonalProfile;
 import dev.persefonia.profileportfolio.domain.profile.PersonalProfileRepository;
 import dev.persefonia.profileportfolio.domain.profile.ProfileId;
-import dev.persefonia.profileportfolio.domain.settings.HomepageSettings;
+import dev.persefonia.profileportfolio.domain.project.ProjectId;
+import dev.persefonia.profileportfolio.domain.project.ProjectSlug;
 import dev.persefonia.profileportfolio.domain.settings.HomepagePromotionLimit;
+import dev.persefonia.profileportfolio.domain.settings.HomepageSettings;
 import dev.persefonia.profileportfolio.domain.settings.PositiveInteger;
 import dev.persefonia.profileportfolio.domain.settings.SeoDescription;
 import dev.persefonia.profileportfolio.domain.settings.SiteName;
@@ -29,6 +29,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
 
+@org.springframework.context.annotation.Import(dev.persefonia.app.TestPublicRouteResolutionConfiguration.class)
 @TestConfiguration(proxyBeanMethods = false)
 @Profile("public-home-mvc-test")
 class PublicHomeTestConfiguration {
@@ -135,6 +136,7 @@ class PublicHomeTestConfiguration {
 
     static final class PublicHomeProfileRepository implements PersonalProfileRepository {
         private PersonalProfile current;
+        private int activeReads;
 
         void setCurrent(PersonalProfile current) {
             this.current = current;
@@ -142,6 +144,7 @@ class PublicHomeTestConfiguration {
 
         void reset() {
             current = null;
+            activeReads = 0;
         }
 
         @Override
@@ -155,8 +158,11 @@ class PublicHomeTestConfiguration {
             return Optional.ofNullable(current).filter(profile -> profile.id().equals(id));
         }
 
+        int activeReads() { return activeReads; }
+
         @Override
         public Optional<PersonalProfile> findActiveProfile() {
+            activeReads++;
             return Optional.ofNullable(current).filter(profile -> profile.active());
         }
     }

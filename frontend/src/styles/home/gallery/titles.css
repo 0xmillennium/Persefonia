@@ -1,0 +1,76 @@
+/* Titles belong to the cover; the entire rectangle remains one semantic link. */
+
+.gallery-card .gallery-cover .gallery-card__title {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: block;
+  margin: 0 !important;
+  overflow: hidden;
+  color: #fff;
+  font-size: clamp(16px, 1.7vw, 24px);
+  line-height: 1.2;
+  -webkit-line-clamp: unset;
+}
+
+.gallery-card .gallery-card__title a {
+  display: flex;
+  align-items: flex-end;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  color: inherit;
+}
+
+.gallery-card__title a > span {
+  display: block;
+  width: 100%;
+  padding: 32px 18px 18px;
+  background: linear-gradient(transparent, rgba(4, 12, 14, 0.96));
+  text-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.9),
+    0 0 18px rgba(0, 0, 0, 0.65);
+  overflow-wrap: anywhere;
+}
+
+.gallery-card__name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gallery-card .gallery-card__title a:focus-visible {
+  outline-offset: -4px;
+}
+
+[data-home-v2][data-enhanced='true'][data-reduced='false'] .gallery-card article {
+  padding-bottom: 0;
+}
+
+[data-home-v2][data-enhanced='true'][data-reduced='false']
+  .gallery-card
+  :is(.home-project__number, .home-writing__number, .home-project__tags) {
+  display: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  [data-home-v2][data-enhanced='true'][data-reduced='false'] .gallery-card__title a > span {
+    opacity: 0;
+  }
+
+  [data-home-v2][data-enhanced='true'][data-reduced='false']
+    .gallery-cover:hover
+    .gallery-card__title
+    a
+    > span,
+  [data-home-v2][data-enhanced='true'][data-reduced='false']
+    .gallery-cover:focus-within
+    .gallery-card__title
+    a
+    > span {
+    opacity: 1;
+  }
+}

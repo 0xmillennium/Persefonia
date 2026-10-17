@@ -1,6 +1,7 @@
 @import dev.persefonia.webpublic.content.PublicNotFoundPage
 @param PublicNotFoundPage page
 @param String publicNavigationScriptPath = null
+@param java.util.List<dev.persefonia.webpublic.navigation.PublicNavigationLink> navigationLinks = java.util.List.of()
 <!doctype html>
 <html lang="en">
 <head>
@@ -12,11 +13,13 @@
 </head>
 <body>
     <a class="skip-link" href="#main-content">Skip to main content</a>
+    @template.site.components.publicHeader("/" + "en" + "/projects", "")
     <main id="main-content" class="public-page public-page--not-found">
         <section class="public-not-found" aria-labelledby="not-found-title">
             <h1 id="not-found-title">${page.title()}</h1>
             <p>${page.message()}</p>
         </section>
     </main>
+    @template.site.components.publicFooter(navigationLinks)
 </body>
 </html>

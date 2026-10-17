@@ -3,47 +3,60 @@
 | Field | Value |
 |---|---|
 | Status | Accepted |
-| Date | 2026-10-13 |
+| Date | 2026-10-13; updated 2026-10-18 |
 | Scope | architecture / operations / testing |
 | Supersedes | none |
 | Superseded by | none |
 
 ## Context
 
-The interactive homepage consumes authored frame sequences. Production builds must be reproducible from application source without an ignored experiment cache or original media library. Public delivery must remain self-hosted and consistent with the immutable OCI release model.
+The homepage presents two scroll-driven authored films and an independently looping waterfall. Builds must be reproducible without an ignored preparation cache, source media library or media credentials. Delivery remains self-hosted and consistent with immutable OCI releases. The initial image-sequence player was replaced by native video; retaining its complete publication as a second runtime player duplicated delivery and recovery complexity.
 
 ## Decision
 
-Version the qualified homepage WebP delivery assets and their manifest/qualification receipt under `frontend/public/home-films/`. Preserve the approved source frames outside public delivery. Publish derivatives explicitly through `npm run home:films:publish`, consuming the existing film preparation's full-integrity receipt and copying bytes unchanged. Publication does not encode or regenerate films.
+Version qualified H.264 scroll films under `frontend/public/home-videos/`, compact opening/final WebP posters under `frontend/public/home-posters/`, and waterfall video/poster derivatives under `frontend/public/home-loops/`. Each publication has an immutable identity, byte/hash inventory and qualification receipt. Vite includes the delivery assets in the BootJar intermediate and OCI image. ADR 0022 continues to govern deployment and same-byte promotion; a local BootJar preview is not a deployment method.
 
-Ordinary Vite builds consume only these repository delivery assets. Build preflight validates the preparation contract, identity, manifests, qualification receipt, frame inventory, dimensions declared in the manifest and file sizes. Full hashes and pixel decoding remain part of explicit film preparation; repeat them when publication changes, not for every frontend edit.
+Ordinary builds validate publication contracts, matching manifests and receipts, complete inventories, file sizes and actual SHA-256 delivery hashes. Poster dimensions are read from their WebP container. Same-size corruption fails validation. Builds neither encode nor require FFmpeg, ignored source frames or a historical public frame publication. Full codec/pixel qualification belongs to explicit preparation/publication and repeats when delivery changes.
 
-Vite packages both delivery tiers into the BootJar intermediate, and the existing OCI image contains them. Versioned public URLs include the delivery identity. Runtime does not read `.local/`, experiment caches or source-frame directories. ADR 0022 continues to govern deployment and same-byte promotion; local BootJar review is not a production deployment method.
+### Explicit publication and source provenance
+
+Preserve immutable source footage/frames outside public delivery. `npm run media:frames:prepare` validates original frame inventory and integrity and prepares the working derivatives under `.local/media/home/prepared-scroll/`. The source inventory, transformation contract/operator hash, source hash and preparation receipt record provenance. Keep a recoverable source-media archive and its matching receipts outside the application delivery set; `.local/` is not a production dependency or a durable architectural authority.
+
+`npm run media:videos:publish` directly consumes this qualified preparation. It encodes 192 poses at 30 fps in 960px/1600px H.264 faststart derivatives, with no B frames and a three-frame keyframe interval. Publication verifies dimensions, frame count, duration, keyframe positions and full decoding; source identity and manifest hash remain in the video contract/receipt. Historical source lineage does not require distributing every source pose to the browser. Existing video bytes and URLs remain unchanged when only the fallback publication changes.
+
+`npm run media:posters:publish` copies only opening/final qualified WebP poses at the same two sizes. Its own identity and receipt bind the exact selection to the preparation identity and manifest hash used by the videos. Eight images replace the former 768-image runtime publication. No sequence cache or sequence playback remains in production. The archived source preparation and its validator remain offline encoding tools.
+
+### Runtime presentation and failure behavior
+
+Native paused video supplies plain scroll scrubbing and GPU textures for active navigator/hold effects. Desired video pose and usable presentation are separate states. A bounded video failure selects a static opening poster while the initial window sheet is visible, or a static final poster in the later film area. A retained usable presentation survives resolution/pose replacement preparation. A poster is explicitly static and is never reported as a decoded requested video frame. Reduced motion can prepare a static poster without starting a scroll-video decoder.
+
+Film switching may reveal a usable incoming poster when native decoding fails. Missing video/poster resources cannot hold the loader or source-switch state indefinitely; semantic content and navigation remain available. The existing explicit gesture/keyboard selection retries failed media at the current scroll target. Readiness means a usable presentation, not necessarily successful video decoding. Accessible notices describe meaningful failure/presentation changes, not every film pose. No frame-by-frame canvas copy is introduced as failure insurance.
+
+The waterfall publication remains independent: `npm run media:loop:publish` consumes the approved source at `.local/media/home/loop-video/loop video.mp4`, preserves 24 fps/eight seconds, and publishes silent 1280px/1920px H.264 faststart files and matching posters. Its contract records source hash, encoder, quality, dimensions, playback GOP, output hashes and full-decode receipt. This does not weaken scroll-film exact-pose/short-GOP qualification.
+
+Background selection is independent of playback mode. The waterfall loops natively and refreshes shader textures from decoded-frame callbacks only during effects. Inactive, fully covered, hidden-page, menu-covered and reduced-motion playback pauses. It needs no separate playback button. Background crop and opening geometry remain fixed for each viewport/source during scrolling and on both sides of a switch. SSR content and CSP boundaries remain unchanged; no blob/MediaSource dependency is introduced.
+
+### Release asset delivery
+
+The build emits an exact qualified immutable URL inventory for one-year public immutable caching. It includes hashed Vite outputs and versioned presentation media, excluding fixed manifests, HTML, theme CSS and revocable CMS media. Native video byte ranges remain supported. Production text compression covers scripts/styles/SVG, not encoded video. Regression checks exercise actual HTTP GET/range behavior; external ingress must preserve these policies and requires deployment verification.
 
 ## Consequences
 
-Clean builds need no media service credentials or source films. Existing qualified delivery files add approximately 60 MB to repository source and release artifacts. Updates must include the complete matching delivery set and receipt; partial or unqualified publication fails the build. Original source preparation still requires the approved source library and FFmpeg.
+Clean application builds need only versioned delivery assets. Videos add approximately 34 MB, loop delivery 21 MB and scroll-film posters 0.56 MB. Removing the complete sequence publication saves approximately 61 MB before metadata differences. Git history retains previously committed objects unless a separately authorized history migration removes them.
 
-Publications and CMS covers remain Media Library responsibilities under ADR 0035. Authored homepage films are application presentation assets, not a parallel CMS or domain storage system.
+Partial, incompatible or corrupt publications fail the build. Preparation still needs the source archive and qualified encoding tools. Runtime failure intentionally reduces cinematic motion while retaining usable content. Physical-device playback, input and CPU/GPU performance need browser/hardware qualification.
 
-### Seekable video delivery
-
-The homepage also versions seekable H.264 delivery derivatives under `frontend/public/home-videos/`. Explicit `npm run home:videos:publish` consumes the qualified published WebP frames, checks their hashes, and encodes the same 192 poses at both existing dimensions. The preparation contract fixes the frame rate, quality, pixel format, three-frame keyframe interval and encoder version. Publication verifies frame count, dimensions, keyframe positions and full decoding, then records output hashes and source provenance. Ordinary builds check the matching manifests, qualification receipt, inventory and sizes without encoding or requiring FFmpeg.
-
-Runtime uses paused native video for plain scroll scrubbing and the existing GPU surface for active navigator/hold effects. The qualified WebP sequences remain the fallback when video delivery or decoding fails. Video URLs include their own immutable delivery identity; runtime media remain same-origin without a blob/MediaSource dependency or CSP relaxation. This adds approximately 34 MB to the versioned delivery set. Native video reduces repeated image decoding and GPU texture submission during plain scrubbing; physical-device and browser-specific performance still require runtime qualification.
-
-The explicitly approved waterfall background adds continuous playback alongside the two scroll-driven films. Its publication is independent: `npm run home:loop:publish` consumes the approved source at `.local/media/home/loop-video/loop video.mp4`, preserves its 24 fps and eight-second duration, and publishes silent 1280px/1920px H.264 faststart files and matching posters under `frontend/public/home-loops/`. The source stays outside public delivery. A separate immutable contract records the source hash, encoder, quality, dimensions, playback GOP, output hashes and full-decode receipt; ordinary builds validate the published inventory without accessing the source or encoding media. It does not weaken the scroll films' exact-pose or short-GOP qualification.
-
-Background selection cycles independently of playback mode. The waterfall uses native looping playback and refreshes shader textures from decoded-frame callbacks only during navigator/hold effects. Inactive, fully covered, hidden-page, menu-covered and reduced-motion playback pauses. The visible loop plays automatically without a separate playback button. A poster preserves usable presentation when playback is unavailable; the existing background gesture or film selection can retry playback. Background crop and opening geometry remain fixed for each viewport and source during scrolling, including both sides of a switch. The same server-rendered content and self-hosted CSP boundary continue to apply.
+Publication covers remain Media Library responsibilities under ADR 0035. Homepage films are application presentation assets, not another CMS or domain storage system.
 
 ## Alternatives considered
 
-- Consume ignored prepared caches during production builds. Rejected because a clean CI checkout lacks those files and qualification provenance.
-- Provision a separately hosted media artifact. Deferred because it adds an external build dependency, credentials and distribution ownership for a bounded, stable delivery set.
-- Serve media from an external runtime CDN. Rejected because it conflicts with current self-hosting and release reproducibility requirements.
+- Keep the complete WebP sequence as video recovery: rejected because it maintains another playback/decoding scheduler and duplicates approximately 61 MB of delivery. A small static presentation preserves usable content without that second engine.
+- Require source preparation during ordinary builds: rejected because clean application builds must not depend on ignored source media, FFmpeg or encoding work.
+- Remove all static media recovery: rejected because unavailable video must leave a deliberate usable presentation and must not block navigation or film selection.
+- Move delivery to an external artifact/media service now: deferred until an accepted immutable distribution contract exists. Repository-owned qualified assets preserve self-hosting and same-byte promotion.
 
 ## Review triggers
 
-- Delivery asset growth makes repository versioning impractical.
-- Film content changes frequently or needs independent release ownership.
-- An accepted artifact-distribution service can supply immutable, qualified build inputs.
+- Delivery growth makes repository versioning impractical.
+- Films require frequent independent releases.
+- An accepted artifact service can supply immutable qualified build inputs.

@@ -1,5 +1,5 @@
 @param String instance
-<!-- Approved Experiment 04 geometry and custom lettering; no redraw. -->
+<!-- Generated from the canonical identity; run npm run identity:generate. -->
 <svg viewBox="-150 -160 300 320" aria-hidden="true" focusable="false">
             <rect class="surface" x="-58" y="-80" width="116" height="160" />
             <g class="registration">

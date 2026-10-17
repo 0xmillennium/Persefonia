@@ -1,0 +1,45 @@
+.mark-face {
+  display: flex;
+  align-items: center;
+  gap: 4vw;
+}
+
+.brand-statement {
+  width: 45%;
+  font-size: clamp(36px, 5vw, 80px);
+  line-height: 1.2;
+  letter-spacing: -0.04em;
+}
+
+.brand-statement > span {
+  display: block;
+  overflow: hidden;
+  line-height: 1.08;
+  padding-bottom: 0.15em;
+  margin-bottom: -0.15em;
+}
+
+.brand-statement > span > span {
+  display: block;
+}
+
+.physical-identity {
+  width: 55%;
+}
+
+.physical-identity svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  fill: var(--ink);
+  overflow: visible;
+}
+
+.physical-identity .navigator {
+  fill: #50cdb844;
+  stroke: var(--accent);
+}
+
+.physical-identity .in-contact {
+  fill: var(--accent);
+}

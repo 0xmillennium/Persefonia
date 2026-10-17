@@ -1,0 +1,52 @@
+.floor-shadow {
+  position: absolute;
+  left: 25%;
+  top: 81%;
+  width: 50%;
+  height: 2%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, #50cdb855, transparent 70%);
+  opacity: 0;
+}
+
+.segment {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.registration {
+  transform-box: view-box;
+  transform-origin: 50% 50%;
+}
+
+.surface,
+.m-mark,
+.reflection,
+.writing-trace,
+.period-trace,
+.writing-point,
+.period-point,
+.settled-finish {
+  opacity: 0;
+}
+
+.m-mark {
+  fill: var(--paper);
+}
+
+.reflection {
+  transform: translateX(-100px);
+}
+
+.writing-trace,
+.period-trace {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+}
+
+.writing-point,
+.period-point {
+  offset-distance: 0%;
+  offset-anchor: 0 0;
+  offset-rotate: 0deg;
+}

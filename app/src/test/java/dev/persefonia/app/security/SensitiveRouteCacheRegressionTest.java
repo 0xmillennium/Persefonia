@@ -16,6 +16,7 @@ import org.springframework.test.web.servlet.MvcResult;
         "spring.autoconfigure.exclude=org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration",
         "spring.flyway.enabled=false"
 })
+@org.springframework.context.annotation.Import(dev.persefonia.app.TestPublicRouteResolutionConfiguration.class)
 @AutoConfigureMockMvc
 class SensitiveRouteCacheRegressionTest {
     @Autowired MockMvc mockMvc;

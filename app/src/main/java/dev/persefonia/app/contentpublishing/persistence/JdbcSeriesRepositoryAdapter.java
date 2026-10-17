@@ -108,6 +108,31 @@ public class JdbcSeriesRepositoryAdapter implements SeriesRepository {
                 resultSet.getTimestamp("updated_at").toInstant()));
     }
 
+    @Override
+    public List<SeriesSummary> findActiveContaining(ContentId contentId, ContentLanguage language) {
+        Objects.requireNonNull(contentId, "contentId");
+        Objects.requireNonNull(language, "language");
+        return jdbc().query("""
+                SELECT series.id, series.language, series.slug, series.title, series.status,
+                       series.updated_at,
+                       (SELECT count(*) FROM publishing.series_entries entries
+                        WHERE entries.series_id = series.id) AS entry_count
+                FROM publishing.series series
+                WHERE series.language = :language AND series.status = 'ACTIVE'
+                  AND EXISTS (SELECT 1 FROM publishing.series_entries member
+                              WHERE member.series_id = series.id AND member.content_item_id = :contentId)
+                ORDER BY series.title, series.id
+                """, Map.of("contentId", contentId.value(), "language", language.name()),
+                (resultSet, rowNumber) -> new SeriesSummary(
+                        SeriesId.from(resultSet.getObject("id", UUID.class)),
+                        ContentLanguage.valueOf(resultSet.getString("language")),
+                        SeriesSlug.of(resultSet.getString("slug")),
+                        SeriesTitle.of(resultSet.getString("title")),
+                        SeriesStatus.valueOf(resultSet.getString("status")),
+                        resultSet.getInt("entry_count"),
+                        resultSet.getTimestamp("updated_at").toInstant()));
+    }
+
     private Optional<Long> currentVersion(SeriesId id) {
         List<Long> versions = jdbc().query("""
                 SELECT version

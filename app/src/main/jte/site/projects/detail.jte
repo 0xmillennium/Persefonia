@@ -1,6 +1,8 @@
 @import dev.persefonia.webpublic.projects.PublicProjectDetailPage
 @param PublicProjectDetailPage page
 @param String publicNavigationScriptPath = null
+@param java.util.List<dev.persefonia.webpublic.navigation.PublicNavigationLink> navigationLinks = java.util.List.of()
+@param java.util.Map<String, String> tagLinks = java.util.Map.of()
 <!doctype html>
 <html lang="${page.htmlLanguage()}">
 <head>
@@ -20,6 +22,7 @@
 </head>
 <body>
     <a class="skip-link" href="#main-content">Skip to main content</a>
+    @template.site.components.publicHeader("/" + page.htmlLanguage() + "/projects", "")
     <main id="main-content" class="public-page">
         <article>
             <header>
@@ -44,7 +47,7 @@
                     <h2>${page.copy().tagsLabel()}</h2>
                     <ul>
                         @for(var tag : page.project().tags())
-                            <li>${tag.name()}</li>
+                            <li>@if(tagLinks.containsKey(tag.slug()))<a href="${tagLinks.get(tag.slug())}">${tag.name()}</a>@else${tag.name()}@endif</li>
                         @endfor
                     </ul>
                 </section>
@@ -70,5 +73,6 @@
             @endif
         </article>
     </main>
+    @template.site.components.publicFooter(navigationLinks)
 </body>
 </html>

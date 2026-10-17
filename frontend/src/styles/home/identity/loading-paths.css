@@ -1,0 +1,23 @@
+[data-loading-identity] .writing-point[data-stroke='0'] {
+  offset-path: url('#loading-identity-writing-path-0');
+}
+
+[data-loading-identity] .writing-point[data-stroke='1'] {
+  offset-path: url('#loading-identity-writing-path-1');
+}
+
+[data-loading-identity] .writing-point[data-stroke='2'] {
+  offset-path: url('#loading-identity-writing-path-2');
+}
+
+[data-loading-identity] .writing-point[data-stroke='3'] {
+  offset-path: url('#loading-identity-writing-path-3');
+}
+
+[data-loading-identity] .writing-point[data-stroke='4'] {
+  offset-path: url('#loading-identity-writing-path-4');
+}
+
+[data-loading-identity] .period-point {
+  offset-path: url('#loading-identity-period-path');
+}
