@@ -22,6 +22,11 @@ public record PublicHomePageCopy(String language) {
     public String menu() { return text("Menu", "Menü"); }
     public String projects() { return text("Projects", "Projeler"); }
     public String writing() { return text("Writing", "Yazılar"); }
+    public String collections() { return text("Collections", "Koleksiyonlar"); }
+    public String articles() { return text("Articles", "Makaleler"); }
+    public String notes() { return text("Notes", "Notlar"); }
+    public String articlesEmpty() { return text("No published articles yet.", "Henüz yayımlanmış makale yok."); }
+    public String notesEmpty() { return text("No published notes yet.", "Henüz yayımlanmış not yok."); }
     public String research() { return text("Research", "Araştırma"); }
     public String about() { return text("About", "Hakkımda"); }
     public String contact() { return text("Contact", "İletişim"); }

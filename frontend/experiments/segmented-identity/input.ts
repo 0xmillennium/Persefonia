@@ -17,27 +17,64 @@ export class InputAdapter {
   private lastPointer: { x: number; y: number } | undefined;
   private lastTouch: { x: number; y: number } | undefined;
   private previousTimestamp: number | undefined;
+  private contact: { id: number; x: number; y: number; dragging: boolean } | undefined;
+  private releaseFrame = 0;
   private readonly reduced = matchMedia("(prefers-reduced-motion: reduce)");
   private readonly abort = new AbortController();
   get pending(): boolean { return this.path.pending; }
   get droppedSamples(): number { return this.path.dropped; }
   constructor(private readonly svg: SVGSVGElement, enabled: () => boolean, private readonly wake: () => void = () => {},
-    private readonly viewport?: { origin: () => Vec }) {
+    private readonly viewport?: { origin: () => Vec; touch?: boolean }) {
     const target = viewport ? window : svg;
     target.addEventListener("pointermove", (event: Event) => {
       const e = event as PointerEvent;
       this.lastPointer = { x: e.clientX, y: e.clientY };
-      if (e.pointerType === "touch") this.lastTouch = this.lastPointer;
+      if (e.pointerType === "touch") {
+        this.lastTouch = this.lastPointer;
+        const contact = this.contact;
+        if (!contact || e.pointerId !== contact.id) return;
+        if (this.reduced.matches || !enabled()) { this.deactivate(); return; }
+        if (!contact.dragging) {
+          const dx = e.clientX - contact.x, dy = e.clientY - contact.y;
+          if (Math.hypot(dx, dy) < 6) return;
+          if (Math.abs(dy) >= Math.abs(dx)) { this.deactivate(); return; }
+          contact.dragging = true;
+          this.svg.setPointerCapture(e.pointerId);
+        }
+        e.preventDefault();
+        const coalesced = e.getCoalescedEvents?.() ?? [];
+        this.observe(coalesced.length ? coalesced : [e]);
+        return;
+      }
       if (!acceptsHover(e) || this.reduced.matches || !enabled()) return;
+      if (this.contact || this.releaseFrame) this.deactivate();
       this.lastTouch = undefined;
       const coalesced = e.getCoalescedEvents?.() ?? [];
       this.observe(coalesced.length ? coalesced : [e]);
     }, { signal: this.abort.signal });
-    for (const type of ["pointerdown", "pointerup"] as const) target.addEventListener(type, (event: Event) => {
+    target.addEventListener("pointerdown", (event: Event) => {
       const e = event as PointerEvent;
       if (e.pointerType === "touch") {
         this.deactivate(); this.lastTouch = { x: e.clientX, y: e.clientY };
+        if (this.viewport?.touch && e.isPrimary && enabled() && !this.reduced.matches
+          && e.target instanceof Element && this.svg.contains(e.target) && e.target.closest('[data-fragment]')) {
+          this.contact = { id: e.pointerId, x: e.clientX, y: e.clientY, dragging: false };
+          this.observe([e]);
+        }
       }
+    }, { signal: this.abort.signal });
+    target.addEventListener("pointerup", (event: Event) => {
+      const e = event as PointerEvent;
+      if (e.pointerType !== "touch") return;
+      this.lastTouch = { x: e.clientX, y: e.clientY };
+      if (e.pointerId !== this.contact?.id) return;
+      this.contact = undefined;
+      if (this.svg.hasPointerCapture(e.pointerId)) this.svg.releasePointerCapture(e.pointerId);
+      // Let the last contact sample reach the physics tick before clearing it.
+      this.releaseFrame = requestAnimationFrame(() => { this.releaseFrame = 0; this.deactivate(); });
+    }, { signal: this.abort.signal });
+    this.svg.addEventListener("lostpointercapture", event => {
+      if (event.target === this.svg && event.pointerId === this.contact?.id) this.deactivate();
     }, { signal: this.abort.signal });
     target.addEventListener("mousemove", (event: Event) => {
       const e = event as MouseEvent;
@@ -72,9 +109,12 @@ export class InputAdapter {
     this.wake();
   }
   deactivate(): void {
+    cancelAnimationFrame(this.releaseFrame); this.releaseFrame = 0;
+    const contact = this.contact; this.contact = undefined;
+    if (contact && this.svg.hasPointerCapture(contact.id)) this.svg.releasePointerCapture(contact.id);
     this.previousTimestamp = undefined; this.lastPointer = undefined;
     this.path.push({ x: -100, y: -100, active: false }); this.wake();
   }
   take(): readonly PointerSample[] | undefined { return this.path.take(); }
-  dispose(): void { this.path.clear(); this.abort.abort(); }
+  dispose(): void { this.deactivate(); this.path.clear(); this.abort.abort(); }
 }

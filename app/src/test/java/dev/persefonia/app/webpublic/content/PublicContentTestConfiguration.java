@@ -82,6 +82,16 @@ public class PublicContentTestConfiguration {
             }
 
             @Override
+            public List<PublicHomepageContentEntry> latestArticles(DiscoveryLanguage language, int limit) {
+                return List.of();
+            }
+
+            @Override
+            public List<PublicHomepageContentEntry> latestNotes(DiscoveryLanguage language, int limit) {
+                return List.of();
+            }
+
+            @Override
             public List<PublicHomepageContentEntry> latestResearch(DiscoveryLanguage language, int limit) {
                 return List.of();
             }

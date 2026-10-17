@@ -83,6 +83,10 @@ public class PublicHomeController {
         List<PublicHomepageContentEntry> latestWriting = homepage.promoteLatestWriting()
                 ? homepageContent.latestWriting(language, homepage.latestWritingLimit())
                 : List.of();
+        List<PublicHomepageContentEntry> articles = homepage.promoteLatestWriting()
+                ? homepageContent.latestArticles(language, homepage.latestWritingLimit()) : List.of();
+        List<PublicHomepageContentEntry> notes = homepage.promoteLatestWriting()
+                ? homepageContent.latestNotes(language, homepage.latestWritingLimit()) : List.of();
         List<PublicHomepageContentEntry> researchHighlights = homepage.promoteResearchHighlights()
                 ? homepageContent.latestResearch(language, homepage.researchHighlightLimit())
                 : List.of();
@@ -96,7 +100,7 @@ public class PublicHomeController {
                     .ifPresent(image -> covers.put(project.publicUrl(), image)));
         }
         var tags = new LinkedHashMap<String, List<String>>();
-        latestWriting.forEach(entry -> entry.sourceId()
+        java.util.stream.Stream.of(articles, notes, researchHighlights).flatMap(List::stream).forEach(entry -> entry.sourceId()
                 .flatMap(id -> contentGallery.galleryMetadata(new PublicContentBySourceQuery(id, entry.publicUrl())))
                 .ifPresent(metadata -> {
                     tags.put(entry.publicUrl(), metadata.tags());
@@ -118,6 +122,8 @@ public class PublicHomeController {
                 homepage.promoteLatestWriting(),
                 homepage.promoteResearchHighlights(),
                 latestWriting,
+                articles,
+                notes,
                 researchHighlights,
                 covers,
                 tags,

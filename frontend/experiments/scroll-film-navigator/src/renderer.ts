@@ -4,17 +4,22 @@ import type { LiquidField } from "./field";
 import type { HoldMaterial } from "./hold-material";
 import type { Hold } from "./hold";
 import type { FrameKey, Film } from "./transport";
-export interface Scene { field: LiquidField|GpuFluid; material: HoldMaterial; hold: Hold; time: number; reveal: boolean; reduced: boolean; current: Film; next: Film; aperture?: readonly [number, number, number, number, number]; filmBounds?: readonly [number, number, number, number]; imageOpacity?: number }
+type Aperture = readonly [number, number, number, number, number];
+type Circle = readonly [number, number, number];
+export interface Scene<Source extends string = Film> { field: LiquidField|GpuFluid; material: HoldMaterial; hold: Hold; time: number; reveal: boolean; reduced: boolean; current: Source; next: Source; aperture?: Aperture; circles?: readonly Circle[]; nextAperture?: Aperture; extraAperture?: Aperture; nextExtraAperture?: Aperture; nextCircles?: readonly Circle[]; dividers?: Circle; nextDividers?: Circle; capsules?: readonly Aperture[]; nextCapsules?: readonly Aperture[]; filmBounds?: readonly [number, number, number, number]; nextFilmBounds?: readonly [number, number, number, number]; imageOpacity?: number }
 interface TimerExtension { TIME_ELAPSED_EXT: number; GPU_DISJOINT_EXT: number }
-export class Renderer {
+export class Renderer<Key extends string = FrameKey, Source extends string = Film> {
   readonly kind="webgl2";
   readonly gl: WebGL2RenderingContext;
   private program: WebGLProgram;
   private textures: WebGLTexture[] = [];
-  private keys: (FrameKey|null)[] = [null,null];
+  private keys: (Key|null)[] = [null,null];
   private textureBytes = [0,0];
   private sheetSize = [0,0];
   private uniforms = new Map<string,WebGLUniformLocation|null>();
+  private capsuleBoxes = new Float32Array(16);
+  private capsuleRadii = new Float32Array(4);
+  private circleData = new Float32Array(21);
   private timer: TimerExtension|null=null;
   private queries: WebGLQuery[]=[];
   readonly gpuSamples: number[]=[];
@@ -65,14 +70,18 @@ export class Renderer {
     this.canvas.width=Math.round(width*scale);this.canvas.height=Math.round(height*scale);
     this.gl.viewport(0,0,this.canvas.width,this.canvas.height);
   }
-  upload(slot: number,key: FrameKey,image: ImageBitmap): void {
+  upload(slot: number,key: Key,image: ImageBitmap | HTMLVideoElement): void {
     if(this.keys[slot]===key) return;
+    const width=image instanceof HTMLVideoElement?image.videoWidth:image.width;
+    const height=image instanceof HTMLVideoElement?image.videoHeight:image.height;
     const gl=this.gl;
     gl.activeTexture(gl.TEXTURE0+slot); gl.bindTexture(gl.TEXTURE_2D,this.textures[slot]!);
-    if(this.textureBytes[slot]===image.width*image.height*4)gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,gl.RGBA,gl.UNSIGNED_BYTE,image);
-    else gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,image);
-    if(gl.getError()!==gl.NO_ERROR) throw new Error(`Film texture upload failed: ${key}`);
-    this.keys[slot]=key; this.textureBytes[slot]=image.width*image.height*4; this.uploads++;
+    if(this.textureBytes[slot]===width*height*4)gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,gl.RGBA,gl.UNSIGNED_BYTE,image);
+    else {
+      gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,image);
+      if(gl.getError()!==gl.NO_ERROR) throw new Error(`Film texture allocation failed: ${key}`);
+    }
+    this.keys[slot]=key; this.textureBytes[slot]=width*height*4; this.uploads++;
   }
   swap(): void { [this.textures[0],this.textures[1]]=[this.textures[1]!,this.textures[0]!]; [this.keys[0],this.keys[1]]=[this.keys[1]!,this.keys[0]!]; [this.textureBytes[0],this.textureBytes[1]]=[this.textureBytes[1]!,this.textureBytes[0]!]; }
   setSheet(image: ImageBitmap): void {
@@ -83,7 +92,7 @@ export class Renderer {
     this.sheetSize=[image.width,image.height];
   }
   get hasSheet(): boolean {return this.sheetSize[0]!>0;}
-  draw(scene: Scene): boolean {
+  draw(scene: Scene<Source>): boolean {
     const gl=this.gl;if(this.disposed||gl.isContextLost())return false;
     gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.viewport(0,0,this.canvas.width,this.canvas.height);
     gl.useProgram(this.program);
@@ -93,8 +102,37 @@ export class Renderer {
     const aperture=scene.aperture??[0,0,this.width,this.height,0];
     gl.uniform4f(this.uniform("aperture"),aperture[0],aperture[1],aperture[2],aperture[3]);
     gl.uniform1f(this.uniform("apertureRadius"),aperture[4]);
+    const nextAperture=scene.nextAperture??aperture;
+    gl.uniform4f(this.uniform("nextAperture"),nextAperture[0],nextAperture[1],nextAperture[2],nextAperture[3]);
+    gl.uniform1f(this.uniform("nextApertureRadius"),nextAperture[4]);
+    for (const [name, bars] of [["dividersA", scene.dividers], ["dividersB", scene.nextDividers]] as const)
+      gl.uniform3f(this.uniform(name), bars?.[0]??0, bars?.[1]??0, bars?.[2]??0);
+    for (const [name, box] of [["extraAperture", scene.extraAperture], ["nextExtraAperture", scene.nextExtraAperture]] as const) {
+      gl.uniform4f(this.uniform(name), box?.[0]??0, box?.[1]??0, box?.[2]??0, box?.[3]??0);
+      gl.uniform1f(this.uniform(`${name}Radius`), box?.[4]??0);
+    }
+    for (const [name, capsules] of [["capsulesA", scene.capsules], ["capsulesB", scene.nextCapsules]] as const) {
+      const count = Math.min(4, capsules?.length??0);
+      gl.uniform1i(this.uniform(name === "capsulesA" ? "capsuleCountA" : "capsuleCountB"), count);
+      if (count) {
+        for (let i = 0; i < count; i++) {
+          const box = capsules![i]!;
+          this.capsuleBoxes.set([box[0], box[1], box[2], box[3]], i * 4);
+          this.capsuleRadii[i] = box[4];
+        }
+        gl.uniform4fv(this.uniform(`${name}[0]`), this.capsuleBoxes);
+        gl.uniform1fv(this.uniform(name === "capsulesA" ? "capsuleRadiiA[0]" : "capsuleRadiiB[0]"), this.capsuleRadii);
+      }
+    }
+    for(const [name,circles] of [["circlesA",scene.circles],["circlesB",scene.nextCircles??scene.circles]] as const){
+      const count=Math.min(7,circles?.length??0);
+      gl.uniform1i(this.uniform(name==="circlesA"?"circleCountA":"circleCountB"),count);
+      if(count){for(let i=0;i<count;i++)this.circleData.set(circles![i]!,i*3);gl.uniform3fv(this.uniform(`${name}[0]`),this.circleData);}
+    }
     const filmBounds=scene.filmBounds??[0,0,0,0];
     gl.uniform4f(this.uniform("filmBounds"),filmBounds[0],filmBounds[1],filmBounds[2],filmBounds[3]);
+    const nextFilmBounds=scene.nextFilmBounds??filmBounds;
+    gl.uniform4f(this.uniform("nextFilmBounds"),nextFilmBounds[0],nextFilmBounds[1],nextFilmBounds[2],nextFilmBounds[3]);
     gl.uniform1f(this.uniform("imageOpacity"),scene.imageOpacity??1); gl.uniform2f(this.uniform("fieldSize"),scene.field.width,scene.field.height);gl.uniform2f(this.uniform("holdSize"),scene.material.width,scene.material.height);
     gl.activeTexture(gl.TEXTURE2);gl.bindTexture(gl.TEXTURE_2D,this.fluid!.texture);
     gl.activeTexture(gl.TEXTURE3);gl.bindTexture(gl.TEXTURE_2D,this.textures[3]!);
@@ -115,7 +153,7 @@ export class Renderer {
   }
   beginFrame():void {if(this.timer&&!this.frameQuery&&this.queries.length<4&&!this.gl.isContextLost()){const query=this.gl.createQuery();if(query){this.frameQuery=query;this.gl.beginQuery(this.timer.TIME_ELAPSED_EXT,query);}}}
   private collectQueries(): void {
-    const gl=this.gl;if(!this.timer)return;
+    const gl=this.gl;if(!this.timer||!this.queries.length)return;
     const disjoint=gl.getParameter(this.timer.GPU_DISJOINT_EXT) as boolean;
     while(this.queries.length) {
       const q=this.queries[0]!;
@@ -124,7 +162,7 @@ export class Renderer {
       gl.deleteQuery(q);this.queries.shift();
     }
   }
-  get residentKeys(): FrameKey[] {return this.keys.filter((key):key is FrameKey=>key!==null);}
+  get residentKeys(): Key[] {return this.keys.filter((key):key is Key=>key!==null);}
   get bytes(): number {return this.disposed?0:this.textureBytes[0]!+this.textureBytes[1]!+this.sheetSize[0]!*this.sheetSize[1]!*4+(this.fluid?.bytes??0)+this.holdSize[0]!*this.holdSize[1]!*4+this.canvas.width*this.canvas.height*4;}
   get textureCount():number{return this.disposed?0:this.textures.length+(this.fluid?.textures??0);}
   get info(): object {

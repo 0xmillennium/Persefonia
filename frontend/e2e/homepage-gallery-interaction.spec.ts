@@ -9,7 +9,9 @@ async function gallery(page: Page, progress = 0) {
     await page.locator('[data-scene="gallery"]').evaluate((node, p) => {
         const rect = node.getBoundingClientRect();
         const entry = parseFloat((node as HTMLElement).style.getPropertyValue('--gallery-entry-distance')) || 0;
-        scrollTo({ top: rect.top + scrollY + entry + (rect.height - entry) * (.12 + p * .7), behavior: 'instant' });
+        const count = node.querySelectorAll('.gallery-category:not([hidden]) .gallery-card').length;
+        const travel = (4 + p * (count - 1)) / (count + 7);
+        scrollTo({ top: rect.top + scrollY + entry + (rect.height - entry) * (.12 + travel * .7), behavior: 'instant' });
     }, progress);
     await expect.poll(() => page.locator('.gallery-face').evaluate(node => node.inert)).toBe(false);
 }
@@ -17,9 +19,10 @@ async function dragPoint(page: Page) {
     const cover = page.locator('.gallery-category:not([hidden]) .gallery-card[data-front="true"]').first().locator('.gallery-cover');
     const box = (await cover.boundingBox())!;
     const width = page.viewportSize()!.width;
-    const radius = width < 700 ? width * .9 : Math.min(1000, width * .72);
+    const spacing = await page.locator('.gallery-category:not([hidden]) .gallery-card').evaluateAll(cards =>
+        new DOMMatrix(getComputedStyle(cards[1]!).transform).m41 - new DOMMatrix(getComputedStyle(cards[0]!).transform).m41);
     return { x: Math.min(width - 30, box.x + box.width * .65), y: box.y + box.height * .5,
-        spacing: radius * Math.sin(width < 700 ? .78 : .48) };
+        spacing };
 }
 
 test('gallery drag follows the pointer, settles to a card and keeps the dragged link closed', async ({ page }, info) => {
@@ -45,7 +48,7 @@ test('gallery drag follows the pointer, settles to a card and keeps the dragged 
     await page.screenshot({ path: info.outputPath('gallery-drag-settled.png') });
 });
 
-test('gallery buttons, keyboard focus and depth settle together and stop updating at rest', async ({ page }) => {
+test('gallery scrolling, keyboard focus and depth settle together and stop updating at rest', async ({ page }) => {
     await visit(page);
     await gallery(page);
     const cards = page.locator('.gallery-category:not([hidden]) .gallery-card');
@@ -54,7 +57,7 @@ test('gallery buttons, keyboard focus and depth settle together and stop updatin
     expect(await cards.nth(1).locator('.gallery-cover').evaluate(n => parseFloat(getComputedStyle(n).filter.slice(5)))).toBeGreaterThan(0);
     expect(await cards.nth(1).locator('h3').evaluate(n => getComputedStyle(n).filter)).toBe('none');
     const before = await cards.nth(1).evaluate(n => getComputedStyle(n).transform);
-    await page.locator('[data-gallery-next]').click();
+    await cards.nth(1).locator('h3 a').focus();
     await expect(page.locator('[data-gallery-position]')).toHaveText('2 / 3');
     await expect.poll(() => cards.nth(1).evaluate(n => getComputedStyle(n).transform)).not.toBe(before);
     await expect.poll(() => cards.nth(1).evaluate(n => Math.hypot(new DOMMatrix(getComputedStyle(n).transform).m41, new DOMMatrix(getComputedStyle(n).transform).m43))).toBeLessThan(.05);
@@ -90,7 +93,7 @@ test('gallery interruption clears dragging and reduced motion removes depth trea
     }
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     await gallery(page);
-    await page.locator('[data-gallery-next]').click();
+    await page.locator('.gallery-category:not([hidden]) .gallery-card').nth(1).locator('h3 a').focus();
     await expect(page.locator('[data-gallery-position]')).toHaveText('2 / 3');
 });
 
@@ -148,4 +151,35 @@ test('a short fast gallery flick continues toward the next card after release', 
     await expect(page.locator('[data-gallery-position]')).toHaveText('2 / 3');
     await page.clock.runFor(500);
     await expect.poll(() => page.locator('.gallery-category:not([hidden]) .gallery-card').nth(1).evaluate(node => Math.hypot(new DOMMatrix(getComputedStyle(node).transform).m41, new DOMMatrix(getComputedStyle(node).transform).m43))).toBeLessThan(.05);
+});
+
+test('gallery titles stay inside clickable covers and reveal on hover or focus without extra controls', async ({ page }, info) => {
+    await visit(page);
+    await gallery(page);
+    await expect(page.locator('[data-gallery-prev],[data-gallery-next],.gallery-controls,.gallery-more')).toHaveCount(0);
+    const cards = page.locator('.gallery-category:not([hidden]) .gallery-card');
+    const cover = cards.first().locator('.gallery-cover');
+    const title = cover.locator('h3 a>span');
+    await expect(cover.locator('a')).toHaveCount(1);
+    await page.mouse.move(5, 120);
+    await expect(title).toHaveCSS('opacity', info.project.use.hasTouch ? '1' : '0');
+    await cover.hover();
+    await expect(title).toHaveCSS('opacity', '1');
+    const rect = (await cover.boundingBox())!, text = (await title.boundingBox())!;
+    expect(text.x).toBeGreaterThanOrEqual(rect.x - 1);
+    expect(text.y).toBeGreaterThanOrEqual(rect.y - 1);
+    expect(text.x + text.width).toBeLessThanOrEqual(rect.x + rect.width + 1);
+    expect(text.y + text.height).toBeLessThanOrEqual(rect.y + rect.height + 1);
+    await page.screenshot({ path: info.outputPath('gallery-title-inside-cover.png') });
+    await page.mouse.move(5, 120);
+    await cover.locator('a').focus();
+    await expect(title).toHaveCSS('opacity', '1');
+    await page.locator('input[value="articles"]').check();
+    const writing = page.locator('.gallery-category:not([hidden]) .gallery-card[data-front="true"] .gallery-cover').first();
+    await writing.hover();
+    await expect(writing.locator('h3 a>span')).toHaveCSS('opacity', '1');
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.mouse.move(5, 120);
+    for (const label of await page.locator('.gallery-category:not([hidden]) .gallery-card__title a>span').all())
+        await expect(label).toHaveCSS('opacity', '1');
 });

@@ -1,4 +1,5 @@
 import { mountFilm } from './homepage/film';
+import { mobileNavigation } from './homepage/mobile-navigation';
 import { physicalIdentity } from './homepage/identity';
 import { compactIdentity } from './homepage/compact-identity';
 import { mountGallery } from './homepage/gallery';
@@ -8,10 +9,12 @@ import { pointerMarker } from './homepage/pointer-marker';
 import { openingState, regionProgress, windowProgress, filmRange, writingPacing, writingBeat, footerPhase, CURTAIN_START, HOMEPAGE_SCROLL_SPEED, GALLERY_HANDOFF } from './homepage/scenes';
 import { navigationCover } from './homepage/navigation';
 import { exitStaircase } from './homepage/staircase';
-import { heroWindow, windowClip } from './homepage/hero-window';
 import { WheelGlide } from './homepage/wheel-glide';
+import { wheelPath, wheelDestination } from './homepage/wheel-path';
+import { galleryEntrance, galleryTravelProgress, galleryTravelPosition } from './homepage/gallery-motion';
 import { firstWriting } from './homepage/first-writing';
 import { secondWriting } from './homepage/second-writing';
+import { galleryWriting } from './homepage/gallery-writing';
 import { laterWriting, galleryCurtain } from './homepage/later-writing';
 /** Native scroll owns choreography. Every region is measured independently. */
 export function enhanceHomepage(): () => void {
@@ -34,6 +37,14 @@ function mountHomepage(cleanup: Array<() => void>): () => void {
         return () => { };
     const root: HTMLElement = found;
     const lifetime = new AbortController(), options = { signal: lifetime.signal };
+    const historyVisit = (performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined)?.type === 'back_forward';
+    const storedPosition = () => {
+        const state = history.state?.homepageV2;
+        return Number.isFinite(state?.y) && state.y >= 0 && state.width === innerWidth && state.height === innerHeight ? state.y as number : null;
+    };
+    let restoreY = historyVisit ? storedPosition() : null, restoreFrame = 0;
+    let pageShown = document.readyState === 'complete';
+    const cancelRestore = () => { restoreY = null; cancelAnimationFrame(restoreFrame); restoreFrame = 0; };
     const pacing = writingPacing();
     const distances = { '--first-writing-distance': pacing.hero, '--statement-writing-distance': pacing.statement, '--writing-distance': pacing.body, '--writing-gap': pacing.gap };
     const clearDistances = () => { for (const property of Object.keys(distances)) root.style.removeProperty(property); };
@@ -41,12 +52,15 @@ function mountHomepage(cleanup: Array<() => void>): () => void {
     const reduced = matchMedia('(prefers-reduced-motion: reduce)');
     const glide = new WheelGlide();
     let glideExpected = scrollY;
-    const observer = new ResizeObserver(() => measure());
+    const measuredSizes = new WeakMap<Element, string>();
+    const sizeOf = (node: Element) => `${node.clientWidth}:${node.clientHeight}`;
+    // Explicit gallery measurements already include their own layout writes.
+    const observer = new ResizeObserver(entries => {
+        if (entries.some(entry => measuredSizes.get(entry.target) !== sizeOf(entry.target))) measure();
+    });
     cleanup.push(() => observer.disconnect());
     const regions = [...root.querySelectorAll<HTMLElement>('[data-scene]')].map(node => ({ node, name: node.dataset.scene!, face: node.querySelector<HTMLElement>('.scene-face')!, top: 0, height: 0 }));
     const environment = root.querySelector<HTMLElement>('.home-environment')!;
-    const canvas = root.querySelector<HTMLCanvasElement>('[data-film-canvas]')!;
-    const poster = root.querySelector<HTMLElement>('.home-cinema__image')!;
     const image = root.querySelector<HTMLImageElement>('[data-hero-image]')!;
     const loading = document.querySelector<HTMLElement>('[data-home-loader]')!;
     const loadingProgress = loading.querySelector<HTMLOutputElement>('[data-loading-progress]')!;
@@ -60,7 +74,7 @@ function mountHomepage(cleanup: Array<() => void>): () => void {
     let film: ReturnType<typeof mountFilm>;
     const marker = pointerMarker(target => film?.canHold(target) ?? false);
     cleanup.push(() => marker.dispose());
-    for (const label of document.querySelectorAll<HTMLElement>('[data-nav-label]')) {
+    for (const label of document.querySelectorAll<HTMLElement>('.home-nav [data-nav-label]')) {
         const letters = letterReels(label);
         letterEffects.push(letters);
         cleanup.push(() => letters.dispose());
@@ -99,21 +113,76 @@ function mountHomepage(cleanup: Array<() => void>): () => void {
     const statementRegion = regions.find(r => r.name === 'statements')!;
     const markRegion = regions.find(r => r.name === 'mark')!;
     const galleryRegion = regions.find(r => r.name === 'gallery')!;
-    const galleryPosition = (p: number) => galleryRegion.top + galleryEntryDistance + p * (galleryRegion.height - galleryEntryDistance);
-    const gallery = mountGallery(galleryRegion.node, p => window.scrollTo({ top: galleryPosition(.12 + p * .7), behavior: 'instant' }));
+    const galleryText = galleryWriting(galleryRegion.node);
+    cleanup.push(() => galleryText.dispose());
+    const gallerySpace = galleryRegion.node.querySelector<HTMLElement>('.gallery-space')!;
+    let galleryClipLeft = 0, galleryClipTop = 0;
+    cleanup.push(() => { gallerySpace.style.removeProperty('clip-path'); galleryRegion.node.style.removeProperty('--gallery-tail-distance'); });
+    // Collection tuning rebases card travel, never the authored curtain or the current page position.
+    const savedTravel = history.state?.homepageV2;
+    const projectsCount = root.querySelectorAll('.gallery-category[data-category="projects"] .gallery-card').length;
+    let pathCount = restoreY !== null && Number.isInteger(savedTravel?.pathCount) && savedTravel.pathCount > 0 ? savedTravel.pathCount as number : Math.max(1, projectsCount);
+    let tuningShift = restoreY !== null && Number.isFinite(savedTravel?.tuningShift) ? savedTravel.tuningShift as number : 0;
+    let gallerySide: -1 | 0 | 1 | null = null;
+    let galleryBaseHeight = 1;
+    const galleryPosition = (p: number) => galleryRegion.top + galleryEntryDistance + p * (galleryBaseHeight - galleryEntryDistance);
+    const galleryFirst = () => galleryPosition(.12 + .7 / (pathCount + 7));
+    const galleryStep = () => (galleryPosition(.82) - galleryPosition(.12)) / (pathCount + 7);
+    const travelFirst = () => galleryFirst() + tuningShift * galleryStep();
+    const travelEnd = () => travelFirst() + (gallery.count + 6) * galleryStep();
+    const travelPosition = (p: number) => galleryTravelPosition(p, travelFirst(), galleryStep(), gallery.count);
+    const galleryCue = () => Math.ceil(filmRange(filmRegion.top, filmRegion.height, markRegion.top, markRegion.height).end) + curtainHeight * GALLERY_HANDOFF.cue;
+    const galleryBoundary = (direction: number) => direction < 0 ? markRegion.top + pacing.transition + pacing.reading
+        : regions.find(region => region.name === 'location')!.top;
+    function moveGallery(top: number, transition: boolean) {
+        glide.cancel();
+        if (transition) {
+            glideExpected = scrollY;
+            glide.retarget(scrollY, top - scrollY, Math.min(scrollY, top), Math.max(scrollY, top), performance.now(), 700);
+        } else window.scrollTo({ top, behavior: 'instant' });
+        schedule();
+    }
+    const gallery = mountGallery(galleryRegion.node, p => {
+        if (p === 0 && scrollY < travelFirst() - galleryStep() - .5) {
+            moveGallery(galleryBoundary(-1), true);
+            return;
+        }
+        const top = travelPosition(p);
+        moveGallery(top, Math.min(scrollY, top) < travelFirst() - galleryStep() - .5);
+    }, schedule, direction => {
+        moveGallery(galleryBoundary(direction), direction < 0);
+    }, () => {
+        glide.cancel();
+        // Tuner selections start with card one centered at the current page position.
+        tuningShift = (scrollY - galleryFirst()) / galleryStep() - 3;
+        measure();
+        save(true);
+    }, restoreY !== null);
     cleanup.push(() => gallery.dispose());
+    function defaultGallery(side: -1 | 1) {
+        if (gallery.category === 'projects' && tuningShift === 0 && pathCount === Math.max(1, projectsCount)) return;
+        const end = travelEnd();
+        gallery.active(false);
+        gallery.select('projects');
+        pathCount = Math.max(1, projectsCount);
+        // Below the gallery, preserve its measured end so the footer cannot jump.
+        tuningShift = side > 0 ? Math.max(0, (end - galleryPosition(.82)) / galleryStep()) : 0;
+        if (side < 0) measure(true);
+    }
     let lastSave = 0;
-    function save(force = false) { if (!force && performance.now() - lastSave < 250)
+    function save(force = false) { if (restoreY !== null || !force && performance.now() - lastSave < 250)
         return; lastSave = performance.now(); try {
-        history.replaceState({ ...history.state, homepageV2: { film: film?.film, category: gallery.category } }, '');
+        history.replaceState({ ...history.state, homepageV2: { film: film?.film, category: gallery.category, pathCount, tuningShift, y: scrollY, width: innerWidth, height: innerHeight } }, '');
     }
     catch { /* Browsers can deny state writes; native scroll restoration still applies. */ } }
-    function measure() {
-        glide.cancel();
+    function measure(preserveGlide = false) {
+        const measuredY = scrollY;
+        if (!preserveGlide) glide.cancel();
         galleryEntryDistance = 0;
         galleryRegion.node.style.setProperty('--gallery-entry-distance', '0px');
+        galleryRegion.node.style.setProperty('--gallery-tail-distance', '0px');
         const count = Math.max(...[...root.querySelectorAll('.gallery-group')].map(g => g.children.length), 1);
-        galleryRegion.node.style.setProperty('--gallery-distance', String((3 + count * 1.4) / HOMEPAGE_SCROLL_SPEED));
+        galleryRegion.node.style.setProperty('--gallery-distance', String((3 + (count + 8) * 1.4) / HOMEPAGE_SCROLL_SPEED));
         clearDistances();
         const readRegions = () => { for (const region of regions) {
             region.top = region.node.getBoundingClientRect().top + scrollY;
@@ -125,15 +194,39 @@ function mountHomepage(cleanup: Array<() => void>): () => void {
             for (const [property, distance] of Object.entries(distances)) root.style.setProperty(property, `${distance}px`);
             readRegions();
             const playback = filmRange(filmRegion.top, filmRegion.height, markRegion.top, markRegion.height);
-            galleryEntryDistance = Math.max(0, Math.ceil(playback.end) + curtainHeight * GALLERY_HANDOFF.solidEnd - galleryRegion.top - galleryRegion.height * .12);
+            galleryEntryDistance = Math.max(0, Math.ceil(playback.end) + curtainHeight * GALLERY_HANDOFF.entryDistance - galleryRegion.top - galleryRegion.height * .12);
             galleryRegion.node.style.setProperty('--gallery-entry-distance', `${galleryEntryDistance}px`);
             readRegions();
+        }
+        galleryBaseHeight = galleryRegion.height;
+        if (!reduced.matches) {
+            const tail = Math.max(0, travelEnd() - galleryPosition(.82));
+            galleryRegion.node.style.setProperty('--gallery-tail-distance', `${tail}px`);
+            readRegions();
+            if (tail > 0 && scrollY < measuredY) scrollTo({ top: measuredY, behavior: 'instant' });
         }
         film?.resize();
         writing.measure();
         perspective.measure();
+        const galleryBox = gallerySpace.getBoundingClientRect();
+        galleryClipLeft = galleryBox.left;
+        galleryClipTop = galleryBox.top;
         curtainCount = curtainBars.filter(bar => getComputedStyle(bar).display !== 'none').length;
+        for (const node of [root, environment]) measuredSizes.set(node, sizeOf(node));
         schedule();
+        restorePosition();
+    }
+    function restorePosition() {
+        if (restoreY === null || !pageShown || readyCount < 3 || restoreFrame || disposed) return;
+        restoreFrame = requestAnimationFrame(() => {
+            restoreFrame = 0;
+            if (disposed || restoreY === null) return;
+            const y = restoreY;
+            restoreY = null;
+            measure();
+            scrollTo({ top: y, behavior: 'instant' });
+            schedule();
+        });
     }
     function ready() { if (disposed)
         return; readyCount++; loadingProgress.value = `${readyCount} / 3`; if (readyCount === 3) {
@@ -152,12 +245,13 @@ function mountHomepage(cleanup: Array<() => void>): () => void {
         loadingIdentity?.dispose();
         loadingIdentity = null;
     }
-    const historyVisit = (performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined)?.type === 'back_forward';
     if (!historyVisit) {
         loading.hidden = false;
         loadingIdentity = compactIdentity(loading.querySelector<HTMLElement>('[data-loading-identity]')!, true);
     }
     root.dataset.enhanced = 'true';
+    const mobileMenu = mobileNavigation();
+    cleanup.push(mobileMenu);
     film = mountFilm(root, ready, schedule);
     cleanup.push(() => film.dispose());
     void document.fonts.ready.then(ready);
@@ -183,32 +277,33 @@ function mountHomepage(cleanup: Array<() => void>): () => void {
             glideExpected = scrollY;
             if (glide.active) schedule();
         }
+        if (!reduced.matches && restoreY === null) {
+            const side = scrollY <= Math.round(galleryCue()) ? -1 : scrollY >= Math.round(galleryBoundary(1)) ? 1 : 0;
+            if (side && side !== gallerySide) defaultGallery(side);
+            gallerySide = side;
+        }
         root.dataset.film = film.film;
         marker.refresh();
         const y = scrollY, hero = regionProgress(y, filmRegion.top, filmRegion.height);
         const firstBeat = writingBeat(y, filmRegion.top, true);
         writing.update(firstBeat.exit, reduced.matches);
         if (reduced.matches) {
+            gallerySpace.style.removeProperty('clip-path');
+            galleryText.update(1, 0, true);
             perspective.update(1, 0, true);
             later.third(1, 0, true);
             later.fourth(1, 0, 1, true);
             footer.update(1, true);
             delete root.dataset.filmBackdrop;
-            canvas.dataset.foreground = 'false';
-            if (canvas.parentElement !== environment) environment.append(canvas);
-            poster.removeAttribute('style');
-            if (film.hasFrame) poster.style.clipPath = windowClip(innerWidth, innerHeight, heroWindow(innerWidth, innerHeight, 0));
-            film.update(0, 1, true, false, heroWindow(innerWidth, innerHeight, 0));
+            film.update(0, 1, true, false, 0, now);
             root.querySelector<HTMLElement>('[data-scene-wipe]')!.hidden = true;
             for (const region of regions) {
                 region.face.dataset.visible = 'true';
                 region.face.inert = false;
                 for (const name of ['clip-path', 'transform', 'z-index', '--gallery-exit', '--gallery-entry-opacity']) region.face.style.removeProperty(name);
-                region.face.querySelectorAll<HTMLElement>(':scope>h2,.gallery-instrument,.gallery-more,.gallery-controls').forEach(node => node.style.removeProperty('clip-path'));
                 region.face.querySelectorAll<HTMLElement>('.home-overline,.hero-scroll').forEach(node => node.style.removeProperty('visibility'));
             }
             gallery.active(false);
-            gallery.update(0);
             physical.active(false);
             const location = regions.find(r => r.name === 'location')!;
             if (y + innerHeight >= location.top - innerHeight && !globeStarting) { globeStarting = true; void startGlobe(); }
@@ -218,23 +313,23 @@ function mountHomepage(cleanup: Array<() => void>): () => void {
         }
         const opening = openingState(hero);
         const expansion = opening.expansion;
-        // The photo is a foreground sheet. Its cutout exposes a stationary film.
-        poster.style.clipPath = film.hasFrame ? windowClip(innerWidth, innerHeight, heroWindow(innerWidth, innerHeight, expansion)) : '';
-        const galleryP = regionProgress(y, galleryRegion.top + galleryEntryDistance, galleryRegion.height - galleryEntryDistance);
+        const galleryP = y < travelEnd() ? .12 + .7 * galleryTravelProgress(y, travelFirst(), galleryStep(), gallery.count)
+            : .82 + .18 * regionProgress(y, travelEnd(), galleryBoundary(1) - travelEnd());
         const playback = filmRange(filmRegion.top, filmRegion.height, markRegion.top, markRegion.height);
-        const coverPhase = CURTAIN_START + (y - Math.ceil(playback.end)) / Math.max(1, curtainHeight);
+        const entrance = galleryEntrance(y, Math.ceil(playback.end), galleryCue(), galleryFirst(), galleryStep(), curtainCount);
+        const coverPhase = entrance.phase;
         const wipeBands = galleryCurtain(coverPhase, curtainCount);
-        const curtainSolid = windowProgress(coverPhase, CURTAIN_START + GALLERY_HANDOFF.solidStart, CURTAIN_START + GALLERY_HANDOFF.solidEnd);
+        const curtainSolid = entrance.darkness;
         const locationRegion = regions.find(r => r.name === 'location')!;
         const locationPhase = footerPhase(y, locationRegion.top, locationRegion.height, innerHeight);
         const locationLead = innerHeight * .1;
         const galleryExit = windowProgress(galleryP, .82, 1);
+        galleryText.update(entrance.writing, windowProgress(galleryP, .83, .9), false);
         const globeActive = footer.update(locationPhase, false);
         const pastEnvironment = y >= galleryRegion.top;
         root.dataset.filmBackdrop = expansion === 1 && curtainSolid < .5 ? film.film : '';
         const capabilityRegion = regions.find(r => r.name === 'capabilities')!;
-        const foreground = curtainSolid === 1;
-        film.update(regionProgress(y, playback.start, playback.end - playback.start), 1, true, !pastEnvironment, heroWindow(innerWidth, innerHeight, expansion), foreground);
+        film.update(regionProgress(y, playback.start, playback.end - playback.start), 1, true, !pastEnvironment, expansion, now, wipeBands.every(p => p === 1));
         const secondBeat = writingBeat(y, statementRegion.top);
         const thirdBeat = writingBeat(y, capabilityRegion.top);
         const fourthBeat = writingBeat(y, markRegion.top);
@@ -246,10 +341,16 @@ function mountHomepage(cleanup: Array<() => void>): () => void {
             const lead = region.name === 'gallery' ? markRegion.height * .12 : region.name === 'location' ? locationLead : region.name === 'mark' ? pacing.gap : 0;
             const visible = y >= region.top - lead && y < region.top + region.height;
             region.face.dataset.visible = String(visible);
-            const unavailable = !visible || region.name === 'gallery' && (wipeBands.at(-1)! < 1 || galleryExit >= .5);
-            if (unavailable && region.face.contains(document.activeElement)) document.querySelector<HTMLElement>('.home-nav nav a')?.focus({ preventScroll: true });
+            const unavailable = !visible || region.name === 'gallery' && (y < Math.round(travelFirst()) && gallery.empty && (gallery.count > 0 || entrance.opacity === 0) || galleryExit >= .5);
+            if (unavailable && region.face.contains(document.activeElement)) {
+                const toggle = document.querySelector<HTMLElement>('[data-menu-toggle]');
+                (toggle?.getClientRects().length ? toggle : document.querySelector<HTMLElement>('.home-nav nav a'))?.focus({ preventScroll: true });
+            }
             region.face.inert = unavailable;
-            if (region.name === 'gallery') gallery.active(!unavailable);
+            if (region.name === 'gallery') {
+                gallery.update(galleryTravelProgress(y, travelFirst(), galleryStep(), gallery.count));
+                gallery.active(!unavailable);
+            }
             if (!visible)
                 continue;
             region.face.style.setProperty('--local-progress', String(p));
@@ -257,19 +358,17 @@ function mountHomepage(cleanup: Array<() => void>): () => void {
                 region.face.querySelectorAll<HTMLElement>('.home-overline,.hero-scroll').forEach(node => node.style.visibility = firstBeat.exit > .12 ? 'hidden' : '');
             }
             if (region.name === 'gallery') {
-                region.face.style.setProperty('--gallery-entry-opacity', String(windowProgress(coverPhase, CURTAIN_START + GALLERY_HANDOFF.revealStart, CURTAIN_START + GALLERY_HANDOFF.revealEnd)));
-                gallery.update(windowProgress(galleryP, .12, .82));
+                region.face.style.setProperty('--gallery-entry-opacity', String(entrance.opacity));
                 region.face.style.setProperty('--gallery-exit', String(galleryExit));
+                region.face.style.clipPath = 'none';
                 if (wipeBands.at(-1)! < 1) {
-                    const frontier = wipeBands.flatMap((p, i) => [`${i * 100 / curtainCount}% ${(1 - p) * 100}%`, `${(i + 1) * 100 / curtainCount}% ${(1 - p) * 100}%`]);
-                    region.face.style.clipPath = `polygon(0 100%,${frontier.join(',')},100% 100%)`;
+                    const frontier = wipeBands.flatMap((p, i) => [`${i * innerWidth / curtainCount - galleryClipLeft}px ${(1 - p) * curtainHeight - galleryClipTop}px`, `${(i + 1) * innerWidth / curtainCount - galleryClipLeft}px ${(1 - p) * curtainHeight - galleryClipTop}px`]);
+                    gallerySpace.style.clipPath = `polygon(0 100%,${frontier.join(',')},100% 100%)`;
                     region.face.style.zIndex = '11';
                 } else {
-                    region.face.style.clipPath = 'none';
+                    gallerySpace.style.clipPath = 'none';
                     region.face.style.zIndex = '11';
                 }
-                const exit = windowProgress(galleryP, .83, .9);
-                region.face.querySelectorAll<HTMLElement>(':scope>h2,.gallery-instrument,.gallery-more,.gallery-controls').forEach(node => node.style.clipPath = `inset(0 0 ${exit * 100}% 0)`);
             }
             if (region.name === 'location')
                 region.face.style.transform = `translateY(${-Math.max(0, y - (region.top + region.height - innerHeight))}px)`;
@@ -306,55 +405,59 @@ function mountHomepage(cleanup: Array<() => void>): () => void {
         }
     }
     window.addEventListener('scroll', schedule, { ...options, passive: true });
-    // Discrete wheel pulses step film frames or one gallery item.
-    // Fine trackpad deltas, native touch, keys and scene boundaries stay native.
+    // Both directions traverse the same measured stops, including section handoffs.
+    // Fine trackpad deltas, native touch and keys retain native scrolling.
     window.addEventListener('wheel', event => {
-        if (reduced.matches || event.defaultPrevented || !event.cancelable || event.ctrlKey || event.metaKey
+        cancelRestore();
+        if (gallery.tunerWheel(event)) { glide.cancel(); return; }
+        if (document.documentElement.dataset.menuOpen === 'true' || reduced.matches || event.defaultPrevented || !event.cancelable || event.ctrlKey || event.metaKey
             || Math.abs(event.deltaX) >= Math.abs(event.deltaY)
             || (event.deltaMode === WheelEvent.DOM_DELTA_PIXEL && Math.abs(event.deltaY) < 40)
-            || (event.target as Element).closest('input,textarea,select,[contenteditable="true"]')) { glide.cancel(); return; }
+            || (event.target as Element).closest('input:not([type="radio"]),textarea,select,[contenteditable="true"]')) { glide.cancel(); return; }
+        gallery.wheel();
         const playback = filmRange(filmRegion.top, filmRegion.height, markRegion.top, markRegion.height);
-        const galleryStart = galleryPosition(.12);
-        const galleryEnd = galleryPosition(.82);
-        const curtainEnd = Math.ceil(playback.end) + curtainHeight * GALLERY_HANDOFF.solidEnd;
-        if (scrollY >= galleryStart - .5 && scrollY <= galleryEnd + .5 && scrollY >= curtainEnd
-            && gallery.wheel(windowProgress(scrollY, galleryStart, galleryEnd), Math.sign(event.deltaY))) {
-            glide.cancel();
-            event.preventDefault();
-            return;
-        }
-
-        if (scrollY < playback.start || scrollY > playback.end + .5
-            || scrollY <= playback.start + .5 && event.deltaY < 0
-            || scrollY >= playback.end - .5 && event.deltaY > 0) { glide.cancel(); return; }
-        if (glide.active && (glide.target <= playback.start + .5 && event.deltaY < 0
-            || glide.target >= playback.end - .5 && event.deltaY > 0)) {
-            const boundary = event.deltaY < 0 ? playback.start : playback.end;
-            glide.cancel();
-            scrollTo({ top: boundary, behavior: 'instant' });
-            return;
-        }
+        const readingEnd = galleryBoundary(-1), footerTop = galleryBoundary(1);
+        const stops = wheelPath(readingEnd, [galleryCue(), ...Array.from({ length: gallery.count ? gallery.count + 6 : 0 }, (_, i) =>
+            travelFirst() + i * galleryStep())], footerTop,
+            document.documentElement.scrollHeight - innerHeight, playback.step * HOMEPAGE_SCROLL_SPEED);
+        if (glide.active && Math.abs(scrollY - glideExpected) > 1) glide.cancel();
+        const origin = glide.active ? glide.target : scrollY;
+        const top = wheelDestination(stops, origin, Math.sign(event.deltaY));
         event.preventDefault();
+        if (top === origin) return;
+        const entrance = travelFirst();
+        const lastVisible = travelFirst() + (gallery.count + 5) * galleryStep();
+        const crossing = Math.min(scrollY, top) < entrance - .5 && Math.max(scrollY, top) > readingEnd + .5
+            || Math.min(scrollY, top) < footerTop - .5 && Math.max(scrollY, top) > lastVisible + .5;
+        glide.cancel();
         glideExpected = scrollY;
-        glide.retarget(scrollY, Math.sign(event.deltaY) * playback.step * HOMEPAGE_SCROLL_SPEED, playback.start, playback.end, performance.now());
+        glide.retarget(scrollY, top - scrollY, 0, stops[stops.length - 1]!, performance.now(), crossing ? 700 : 180);
         schedule();
     }, { ...options, passive: false });
     window.addEventListener('keydown', event => {
-        if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(event.key)) glide.cancel();
+        if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(event.key)) { glide.cancel(); cancelRestore(); }
     }, options);
-    window.addEventListener('pointerdown', () => glide.cancel(), { ...options, passive: true, capture: true });
+    window.addEventListener('pointerdown', () => { glide.cancel(); cancelRestore(); }, { ...options, passive: true, capture: true });
     window.addEventListener('blur', () => glide.cancel(), options);
-    window.addEventListener('resize', measure, { ...options, passive: true });
-    window.addEventListener('pointermove', e => { if (scrollY >= galleryRegion.top && scrollY < galleryRegion.top + galleryRegion.height && e.pointerType !== 'touch' && !reduced.matches)
+    window.addEventListener('resize', () => measure(), { ...options, passive: true });
+    window.addEventListener('pointermove', e => { if (document.documentElement.dataset.menuOpen !== 'true' && scrollY >= galleryRegion.top && scrollY < galleryRegion.top + galleryRegion.height && e.pointerType !== 'touch' && !reduced.matches)
         gallery.orient(e.clientX / innerWidth * 2 - 1, e.clientY / innerHeight * 2 - 1); }, options);
     document.addEventListener('click', e => {
         const anchor = (e.target as Element).closest<HTMLAnchorElement>('a[href^="#"]');
         if (!anchor)
             return;
         if (anchor.hash === '#work' || anchor.hash === '#writing') {
-            gallery.select(anchor.hash === '#writing' ? 'writings' : 'projects');
+            gallery.select(anchor.hash === '#writing' ? 'articles' : 'projects');
+            tuningShift = 0;
+            pathCount = Math.max(1, gallery.count);
+            measure();
             e.preventDefault();
-            window.scrollTo({ top: galleryPosition(.13), behavior: 'instant' });
+            glide.cancel();
+            cancelRestore();
+            window.scrollTo({ top: travelFirst(), behavior: 'instant' });
+            // Make the destination available before transferring keyboard focus.
+            cancelAnimationFrame(raf);
+            update(performance.now());
             root.querySelector<HTMLElement>(anchor.hash)?.focus({ preventScroll: true });
         }
     }, options);
@@ -370,12 +473,17 @@ function mountHomepage(cleanup: Array<() => void>): () => void {
     } }, options);
     window.addEventListener('pagehide', e => { glide.cancel(); save(true); suspended = true; film.suspend(); physical.active(false); if (!e.persisted)
         dispose(); }, options);
-    window.addEventListener('pageshow', e => { if (!e.persisted)
-        return; suspended = false; film.resume(); loading.hidden = true; measure(); }, options);
+    window.addEventListener('pageshow', e => {
+        pageShown = true;
+        if (e.persisted) { restoreY = storedPosition(); suspended = false; film.resume(); loading.hidden = true; measure(); }
+        restorePosition();
+    }, options);
     observer.observe(root);
+    observer.observe(environment);
     root.dataset.reduced = String(reduced.matches);
     measure();
-    function dispose() { if (disposed)
-        return; disposed = true; lifetime.abort(); marker.dispose(); for (const letters of letterEffects) letters.dispose(); clearDistances(); clearTimeout(deadline); cancelAnimationFrame(raf); observer.disconnect(); film.dispose(); physical.active(false); physical.dispose(); footer.dispose(); later.dispose(); perspective.dispose(); compact.dispose(); loadingIdentity?.dispose(); gallery.dispose(); writing.dispose(); globe?.dispose(); navigation(); delete root.dataset.enhanced; delete root.dataset.filmBackdrop; loading.hidden = true; }
+    cleanup.push(() => cancelAnimationFrame(restoreFrame));
+    function dispose() { gallerySpace.style.removeProperty('clip-path'); galleryRegion.node.style.removeProperty('--gallery-tail-distance'); if (disposed)
+        return; disposed = true; lifetime.abort(); mobileMenu(); marker.dispose(); for (const letters of letterEffects) letters.dispose(); clearDistances(); clearTimeout(deadline); cancelAnimationFrame(raf); cancelAnimationFrame(restoreFrame); observer.disconnect(); film.dispose(); physical.active(false); physical.dispose(); footer.dispose(); later.dispose(); perspective.dispose(); compact.dispose(); loadingIdentity?.dispose(); gallery.dispose(); writing.dispose(); globe?.dispose(); navigation(); delete root.dataset.enhanced; delete root.dataset.filmBackdrop; loading.hidden = true; }
     return dispose;
 }

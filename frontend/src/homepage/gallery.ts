@@ -1,7 +1,8 @@
-import { galleryIndex, galleryWheelProgress, clamp } from './scenes';
+import { collectionTuner } from './collection-tuner';
+import { galleryIndex } from './scenes';
 import { galleryDepth, galleryProgress, galleryRelease, gallerySettle } from './gallery-motion';
 
-export function mountGallery(root: HTMLElement, position: (progress: number) => void) {
+export function mountGallery(root: HTMLElement, position: (progress: number) => void, changed: () => void = () => {}, leave: (direction: number) => void = () => {}, tune: () => void = () => {}, restoreCategory = false) {
     const groups = [...root.querySelectorAll<HTMLElement>('.gallery-category')].map(node => ({
         node, group: node.querySelector<HTMLElement>('.gallery-group'), cards: [...node.querySelectorAll<HTMLElement>('.gallery-card')]
     }));
@@ -10,13 +11,24 @@ export function mountGallery(root: HTMLElement, position: (progress: number) => 
     const space = root.querySelector<HTMLElement>('.gallery-space')!;
     const abort = new AbortController(), options = { signal: abort.signal };
     const reduced = matchMedia('(prefers-reduced-motion: reduce)');
-    let category = history.state?.homepageV2?.category === 'writings' ? 'writings' : 'projects', progress = 0;
+    const savedCategory = restoreCategory ? history.state?.homepageV2?.category : null;
+    let category = groups.some(group => group.node.dataset.category === savedCategory) ? savedCategory as string : 'projects', progress = 0;
+    let keyboardSelecting = false, departing = 0;
+    const directory = root.querySelector<HTMLElement>('.gallery-instrument')!;
+    const transitions = new Map<HTMLElement, Animation>();
+    let tuner: ReturnType<typeof collectionTuner> | undefined;
     let selectedIndex = 0, targetIndex = 0, frame = 0, previous = 0, active = false;
+    let cardWidth = 1, spacing = 1;
     let tiltX = 0, tiltY = 0, targetX = 0, targetY = 0;
     let press: { id: number; x: number; y: number; index: number; last: number; time: number; velocity: number; spacing: number; dragging: boolean } | null = null;
     let suppressClick = false;
     const current = () => groups.find(group => group.node.dataset.category === category)!;
     const stop = () => { cancelAnimationFrame(frame); frame = previous = 0; };
+    function measureCards() {
+        const card = current().cards[0] ?? groups.find(group => group.cards.length)?.cards[0];
+        if (card) cardWidth = parseFloat(getComputedStyle(card).width) || 1;
+        spacing = Math.min(cardWidth * (1.62 / 2.6), space.clientWidth / 6);
+    }
     for (const image of root.querySelectorAll<HTMLImageElement>('.gallery-cover img')) {
         image.addEventListener('error', () => { image.hidden = true; }, options);
         if (image.complete && image.naturalWidth === 0) image.hidden = true;
@@ -24,10 +36,9 @@ export function mountGallery(root: HTMLElement, position: (progress: number) => 
     function render() {
         const group = current();
         group.group?.style.setProperty('transform', reduced.matches ? '' : `rotateY(${tiltX}deg) rotateX(${tiltY}deg)`);
-        const radius = innerWidth < 700 ? innerWidth * .9 : Math.min(1000, innerWidth * .72);
         group.cards.forEach((card, i) => {
-            const distance = Math.abs(i - selectedIndex), theta = (i - selectedIndex) * (innerWidth < 700 ? .78 : .48);
-            card.style.transform = reduced.matches ? '' : `translateX(${Math.sin(theta) * radius}px) translateZ(${(Math.cos(theta) - 1) * radius}px) rotateY(${-theta * 180 / Math.PI}deg)`;
+            const offset = selectedIndex - i, distance = Math.abs(offset);
+            card.style.transform = reduced.matches ? '' : `translateX(${offset * spacing}px) translateZ(${-Math.min(distance, 2) * cardWidth * (.85 / 2.6)}px) rotateY(${-Math.max(-1, Math.min(1, offset / 2)) * (180 / 3.4)}deg)`;
             const depth = galleryDepth(distance);
             if (reduced.matches) {
                 card.style.removeProperty('--gallery-blur');
@@ -39,8 +50,11 @@ export function mountGallery(root: HTMLElement, position: (progress: number) => 
             card.dataset.front = String(distance < .5);
             card.style.visibility = distance > 3 && !reduced.matches ? 'hidden' : 'inherit';
         });
-        const text = group.cards.length ? `${Math.round(targetIndex) + 1} / ${group.cards.length}` : '0 / 0';
+        const centered = targetIndex >= 0 && targetIndex <= group.cards.length - 1;
+        const text = `${centered ? Math.round(targetIndex) + 1 : 0} / ${group.cards.length}`;
         if (output.value !== text) output.value = text;
+        root.dataset.galleryIndex = String(selectedIndex);
+        root.dataset.galleryEmpty = String(!group.cards.length || !reduced.matches && (selectedIndex < -3 || selectedIndex > group.cards.length + 2));
     }
     function tick(now: number) {
         frame = 0;
@@ -52,12 +66,17 @@ export function mountGallery(root: HTMLElement, position: (progress: number) => 
         tiltY = gallerySettle(tiltY, targetY, seconds);
         render();
         if (selectedIndex !== targetIndex || tiltX !== targetX || tiltY !== targetY) wake();
-        else previous = 0;
+        else {
+            previous = 0;
+            if (departing) { const direction = departing; departing = 0; leave(direction); }
+        }
     }
     function wake() { if (active && !reduced.matches && !document.hidden && !frame) frame = requestAnimationFrame(tick); }
     function update(p: number) {
         progress = p;
         targetIndex = galleryIndex(progress, current().cards.length);
+        if (!active) departing = 0;
+        if (departing && (departing < 0 ? targetIndex > -4 : targetIndex < current().cards.length + 3)) departing = 0;
         if (!active || reduced.matches || press?.dragging) { selectedIndex = targetIndex; render(); }
         else wake();
     }
@@ -72,34 +91,65 @@ export function mountGallery(root: HTMLElement, position: (progress: number) => 
             const velocity = !momentum || performance.now() - gesture.time > 80 ? 0 : gesture.velocity;
             const count = current().cards.length;
             const index = galleryRelease(selectedIndex, velocity, count);
-            update(count < 2 ? 0 : index / (count - 1));
-            position(progress);
+            moveTo(galleryProgress(index, count), true);
         } else { targetIndex = selectedIndex; stop(); }
     }
-    function select(value: string) {
-        if (value === category) return;
+    function moveTo(p: number, allowLeave = false) {
+        departing = allowLeave ? (p === 0 ? -1 : p === 1 ? 1 : 0) : 0;
+        update(p);
+        position(p);
+        changed();
+    }
+    function select(value: string, animate = false, turnDirection?: number, center = false) {
+        if (value === category || !groups.some(group => group.node.dataset.category === value)) return;
+        const oldGroup = current();
+        const oldIndex = groups.indexOf(oldGroup);
+        const outgoingStyle = oldGroup ? getComputedStyle(oldGroup.node) : null;
+        const oldOpacity = outgoingStyle?.opacity ?? '1', oldTransform = outgoingStyle?.transform ?? 'none';
+        if (oldGroup?.node.contains(document.activeElement)) directory.querySelector<HTMLButtonElement>('.collection-tuner')!.focus({ preventScroll: true });
         finish(false);
         category = value;
+        const group = current();
+        const incomingStyle = !group.node.hidden ? getComputedStyle(group.node) : null;
+        const incomingOpacity = incomingStyle?.opacity ?? '0', incomingTransform = incomingStyle?.transform;
+        const index = reduced.matches || center ? 0 : -3;
+        selectedIndex = targetIndex = index;
+        departing = 0;
+        for (const animation of transitions.values()) animation.cancel();
+        transitions.clear();
         root.dataset.category = category;
-        root.querySelectorAll<HTMLElement>('[data-gallery-more]').forEach(link => link.hidden = link.dataset.galleryMore !== category);
         for (const radio of radios) radio.checked = radio.value === category;
         for (const group of groups) {
             group.node.hidden = group.node.dataset.category !== category;
             group.node.inert = group.node.hidden;
+            group.node.removeAttribute('aria-hidden');
         }
-        update(progress);
+        measureCards();
+        progress = galleryProgress(index, group.cards.length);
+        render();
+        if (center && active && !reduced.matches) tune();
+        tuner?.update(category, active && animate);
+        if (animate && active && !reduced.matches && group.group) {
+            const direction = turnDirection ?? (groups.indexOf(group) > oldIndex ? 1 : -1);
+            oldGroup.node.hidden = false;
+            oldGroup.node.inert = true;
+            oldGroup.node.setAttribute('aria-hidden', 'true');
+            const outgoing = oldGroup.node.animate([
+                { opacity: oldOpacity, transform: oldTransform },
+                { opacity: 0, transform: `translateX(${-direction * 18}px)` }
+            ], { duration: 220, easing: 'cubic-bezier(.22,1,.36,1)' });
+            outgoing.onfinish = () => { if (oldGroup !== current()) oldGroup.node.hidden = true; outgoing.cancel(); transitions.delete(oldGroup.node); };
+            transitions.set(oldGroup.node, outgoing);
+            transitions.set(group.node, group.node.animate([
+                { opacity: incomingOpacity, transform: incomingTransform ?? `translateX(${direction * 14}px)` },
+                { opacity: 1, transform: 'none' }
+            ], { duration: 220, easing: 'cubic-bezier(.22,1,.36,1)' }));
+        }
+        changed();
     }
-    radios.forEach(radio => radio.addEventListener('change', () => select(radio.value), options));
-    const step = (amount: number) => {
-        const from = targetIndex;
-        finish(false);
-        const count = current().cards.length;
-        const p = count < 2 ? 0 : clamp((Math.round(from) + amount) / (count - 1));
-        update(p);
-        position(p);
-    };
-    root.querySelector('[data-gallery-prev]')?.addEventListener('click', () => step(-1), options);
-    root.querySelector('[data-gallery-next]')?.addEventListener('click', () => step(1), options);
+    root.addEventListener('keydown', () => { keyboardSelecting = true; }, options);
+    tuner = collectionTuner(directory, (value, direction) => select(value, true, direction, true));
+    radios.forEach(radio => radio.addEventListener('change', () => tuner!.select(radio.value), options));
     root.addEventListener('focusin', event => {
         if (press) return;
         const card = (event.target as Element).closest<HTMLElement>('.gallery-card');
@@ -107,19 +157,18 @@ export function mountGallery(root: HTMLElement, position: (progress: number) => 
         const cards = current().cards, index = cards.indexOf(card);
         if (index >= 0 && Math.abs(index - targetIndex) > .5) {
             finish(false);
-            const p = cards.length < 2 ? 0 : index / (cards.length - 1);
-            update(p);
-            position(p);
+            if (keyboardSelecting) selectedIndex = index;
+            moveTo(galleryProgress(index, cards.length));
+            if (keyboardSelecting) render();
         }
     }, options);
     space.addEventListener('dragstart', event => { event.preventDefault(); }, options);
-    root.addEventListener('pointerdown', () => { suppressClick = false; }, { ...options, capture: true });
+    root.addEventListener('pointerdown', () => { suppressClick = false; keyboardSelecting = false; }, { ...options, capture: true });
     space.addEventListener('pointerdown', e => {
-        if (!active || reduced.matches || !e.isPrimary || e.button !== 0 || current().cards.length < 2 || press
+        if (!active || reduced.matches || !e.isPrimary || e.button !== 0 || current().cards.length < 1 || press
             || (e.target as Element).closest('button,input,select,textarea,[contenteditable="true"]')) return;
-        const radius = innerWidth < 700 ? innerWidth * .9 : Math.min(1000, innerWidth * .72);
         press = { id: e.pointerId, x: e.clientX, y: e.clientY, index: selectedIndex, last: selectedIndex,
-            time: performance.now(), velocity: 0, spacing: radius * Math.sin(innerWidth < 700 ? .78 : .48), dragging: false };
+            time: performance.now(), velocity: 0, spacing, dragging: false };
     }, options);
     space.addEventListener('pointermove', e => {
         if (!press || e.pointerId !== press.id) return;
@@ -134,12 +183,11 @@ export function mountGallery(root: HTMLElement, position: (progress: number) => 
         }
         e.preventDefault();
         const now = performance.now(), count = current().cards.length;
-        const index = Math.max(0, Math.min(count - 1, press.index - dx / press.spacing));
+        const index = Math.max(-4, Math.min(count + 3, press.index + dx / press.spacing));
         press.velocity = .6 * press.velocity + .4 * (index - press.last) / Math.max(.008, (now - press.time) / 1000);
         press.last = index;
         press.time = now;
-        update(galleryProgress(index, count));
-        position(progress);
+        moveTo(galleryProgress(index, count));
     }, options);
     window.addEventListener('pointerup', e => { if (e.pointerId === press?.id) finish(true); }, options);
     window.addEventListener('pointercancel', e => { if (e.pointerId === press?.id) finish(true, false); }, options);
@@ -149,43 +197,58 @@ export function mountGallery(root: HTMLElement, position: (progress: number) => 
         suppressClick = false;
     }, { ...options, capture: true });
     window.addEventListener('blur', () => { finish(false); stop(); }, options);
-    window.addEventListener('resize', () => { finish(false); render(); }, options);
+    window.addEventListener('resize', () => { finish(false); measureCards(); render(); }, options);
     window.addEventListener('pagehide', () => { finish(false); stop(); }, options);
     document.addEventListener('visibilitychange', () => { if (document.hidden) { finish(false); stop(); } else wake(); }, options);
-    reduced.addEventListener('change', () => { finish(false); stop(); selectedIndex = targetIndex; tiltX = tiltY = targetX = targetY = 0; render(); }, options);
+    reduced.addEventListener('change', () => {
+        finish(false); stop();
+        for (const animation of transitions.values()) animation.cancel();
+        transitions.clear();
+        for (const group of groups) {
+            group.node.hidden = group !== current();
+            group.node.inert = group.node.hidden;
+            group.node.removeAttribute('aria-hidden');
+        }
+        selectedIndex = targetIndex; tiltX = tiltY = targetX = targetY = 0; render();
+    }, options);
     const initial = category;
     category = '';
     select(initial);
+    const directoryObserver = new ResizeObserver(() => { measureCards(); render(); });
+    directoryObserver.observe(directory);
+    directoryObserver.observe(space);
     return {
         update,
         active(value: boolean) {
             if (active === value) return;
             active = value;
-            if (!active) { finish(false); stop(); selectedIndex = targetIndex; render(); }
+            if (!active) { departing = 0; finish(false); stop(); selectedIndex = targetIndex = galleryIndex(progress, current().cards.length); render(); }
             else wake();
         },
         orient(x: number, y: number) { targetX = x * 3; targetY = -y * 1.5; wake(); },
         select,
-        wheel(currentProgress: number, direction: number) {
+        wheel() {
+            departing = 0;
             finish(false);
-            const target = galleryWheelProgress(currentProgress, current().cards.length, direction);
-            if (target === null) return false;
-            update(target);
-            position(target);
-            return true;
         },
+        tunerWheel(event: WheelEvent) { return tuner!.wheel(event); },
         get category() { return category; },
+        get count() { return current().cards.length; },
+        get empty() { return root.dataset.galleryEmpty === 'true'; },
         dispose() {
-            finish(false); stop(); abort.abort();
+            finish(false); stop(); abort.abort(); directoryObserver.disconnect();
+            tuner?.dispose();
+            for (const animation of transitions.values()) animation.cancel();
+            delete root.dataset.galleryIndex;
+            delete root.dataset.galleryEmpty;
             for (const group of groups) {
-                group.node.hidden = false; group.node.inert = false;
+                group.node.hidden = false; group.node.inert = false; group.node.removeAttribute('aria-hidden');
                 group.group?.style.removeProperty('transform');
                 for (const card of group.cards) {
                     for (const property of ['transform', 'visibility', '--gallery-blur', '--gallery-depth-opacity']) card.style.removeProperty(property);
                     delete card.dataset.front;
                 }
             }
-            root.querySelectorAll<HTMLElement>('[data-gallery-more]').forEach(link => link.hidden = false);
         }
     };
 }

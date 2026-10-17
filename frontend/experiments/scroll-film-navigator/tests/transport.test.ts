@@ -4,6 +4,15 @@ interface Image extends Decoded { id:string; close: ReturnType<typeof vi.fn<() =
 const image=(id:string):Image=>({id,width:1600,height:900,close:vi.fn()});
 const flush=async()=>{for(let i=0;i<8;i++)await Promise.resolve();};
 describe("Frame transport",()=>{
+  it("prepares a complete four-frame wheel step at rest without exceeding decoded or work budgets",async()=>{
+    const cache=new FrameCache<Image>(async(film,index)=>image(keyFor(film,index)),20,2);
+    cache.request([{film:"tree",index:80}],[],{direction:1,speed:0,lookahead:6});
+    for(let i=0;i<4;i++)await flush();
+    for(const index of [76,77,78,79,80,81,82,83,84,85,86])expect(cache.get(keyFor("tree",index))).toBeDefined();
+    expect(cache.entries.size).toBeLessThanOrEqual(20);
+    expect(cache.peakPending).toBe(2);
+    cache.dispose();
+  });
   it("FT-02 endpoints and finite clamping",()=>{expect(frameAt(0)).toBe(0);expect(frameAt(1)).toBe(191);expect(frameAt(-2)).toBe(0);expect(frameAt(2)).toBe(191);expect(frameAt(NaN)).toBe(0);expect(scrollAt(100,0)).toBe(0);});
   it("FT-03/04 deterministic forward and reverse mapping",()=>{const path=Array.from({length:192},(_,i)=>i/191);expect(path.map(frameAt)).toEqual(Array.from({length:192},(_,i)=>i));expect(path.reverse().map(frameAt)).toEqual(Array.from({length:192},(_,i)=>191-i));for(let n=0;n<100;n++)expect(frameAt(.35)).toBe(67);});
   it("FT-05 freezes and FT-07 switching preserves normalized position",()=>{const t=new FilmTransport();t.setProgress(.35);const version=t.version;for(let i=0;i<100;i++)t.setProgress(.35);expect(t.version).toBe(version);expect(t.desired).toBe(67);t.switchFilm();expect(t.film).toBe("tree");expect(t.progress).toBe(.35);expect(t.desired).toBe(67);});

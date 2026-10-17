@@ -24,12 +24,19 @@
     <header class="home-nav">
         <div class="home-brand" data-compact-identity><button type="button" aria-label="Inspect 0xmillennium identity"><span class="identity-plane">@template.site.components.compactIdentity("nav-identity")</span><span class="floor-shadow"></span></button></div>
         <a class="home-sitename" href="/" data-site-name>${page.ownerAlias().toUpperCase(java.util.Locale.ROOT)}</a>
+        <button class="home-menu-toggle" type="button" data-menu-toggle aria-label="Open menu" aria-controls="home-mobile-menu" aria-expanded="false" hidden><span aria-hidden="true"></span><span aria-hidden="true"></span></button>
         <nav aria-label="${page.copy().primaryNavigation()}">
             <a href="#work"><span data-nav-label>${page.copy().projects()}</span>@if(page.projectNavigationCover().isPresent())<span class="nav-media" aria-hidden="true"><img src="${page.projectNavigationCover().get().url()}" alt="" width="${page.projectNavigationCover().get().width()}" height="${page.projectNavigationCover().get().height()}" loading="lazy" decoding="async"></span>@endif</a>
             <a href="#writing"><span data-nav-label>${page.copy().writing()}</span>@if(page.writingNavigationCover().isPresent())<span class="nav-media" aria-hidden="true"><img src="${page.writingNavigationCover().get().url()}" alt="" width="${page.writingNavigationCover().get().width()}" height="${page.writingNavigationCover().get().height()}" loading="lazy" decoding="async"></span>@endif</a>
             <a class="home-nav__contact" href="/contact"><span class="nav-contact-window"><span class="nav-contact-track"><span>${page.copy().contact()}</span><span aria-hidden="true">${page.copy().contact()}</span></span></span></a>
         </nav>
     </header>
+    <dialog id="home-mobile-menu" class="home-menu" aria-label="${page.copy().primaryNavigation()}" data-mobile-menu>
+        <div class="home-menu__bands" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="home-menu__content"><div class="home-menu__top"><a class="home-menu__name" href="/">${page.ownerAlias().toUpperCase(java.util.Locale.ROOT)}</a><button type="button" data-menu-close aria-label="Close menu" autofocus><span aria-hidden="true">×</span></button></div>
+            <nav aria-label="${page.copy().primaryNavigation()}"><a href="#work"><span data-nav-label>${page.copy().projects()}</span></a><a href="#writing"><span data-nav-label>${page.copy().writing()}</span></a><a href="/contact"><span data-nav-label>${page.copy().contact()}</span></a></nav>
+        </div>
+    </dialog>
     <main id="main-content" class="homepage" tabindex="-1" data-home-v2 aria-keyshortcuts="F" aria-describedby="film-instructions">
         <p id="film-instructions" class="sr-only">Hold the background to change film, or press F while the main content is focused. Repeat to retry if a film is unavailable.</p>
         <div class="home-environment" aria-hidden="true">
@@ -38,15 +45,26 @@
             <canvas class="home-film" data-film-canvas aria-hidden="true"></canvas>
         </div>
         <section class="home-scene home-identity" id="identity" data-scene="hero" aria-labelledby="identity-title">
-            <div class="scene-face hero-face"><h1 id="identity-title" class="home-masthead">${page.ownerAlias()}</h1><p class="home-overline">Independent thinking / deliberate engineering</p><h2 class="hero-statement"><span class="hero-writing-row"><span class="hero-writing-text">Clarity is</span></span><span class="hero-writing-row"><em class="hero-writing-text">engineered.</em></span></h2><p class="hero-scroll">Scroll to explore <span aria-hidden="true">↓</span></p></div>
+            <div class="scene-face hero-face"><h1 id="identity-title" class="home-masthead">${page.ownerAlias()}</h1><h2 class="hero-statement"><span class="hero-writing-row"><span class="hero-writing-text">Clarity is</span></span><span class="hero-writing-row"><em class="hero-writing-text">engineered</em></span></h2><p class="hero-scroll">Scroll to explore</p></div>
         </section>
-        <section class="home-scene" data-scene="statements" aria-label="Perspective"><div class="scene-face statement-face"><div class="statement-top statement-slot"><p class="statement-copy" data-second-writing><span class="statement-row"><span class="statement-word"><span class="statement-word-slot"><span class="statement-word-text">Curious</span></span></span> <span class="statement-word"><span class="statement-word-slot"><span class="statement-word-text">by</span></span></span> <span class="statement-word"><span class="statement-word-slot"><span class="statement-word-text">nature.</span></span></span></span><span class="statement-row"><span class="statement-word"><span class="statement-word-slot"><span class="statement-word-text">Engineering</span></span></span> <span class="statement-word"><span class="statement-word-slot"><span class="statement-word-text">by</span></span></span> <span class="statement-word"><span class="statement-word-slot"><span class="statement-word-text">choice.</span></span></span></span></p></div></div></section>
+        <section class="home-scene" data-scene="statements" aria-label="Perspective"><div class="scene-face statement-face"><div class="statement-top statement-slot"><p class="statement-copy" data-second-writing><span class="statement-row"><span class="statement-word"><span class="statement-word-slot"><span class="statement-word-text">Curious</span></span></span> <span class="statement-word"><span class="statement-word-slot"><span class="statement-word-text">by</span></span></span> <span class="statement-word"><span class="statement-word-slot"><span class="statement-word-text">nature</span></span></span></span><span class="statement-row"><span class="statement-word"><span class="statement-word-slot"><span class="statement-word-text">Engineering</span></span></span> <span class="statement-word"><span class="statement-word-slot"><span class="statement-word-text">by</span></span></span> <span class="statement-word"><span class="statement-word-slot"><span class="statement-word-text">choice</span></span></span></span></p></div></div></section>
         <section class="home-scene" data-scene="capabilities" aria-label="Areas of focus"><div class="scene-face capability-face"><p class="home-overline">Areas of focus</p><ol class="capabilities"><li><span>AI Systems</span></li><li><span>Cloud Infrastructure</span></li><li><span>Backend Engineering</span></li><li><span>DevOps &amp; Automation</span></li></ol></div></section>
         <section class="home-scene" data-scene="breath" aria-label="Space to think"><div class="scene-face breath-face" aria-hidden="true"></div></section>
-        <section class="home-scene" data-scene="mark" aria-label="0xmillennium identity"><div class="scene-face mark-face"><p class="brand-statement"><span><span>Made to think.</span></span><span><span>Built to work.</span></span></p><div class="physical-identity" data-physical-identity data-input-owner>@template.site.components.physicalIdentity()</div></div></section>
+        <section class="home-scene" data-scene="mark" aria-label="0xmillennium identity"><div class="scene-face mark-face"><p class="brand-statement"><span><span>Made to think</span></span><span><span>Built to work</span></span></p><div class="physical-identity" data-physical-identity data-input-owner>@template.site.components.physicalIdentity()</div></div></section>
         <section class="home-scene home-gallery" data-scene="gallery" aria-labelledby="gallery-title"><div class="scene-face gallery-face">
-            <h2 id="gallery-title">Building systems<br><em>worth explaining.</em></h2>
-            <fieldset class="gallery-instrument" data-input-owner><legend>${page.copy().projects()} / ${page.copy().writing()}</legend><div class="instrument-dial" aria-hidden="true"><span class="instrument-needle"></span><span class="instrument-hub"></span><span class="instrument-tick"></span><span class="instrument-tick"></span><span class="instrument-tick"></span></div><label><input type="radio" name="gallery-category" value="projects" checked><span>${page.copy().projects()}</span></label><label><input type="radio" name="gallery-category" value="writings"><span>${page.defaultLanguage().equals("TR") ? "Yazılar" : "Writings"}</span></label></fieldset>
+            <h2 id="gallery-title"><span class="gallery-writing-slot"><span class="gallery-writing-rise">Building systems</span></span> <span class="gallery-writing-slot"><em class="gallery-writing-rise">worth explaining</em></span></h2>
+            <fieldset class="gallery-instrument" data-input-owner><legend>${page.copy().collections()}</legend>
+                <div class="tuner-reveal-slot"><button class="collection-tuner" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="collection-options" aria-label="${page.copy().collections()}">
+                    <span class="tuner-scale" aria-hidden="true"></span><span class="tuner-marker" aria-hidden="true"></span>
+                    <span class="tuner-names" aria-hidden="true"></span><span class="tuner-name sr-only" aria-hidden="true">${page.copy().projects()}</span>
+                </button></div>
+                <div class="collection-options" id="collection-options" role="dialog" aria-label="${page.copy().collections()}" hidden>
+                <label><input type="radio" name="gallery-category" value="projects" checked><span>${page.copy().projects()}</span></label>
+                <label><input type="radio" name="gallery-category" value="articles"><span>${page.copy().articles()}</span></label>
+                <label><input type="radio" name="gallery-category" value="notes"><span>${page.copy().notes()}</span></label>
+                <label><input type="radio" name="gallery-category" value="research"><span>${page.copy().research()}</span></label>
+                </div>
+            </fieldset>
             <div class="gallery-space">
                 <section id="work" class="home-work gallery-category" data-category="projects" tabindex="-1" aria-label="${page.copy().projects()}">
                     <h2 class="sr-only">${page.copy().workTitle()}</h2>
@@ -54,12 +72,11 @@
                 <ol class="home-projects gallery-group" aria-label="${page.featuredProjectsTitle()}">
                     @for(int i = 0; i < page.featuredProjects().size(); i++)
                         <li class="home-projects__item gallery-card">
-                            <article class="home-project"><a class="gallery-cover" href="${page.featuredProjects().get(i).publicUrl()}" tabindex="-1" aria-hidden="true"><span class="gallery-cover__fallback">0x<span>${String.format(java.util.Locale.ROOT, "%02d", i + 1)}</span></span>@if(page.galleryCovers().containsKey(page.featuredProjects().get(i).publicUrl()))
+                            <article class="home-project"><div class="gallery-cover"><span class="gallery-cover__fallback" aria-hidden="true">0x<span>${String.format(java.util.Locale.ROOT, "%02d", i + 1)}</span></span>@if(page.galleryCovers().containsKey(page.featuredProjects().get(i).publicUrl()))
                             <img src="${page.galleryCovers().get(page.featuredProjects().get(i).publicUrl()).url()}" alt="" width="${page.galleryCovers().get(page.featuredProjects().get(i).publicUrl()).width()}" height="${page.galleryCovers().get(page.featuredProjects().get(i).publicUrl()).height()}" loading="lazy" decoding="async">
-                            @endif</a>
+                            @endif<h3 class="gallery-card__title"><a href="${page.featuredProjects().get(i).publicUrl()}" title="${page.featuredProjects().get(i).title()}"><span><span class="gallery-card__name">${page.featuredProjects().get(i).title()}</span></span></a></h3></div>
                                 <span class="home-project__number" aria-hidden="true">${String.format(java.util.Locale.ROOT, "%02d", i + 1)}</span>
                                 <div class="home-project__body">
-                                    <h3><a href="${page.featuredProjects().get(i).publicUrl()}">${page.featuredProjects().get(i).title()} <span class="home-project__arrow" aria-hidden="true">↗</span></a></h3>
                                     <p>${page.featuredProjects().get(i).summary()}</p>
                                     @if(!page.featuredProjects().get(i).technologies().isEmpty())
                                         <ul class="home-project__tags" aria-label="${page.copy().projectTechnologies()}">
@@ -85,34 +102,36 @@
                 <p class="home-empty">${page.copy().projectsEmpty()}</p>
             @endif
                 </section>
-                <section id="writing" class="home-writing gallery-category" data-category="writings" tabindex="-1" aria-label="${page.copy().writing()}">
-            @if(page.promoteLatestWriting() && !page.latestWriting().isEmpty())
-                <ol class="home-writing__list gallery-group">
-                    @for(int i = 0; i < page.latestWriting().size(); i++)
-                        <li class="gallery-card"><article><a class="gallery-cover" href="${page.latestWriting().get(i).publicUrl()}" tabindex="-1" aria-hidden="true"><span class="gallery-cover__fallback">Aa<span>${String.format(java.util.Locale.ROOT, "%02d", i + 1)}</span></span>@if(page.galleryCovers().containsKey(page.latestWriting().get(i).publicUrl()))
-                            <img src="${page.galleryCovers().get(page.latestWriting().get(i).publicUrl()).url()}" alt="" width="${page.galleryCovers().get(page.latestWriting().get(i).publicUrl()).width()}" height="${page.galleryCovers().get(page.latestWriting().get(i).publicUrl()).height()}" loading="lazy" decoding="async">
-                            @endif</a>
-                            <p class="home-writing__number">${page.copy().writing()}</p>
-                            <h3><a href="${page.latestWriting().get(i).publicUrl()}">${page.latestWriting().get(i).title()} <span aria-hidden="true">↗</span></a></h3>
-                            <p>${page.latestWriting().get(i).summary()}</p>
-                            @if(page.galleryTags().containsKey(page.latestWriting().get(i).publicUrl()) && !page.galleryTags().get(page.latestWriting().get(i).publicUrl()).isEmpty())
+                <div id="writing" tabindex="-1">
+                @for(var collection : page.writingCollections())
+                <section id="${collection.id()}" class="home-writing gallery-category" data-category="${collection.id()}" tabindex="-1" aria-label="${collection.title()}">
+                    <h2 class="gallery-collection-name">${collection.title()}</h2>
+                    @if(collection.enabled() && !collection.entries().isEmpty())
+                    <ol class="home-writing__list gallery-group">
+                        @for(int i = 0; i < collection.entries().size(); i++)
+                        <li class="gallery-card"><article><div class="gallery-cover"><span class="gallery-cover__fallback" aria-hidden="true">${collection.id().equals("research") ? "R" : collection.id().equals("notes") ? "N" : "Aa"}<span>${String.format(java.util.Locale.ROOT, "%02d", i + 1)}</span></span>@if(page.galleryCovers().containsKey(collection.entries().get(i).publicUrl()))
+                            <img src="${page.galleryCovers().get(collection.entries().get(i).publicUrl()).url()}" alt="" width="${page.galleryCovers().get(collection.entries().get(i).publicUrl()).width()}" height="${page.galleryCovers().get(collection.entries().get(i).publicUrl()).height()}" loading="lazy" decoding="async">
+                            @endif<h3 class="gallery-card__title"><a href="${collection.entries().get(i).publicUrl()}" title="${collection.entries().get(i).title()}"><span><span class="gallery-card__name">${collection.entries().get(i).title()}</span></span></a></h3></div>
+                            <p>${collection.entries().get(i).summary()}</p>
+                            @if(page.galleryTags().containsKey(collection.entries().get(i).publicUrl()) && !page.galleryTags().get(collection.entries().get(i).publicUrl()).isEmpty())
                             <ul class="home-project__tags" aria-label="Tags">
-                                @for(var tag : page.galleryTags().get(page.latestWriting().get(i).publicUrl()))
+                                @for(var tag : page.galleryTags().get(collection.entries().get(i).publicUrl()))
                                 <li>${tag}</li>
                                 @endfor
                             </ul>
                             @endif
                         </article></li>
-                    @endfor
-                </ol>
-            @endif
-            @if(page.promoteLatestWriting() && page.latestWriting().isEmpty())
-                <p class="home-empty">${page.copy().writingEmpty()}</p>
-            @endif
+                        @endfor
+                    </ol>
+                    @endif
+                    @if(collection.enabled() && collection.entries().isEmpty())
+                    <p class="home-empty">${collection.emptyMessage()}</p>
+                    @endif
                 </section>
+                @endfor
+                </div>
             </div>
-            <div class="gallery-more" data-input-owner><a class="home-section__more home-link" data-gallery-more="projects" href="/${page.defaultLanguage().toLowerCase(java.util.Locale.ROOT)}/projects">${page.copy().viewProjects()} <span aria-hidden="true">↗</span></a><a class="home-section__more home-link" data-gallery-more="writings" href="/search">${page.copy().searchPublished()} <span aria-hidden="true">↗</span></a></div>
-            <div class="gallery-controls" data-input-owner><button type="button" data-gallery-prev aria-label="Previous publication">←</button><output data-gallery-position aria-live="polite"></output><button type="button" data-gallery-next aria-label="Next publication">→</button></div>
+            <output class="sr-only" data-gallery-position aria-live="polite"></output>
         </div></section>
         <section class="home-scene home-contact" id="contact" data-scene="location" aria-labelledby="contact-title"><div class="scene-face location-face">
             <div class="location-links"><h2 id="contact-title" class="sr-only">${page.copy().contactTitle()}</h2><nav aria-label="Explore"><a href="/${page.defaultLanguage().toLowerCase(java.util.Locale.ROOT)}/projects">${page.copy().projects()}</a><a href="/search">${page.copy().writing()}</a><a href="/contact">${page.copy().contact()}</a></nav><p>Istanbul, Türkiye</p><a class="contact-entry" href="/contact">${page.copy().getInTouch()} ↗</a></div>

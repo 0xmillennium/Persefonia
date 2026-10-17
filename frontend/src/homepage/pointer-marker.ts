@@ -18,7 +18,7 @@ export function pointerMarker(canHold: (target: Element) => boolean = () => fals
     hint.dataset.visible = 'false';
     marker.append(dot, hint);
     document.body.append(marker);
-    let visible = false, pressed = false, hovered = false, hasPoint = false, captured = false;
+    let visible = false, pressed = false, hovered = false, hasPoint = false, captured = false, fineInput = false;
     let x = 0, y = 0, placedX = NaN, placedY = NaN;
     let frame = 0, refreshFrame = 0, scale = 1, targetScale = 1;
     let lastElement: Element | null = null;
@@ -63,7 +63,7 @@ export function pointerMarker(canHold: (target: Element) => boolean = () => fals
         cancelAnimationFrame(frame);
         cancelAnimationFrame(refreshFrame);
         frame = refreshFrame = 0;
-        hasPoint = pressed = hovered = captured = false;
+        hasPoint = pressed = hovered = captured = fineInput = false;
         lastElement = null;
         scale = targetScale = 1;
         marker.hidden = true;
@@ -74,9 +74,11 @@ export function pointerMarker(canHold: (target: Element) => boolean = () => fals
     const refresh = (hit?: Element | null) => {
         if (!hasPoint) return;
         const element = hit ?? document.elementFromPoint(x, y);
+        const parent = element?.closest('dialog[open]') ?? document.body;
+        if (marker.parentElement !== parent) parent.append(marker);
         if (visible && element === lastElement) { hintAvailability(!pressed && !hovered && canHold(element!)); resize(); return; }
         const field = element?.closest('input,textarea,iframe,[contenteditable]:not([contenteditable="false"])');
-        if (!element || !fine.matches || reduced.matches || forced.matches
+        if (!element || !fine.matches && !fineInput || reduced.matches || forced.matches
             || field && !(field instanceof HTMLInputElement && actionInputs.has(field.type))) {
             hide();
             return;
@@ -91,7 +93,11 @@ export function pointerMarker(canHold: (target: Element) => boolean = () => fals
         resize();
     };
     const move = (event: PointerEvent) => {
-        if (event.pointerType === 'touch' || !fine.matches || reduced.matches || forced.matches) { hide(); return; }
+        if (event.pointerType === 'touch' || reduced.matches || forced.matches) { hide(); return; }
+        // Actual mouse/pen input also covers hybrid browsers whose capability
+        // queries keep reporting the touchscreen after a mouse is connected.
+        fineInput = event.pointerType === 'mouse' || event.pointerType === 'pen';
+        if (!fine.matches && !fineInput) { hide(); return; }
         if (event.type === 'pointermove' || event.type === 'pointerdown') hintAvailability(false);
         x = event.clientX;
         y = event.clientY;
@@ -113,6 +119,7 @@ export function pointerMarker(canHold: (target: Element) => boolean = () => fals
     document.documentElement.addEventListener('pointerleave', hide, options);
     window.addEventListener('blur', hide, options);
     window.addEventListener('pagehide', hide, options);
+    document.addEventListener('close', hide, {...options,capture:true});
     window.addEventListener('keydown', hide, options);
     document.addEventListener('visibilitychange', () => { if (document.hidden) hide(); }, options);
     for (const query of [fine,reduced,forced]) query.addEventListener('change', hide, options);

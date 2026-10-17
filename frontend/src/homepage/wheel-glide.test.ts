@@ -2,14 +2,32 @@ import { describe, expect, it } from 'vitest';
 import { WheelGlide } from './wheel-glide';
 
 describe('film wheel glide', () => {
-    it('passes through intermediate positions, slows near its target and stops exactly', () => {
+    it('traverses an authored section handoff over its full duration and reverses along the same path', () => {
+        const forward = new WheelGlide(), backward = new WheelGlide();
+        forward.retarget(5300, 1600, 5300, 6900, 0, 700);
+        backward.retarget(6900, -1600, 5300, 6900, 0, 700);
+        for (const time of [0, 100, 250, 350, 500, 600, 700])
+            expect(forward.sample(time)).toBeCloseTo(backward.sample(700 - time), 8);
+        expect(forward.sample(350)).toBe(6100);
+        expect(forward.sample(700)).toBe(6900);
+        expect(forward.active).toBe(false);
+    });
+    it('spreads source frames across the glide and settles exactly in both directions', () => {
         const glide = new WheelGlide();
         glide.retarget(600, 120, 0, 1000, 0);
         const positions = [0, 30, 60, 90, 120, 150, 180].map(time => glide.sample(time));
         expect(positions[0]).toBe(600);
         expect(positions.at(-1)).toBe(720);
         expect(positions.every((value, index) => index === 0 || value > positions[index - 1]!)).toBe(true);
-        expect(positions[1]! - positions[0]!).toBeGreaterThan(positions[5]! - positions[4]!);
+        expect(positions[1]! - positions[0]!).toBeCloseTo(positions[6]! - positions[5]!);
+        const thresholds = [0, 1, 2, 3].map(index => {
+            const sample = new WheelGlide();
+            sample.retarget(0, 4, 0, 4, 0);
+            return Array.from({ length: 181 }, (_, time) => time).find(time => Math.round(sample.sample(time)) > index)!;
+        });
+        expect(thresholds[0]).toBeGreaterThan(30);
+        expect(thresholds.at(-1)).toBeGreaterThan(135);
+        expect(thresholds.at(-1)).toBeLessThan(150);
         expect(glide.active).toBe(false);
     });
 

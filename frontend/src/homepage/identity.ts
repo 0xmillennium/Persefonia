@@ -10,7 +10,7 @@ export function physicalIdentity(svg: SVGSVGElement) {
     const renderer = new Renderer(svg, PHYSICS.navigatorRadius), scheduler = new FixedScheduler();
     const homes = new Map(canonicalGeometry.map(g => [g.id, { x:g.home.x+480, y:g.home.y+310 }]));
     const reduced = matchMedia('(prefers-reduced-motion: reduce)');
-    const input = new InputAdapter(svg, () => active && !reduced.matches, wake, { origin: () => origin });
+    const input = new InputAdapter(svg, () => active && !reduced.matches && document.documentElement.dataset.menuOpen !== 'true', wake, { origin: () => origin, touch: true });
     const reset = () => {
         input.deactivate();
         input.take();

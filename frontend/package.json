@@ -51,7 +51,9 @@
     "effects:browser": "playwright test --config experiments/identity-effects/playwright.config.ts",
     "effects:check": "npm run effects:typecheck && npm run effects:build",
     "home:media": "node scripts/home-media.mjs",
-    "home:films:publish": "node scripts/publish-home-films.mjs"
+    "home:films:publish": "node scripts/publish-home-films.mjs",
+    "home:videos:publish": "node scripts/publish-home-videos.mjs",
+    "home:loop:publish": "node scripts/publish-home-loop.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.57.0",

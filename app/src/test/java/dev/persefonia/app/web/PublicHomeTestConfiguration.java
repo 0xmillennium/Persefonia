@@ -118,6 +118,16 @@ class PublicHomeTestConfiguration {
         }
 
         @Override
+        public List<PublicHomepageContentEntry> latestArticles(DiscoveryLanguage language, int limit) {
+            return latestWriting(language, Integer.MAX_VALUE).stream().filter(entry -> entry.publicUrl().startsWith("/en/articles/")).limit(limit).toList();
+        }
+
+        @Override
+        public List<PublicHomepageContentEntry> latestNotes(DiscoveryLanguage language, int limit) {
+            return latestWriting(language, Integer.MAX_VALUE).stream().filter(entry -> entry.publicUrl().startsWith("/en/notes/")).limit(limit).toList();
+        }
+
+        @Override
         public List<PublicHomepageContentEntry> latestResearch(DiscoveryLanguage language, int limit) {
             return language == DiscoveryLanguage.EN ? research.stream().limit(limit).toList() : List.of();
         }

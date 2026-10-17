@@ -37,7 +37,8 @@ class PublicHomeChaptersTest {
     void homepageRendersCurrentScenesAndPublicContentWithoutObsoleteExperiments() throws Exception {
         content.setContent(
                 List.of(new PublicHomepageContentEntry(
-                        "A real article", "Published summary", "/en/articles/real-article")),
+                        "A real article", "Published summary", "/en/articles/real-article"),
+                        new PublicHomepageContentEntry("A real note", "Note summary", "/en/notes/real-note")),
                 List.of(new PublicHomepageContentEntry(
                         "A real study", "Research summary", "/en/research/real-study")));
 
@@ -51,7 +52,8 @@ class PublicHomeChaptersTest {
         assertThat(html).contains("href=\"#work\"", "href=\"#writing\"", "href=\"/contact\"");
         assertThat(html).contains("href=\"/en/articles/real-article\"");
         assertThat(html).contains("A real article");
-        assertThat(html).doesNotContain("A real study", "id=\"research\"", "id=\"architecture\"", "id=\"about\"",
+        assertThat(html).contains("A real study", "A real note", "data-category=\"articles\"", "data-category=\"notes\"", "data-category=\"research\"");
+        assertThat(html).doesNotContain("id=\"architecture\"", "id=\"about\"",
                 "href=\"#about\"", "href=\"#architecture\"", "class=\"film-controls\"",
                 "data-film-switch", "data-film-retry", "id=\"find-location\"", "id=\"tilt-up\"", "id=\"pause\"");
         assertThat(html).contains("class=\"home-cinema__image\" aria-hidden=\"true\"");

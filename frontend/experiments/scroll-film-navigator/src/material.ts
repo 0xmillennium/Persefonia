@@ -39,7 +39,26 @@ uniform vec2 sheetSize;
 uniform vec2 viewport;
 uniform vec4 aperture;
 uniform vec4 filmBounds;
+uniform vec4 nextFilmBounds;
 uniform float apertureRadius;
+uniform vec4 nextAperture;
+uniform float nextApertureRadius;
+uniform vec4 extraAperture;
+uniform vec4 nextExtraAperture;
+uniform float extraApertureRadius;
+uniform float nextExtraApertureRadius;
+uniform vec3 dividersA;
+uniform vec3 dividersB;
+uniform int capsuleCountA;
+uniform int capsuleCountB;
+uniform vec4 capsulesA[4];
+uniform vec4 capsulesB[4];
+uniform float capsuleRadiiA[4];
+uniform float capsuleRadiiB[4];
+uniform int circleCountA;
+uniform int circleCountB;
+uniform vec3 circlesA[7];
+uniform vec3 circlesB[7];
 uniform float imageOpacity;
 uniform vec2 fieldSize;
 uniform vec2 holdSize;
@@ -50,8 +69,8 @@ uniform float holdActive;
 uniform float portrait;
 uniform float framingA;
 uniform float framingB;
-vec2 filmUV(vec2 p,float framing){
- if(filmBounds.z>filmBounds.x)return (p*viewport-filmBounds.xy)/(filmBounds.zw-filmBounds.xy);
+vec2 filmUV(vec2 p,float framing,vec4 bounds){
+ if(bounds.z>bounds.x)return (p*viewport-bounds.xy)/(bounds.zw-bounds.xy);
  vec2 size=max(aperture.zw-aperture.xy,vec2(1.0));
  p=(p*viewport-aperture.xy)/size;
  float aspect=size.x/size.y;
@@ -61,20 +80,60 @@ vec2 filmUV(vec2 p,float framing){
  if(portrait>.5)q.y=(p.y-.5)/max(size.x/(16.0/9.0)/size.y,.01)+.5;
  q.x+=(1.0-scale.x)*(framing-.5);return q;
 }
-vec3 sampleFilm(sampler2D film,vec2 p,float framing){
- vec2 q=filmUV(p,framing);
- if(filmBounds.z>filmBounds.x && (q.x<0.0||q.x>1.0||q.y<0.0||q.y>1.0))return vec3(.03,.055,.067);
+vec3 sampleFilm(sampler2D film,vec2 p,float framing,vec4 bounds){
+ vec2 q=filmUV(p,framing,bounds);
+ if(bounds.z>bounds.x && (q.x<0.0||q.x>1.0||q.y<0.0||q.y>1.0))return vec3(.03,.055,.067);
  if(portrait>.5 && (q.y<0.0||q.y>1.0))return texture(film,clamp(q,vec2(.01),vec2(.99))).rgb*.15;
  return texture(film,clamp(q,vec2(0),vec2(1))).rgb;
 }
-float apertureAt(vec2 p){
- vec2 size=max(aperture.zw-aperture.xy,vec2(1.0));
- float radius=min(apertureRadius,min(size.x*.5,size.y));
- float inside=step(aperture.x,p.x)*step(p.x,aperture.z)*step(aperture.y,p.y)*step(p.y,aperture.w);
- if(radius>0.0 && p.y<aperture.y+radius){
-  float cx=clamp(p.x,aperture.x+radius,aperture.z-radius);
-  float edge=length(vec2(p.x-cx,p.y-aperture.y-radius))-radius;
+float archAt(vec2 p,vec4 box,float requestedRadius){
+ if(box.z<=box.x || box.w<=box.y)return 0.0;
+ vec2 size=max(box.zw-box.xy,vec2(1.0));
+ float radius=min(requestedRadius,min(size.x*.5,size.y));
+ float inside=step(box.x,p.x)*step(p.x,box.z)*step(box.y,p.y)*step(p.y,box.w);
+ if(radius>0.0 && p.y<box.y+radius){
+  float cx=clamp(p.x,box.x+radius,box.z-radius);
+  float edge=length(vec2(p.x-cx,p.y-box.y-radius))-radius;
   inside*=1.0-smoothstep(-1.0,1.0,edge);
+ }
+ return inside;
+}
+float apertureAt(vec2 p,bool incoming){
+ int capsules=incoming?capsuleCountB:capsuleCountA;
+ if(capsules>0){
+  float inside=0.0;
+  for(int i=0;i<4;i++){
+   if(i>=capsules)break;
+   vec4 box=incoming?capsulesB[i]:capsulesA[i];
+   float radius=incoming?capsuleRadiiB[i]:capsuleRadiiA[i];
+   vec2 halfSize=(box.zw-box.xy)*.5;
+   radius=min(radius,min(halfSize.x,halfSize.y));
+   vec2 q=abs(p-(box.xy+box.zw)*.5)-halfSize+radius;
+   float edge=length(max(q,0.0))+min(max(q.x,q.y),0.0)-radius;
+   inside=max(inside,1.0-smoothstep(-.5,.5,edge));
+  }
+  return inside;
+ }
+ int count=incoming?circleCountB:circleCountA;
+ if(count>0){
+  float edge=1e6;
+  for(int i=0;i<7;i++){if(i>=count)break;vec3 circle=incoming?circlesB[i]:circlesA[i];edge=min(edge,length(p-circle.xy)-circle.z);}
+  return 1.0-smoothstep(-.5,.5,edge);
+ }
+ float inside=archAt(p,incoming?nextAperture:aperture,incoming?nextApertureRadius:apertureRadius);
+ inside=max(inside,archAt(p,incoming?nextExtraAperture:extraAperture,incoming?nextExtraApertureRadius:extraApertureRadius));
+ vec3 bars=incoming?dividersB:dividersA;
+ if(bars.z>0.0){
+  vec4 box=incoming?nextAperture:aperture;
+  float radius=incoming?nextApertureRadius:apertureRadius;
+  float halfGap=bars.z*.5;
+  float paneWidth=(box.z-box.x-bars.z*2.0)/3.0;
+  inside=0.0;
+  for(int i=0;i<3;i++){
+   float x=box.x+float(i)*(paneWidth+bars.z);
+   inside=max(inside,archAt(p,vec4(x,box.y,x+paneWidth,bars.y-halfGap),radius));
+   inside=max(inside,archAt(p,vec4(x,bars.y+halfGap,x+paneWidth,box.w),radius));
+  }
  }
  return inside;
 }
@@ -86,6 +145,13 @@ vec3 sampleSheet(vec2 p){
 vec3 pigmentAt(vec2 p){return texture(field,p).rgb;}
 vec3 tinted(vec3 a){return mix(a,a*vec3(.55,.93,.9)+vec3(.025,.2,.17),${HOLD_OPTICS.tintStrength});}
 void main(){
+ if(fieldActive<.5 && holdActive<.5 && imageOpacity==1.0 && captureCode<0 &&
+    (sheetSize.x>0.0 || (aperture.x<=0.0 && aperture.y<=0.0 && aperture.z>=viewport.x && aperture.w>=viewport.y && apertureRadius==0.0))){
+  float inside=apertureAt(uv*viewport,false);
+  vec3 image=sampleFilm(filmA,uv,framingA,filmBounds);
+  if(sheetSize.x>0.0 && inside<1.0)image=mix(sampleSheet(uv),image,inside);
+  color=vec4(image,1.0);return;
+ }
  vec4 m=texture(holdField,uv);vec3 f=vec3(0);vec2 gradient=vec2(0),displacement=vec2(0);float density=0.0;
  if(reduced<.5 && fieldActive>.5){
   vec2 px=1.0/fieldSize,fluidUV=vec2(uv.x,1.0-uv.y);
@@ -97,15 +163,15 @@ void main(){
   displacement=bend*inversesqrt(1.0+dot(bend,bend)/${PIGMENT.maxRefraction*PIGMENT.maxRefraction}.0)/viewport;
  }
  if(reduced<.5 && holdActive>.5){vec2 h=1.0/holdSize;vec4 left=texture(holdField,uv-vec2(h.x,0)),right=texture(holdField,uv+vec2(h.x,0)),top=texture(holdField,uv-vec2(0,h.y)),bottom=texture(holdField,uv+vec2(0,h.y));vec2 slope=(revealing>.5?vec2(right.g-left.g,bottom.g-top.g):vec2(right.r-left.r,bottom.r-top.r))*holdSize/viewport;vec2 normal=slope/max(length(slope),.00001);float edge=revealing>.5?m.b:m.a;displacement+=normal*${HOLD_OPTICS.refraction}.0*edge/viewport;}
- vec3 a=sampleFilm(filmA,uv+displacement,framingA);
+ vec3 a=sampleFilm(filmA,uv+displacement,framingA,filmBounds);
  bool hasSheet=sheetSize.x>0.0;
- float inside=apertureAt((hasSheet?uv+displacement:uv)*viewport);
+ float inside=apertureAt((hasSheet?uv+displacement:uv)*viewport,false);
  // Growth and cancellation use the existing hold mask to open/restore the sheet.
  float currentOpening=max(inside,reduced>.5?0.0:m.r);
  if(hasSheet)a=mix(sampleSheet(uv+displacement),a,currentOpening);
  vec3 image=mix(a,tinted(a),reduced>.5?0.0:m.r);
- // The incoming-film reveal brings the original sheet and doorway back with it.
- if(revealing>.5 && reduced<.5){vec3 b=sampleFilm(filmB,uv+displacement,framingB);if(hasSheet)b=mix(sampleSheet(uv+displacement),b,inside);image=mix(tinted(a),b,m.g);image=mix(image,vec3(.93,.98,.96),m.b*.8);}
+ // Each incoming film restores its own openings as its sheet arrives.
+ if(revealing>.5 && reduced<.5){vec3 b=sampleFilm(filmB,uv+displacement,framingB,nextFilmBounds);if(hasSheet)b=mix(sampleSheet(uv+displacement),b,apertureAt((uv+displacement)*viewport,true));image=mix(tinted(a),b,m.g);image=mix(image,vec3(.93,.98,.96),m.b*.8);}
  else if(reduced<.5 && holdActive>.5){image=mix(image,vec3(.78,1.0,.94),m.a*${HOLD_OPTICS.rimStrength});}
  float marble=clamp(f.g/(f.r+.001),0.0,1.0);
  float crest=clamp(length(gradient)*.9,0.0,1.0);

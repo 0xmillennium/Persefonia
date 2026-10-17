@@ -47,6 +47,22 @@ class PublicIndexAdapterTest extends DiscoveryRepositoryTestDatabase {
     }
 
     @Test
+    void homepageCollectionsHaveIndependentLimitsAndExcludeOtherTypesAndHiddenResources() {
+        seedPublicIndexRows();
+        insertResource("CONTENT_PUBLISHING", "CONTENT_ITEM", "NOTE", "DETAIL",
+                "/en/notes/private-note", "NO_INDEX", "NOT_ELIGIBLE", "NOT_ELIGIBLE", "NOT_ELIGIBLE",
+                PUBLISHED_NEW, UPDATED, "private note");
+        assertThat(homepage.latestArticles(DiscoveryLanguage.EN, 2))
+                .extracting(entry -> entry.publicUrl())
+                .containsExactly("/en/articles/aurora-article", "/en/articles/no-match");
+        assertThat(homepage.latestNotes(DiscoveryLanguage.EN, 3))
+                .extracting(entry -> entry.publicUrl()).containsExactly("/en/notes/aurora-note");
+        assertThat(homepage.latestNotes(DiscoveryLanguage.TR, 3)).isEmpty();
+        assertThatThrownBy(() -> homepage.latestArticles(DiscoveryLanguage.EN, 4))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void publicSearchReturnsOnlyIndexAndSearchEligibleMatchingResources() {
         seedPublicIndexRows();
 

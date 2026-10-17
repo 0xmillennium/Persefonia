@@ -15,13 +15,16 @@ describe('native scene geometry', () => {
             expect(Math.min((right - left) / width!, (bottom - top) / height!)).toBeCloseTo(1);
         }
     });
-    it('holds the first film frame throughout aperture expansion, including its full-screen boundary', () => {
-        const playback = filmRange(0, 3780, 7785, 1800);
-        for (const progress of [0, .12, .25, .41, .42]) expect(frameAt(regionProgress(progress * 3780, playback.start, playback.end - playback.start))).toBe(0);
-        expect(openingState(.25).expansion).toBeGreaterThan(0);
-        expect(openingState(.25).expansion).toBeLessThan(1);
+    it('starts film and first-writing movement with the opening, without waiting for full screen', () => {
+        const pacing = writingPacing();
+        const playback = filmRange(0, pacing.hero, pacing.hero + pacing.statement + pacing.body + pacing.gap, pacing.body);
+        expect(frameAt(regionProgress(0, playback.start, playback.end - playback.start))).toBe(0);
+        expect(frameAt(regionProgress(FILM_SCROLL_STEP, playback.start, playback.end - playback.start))).toBe(1);
+        expect(openingState(FILM_SCROLL_STEP / pacing.hero).expansion).toBeGreaterThan(0);
+        expect(openingState(FILM_SCROLL_STEP / pacing.hero).expansion).toBeLessThan(1);
+        expect(writingBeat(FILM_SCROLL_STEP, 0, true).exit).toBeGreaterThan(0);
         expect(openingState(.42).expansion).toBe(1);
-        expect(frameAt(regionProgress(3780, playback.start, playback.end - playback.start))).toBeLessThan(191);
+        expect(frameAt(regionProgress(pacing.hero * .42, playback.start, playback.end - playback.start))).toBeGreaterThan(0);
     });
     it('spreads 192 frames across the measured writing sequence at one frame per scroll step', () => {
         const pacing = writingPacing();
@@ -38,7 +41,7 @@ describe('native scene geometry', () => {
             expect(frameAt(regionProgress(playback.end, playback.start, distance))).toBe(191);
         }
     });
-    it('gives all four writings the same reading plateau and exit distance', () => {
+    it('keeps later writings equally readable and gives all four the same exit distance', () => {
         const pacing = writingPacing();
         expect(pacing.transition).toBe(420);
         expect(pacing.reading).toBe(720);
@@ -47,12 +50,12 @@ describe('native scene geometry', () => {
         const tops = [0, pacing.hero, pacing.hero + pacing.statement, pacing.hero + pacing.statement + pacing.body + pacing.gap];
         tops.forEach((top, index) => {
             const initiallyOpen = index === 0;
-            const readStart = top + (initiallyOpen ? 0 : pacing.transition);
-            for (const offset of [0, 600, pacing.reading]) {
-                expect(writingBeat(readStart + offset, top, initiallyOpen)).toEqual({ entry: 1, exit: 0 });
+            const exitStart = top + (initiallyOpen ? 0 : pacing.transition + pacing.reading);
+            if (!initiallyOpen) for (const offset of [0, 600, pacing.reading]) {
+                expect(writingBeat(top + pacing.transition + offset, top)).toEqual({ entry: 1, exit: 0 });
             }
-            expect(writingBeat(readStart + pacing.reading + pacing.transition / 2, top, initiallyOpen).exit).toBeCloseTo(.5);
-            expect(writingBeat(readStart + pacing.reading + pacing.transition, top, initiallyOpen).exit).toBe(1);
+            expect(writingBeat(exitStart + pacing.transition / 2, top, initiallyOpen).exit).toBeCloseTo(.5);
+            expect(writingBeat(exitStart + pacing.transition, top, initiallyOpen).exit).toBe(1);
         });
         expect(pacing.transition / FILM_SCROLL_STEP).toBe(14);
         expect(pacing.reading / FILM_SCROLL_STEP).toBe(24);
@@ -64,9 +67,10 @@ describe('native scene geometry', () => {
         expect([1200, 800, 350, 100, 0].map(y => regionProgress(y, 100, 700))).toEqual([...forward].reverse());
     });
     it('keeps the selected gallery item still during a readable plateau', () => {
-        expect(galleryIndex(.1, 3)).toBe(0);
-        expect(galleryIndex(.3, 3)).toBe(0);
-        expect(galleryIndex(1, 3)).toBe(2);
+        expect(galleryIndex(.4, 3)).toBe(0);
+        expect(galleryIndex(.46, 3)).toBe(0);
+        expect(galleryIndex(0, 3)).toBe(-4);
+        expect(galleryIndex(1, 3)).toBe(6);
         expect(galleryIndex(.5, 3)).toBe(1);
         expect(galleryIndex(.75, 0)).toBe(0);
     });
@@ -97,16 +101,23 @@ describe('native scene geometry', () => {
         }
     });
 
-    it('steps exactly one gallery item in either direction and releases empty, single and edge states', () => {
-        expect(galleryWheelProgress(0, 5, 1)).toBe(.25);
-        expect(galleryWheelProgress(.25, 5, 1)).toBe(.5);
-        expect(galleryWheelProgress(.5, 5, -1)).toBe(.25);
-        expect(galleryWheelProgress(1, 5, 1)).toBeNull();
-        expect(galleryWheelProgress(0, 5, -1)).toBeNull();
-        for (const count of [0, 1]) {
-            expect(galleryWheelProgress(.5, count, 1)).toBeNull();
-            expect(galleryWheelProgress(.5, count, -1)).toBeNull();
+    it('takes three notches to center the first card and four to clear either end before releasing', () => {
+        for (const count of [1, 3, 8, 12]) {
+            let p = 1 / (count + 7);
+            expect(galleryIndex(p, count)).toBe(-3);
+            for (let step = 0; step < 3; step++) p = galleryWheelProgress(p, count, 1)!;
+            expect(galleryIndex(p, count)).toBe(0);
+            for (let step = 0; step < 4; step++) p = galleryWheelProgress(p, count, -1)!;
+            expect(galleryIndex(p, count)).toBe(-4);
+            expect(galleryWheelProgress(p, count, -1)).toBeNull();
+            p = (count + 3) / (count + 7);
+            expect(galleryIndex(p, count)).toBe(count - 1);
+            for (let step = 0; step < 4; step++) p = galleryWheelProgress(p, count, 1)!;
+            expect(galleryIndex(p, count)).toBe(count + 3);
+            expect(galleryWheelProgress(p, count, 1)).toBeNull();
         }
+        expect(galleryWheelProgress(.5, 0, 1)).toBeNull();
+        expect(galleryWheelProgress(.5, 0, -1)).toBeNull();
         expect(galleryWheelProgress(.5, 5, 0)).toBeNull();
     });
 

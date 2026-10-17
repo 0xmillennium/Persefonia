@@ -7,7 +7,7 @@ export function scrollAt(y: number, range: number): number { return clamp(range 
 export function otherFilm(film: Film): Film { return film === FILMS[0] ? FILMS[1] : FILMS[0]; }
 export type FrameKey = `${Film}:${number}`;
 export const keyFor = (film: Film, index: number): FrameKey => `${film}:${index}`;
-export interface PreparationHint { direction: 1|-1; speed: number }
+export interface PreparationHint { direction: 1|-1; speed: number; lookahead?: number }
 export interface Decoded { width: number; height: number; close(): void }
 export interface Loader<T extends Decoded> { (film: Film, index: number, signal: AbortSignal, attempt: number): Promise<T> }
 interface Request { key: FrameKey; film: Film; index: number; priority: number; attempt: number; controller: AbortController; id:number; lane?:"current"|"speculative" }
@@ -49,7 +49,7 @@ export class FrameCache<T extends Decoded> {
     // Prepare the neighbor that can finish before scroll reaches it. Always
     // prioritize the exact current target; this changes decode order only.
     const lead=hint?Math.min(10,Math.max(1,Math.ceil(Math.abs(hint.speed)*this.readinessSeconds))):1;
-    const ahead=hint?Math.min(10,Math.max(2,Math.ceil(Math.abs(hint.speed)*.18),lead+1)):1;
+    const ahead=hint?Math.min(10,Math.max(hint.lookahead??2,Math.ceil(Math.abs(hint.speed)*.18),lead+1)):1;
     const behind=hint?Math.min(4,ahead):0,direction=hint?.direction??1;
     for(let distance=1;distance<=Math.max(ahead,behind);distance++)for(const [filmOrder,target] of targets.entries()) {
       if(distance<=ahead)work.push({film:target.film,index:clamp(target.index+distance*direction,0,191),priority:10+Math.abs(distance-lead)*2+filmOrder});

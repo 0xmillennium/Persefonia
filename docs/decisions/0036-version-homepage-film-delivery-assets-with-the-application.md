@@ -26,6 +26,16 @@ Clean builds need no media service credentials or source films. Existing qualifi
 
 Publications and CMS covers remain Media Library responsibilities under ADR 0035. Authored homepage films are application presentation assets, not a parallel CMS or domain storage system.
 
+### Seekable video delivery
+
+The homepage also versions seekable H.264 delivery derivatives under `frontend/public/home-videos/`. Explicit `npm run home:videos:publish` consumes the qualified published WebP frames, checks their hashes, and encodes the same 192 poses at both existing dimensions. The preparation contract fixes the frame rate, quality, pixel format, three-frame keyframe interval and encoder version. Publication verifies frame count, dimensions, keyframe positions and full decoding, then records output hashes and source provenance. Ordinary builds check the matching manifests, qualification receipt, inventory and sizes without encoding or requiring FFmpeg.
+
+Runtime uses paused native video for plain scroll scrubbing and the existing GPU surface for active navigator/hold effects. The qualified WebP sequences remain the fallback when video delivery or decoding fails. Video URLs include their own immutable delivery identity; runtime media remain same-origin without a blob/MediaSource dependency or CSP relaxation. This adds approximately 34 MB to the versioned delivery set. Native video reduces repeated image decoding and GPU texture submission during plain scrubbing; physical-device and browser-specific performance still require runtime qualification.
+
+The explicitly approved waterfall background adds continuous playback alongside the two scroll-driven films. Its publication is independent: `npm run home:loop:publish` consumes the approved source at `.local/media/home/loop-video/loop video.mp4`, preserves its 24 fps and eight-second duration, and publishes silent 1280px/1920px H.264 faststart files and matching posters under `frontend/public/home-loops/`. The source stays outside public delivery. A separate immutable contract records the source hash, encoder, quality, dimensions, playback GOP, output hashes and full-decode receipt; ordinary builds validate the published inventory without accessing the source or encoding media. It does not weaken the scroll films' exact-pose or short-GOP qualification.
+
+Background selection cycles independently of playback mode. The waterfall uses native looping playback and refreshes shader textures from decoded-frame callbacks only during navigator/hold effects. Inactive, fully covered, hidden-page, menu-covered and reduced-motion playback pauses. The visible loop plays automatically without a separate playback button. A poster preserves usable presentation when playback is unavailable; the existing background gesture or film selection can retry playback. Background crop and opening geometry remain fixed for each viewport and source during scrolling, including both sides of a switch. The same server-rendered content and self-hosted CSP boundary continue to apply.
+
 ## Alternatives considered
 
 - Consume ignored prepared caches during production builds. Rejected because a clean CI checkout lacks those files and qualification provenance.

@@ -39,6 +39,16 @@ public class JdbcPublicHomepageContentQueryAdapter implements PublicHomepageCont
     }
 
     @Override
+    public List<PublicHomepageContentEntry> latestArticles(DiscoveryLanguage language, int limit) {
+        return find(language, List.of(DiscoverableResourceType.ARTICLE), limit);
+    }
+
+    @Override
+    public List<PublicHomepageContentEntry> latestNotes(DiscoveryLanguage language, int limit) {
+        return find(language, List.of(DiscoverableResourceType.NOTE), limit);
+    }
+
+    @Override
     public List<PublicHomepageContentEntry> latestResearch(DiscoveryLanguage language, int limit) {
         return find(language, List.of(DiscoverableResourceType.RESEARCH), limit);
     }

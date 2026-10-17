@@ -63,17 +63,20 @@ test('SSR publications, metadata, public destinations, CSP and self-hosted asset
     await assertStructure(page, 'EN');
     await expect(page.locator('[data-home-v2]')).toHaveAttribute('data-ready', 'true');
     await expect(page.locator('.home-projects__item')).toHaveCount(3);
-    await expect(page.locator('.home-writing__list>.gallery-card')).toHaveCount(3);
-    await expect(page.locator('.home-support, #research, #architecture, #about')).toHaveCount(0);
+    await expect(page.locator('.home-writing__list>.gallery-card')).toHaveCount(6);
+    await expect(page.locator('.home-support, #architecture, #about')).toHaveCount(0);
     await expect(page.locator('.film-controls, [data-film-switch], [data-film-retry], .location-system .controls')).toHaveCount(0);
     await expect(page.locator("link[rel='canonical']")).toHaveAttribute('href', `${process.env.PERSEFONIA_BROWSER_URL}/`);
     await expect(page.locator("meta[property='og:url']")).toHaveAttribute('content', `${process.env.PERSEFONIA_BROWSER_URL}/`);
-    for (const selector of ['.home-project h3 a', '.home-writing__list h3 a', '.home-section__more', '.contact-entry']) {
+    for (const selector of ['.home-project h3 a', '.home-writing__list h3 a', '.location-links nav a', '.contact-entry']) {
         const href = await page.locator(selector).first().getAttribute('href');
         expect((await page.request.get(href!)).status()).toBe(200);
     }
     expect(requests.every(url => new URL(url).origin === new URL(process.env.PERSEFONIA_BROWSER_URL!).origin)).toBe(true);
-    expect(requests.some(url => /pixi|mermaid|\.mp4/.test(url))).toBe(false);
+    expect(requests.some(url => /pixi|mermaid/.test(url))).toBe(false);
+    const videos = requests.filter(url => new URL(url).pathname.endsWith('.mp4'));
+    expect(videos.length).toBeGreaterThan(0);
+    expect(videos.every(url => /^\/assets\/home-videos\/[a-f0-9]{64}\/(?:960|1600)\/(?:robotic-arm|tree)\.mp4$/.test(new URL(url).pathname))).toBe(true);
     for (const name of ['hero', 'statements', 'capabilities', 'mark', 'gallery', 'location']) {
         await scene(page, name);
         await page.screenshot({ path: testInfo.outputPath(`${name}.png`) });
@@ -191,7 +194,12 @@ test('enabled empty and disabled promotion retain honest content states', async 
     setSettings("DELETE FROM discovery.discoverable_resources WHERE source_context='CONTENT_PUBLISHING'; DELETE FROM portfolio.project_localizations; DELETE FROM portfolio.projects");
     await visit(page);
     await assertStructure(page, 'EN');
-    await expect(page.locator('.home-empty')).toHaveCount(3);
+    await expect(page.locator('.home-empty')).toHaveCount(4);
+    await scene(page, 'gallery', .3);
+    for (const category of ['projects', 'articles', 'notes', 'research']) {
+        await page.locator(`input[value="${category}"]`).check();
+        await expect(page.locator(`.gallery-category[data-category="${category}"] .home-empty`)).toBeVisible();
+    }
     setSettings("UPDATE portfolio.site_presentation_settings SET promote_featured_projects=false,promote_latest_writing=false,promote_research_highlights=false");
     await page.reload({ waitUntil: 'networkidle' });
     await expect(page.locator('.home-empty')).toHaveCount(0);
@@ -212,8 +220,9 @@ test('no JS and unavailable enhancement retain publications and contact', async 
         await visit(page);
         await assertStructure(page, 'EN');
         await expect(page.locator('[data-home-v2]')).not.toHaveAttribute('data-enhanced', 'true');
+        await expect(page.locator('.gallery-instrument')).toBeHidden();
         await expect(page.locator('.home-project h3 a')).toHaveCount(3);
-        await expect(page.locator('.home-writing__list h3 a')).toHaveCount(3);
+        await expect(page.locator('.home-writing__list h3 a')).toHaveCount(6);
         await expect(page.locator('.home-support, .film-controls, .location-system .controls')).toHaveCount(0);
         await page.locator('.contact-entry').click();
         await expect(page).toHaveURL(/\/contact$/);
@@ -234,9 +243,9 @@ test('keyboard navigation, contrast and category input', async ({ page }) => {
     await scene(page, 'gallery');
     await page.locator('input[value="projects"]').focus();
     await page.keyboard.press('ArrowRight');
-    await expect(page.locator('input[value="writings"]')).toBeChecked();
+    await expect(page.locator('input[value="articles"]')).toBeChecked();
     await expect(page.locator('#writing')).toBeVisible();
-    const writing = page.locator('.home-writing__list h3 a').first();
+    const writing = page.locator('#articles h3 a').first();
     const destination = await writing.getAttribute('href');
     await writing.focus();
     await page.keyboard.press('Enter');

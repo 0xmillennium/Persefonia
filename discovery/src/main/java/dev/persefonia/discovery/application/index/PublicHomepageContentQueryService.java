@@ -7,5 +7,9 @@ import java.util.List;
 public interface PublicHomepageContentQueryService {
     List<PublicHomepageContentEntry> latestWriting(DiscoveryLanguage language, int limit);
 
+    List<PublicHomepageContentEntry> latestArticles(DiscoveryLanguage language, int limit);
+
+    List<PublicHomepageContentEntry> latestNotes(DiscoveryLanguage language, int limit);
+
     List<PublicHomepageContentEntry> latestResearch(DiscoveryLanguage language, int limit);
 }

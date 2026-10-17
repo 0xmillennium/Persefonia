@@ -1,6 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
 import { difference, pixels } from '../experiments/scroll-film-navigator/tests/pixels';
-async function visit(page: Page) { await page.goto('/', { waitUntil: 'networkidle' }); await expect(page.locator('[data-home-v2]')).toHaveAttribute('data-ready', 'true'); }
+async function visit(page: Page) {
+    await page.goto('/', { waitUntil: 'networkidle' });
+    await expect(page.locator('[data-home-v2]')).toHaveAttribute('data-ready', 'true');
+    await expect(page.locator('[data-home-loader]')).toBeHidden();
+}
 async function position(page: Page, scene: string, p: number) { await page.locator(`[data-scene="${scene}"]`).evaluate((node, p) => {
     const entry = Number.parseFloat((node as HTMLElement).style.getPropertyValue('--gallery-entry-distance')) || 0;
     const rect = node.getBoundingClientRect();
@@ -9,20 +13,176 @@ async function position(page: Page, scene: string, p: number) { await page.locat
 async function writingPosition(page: Page, scene: string, offset: number) { await page.locator(`[data-scene="${scene}"]`).evaluate((node, offset) => scrollTo(0, Math.ceil(node.getBoundingClientRect().top + scrollY + offset)), offset); }
 async function selectFilm(page: Page) { await page.locator('[data-home-v2]').evaluate(node => node.focus({ preventScroll: true })); await page.keyboard.press('f'); }
 async function presented(page: Page) { await expect(page.locator('[data-film-status]')).toHaveText(/(?:Tree|Robotic arm) · \d{3} \/ 192/); }
+test('desktop tree panes retain their frame and dividers through navigator rendering and scroll reversal', async ({ page }, info) => {
+    test.skip(info.project.name !== 'desktop-1440', 'Six-pane desktop tree composition');
+    await page.addInitScript(() => history.replaceState({ ...history.state, homepageV2: { film: 'tree' } }, ''));
+    await page.clock.install();
+    await visit(page);
+    await page.clock.pauseAt(await page.evaluate(() => Date.now() + 50));
+    const sheet = page.locator('.home-cinema__image');
+    const initial = await sheet.evaluate(node => node.style.maskImage);
+    const svg = decodeURIComponent(/data:image\/svg\+xml,([^"\)]+)/.exec(initial)![1]!);
+    // Six identical arches, arranged in three columns and two rows.
+    expect(svg).toContain('fill-rule="evenodd"');
+    const paths = [...svg.matchAll(/M([\d.]+) ([\d.]+)H([\d.]+)(A|L)/g)];
+    expect(paths).toHaveLength(6);
+    expect(paths.map(path => path[4])).toEqual(Array(6).fill('A'));
+    expect(new Set(paths.map(path => path[1])).size).toBe(3);
+    expect(new Set(paths.map(path => path[2])).size).toBe(2);
+    const panes = [...svg.matchAll(/M[\d.]+ ([\d.]+)H[\d.]+A([\d.]+) [\d.]+ 0 0 1 [\d.]+ [\d.]+V([\d.]+)/g)];
+    expect(panes).toHaveLength(6);
+    const heights = panes.map(pane => Number(pane[3]) - Number(pane[1]));
+    for (const height of heights) expect(height).toBeCloseTo(heights[0]!);
+    expect(new Set(panes.map(pane => pane[2])).size).toBe(1);
+    const nav = (await page.locator('.home-nav').boundingBox())!;
+    const prompt = (await page.locator('.hero-scroll').boundingBox())!;
+    expect(Math.min(...panes.map(pane => Number(pane[1]))) - nav.y - nav.height).toBeCloseTo(16);
+    expect(prompt.y - Math.max(...panes.map(pane => Number(pane[3])))).toBeCloseTo(16);
+    const clip = { x: 922, y: 410, width: 6, height: 30 };
+    const video = page.locator('video.film-fallback:visible'), bounds = await video.boundingBox();
+    await page.screenshot({ path: info.outputPath('tree-six-panes.png') });
+    const clips = [clip, { x: 838, y: 60, width: 6, height: 6 },
+        { x: 1172, y: 60, width: 6, height: 6 }, { x: 700, y: 220, width: 6, height: 6 },
+        { x: 700, y: 445, width: 6, height: 6 }, { x: 720, y: 700, width: 6, height: 6 }];
+    const native = [];
+    for (const sample of clips) native.push(await page.screenshot({ clip: sample }));
+    await page.mouse.move(120, 160);
+    await page.mouse.move(320, 170, { steps: 6 });
+    await page.clock.runFor(32);
+    await expect(page.locator('[data-home-v2]')).toHaveAttribute('data-gpu-sheet', 'true');
+    for (let i = 0; i < clips.length; i++)
+        expect(difference(native[i]!, await page.screenshot({ clip: clips[i]! })).mean).toBeLessThan(2);
+    await page.clock.fastForward(5000);
+    await position(page, 'hero', .3);
+    await page.evaluate(() => dispatchEvent(new Event('scroll')));
+    await page.clock.runFor(64);
+    await expect(sheet).not.toHaveCSS('mask-image', initial);
+    expect(await video.boundingBox()).toEqual(bounds);
+    await page.screenshot({ path: info.outputPath('tree-panes-expanding.png') });
+    // Cross the completion boundary despite native scroll rounding.
+    await position(page, 'hero', .43);
+    await page.evaluate(() => dispatchEvent(new Event('scroll')));
+    await page.clock.runFor(64);
+    await expect(sheet).toHaveCSS('mask-image', 'none');
+    expect(await video.boundingBox()).toEqual(bounds);
+    await position(page, 'hero', 0);
+    await page.evaluate(() => dispatchEvent(new Event('scroll')));
+    await page.clock.runFor(64);
+    await expect(sheet).toHaveCSS('mask-image', initial);
+});
+test('mobile tree has equal centered windows above and below the writing in native and navigator presentation', async ({ page }, info) => {
+    test.skip(info.project.name !== 'mobile-390', 'Paired portrait phone composition');
+    await page.addInitScript(() => history.replaceState({ ...history.state, homepageV2: { film: 'tree' } }, ''));
+    await page.clock.install();
+    await visit(page);
+    await expect(page.locator('[data-home-loader]')).toBeHidden();
+    await page.clock.pauseAt(await page.evaluate(() => Date.now() + 50));
+    const sheet = page.locator('.home-cinema__image');
+    const initial = await sheet.evaluate(node => node.style.maskImage);
+    const holes = [...initial.matchAll(/data:image\/svg\+xml,([^"\)]+)/g)].map(match => {
+        const svg = decodeURIComponent(match[1]!);
+        const path = /d="([^"]+)"/.exec(svg)![1]!;
+        const points = /Z M([\d.]+) ([\d.]+)H[\d.]+A([\d.]+) [\d.]+ 0 0 1 ([\d.]+) [\d.]+V([\d.]+)/.exec(path)!;
+        return { center: Number(points[1]), top: Number(points[2]), width: Number(points[3]) * 2, right: Number(points[4]), bottom: Number(points[5]) };
+    });
+    expect(holes).toHaveLength(2);
+    const [lower, upper] = holes;
+    for (const hole of holes) expect(hole.center).toBeCloseTo(195);
+    expect(lower!.width).toBeCloseTo(upper!.width);
+    expect(lower!.bottom - lower!.top).toBeCloseTo(upper!.bottom - upper!.top);
+    expect(lower!.bottom - lower!.top).toBeGreaterThan(250);
+    await expect(page.getByText('Independent thinking / deliberate engineering', { exact: true })).toHaveCount(0);
+    const nav = (await page.locator('.home-nav').boundingBox())!;
+    expect(upper!.top - nav.y - nav.height).toBeGreaterThanOrEqual(16);
+    const writing = (await page.locator('.hero-statement').boundingBox())!;
+    expect(lower!.top - writing.y - writing.height).toBeCloseTo(16);
+    expect(writing.y - upper!.bottom).toBeCloseTo(16);
+    const video = page.locator('video.film-fallback:visible'), bounds = await video.boundingBox();
+    await page.screenshot({ path: info.outputPath('tree-paired-windows.png') });
+    // Use flat sky away from branch edges, whose downsampling differs by renderer.
+    const clip = { x: Math.ceil(lower!.right - lower!.width + 16), y: Math.floor(lower!.bottom - 30), width: 12, height: 12 };
+    const native = await page.screenshot({ clip, scale: 'css' });
+    await page.mouse.move(20, 110);
+    await page.mouse.move(70, 120, { steps: 4 });
+    await page.clock.runFor(32);
+    await expect(page.locator('[data-home-v2]')).toHaveAttribute('data-gpu-sheet', 'true');
+    expect(difference(native, await page.screenshot({ clip, scale: 'css' })).mean).toBeLessThan(2);
+    await page.clock.fastForward(5000);
+    await position(page, 'hero', .3);
+    await page.evaluate(() => dispatchEvent(new Event('scroll')));
+    await page.clock.runFor(64);
+    await expect(sheet).not.toHaveCSS('mask-image', initial);
+    expect(await video.boundingBox()).toEqual(bounds);
+    await position(page, 'hero', 0);
+    await page.evaluate(() => dispatchEvent(new Event('scroll')));
+    await page.clock.runFor(64);
+    await expect(sheet).toHaveCSS('mask-image', initial);
+});
+test('constellation circles expose their stars and overlapping openings stay open', async ({ page }, info) => {
+    await visit(page);
+    const video = page.locator('video.film-fallback').first();
+    const background = page.locator('.home-cinema__image');
+    const initialMask = await background.evaluate(node => getComputedStyle(node).maskImage);
+    expect(initialMask.match(/radial-gradient/g)).toHaveLength(7);
+    const bounds = await video.boundingBox();
+    expect(bounds).not.toBeNull();
+    const sample = async (sx: number, sy: number) => {
+        const clip = { x: Math.round(bounds!.x + sx / 1600 * bounds!.width) - 3,
+            y: Math.round(bounds!.y + sy / 900 * bounds!.height) - 3, width: 6, height: 6 };
+        const expected = await video.evaluate((node, clip) => {
+            const video = node as HTMLVideoElement, rect = video.getBoundingClientRect();
+            const canvas = document.createElement('canvas');
+            canvas.width = canvas.height = 6;
+            const context = canvas.getContext('2d')!;
+            context.drawImage(video, (clip.x - rect.x) / rect.width * video.videoWidth,
+                (clip.y - rect.y) / rect.height * video.videoHeight,
+                clip.width / rect.width * video.videoWidth, clip.height / rect.height * video.videoHeight, 0, 0, 6, 6);
+            return [...context.getImageData(0, 0, 6, 6).data];
+        }, clip);
+        const actual = pixels(await page.screenshot({ clip, scale: 'css' }));
+        let error = 0;
+        for (let i = 0; i < 36; i++) for (let c = 0; c < 3; c++) error += Math.abs(actual.data[i * actual.channels + c]! - expected[i * 4 + c]!);
+        expect(error / (36 * 3)).toBeLessThan(8);
+    };
+    // Sample the glow below the top star, clear of the tablet navigation button.
+    await sample(1011, 130);
+    await sample(1228, 222);
+    // The intentionally overlapping lower pair must expose film, not refill with photo.
+    await sample(1137.5, 594);
+    await page.screenshot({ path: info.outputPath('constellation-opening.png') });
+    await position(page, 'hero', .15);
+    await expect(background).not.toHaveCSS('mask-image', initialMask);
+    // Shared projection preserves the intentional overlap of the two close circles.
+    const circles = await background.evaluate(node => [...node.style.maskImage.matchAll(/circle at ([\d.e+-]+)px ([\d.e+-]+)px, (?:transparent|rgba\([^)]*\)) ([\d.e+-]+)px/g)].map(m => [Number(m[1]), Number(m[2]), Number(m[3]) + .5]));
+    expect(circles).toHaveLength(7);
+    const a = circles[4]!, b = circles[5]!;
+    expect(Math.hypot(a[0]! - b[0]!, a[1]! - b[1]!)).toBeLessThan(a[2]! + b[2]!);
+    await expect(page.locator('[data-film-status]')).not.toHaveText('Robotic arm · 001 / 192');
+    expect(await video.boundingBox()).toEqual(bounds);
+    await page.screenshot({ path: info.outputPath('constellation-overlap.png') });
+    await position(page, 'hero', 0);
+    await expect(background).toHaveCSS('mask-image', initialMask);
+    expect(await video.boundingBox()).toEqual(bounds);
+});
 test('navigator paints and then releases the photo outside the opening doorway', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop-1440', 'Fine-pointer photo composition at the desktop review size');
+    await page.clock.install();
     await visit(page);
-    await expect(page.locator('[data-home-v2]')).toHaveAttribute('data-gpu-sheet', 'true');
+    await expect(page.locator('video.film-fallback').first()).toBeVisible();
     await expect(page.locator('[data-film-status]')).toHaveText('Robotic arm · 001 / 192');
-    // This empty region is outside the doorway and excludes all text and controls.
+    await page.clock.pauseAt(await page.evaluate(() => Date.now() + 50));
+    // This empty region is outside the openings and excludes all text and controls.
     const clip = { x: 120, y: 100, width: 480, height: 100 };
     const clean = await page.screenshot({ clip });
     await page.mouse.move(160, 145);
     await page.mouse.move(550, 155, { steps: 12 });
+    await page.clock.runFor(32);
+    await expect(page.locator('[data-home-v2]')).toHaveAttribute('data-gpu-sheet', 'true');
     const painted = await page.screenshot({ clip, path: testInfo.outputPath('photo-navigator.png') });
     expect(difference(clean, painted).changed).toBeGreaterThan(500);
     await page.mouse.move(700, 250);
-    await page.waitForTimeout(4700);
+    await page.clock.runFor(32);
+    await page.clock.fastForward(4700);
     const settled = await page.screenshot({ clip });
     expect(difference(clean, settled).changed).toBeLessThan(100);
     await expect(page.locator('[data-film-status]')).toHaveText('Robotic arm · 001 / 192');
@@ -31,23 +191,25 @@ test('hold opens the photo to the current frame and restores it after cancel or 
     test.skip(info.project.name === 'tablet-834', 'Desktop and native touch exercise the same composition');
     await page.clock.install();
     await visit(page);
-    await expect(page.locator('[data-home-v2]')).toHaveAttribute('data-gpu-sheet', 'true');
+    await expect(page.locator('video.film-fallback').first()).toBeVisible();
     await expect(page.locator('[data-home-loader]')).toBeHidden();
     // Capture overhead must not turn an early-release gesture into a completed hold.
     await page.clock.pauseAt(await page.evaluate(() => Date.now() + 50));
     const touch = info.project.name.startsWith('mobile');
     const point = touch ? { x: 78, y: 382 } : { x: 330, y: 180 };
-    // Both crops are outside the doorway, over the empty charcoal part of arm frame 001.
-    // They exclude text, controls, countdown, and the hold boundary.
-    const clip = touch ? { x: 25, y: 465, width: 15, height: 15 } : { x: 260, y: 115, width: 50, height: 30 };
+    // These crops stay outside both scroll films' openings, over charcoal in arm frame 001.
+    // The phone sample sits below the centered writing, away from controls/countdown/boundary.
+    const clip = touch ? { x: 80, y: 510, width: 15, height: 15 } : { x: 260, y: 115, width: 50, height: 30 };
     const session = touch ? await page.context().newCDPSession(page) : null;
     if (!touch) await page.mouse.move(point.x, point.y);
     const press = async () => { if (session) await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] }); else await page.mouse.down(); };
     const release = async () => { if (session) await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); else await page.mouse.up(); };
     const clean = await page.screenshot({ clip });
-    const doorway = await page.locator('.home-cinema__image').evaluate(node => getComputedStyle(node).clipPath);
+    const constellation = await page.locator('.home-cinema__image').evaluate(node => getComputedStyle(node).maskImage);
+    expect(constellation.match(/radial-gradient/g)).toHaveLength(7);
     await press();
     await page.clock.fastForward(1300);
+    await expect(page.locator('[data-home-v2]')).toHaveAttribute('data-gpu-sheet', 'true');
     await expect(page.locator('[data-hold-countdown]')).toBeVisible();
     const revealed = await page.screenshot({ clip });
     await page.screenshot({ path: info.outputPath('hold-current-frame.png') });
@@ -75,25 +237,25 @@ test('hold opens the photo to the current frame and restores it after cancel or 
     await release();
     await page.clock.fastForward(32);
     expect(difference(clean, await page.screenshot({ clip })).changed).toBeLessThan(5);
-    await expect(page.locator('.home-cinema__image')).toHaveCSS('clip-path', doorway);
+    await expect(page.locator('.home-cinema__image')).toHaveCSS('clip-path', 'none');
+    await expect(page.locator('.home-cinema__image')).toHaveCSS('mask-image', /data:image\/svg\+xml/);
     await page.screenshot({ path: info.outputPath('hold-switched.png') });
     await session?.detach();
 });
-test('film waits for full-screen expansion, then scrubs, reverses and keeps selection progress', async ({ page }, testInfo) => {
+test('film scrubs from the first scroll, reverses and keeps selection progress', async ({ page }, testInfo) => {
     await visit(page);
     const status = page.locator('[data-film-status]');
     const background = page.locator('.home-cinema__image');
     await expect.poll(() => background.evaluate(node => ({ x:node.getBoundingClientRect().x,y:node.getBoundingClientRect().y,width:node.getBoundingClientRect().width,height:node.getBoundingClientRect().height }))).toEqual({x:0,y:0,width:page.viewportSize()!.width,height:page.viewportSize()!.height});
-    await expect(background).toHaveCSS('clip-path', /path\(/);
-    const openingDoor = await background.evaluate(node => getComputedStyle(node).clipPath);
-    await page.screenshot({ path: testInfo.outputPath('shared-door-arm.png') });
+    await expect(background).toHaveCSS('mask-image', /radial-gradient/);
+    await page.screenshot({ path: testInfo.outputPath('constellation-arm.png') });
     for (const p of [0, .15, .3, .42, .5, .75, .5]) {
         await position(page, 'hero', p);
         await presented(page);
         const expected = await page.evaluate(() => {
             const hero = document.querySelector('[data-scene="hero"]')!.getBoundingClientRect();
             const mark = document.querySelector('[data-scene="mark"]')!.getBoundingClientRect();
-            const start = hero.top + scrollY + hero.height * .42, end = mark.top + scrollY + mark.height * .98;
+            const start = hero.top + scrollY, end = mark.top + scrollY + mark.height * .98;
             return Math.round(Math.max(0, Math.min(1, (scrollY - start) / (end - start))) * 191);
         });
         await expect(status).toHaveText(`Robotic arm · ${String(expected + 1).padStart(3, '0')} / 192`);
@@ -107,12 +269,14 @@ test('film waits for full-screen expansion, then scrubs, reverses and keeps sele
     await expect(status).toHaveText(before!.replace('Robotic arm', 'Tree'));
     await position(page, 'hero', .3);
     await presented(page);
-    await expect(status).toHaveText('Tree · 001 / 192');
+    await expect(status).not.toHaveText('Tree · 001 / 192');
     await expect(page.locator('[data-home-v2]')).toHaveAttribute('data-film', 'tree');
     await position(page, 'hero', 0);
-    await expect(background).toHaveCSS('clip-path', openingDoor);
+    const masked = testInfo.project.name !== 'tablet-834';
+    await expect(background).toHaveCSS('clip-path', masked ? 'none' : /path\(/);
+    await expect(background).toHaveCSS('mask-image', masked ? /data:image\/svg\+xml/ : 'none');
     await page.waitForTimeout(500);
-    await page.screenshot({ path: testInfo.outputPath('shared-door-tree.png') });
+    await page.screenshot({ path: testInfo.outputPath('tree-door.png') });
 });
 test('each wheel notch advances four frames and the film finishes immediately before the gallery cover', async ({ page }, info) => {
     test.skip(info.project.name === 'tablet-834', 'Desktop and portrait playback geometry');
@@ -124,7 +288,7 @@ test('each wheel notch advances four frames and the film finishes immediately be
     const range = await page.evaluate(() => {
         const hero = document.querySelector('[data-scene="hero"]')!.getBoundingClientRect();
         const mark = document.querySelector('[data-scene="mark"]')!.getBoundingClientRect();
-        const start = hero.top + scrollY + hero.height * .42, end = mark.top + scrollY + mark.height * .98;
+        const start = hero.top + scrollY, end = mark.top + scrollY + mark.height * .98;
         return { start, end, step: (end - start) / 191 };
     });
     expect(range.step).toBeCloseTo(30, 1);
@@ -161,28 +325,36 @@ test('film wheel glides through intermediate positions and yields to native inpu
     await expect(page.locator('[data-home-loader]')).toBeHidden();
     const start = await page.locator('[data-scene="hero"]').evaluate(node => {
         const rect = node.getBoundingClientRect();
-        return rect.top + scrollY + rect.height * .42 + 20 * 30;
+        return rect.top + scrollY + 20 * 30;
     });
     await page.evaluate(y => scrollTo(0, y), start);
     await expect(page.locator('[data-film-status]')).toHaveText('Robotic arm · 021 / 192');
     const origin = await page.evaluate(() => scrollY);
-    const recording = page.evaluate(() => new Promise<Array<{ y: number; frame: string | null }>>(resolve => {
+    const recording = page.evaluate(() => new Promise<{ samples: Array<{ y: number; frame: string | null }>; presented: number[]; native: boolean }>(resolve => {
         const samples: Array<{ y: number; frame: string | null }> = [];
+        const video = document.querySelector<HTMLVideoElement>('video.film-fallback:not([hidden])');
+        const presented: number[] = [];
+        let callback = 0;
+        const onFrame: VideoFrameRequestCallback = (_now, metadata) => {
+            presented.push(1 + Math.round(metadata.mediaTime * 30));
+            callback = video!.requestVideoFrameCallback(onFrame);
+        };
+        if (video) callback = video.requestVideoFrameCallback(onFrame);
         const started = performance.now();
         const sample = () => {
             samples.push({ y: scrollY, frame: document.querySelector('[data-film-status]')!.textContent });
             if (performance.now() - started < 450) requestAnimationFrame(sample);
-            else resolve(samples);
+            else { if (video) video.cancelVideoFrameCallback(callback); resolve({ samples, presented, native: !!video }); }
         };
         requestAnimationFrame(sample);
     }));
     await page.mouse.wheel(0, 120 * wheelScale);
-    const samples = await recording;
+    const { samples, presented, native } = await recording;
     const positions = samples.map(sample => sample.y);
     expect(new Set(positions).size).toBeGreaterThan(3);
     expect(positions.every((value, index) => index === 0 || value >= positions[index - 1]!)).toBe(true);
     expect(positions.at(-1)).toBeCloseTo(origin + 120, 0);
-    expect(samples.some(sample => /02[234] \/ 192/.test(sample.frame ?? ''))).toBe(true);
+    expect(native ? presented.some(frame => frame >= 22 && frame <= 24) : samples.some(sample => /02[234] \/ 192/.test(sample.frame ?? ''))).toBe(true);
     await expect(page.locator('[data-film-status]')).toHaveText('Robotic arm · 025 / 192');
     await page.mouse.wheel(0, 120 * wheelScale);
     await page.evaluate(() => scrollTo(0, 300));
@@ -201,11 +373,11 @@ test('gallery wheel pulses select one adjacent item and release both boundaries'
     const wheel = (delta: number) => page.mouse.wheel(0, delta * wheelScale);
     await visit(page);
     await expect(page.locator('[data-home-loader]')).toBeHidden();
-    await position(page, 'gallery', .13);
+    await position(page, 'gallery', .4);
     const counter = page.locator('[data-gallery-position]');
     await expect(counter).toHaveText('1 / 3');
     const galleryHeight = await page.locator('[data-scene="gallery"]').evaluate(node => node.getBoundingClientRect().height - (Number.parseFloat((node as HTMLElement).style.getPropertyValue('--gallery-entry-distance')) || 0));
-    expect(galleryHeight).toBeCloseTo(page.viewportSize()!.height * 1.8, 1);
+    expect(galleryHeight).toBeCloseTo(page.viewportSize()!.height * 4.6, 1);
     for (const [delta, label] of [[120, '2 / 3'], [240, '3 / 3'], [-100, '2 / 3'], [-120, '1 / 3']] as const) {
         await wheel(delta);
         await expect(counter).toHaveText(label);
@@ -213,18 +385,19 @@ test('gallery wheel pulses select one adjacent item and release both boundaries'
     const first = await page.evaluate(() => scrollY);
     await wheel(-120);
     await expect.poll(() => page.evaluate(() => scrollY)).toBeLessThan(first);
-    await position(page, 'gallery', .82);
+    await position(page, 'gallery', .54);
     await expect(counter).toHaveText('3 / 3');
     const last = await page.evaluate(() => scrollY);
     await wheel(120);
     await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(last);
-    await position(page, 'gallery', .13);
+    await position(page, 'gallery', .4);
     await expect(counter).toHaveText('1 / 3');
-    await page.locator('input[value="writings"]').check();
+    await page.locator('input[value="articles"]').check();
     await page.mouse.move(page.viewportSize()!.width / 2, page.viewportSize()!.height / 2);
+    await page.locator('#articles h3 a').first().focus();
     await wheel(120);
-    await expect(counter).toHaveText('2 / 3');
-    await expect(page.locator('input[value="writings"]')).toBeChecked();
+    await expect(counter).toHaveText('2 / 2');
+    await expect(page.locator('input[value="articles"]')).toBeChecked();
     await expect.poll(() => page.locator('.gallery-card').evaluateAll(nodes => nodes.flatMap(n => n.getAnimations()).length)).toBe(0);
 });
 test('wheel reversal returns from the gallery through the film boundary to the top', async ({ page }, info) => {
@@ -239,8 +412,8 @@ test('wheel reversal returns from the gallery through the film boundary to the t
     await expect(page.locator('[data-film-status]')).toHaveText('Robotic arm · 001 / 192');
     await expect(page.locator('.hero-writing-text').first()).toHaveCSS('opacity', '1');
     await expect(page.locator('[data-scene-wipe]')).toBeHidden();
-    // Also exercise a fractional start directly: this was the trapped position.
-    const boundary = await page.locator('[data-scene="hero"]').evaluate(node => node.getBoundingClientRect().top + scrollY + node.getBoundingClientRect().height * .42);
+    // Also exercise a single-pixel position immediately above the start.
+    const boundary = await page.locator('[data-scene="hero"]').evaluate(node => node.getBoundingClientRect().top + scrollY + 1);
     await page.evaluate(y => scrollTo(0, Math.ceil(y)), boundary);
     await page.mouse.wheel(0, -120);
     await expect.poll(() => page.evaluate(() => scrollY)).toBeLessThan(boundary);
@@ -248,7 +421,7 @@ test('wheel reversal returns from the gallery through the film boundary to the t
 test('second statement resolves from word blobs and exits through individual slits', async ({ page }, info) => {
     await visit(page);
     await expect(page.locator('[data-home-loader]')).toBeHidden();
-    await expect(page.locator('.statement-word-text')).toHaveText(['Curious', 'by', 'nature.', 'Engineering', 'by', 'choice.']);
+    await expect(page.locator('.statement-word-text')).toHaveText(['Curious', 'by', 'nature', 'Engineering', 'by', 'choice']);
     const reading = () => page.locator('.statement-word').evaluateAll(nodes => nodes.map(node => {
         const filter=(node as HTMLElement).style.filter;
         const id=filter.match(/#([\w-]+)/)?.[1];
@@ -293,7 +466,7 @@ test('second statement resolves from word blobs and exits through individual sli
 test('first writing enters and exits through per-row slits from left to right', async ({ page }, info) => {
     await visit(page);
     await expect(page.locator('[data-home-loader]')).toBeHidden();
-    await expect(page.locator('.hero-writing-text')).toHaveText(['Clarity is', 'engineered.']);
+    await expect(page.locator('.hero-writing-text')).toHaveText(['Clarity is', 'engineered']);
     await expect(page.locator('.hero-writing-text').first()).toHaveCSS('text-transform', 'none');
     await expect(page.locator('.hero-writing-text').last()).toHaveCSS('text-transform', 'uppercase');
     for (const selector of ['.hero-writing-text', '.hero-writing-visual']) {
@@ -310,7 +483,7 @@ test('first writing enters and exits through per-row slits from left to right', 
     await position(page, 'hero', 0);
     await expect.poll(async () => (await reading()).every(row => row.hidden && row.opacity === '')).toBe(true);
     await page.screenshot({ path: info.outputPath('writing-open.png') });
-    await writingPosition(page, 'hero', 720 + 420 * .35);
+    await writingPosition(page, 'hero', 420 * .35);
     await expect.poll(async () => (await reading()).every(row => !row.hidden)).toBe(true);
     const partial = await reading();
     const vertical = (value: string) => Number(value.match(/,\s*(-?[\d.]+)px/)![1]);
@@ -318,11 +491,11 @@ test('first writing enters and exits through per-row slits from left to right', 
     expect(vertical(partial[0]!.transforms[0]!)).toBeLessThan(vertical(partial[1]!.transforms[0]!));
     await page.screenshot({ path: info.outputPath('writing-pulled.png') });
     expect(await reading()).toEqual(partial);
-    await writingPosition(page, 'hero', 720 + 420 * .8);
+    await writingPosition(page, 'hero', 420 * .8);
     await page.screenshot({ path: info.outputPath('writing-closing.png') });
-    await writingPosition(page, 'hero', 720 + 420 * .35);
+    await writingPosition(page, 'hero', 420 * .35);
     await expect.poll(reading).toEqual(partial);
-    await writingPosition(page, 'hero', 1141);
+    await writingPosition(page, 'hero', 421);
     await expect.poll(async () => (await reading()).every(row => row.hidden && row.opacity === '0')).toBe(true);
     await position(page, 'hero', 0);
     await expect.poll(async () => (await reading()).every(row => row.hidden && row.opacity === '')).toBe(true);
@@ -360,10 +533,11 @@ test('gallery departure removes hidden keyboard targets and transfers focus visi
         return { x:matrix.m41, scaleX:matrix.m11, scaleY:matrix.m22, opacity:style.opacity, clip:style.clipPath };
     });
     const outgoing = await departure();
-    expect(outgoing.x).toBeLessThan(0);
+    expect(outgoing.x).toBe(0);
+    await expect(page.locator('[data-scene="gallery"]')).toHaveAttribute('data-gallery-empty', 'true');
     expect(outgoing.scaleX).toBe(1);
     expect(outgoing.scaleY).toBe(1);
-    expect(outgoing.clip).toBe('none');
+    expect(outgoing.opacity).toBe('1');
     await expect(page.locator('.location-links nav .footer-rise').first()).toHaveCSS('opacity', '0');
     await position(page, 'location', .075);
     await expect.poll(async () => {
@@ -376,10 +550,11 @@ test('gallery departure removes hidden keyboard targets and transfers focus visi
     await expect(page.locator('.location-links nav a').first()).toHaveJSProperty('inert', false);
     await position(page, 'gallery', .945);
     await expect.poll(departure).toEqual(outgoing);
-    await expect(page.locator('.home-nav nav a').first()).toBeFocused();
+    const menuToggle = page.locator('[data-menu-toggle]');
+    await expect(await menuToggle.isVisible() ? menuToggle : page.locator('.home-nav nav a').first()).toBeFocused();
     await position(page, 'gallery', .3);
     await expect.poll(() => page.locator('.gallery-face').evaluate(node => node.inert)).toBe(false);
-    await page.locator('input[value="writings"]').check();
+    await page.locator('input[value="articles"]').check();
 });
 test('reduced motion uses readable static sections on initial and live preference changes', async ({ page }) => {
     await visit(page);
@@ -390,7 +565,7 @@ test('reduced motion uses readable static sections on initial and live preferenc
         const face = page.locator(`[data-scene="${scene}"] .scene-face`);
         await expect.poll(() => face.evaluate(node => ({ position:getComputedStyle(node).position,clip:getComputedStyle(node).clipPath,inert:node.inert }))).toEqual({ position:'relative',clip:'none',inert:false });
     }
-    await page.locator('input[value="writings"]').check();
+    await page.locator('input[value="articles"]').check();
     for (const link of await page.locator('#writing h3 a').all()) await expect(link).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(await page.evaluate(() => innerWidth + 1));
     await page.reload({waitUntil:'networkidle'});
@@ -401,40 +576,58 @@ test('reduced motion uses readable static sections on initial and live preferenc
     await expect.poll(() => page.locator('.gallery-face').evaluate(node => getComputedStyle(node).position)).toBe('fixed');
     await expect.poll(() => page.locator('.gallery-face').evaluate(node => node.inert)).toBe(false);
 });
-test('liquid navigator remains visible over the gallery and suspends with reduced motion', async ({ page }, info) => {
-    test.skip(info.project.name.startsWith('mobile'), 'Touch deliberately has no synthetic fine-pointer trails.');
+test('gallery cover hides the live navigator trail and a quick reversal reveals it until it fades', async ({ page }, info) => {
+    await page.clock.install();
     await visit(page);
+    const canvas = page.locator('[data-film-canvas]');
+    const coveredByGallery = () => canvas.evaluate(node => {
+        const environment = node.closest('.home-environment');
+        const cover = document.querySelector('[data-scene-wipe]')!;
+        return !!environment && Number(getComputedStyle(environment).zIndex) < Number(getComputedStyle(cover).zIndex);
+    });
+    // The final film pose is the same on both sides of the cover. This lets
+    // pixel differences identify the trail, rather than a changed film frame.
+    await position(page, 'mark', .979);
+    await expect(page.locator('[data-film-status]')).toHaveText('Robotic arm · 192 / 192');
+    await page.clock.pauseAt(await page.evaluate(() => Date.now() + 50));
+    await expect(page.locator('[data-scene-wipe]')).toBeHidden();
+    // Empty left margin: gallery tilt, labels and the pointer cannot affect it.
+    const clip = { x: 0, y: 400, width: 16, height: 120 };
+    const clean = await page.screenshot({ clip, scale: 'css' });
     await position(page, 'gallery', .25);
-    await page.waitForTimeout(200);
-    const clip = { x: 120, y: 460, width: 180, height: 100 };
-    const before = await page.screenshot({ clip });
-    // Capture during native pointer movement. Screenshot IPC can outlast a
-    // deliberately decaying trail, particularly with software GPU tracing.
-    let moving = true;
-    const movement = (async () => {
-        for (let i = 0; moving; i++) {
-            await page.mouse.move(i % 2 ? 280 : 130, 510, { steps: 8 });
-            await page.waitForTimeout(30);
-        }
-    })();
-    let after: Buffer;
-    try {
-        await page.waitForTimeout(100);
-        after = await page.screenshot({ clip });
-    } finally {
-        moving = false;
-        await movement;
-    }
-    expect(difference(before, after).changed).toBeGreaterThan(100);
+    await page.evaluate(() => dispatchEvent(new Event('scroll')));
+    await page.clock.runFor(64);
+    const covered = await page.screenshot({ clip, scale: 'css' });
+    await page.mouse.move(30, 300);
+    await page.mouse.move(30, 600, { steps: 6 });
+    await page.mouse.move(100, 630);
+    await page.clock.runFor(32);
+    await expect(page.locator('[data-home-v2]')).toHaveAttribute('data-gpu-sheet', 'true');
+    await expect(canvas).toHaveCSS('opacity', '1');
+    expect(await coveredByGallery()).toBe(true);
+    expect(difference(covered, await page.screenshot({ clip, scale: 'css' })).changed).toBe(0);
+    await page.screenshot({ path: info.outputPath('navigator-hidden-under-gallery.png') });
+    await position(page, 'mark', .979);
+    await page.evaluate(() => dispatchEvent(new Event('scroll')));
+    await page.clock.runFor(64);
+    await expect(page.locator('[data-scene-wipe]')).toBeHidden();
+    expect(difference(clean, await page.screenshot({ clip, scale: 'css' })).changed).toBeGreaterThan(100);
+    await page.screenshot({ path: info.outputPath('navigator-revealed-on-reversal.png') });
+    await page.clock.fastForward(5000);
+    await expect(canvas).toHaveCSS('opacity', '0');
+    expect(difference(clean, await page.screenshot({ clip, scale: 'css' })).mean).toBeLessThan(.1);
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    await page.waitForTimeout(100);
-    const quiet = await page.screenshot({ clip });
-    await page.mouse.move(140, 510, { steps: 12 });
-    expect(difference(quiet, await page.screenshot({ clip })).changed).toBe(0);
+    await page.clock.runFor(64);
+    const quiet = await page.screenshot({ clip, scale: 'css' });
+    await page.mouse.move(30, 300);
+    await page.mouse.move(30, 600, { steps: 6 });
+    await page.clock.runFor(64);
+    expect(difference(quiet, await page.screenshot({ clip, scale: 'css' })).changed).toBe(0);
 });
 test('failed incoming frames retain the outgoing film and recover through explicit retry', async ({ page }) => {
     let fail = true;
     await page.route('**/tree/frame_*.webp*', route => fail ? route.fulfill({ status: 503, body: 'temporarily unavailable' }) : route.continue());
+    await page.route('**/tree.mp4*', route => fail ? route.fulfill({ status: 503, body: 'temporarily unavailable' }) : route.continue());
     await visit(page);
     await position(page, 'hero', .3);
     await selectFilm(page);
@@ -618,26 +811,26 @@ test('gallery arrives on staggered dark columns above the retained film', async 
     await expect.poll(async () => (await translations())[0]).toBeLessThan(page.viewportSize()!.height);
     const steps = await translations();
     expect(steps[0]).toBeLessThan(steps.at(-1)!);
-    await expect(page.locator('[data-film-canvas]')).toHaveAttribute('data-foreground', 'false');
+    expect(await page.locator('[data-film-canvas]').evaluate(node => !!node.closest('.home-environment'))).toBe(true);
     await page.screenshot({ path: info.outputPath('gallery-curtain.png') });
     await page.evaluate(start => scrollTo(0, start + innerHeight * .3), coverStart);
     await expect.poll(async () => (await translations())[0]).toBe(0);
     expect((await translations()).at(-1)).toBeGreaterThan(0);
-    await expect(page.locator('[data-gallery-position]')).toHaveText('1 / 3');
+    await expect(page.locator('[data-gallery-position]')).toHaveText('0 / 3');
     await expect.poll(() => page.locator('.gallery-face').evaluate(node => Number(getComputedStyle(node).opacity))).toBeCloseTo(2 / 3, 1);
     const middle = await translations();
     await page.evaluate(start => scrollTo(0, start + innerHeight * .6), coverStart);
     await expect.poll(translations).toEqual(Array(info.project.name.startsWith('mobile') ? 6 : 12).fill(0));
-    await expect(page.locator('[data-gallery-position]')).toHaveText('1 / 3');
-    await expect(page.locator('[data-film-canvas]')).toHaveAttribute('data-foreground', 'false');
+    await expect(page.locator('[data-gallery-position]')).toHaveText('0 / 3');
+    expect(await page.locator('[data-film-canvas]').evaluate(node => !!node.closest('.home-environment'))).toBe(true);
     await page.evaluate(start => scrollTo(0, start + innerHeight * .3), coverStart);
     await expect.poll(translations).toEqual(middle);
     await position(page, 'gallery', .3);
     await expect.poll(() => translations()).toEqual(Array(info.project.name.startsWith('mobile') ? 6 : 12).fill(0));
-    await expect(page.locator('[data-film-canvas]')).toHaveAttribute('data-foreground', 'true');
-    await expect.poll(() => page.locator('[data-film-fallback]').evaluate(node => !node.hidden && (node as HTMLImageElement).naturalWidth > 0 && getComputedStyle(node).opacity === '1')).toBe(true);
+    expect(await page.locator('[data-film-canvas]').evaluate(node => !!node.closest('.home-environment'))).toBe(true);
+    await expect(page.locator('[data-film-fallback]')).toBeHidden();
     await position(page, 'mark', .5);
-    await expect(page.locator('[data-film-canvas]')).toHaveAttribute('data-foreground', 'false');
+    expect(await page.locator('[data-film-canvas]').evaluate(node => !!node.closest('.home-environment'))).toBe(true);
     await expect(page.locator('[data-scene-wipe]')).toBeHidden();
 });
 test('missing critical hero media releases the loader to readable content without claiming readiness', async ({ page }) => {
@@ -654,16 +847,17 @@ test('gallery category, navigation and history restore film and scene', async ({
     await selectFilm(page);
     await expect(page.locator('[data-home-v2]')).toHaveAttribute('data-film', 'tree');
     await position(page, 'gallery', .5);
-    await page.locator('input[value="writings"]').check();
+    await page.locator('input[value="articles"]').check();
     await page.waitForTimeout(350);
     const y = await page.evaluate(() => scrollY);
-    await page.locator('.home-writing__list h3 a').nth(1).click();
+    await page.locator('#articles a[href="/en/articles/fixture-writing-2"]').focus();
+    await page.keyboard.press('Enter');
     await expect(page).toHaveURL(/\/en\/articles\/fixture-writing-2$/);
     await expect(page.locator('.navigation-cover')).toHaveCount(0);
     await page.goBack({ waitUntil: 'networkidle' });
     await expect(page.locator('[data-home-v2]')).toHaveAttribute('data-ready', 'true');
     await expect(page.locator('[data-home-v2]')).toHaveAttribute('data-film', 'tree');
-    await expect(page.locator('input[value="writings"]')).toBeChecked();
+    await expect(page.locator('input[value="articles"]')).toBeChecked();
     await expect.poll(() => page.evaluate(() => scrollY)).toBe(y);
     await expect(page.locator('[data-home-loader]')).toBeHidden();
     await page.goForward({ waitUntil: 'networkidle' });
@@ -723,7 +917,7 @@ test('reduced motion and blocked WebGL preserve semantic content and controls', 
         await visit(page);
         await position(page, 'gallery', .2);
         await expect(page.locator('.home-project h3 a').first()).toBeVisible();
-        await page.locator('input[value="writings"]').check();
+        await page.locator('input[value="articles"]').check();
         await expect(page.locator('#writing')).toBeVisible();
         await page.screenshot({ path: testInfo.outputPath(`${mode}.png`) });
         await context.close();
