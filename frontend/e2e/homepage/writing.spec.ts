@@ -50,7 +50,7 @@ test('second statement resolves from word blobs and exits through individual sli
   await expect
     .poll(async () => {
       const words = await reading();
-      return words[0]!.blur < words[5]!.blur;
+      return words[0]!.blur < words[5]!.blur * 0.5;
     })
     .toBe(true);
   const first = await reading();

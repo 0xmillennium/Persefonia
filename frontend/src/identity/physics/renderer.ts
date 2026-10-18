@@ -40,11 +40,12 @@ export class Renderer {
   ): void {
     fragments.forEach((b) => {
       const p = this.nodes.get(b.geometry.id)!;
-      this.attribute(
-        p,
-        'transform',
-        `translate(${b.position.x} ${b.position.y}) rotate(${(b.angle * 180) / Math.PI})`,
-      );
+      const degrees = (b.angle * 180) / Math.PI;
+      const transform =
+        Math.abs(degrees) > 1e-4
+          ? `translate(${b.position.x} ${b.position.y}) rotate(${degrees})`
+          : `translate(${b.position.x} ${b.position.y})`;
+      this.attribute(p, 'transform', transform);
     });
     this.attribute(this.navigator, 'cx', String(navigator.position.x));
     this.attribute(this.navigator, 'cy', String(navigator.position.y));
