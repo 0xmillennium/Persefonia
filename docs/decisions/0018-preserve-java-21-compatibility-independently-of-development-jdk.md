@@ -4,7 +4,7 @@
 |---|---|
 | Status | Accepted |
 | Date | 2026-09-03 |
-| Scope | architecture / runtime / compatibility |
+| Scope | architecture / operations |
 | Supersedes | none |
 | Superseded by | none |
 

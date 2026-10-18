@@ -21,14 +21,7 @@ afterAll(() => {
   );
 });
 it.each(seeds)('seed %i converges without invariant failures', (seed) => {
-  let runtimeFailure: string | null = null;
-  const result = stressRun(seed, 45, (core) => {
-    const advance = core.stepFixed.bind(core);
-    core.stepFixed = (...args) => {
-      advance(...args);
-      runtimeFailure ??= core.runtimeFailure();
-    };
-  });
+  const result = stressRun(seed, 45);
   results.push({
     seed,
     passed: result.passed,
@@ -44,7 +37,7 @@ it.each(seeds)('seed %i converges without invariant failures', (seed) => {
       JSON.stringify({ fixture: seedFixture(seed), ...result }, null, 2),
     );
   }
-  expect(runtimeFailure, `live guard in seed ${seed}`).toBeNull();
+  expect(result.failure, `live guard in seed ${seed}`).toBeNull();
   expect(
     result.passed,
     `seed ${seed}: ${result.failure}; error ${Math.max(...result.snapshot.fragments.map((b) => b.homeAnchorError))}; energy ${result.snapshot.energy}`,

@@ -263,13 +263,15 @@ it.each([1, 2, 3, 4, 5])(
           elapsedSeconds: 0.008,
         },
       ]);
-      expect(invariantFailure(core.getSnapshot())).toBeNull();
+      expect(core.runtimeFailure()).toBeNull();
     }
     core.stepStroke([{ x: 0, y: 0, active: false }]);
     for (let s = 0; s < 45 / FIXED_DT && !core.isRest(); s++) {
       core.stepFixed();
-      expect(invariantFailure(core.getSnapshot())).toBeNull();
+      expect(core.runtimeFailure()).toBeNull();
     }
-    expect(core.isRest()).toBe(true);
+    const snapshot = core.getSnapshot();
+    expect(invariantFailure(snapshot)).toBeNull();
+    expect(snapshot.rest).toBe(true);
   },
 );

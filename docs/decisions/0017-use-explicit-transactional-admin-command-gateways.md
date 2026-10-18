@@ -4,47 +4,40 @@
 |---|---|
 | Status | Accepted |
 | Date | 2026-09-02 |
-| Scope | architecture / transactions / security |
+| Scope | architecture / persistence / security |
 | Supersedes | none |
 | Superseded by | none |
 
 ## Context
 
-Persefonia requires mandatory Audit records for important admin mutations to commit atomically with their source changes. Some existing mutation paths expose concrete application services directly to web controllers or rely on transactions scoped only to repository work. Those shapes cannot coordinate a complete use case that will later include both source mutation and Audit append.
-
-Admin route protection is also only an early guard. Application commands can be invoked outside an HTTP controller, so source application services must remain the authoritative mutation-authorization boundary. Expected validation and business rejection must stay distinct from unexpected persistence, transaction, or Audit failures so transaction rollback remains reliable.
-
-This decision builds on, and does not supersede, [ADR 0004](0004-use-modular-monolith-with-app-composition-root.md), [ADR 0005](0005-keep-domain-modules-framework-free.md), [ADR 0008](0008-require-owner-authorization-for-admin-mutations.md), [ADR 0010](0010-use-spring-data-jdbc-through-persistence-adapters.md), and [ADR 0016](0016-use-post-commit-operational-side-effects.md).
+Mandatory Audit records for admin mutations must commit atomically with their source domain changes ([ADR 0016](0016-use-post-commit-operational-side-effects.md)). Exposing concrete application services directly to controllers or relying on repository-scoped transactions cannot coordinate a complete use case across source mutation, Discovery projection, and Audit append while keeping application modules framework-free ([ADR 0005](0005-keep-domain-modules-framework-free.md)).
 
 ## Decision
 
-Every state-changing admin use case is exposed through a narrow, framework-free command gateway interface owned by its source application module. The `:app` composition root implements each gateway with a Spring `@Transactional` adapter using the default `REQUIRED` propagation. Web controllers depend on these gateway interfaces rather than concrete mutation services.
+Every state-changing admin use case is exposed through a narrow, framework-free command gateway interface owned by its source application module. The `:app` composition root implements each gateway with a Spring `@Transactional` adapter using default `REQUIRED` propagation, and web controllers depend on these gateway interfaces rather than concrete mutation services.
 
-The source application service retains command authorization and domain mutation responsibilities. Admin route protection remains defense in depth and does not replace application-layer OWNER authorization.
+Source application services retain `OWNER` command authorization ([ADR 0008](0008-require-owner-authorization-for-admin-mutations.md)) and domain mutation logic. Route protection remains defense in depth only.
 
-Repository-local `TransactionTemplate` usage is an aggregate-persistence fallback, not the complete use-case transaction boundary. Mandatory future Audit append is coordinated inside the same transactional application gateway as its source mutation. `REQUIRES_NEW` is forbidden for both the source mutation and mandatory same-transaction Audit append.
+Repository-local `TransactionTemplate` usage is an aggregate-persistence fallback that joins the active gateway transaction, not the use-case transaction boundary. `REQUIRES_NEW` is forbidden for both source mutations and mandatory same-transaction Audit appends.
 
-Expected validation and business rejection are represented by typed results. Unexpected runtime, persistence, transaction, or Audit failures propagate and must not be converted into successful or expected business results.
+Expected validation and business rejections return typed results. Unexpected runtime, persistence, transaction, or Audit failures propagate so Spring rolls back the transaction.
 
 ## Consequences
 
-Admin mutations gain an explicit transaction boundary in `:app` while source application and domain modules stay framework-free. Controllers have a stable, narrow dependency that can later coordinate same-transaction Audit without acquiring persistence or transaction responsibilities.
+Admin mutations gain an explicit use-case transaction boundary in `:app` while source modules stay framework-free and controllers remain thin transport adapters.
 
-Authorization remains testable independently of HTTP routing, and unauthorized callers cannot reach mutation ports. Infrastructure failures remain visible to Spring transaction management and trigger rollback.
-
-Repository adapters may retain local transaction fallbacks for aggregate consistency, but those transactions join an existing application transaction and do not define the complete use case.
+Authorization stays testable independently of HTTP routing, and unexpected infrastructure or Audit failures reliably roll back the entire mutation.
 
 ## Alternatives considered
 
-- Put `@Transactional` on web controllers. Rejected because transaction ownership belongs to the application composition boundary and controllers must remain transport adapters.
-- Treat repository-local transactions as the use-case boundary. Rejected because they cannot coordinate source mutation with mandatory Audit work.
-- Convert unexpected exceptions into UI business results. Rejected because this hides infrastructure failures and may allow partial commits.
+- Put `@Transactional` on web controllers. Rejected because transaction boundaries belong to application composition, not HTTP transport adapters.
+- Treat repository-local transactions as the use-case boundary. Rejected because they cannot atomically coordinate source mutation, Discovery, and Audit.
+- Convert unexpected exceptions into business result values. Rejected because it hides infrastructure failures and risks partial commits.
 - Use `REQUIRES_NEW` for Audit append. Rejected because Audit and source state could commit independently.
-- Rely only on route protection for authorization. Rejected because application commands can be invoked outside the controller.
 
 ## Review triggers
 
-- Admin mutations need coordination across more than one local database transaction.
-- Mandatory Audit delivery semantics change from the same-transaction model in ADR 0016.
-- A command cannot be represented through a narrow source-owned gateway without cross-context repository access.
-- The OWNER-only mutation authorization model changes.
+- Admin mutations require coordination across more than one database transaction.
+- Mandatory Audit delivery changes from the same-transaction model in ADR 0016.
+- A command cannot be expressed through a source-owned gateway without cross-context repository access.
+- The `OWNER` mutation authorization model changes.

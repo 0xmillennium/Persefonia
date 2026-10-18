@@ -110,7 +110,7 @@ it('the real solver releases a three-piece contact group concurrently without ch
       expect(events.map((e) => e.key).sort()).toEqual(['a/b', 'a/c', 'b/c']);
       expect(events.every((e) => e.step === firstRelease)).toBe(true);
     }
-    if (core.getSnapshot().rest) break;
+    if (core.isRest()) break;
   }
   expect(firstRelease).toBeGreaterThan(0);
   expect(firstRelease / 120).toBeLessThan(0.25);
@@ -241,13 +241,14 @@ it('finishes a group forecast despite fluctuating contact-normal scores in a rea
   expect(core.permissions.events.some((e) => e.type === 'ghost')).toBe(true);
   expect(core.forecastWork.cancelled).toBeLessThan(5);
   let failure = false;
-  for (let step = 0; step < 2000 && !core.getSnapshot().rest; step++) {
+  for (let step = 0; step < 2000 && !core.isRest(); step++) {
     core.stepFixed();
-    const s = core.getSnapshot();
-    failure ||= !s.finite || !s.contained || s.ledger.permissions !== 0 || !!s.failures.length;
+    failure ||= core.runtimeFailure() !== null;
   }
+  const s = core.getSnapshot();
+  failure ||= !s.finite || !s.contained || s.ledger.permissions !== 0 || !!s.failures.length;
   expect(failure).toBe(false);
-  expect(core.getSnapshot().rest).toBe(true);
+  expect(s.rest).toBe(true);
 });
 
 it('tests only two plans even when some internal pairs are not touching yet', () => {

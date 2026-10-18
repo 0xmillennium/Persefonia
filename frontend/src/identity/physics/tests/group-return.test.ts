@@ -195,25 +195,30 @@ it.each([4, 12])(
           };
         }),
       );
-      const s = core.getSnapshot();
-      expect(invariantFailure(s)).toBeNull();
-      restoredWhileMoving ||= s.events.some(
+      expect(core.runtimeFailure()).toBeNull();
+      restoredWhileMoving ||= core.permissions.events.some(
         (e) =>
           e.type === 'rearm' &&
-          e.step === s.step &&
-          s.fragments.some((b) => e.key.split('/').includes(b.id) && b.homeAnchorError > 1),
+          e.step === core.step &&
+          core.bodies.some(
+            (b) => e.key.split('/').includes(b.geometry.id) && core.homeError(b) > 1,
+          ),
       );
       if (tick === 120)
-        expect(s.pairs.filter((p) => p.state === 'GHOSTED_LATCHED').length).toBeLessThanOrEqual(1);
+        expect(
+          core.permissions.snapshot().filter((p) => p.state === 'GHOSTED_LATCHED').length,
+        ).toBeLessThanOrEqual(1);
     }
     expect(restoredWhileMoving).toBe(true);
     expect(core.permissions.snapshot().every((p) => p.state === 'SOLID')).toBe(true);
     core.stepStroke([{ x: 0, y: 0, active: false }]);
     for (let tick = 0; tick < 5400 && !core.isRest(); tick++) {
       core.stepFixed();
-      expect(invariantFailure(core.getSnapshot())).toBeNull();
+      expect(core.runtimeFailure()).toBeNull();
     }
-    expect(core.isRest()).toBe(true);
+    const snapshot = core.getSnapshot();
+    expect(invariantFailure(snapshot)).toBeNull();
+    expect(snapshot.rest).toBe(true);
   },
 );
 

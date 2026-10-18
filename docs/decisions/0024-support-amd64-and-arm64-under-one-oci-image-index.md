@@ -4,7 +4,7 @@
 |---|---|
 | Status | Accepted |
 | Date | 2026-09-06 |
-| Scope | architecture / operations / deployment / supply-chain |
+| Scope | architecture / operations |
 | Supersedes | none |
 | Superseded by | none |
 

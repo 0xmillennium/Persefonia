@@ -194,6 +194,10 @@ test('drag previews the scale, commits on release, cancels cleanly, and keyboard
 test('the tuner and its choices fit intermediate widths and short viewports', async ({
   page,
 }, info) => {
+  test.skip(
+    info.project.name !== 'desktop-1440',
+    'Explicitly sweeps desktop, tablet, mobile, and short viewports',
+  );
   await visit(page);
   for (const [width, height] of [
     [1440, 900],
@@ -327,27 +331,6 @@ test('late tuner changes center card one and reset Projects after either complet
   await at(page, 0);
   await expect(root(page)).toHaveAttribute('data-category', 'projects');
   await expect(page.locator('#work .gallery-card').first()).toHaveAttribute('data-front', 'true');
-});
-
-test('without JavaScript all four semantic collections and their links remain available', async ({
-  browser,
-}, info) => {
-  test.skip(info.project.name !== 'desktop-1440', 'SSR fallback shared across viewports');
-  const context = await browser.newContext({ javaScriptEnabled: false });
-  try {
-    const page = await context.newPage();
-    await page.goto(process.env.PERSEFONIA_BROWSER_URL ?? 'http://127.0.0.1:18080');
-    await expect(page.locator('.gallery-instrument')).toBeHidden();
-    await expect(page.locator('.gallery-category:not([hidden])')).toHaveCount(4);
-    for (const category of ['projects', 'articles', 'notes', 'research']) {
-      await expect(page.locator(`.gallery-category[data-category="${category}"]`)).toBeVisible();
-      expect(
-        await page.locator(`.gallery-category[data-category="${category}"] h3 a`).count(),
-      ).toBeGreaterThan(0);
-    }
-  } finally {
-    await context.close();
-  }
 });
 
 test('the cylinder loops both ways with previous and next names, without resetting its motion at the seam', async ({

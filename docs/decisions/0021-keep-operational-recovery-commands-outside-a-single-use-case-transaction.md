@@ -4,42 +4,36 @@
 |---|---|
 | Status | Accepted |
 | Date | 2026-09-04 |
-| Scope | architecture / operations / transactions / security |
+| Scope | architecture / operations / security |
 | Supersedes | none |
 | Superseded by | none |
 
 ## Context
 
-Normal source-domain admin mutations use the single `REQUIRED` application gateway established by [ADR 0017](0017-use-explicit-transactional-admin-command-gateways.md), so source correctness, Discovery, and mandatory Audit commit atomically. Cache recovery is different: its purpose is to coordinate a committed operator request with independent reservation and result transactions around an external provider call. One encompassing transaction would either make the Audit record untruthful until provider completion or place the failure-prone provider call inside a database transaction.
-
-This decision builds on OWNER authorization at both route and application layers in [ADR 0008](0008-require-owner-authorization-for-admin-mutations.md), post-commit transaction choreography in [ADR 0016](0016-use-post-commit-operational-side-effects.md), normal mutation gateways in ADR 0017, and the cache's freshness-only role in [ADR 0019](0019-keep-cache-invalidation-outside-public-exposure-correctness.md).
+Normal admin mutations use a single `REQUIRED` transaction gateway ([ADR 0017](0017-use-explicit-transactional-admin-command-gateways.md)). Operational cache recovery is different: it coordinates a committed operator request with independent reservation and result transactions around an external provider call. A single encompassing transaction would either delay Audit attribution until provider completion or hold a database transaction across external network I/O.
 
 ## Decision
 
-Normal source-domain state-changing admin use cases remain governed by ADR 0017 and use one `REQUIRED` transactional gateway containing source mutation, correctness-critical synchronous work, and mandatory Audit.
+Normal source-domain admin mutations remain governed by [ADR 0017](0017-use-explicit-transactional-admin-command-gateways.md). Operational recovery commands that coordinate independent persistence phases around an external provider call use a framework-free command boundary with application-layer `OWNER` authorization ([ADR 0008](0008-require-owner-authorization-for-admin-mutations.md)), without one encompassing database transaction.
 
-Operational recovery commands that coordinate independent local persistence phases around a failure-prone external side effect use a narrow framework-free command boundary and application-layer OWNER authorization, but their orchestration gateway does not create one encompassing database transaction.
+Each recovery request first commits a short preflight transaction that validates eligibility, derives the attempt number, and appends the mandatory `.requested` Audit record. Only after commit does the recovery executor reserve work in `REQUIRES_NEW`, invoke the external provider outside any database transaction, and persist the outcome in `REQUIRES_NEW`.
 
-Each recovery request first runs a short transaction that revalidates eligibility, derives its server-side attempt number, and appends the mandatory Audit record describing operator intent. Only after that transaction commits may the existing cache execution infrastructure reserve work in `REQUIRES_NEW`, invoke the provider without a database transaction, and persist the result in `REQUIRES_NEW`.
-
-This qualification applies only to operational-recovery workflows. It does not weaken ADR 0017 for Content, Project, Media, Taxonomy, Redirect, IAM, or any other normal source mutation. Cache invalidation remains freshness infrastructure and does not become a public-exposure correctness authority.
+This exception applies only to operational-recovery workflows and does not weaken ADR 0017 for domain mutations or [ADR 0019](0019-keep-cache-invalidation-outside-public-exposure-correctness.md) for public-exposure authority.
 
 ## Consequences
 
-An accepted recovery request has durable attribution even if the process stops before provider execution. An Audit action ending in `.requested` records intent and does not claim provider or persistence success. Audit failure blocks execution. A race after preflight can leave a truthful request record while a later reservation safely rejects changed state.
+Accepted recovery requests have durable `.requested` Audit attribution before external execution begins, and Audit failure blocks execution.
 
-The workflow deliberately retains the crash gap accepted by ADR 0016. Reservation, provider invocation, and result persistence remain separate phases; optimistic locking and reservation generations protect newer recovery work from delayed provider results.
+Reservation, provider execution, and result persistence remain distinct phases protected by optimistic locking and reservation generations rather than a single database transaction.
 
 ## Alternatives considered
 
-- Wrap preflight, provider execution, and result persistence in one `REQUIRED` transaction. Rejected because external work must remain transaction-free and durable reservations/results require independent commits.
-- Append Audit after provider completion. Rejected because Audit answers who requested recovery and must be mandatory before execution, not an operational outcome log.
-- Weaken ADR 0017 for all admin mutations. Rejected because normal source mutations still require one atomic source/Discovery/Audit transaction.
-- Add an outbox, queue, scheduler, or automatic retry. Rejected for the MVP by ADR 0016 and the explicit manual-recovery scope.
+- Wrap preflight, provider call, and result persistence in one `REQUIRED` transaction. Rejected because external network I/O must not hold a database transaction.
+- Append Audit only after provider completion. Rejected because Audit records mandatory operator intent before execution, not provider outcome.
+- Weaken ADR 0017 across all admin mutations. Rejected because domain mutations require atomic source, Discovery, and Audit commits.
 
 ## Review triggers
 
-- Recovery moves to a durable queue, outbox, or external workflow engine.
+- Recovery adopts a durable outbox, queue, or external workflow engine.
 - Audit semantics change from mandatory request attribution.
-- Provider execution can participate safely in a distributed transaction.
 - Operational recovery expands beyond cache invalidation.

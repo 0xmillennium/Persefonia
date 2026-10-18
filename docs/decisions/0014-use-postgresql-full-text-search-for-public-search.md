@@ -4,7 +4,7 @@
 |---|---|
 | Status | Accepted |
 | Date | 2026-06-24 |
-| Scope | architecture / public search / privacy |
+| Scope | architecture / security |
 | Supersedes | none |
 | Superseded by | none |
 

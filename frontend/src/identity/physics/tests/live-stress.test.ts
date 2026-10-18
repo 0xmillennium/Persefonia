@@ -20,29 +20,31 @@ it.each(seeds)('live seed %i: coalesced fast strokes preserve invariants and rec
     fixture = seedFixture(seed);
   core.loadFixture(fixture.fragments);
   core.stepStroke([fixture.path[0]!]);
-  let failure = invariantFailure(core.getSnapshot()) ?? core.runtimeFailure();
+  let failure = core.runtimeFailure();
   // Three actual observations per tick exercise corners/reversals inside the
   // new production input path, rather than only the scalar fixture replay API.
   for (let i = 1; i < fixture.path.length - 1 && !failure; i += 3) {
     core.stepStroke(fixture.path.slice(i, Math.min(i + 3, fixture.path.length - 1)));
-    failure = invariantFailure(core.getSnapshot()) ?? core.runtimeFailure();
+    failure = core.runtimeFailure();
   }
   if (!failure) {
     core.stepStroke([fixture.path.at(-1)!]);
-    failure = invariantFailure(core.getSnapshot()) ?? core.runtimeFailure();
+    failure = core.runtimeFailure();
   }
   for (let i = 0; i < 45 / FIXED_DT && !failure && !core.isRest(); i++) {
     core.stepFixed();
-    failure = invariantFailure(core.getSnapshot()) ?? core.runtimeFailure();
+    failure = core.runtimeFailure();
   }
-  results.push({ seed, failure, seconds: core.step * FIXED_DT, rest: core.isRest() });
-  if (failure || !core.isRest()) {
+  const snapshot = core.getSnapshot();
+  failure ??= invariantFailure(snapshot);
+  results.push({ seed, failure, seconds: core.step * FIXED_DT, rest: snapshot.rest });
+  if (failure || !snapshot.rest) {
     mkdirSync('test-results/segmented-identity/live-seeds', { recursive: true });
     writeFileSync(
       `test-results/segmented-identity/live-seeds/${seed}.json`,
-      JSON.stringify({ fixture, snapshot: core.getSnapshot(), failure }, null, 2),
+      JSON.stringify({ fixture, snapshot, failure }, null, 2),
     );
   }
   expect(failure, `live seed ${seed}`).toBeNull();
-  expect(core.isRest(), `live seed ${seed}`).toBe(true);
+  expect(snapshot.rest, `live seed ${seed}`).toBe(true);
 });

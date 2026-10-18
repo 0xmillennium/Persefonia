@@ -10,11 +10,9 @@
 
 ## Context
 
-Persefonia is still in an early development stage.
+Broad public maintainer documentation becomes stale quickly when a system is evolving and can expose temporary planning details prematurely.
 
-Broad public maintainer documentation would become stale quickly and could expose private planning details before the project is ready for public consumption.
-
-The current documentation need is not onboarding. The current need is preserving durable decisions that future development must not accidentally violate.
+The primary documentation need is preserving durable architectural decisions that future changes must not accidentally violate.
 
 ## Decision
 
@@ -24,7 +22,7 @@ Do not create committed architecture guides, development guides, operations runb
 
 Decision records are allowed because they preserve durable constraints needed for maintenance and later development.
 
-Temporary notes must use the mechanism defined in [ADR 0003: Use Local Ignored TODO for Temporary Notes](0003-use-local-ignored-todo-for-temporary-notes.md).
+Temporary notes and working contracts must use the ignored local workspace defined in [ADR 0003](0003-use-local-ignored-todo-for-temporary-notes.md) and superseded by [ADR 0034](0034-permit-structured-ignored-local-working-contracts.md).
 
 ## Consequences
 

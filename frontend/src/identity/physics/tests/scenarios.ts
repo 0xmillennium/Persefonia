@@ -67,21 +67,26 @@ export function stressRun(
     maximumEnergy = core.energy();
   for (const p of fixture.path) {
     core.stepFixed(1, p);
-    const s = core.getSnapshot();
-    failure = invariantFailure(s);
-    maximumEnergy = Math.max(maximumEnergy, s.energy);
-    if (failure) return { seed, passed: false, failure, maximumEnergy, snapshot: s };
+    failure = core.runtimeFailure();
+    maximumEnergy = Math.max(maximumEnergy, core.ledger.after);
+    if (failure) {
+      const s = core.getSnapshot();
+      failure = invariantFailure(s) ?? failure;
+      return { seed, passed: false, failure, maximumEnergy, snapshot: s };
+    }
   }
   const limit = Math.ceil(maxSeconds / FIXED_DT);
   for (let step = 0; step < limit; step++) {
     core.stepFixed();
     // All invariant observations are sampled every fixed step, never only at
     // final rest. Transient escape/penetration must fail the originating seed.
-    const s = core.getSnapshot();
-    failure = invariantFailure(s);
-    maximumEnergy = Math.max(maximumEnergy, s.energy);
-    if (failure || s.rest)
+    failure = core.runtimeFailure();
+    maximumEnergy = Math.max(maximumEnergy, core.ledger.after);
+    if (failure || core.isRest()) {
+      const s = core.getSnapshot();
+      failure = invariantFailure(s) ?? failure;
       return { seed, passed: !failure && s.rest, failure, maximumEnergy, snapshot: s };
+    }
   }
   return {
     seed,

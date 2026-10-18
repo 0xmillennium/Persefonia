@@ -16,52 +16,31 @@ The system distinguishes listed public content from direct URL only content. Tha
 
 ## Decision
 
-Public navigation surfaces expose only content that is both `PUBLISHED` and `PUBLIC`.
+Public navigation surfaces (public tag pages, public series pages, visible public translation links, and public hreflang alternates) expose only content that is both `PUBLISHED` and `PUBLIC`.
 
-Public navigation surfaces include:
+`UNLISTED` content remains direct URL only. It must be accessible by its valid current detail URL, but excluded from public tag pages, series pages, visible translation links, and hreflang alternates. `PRIVATE`, `DRAFT`, `UNPUBLISHED`, and `ARCHIVED` content are excluded from all public navigation surfaces.
 
-- public tag pages
-- public series pages
-- visible public translation links
-- public hreflang alternates
+Public tag pages and public series pages are public read surfaces, but they remain `NO_INDEX` and ineligible for search, feed, or sitemap publication.
 
-`UNLISTED` content remains direct URL only. It must be accessible by its valid current detail URL, but it must be excluded from public tag pages, public series pages, visible translation links, and hreflang alternates.
-
-`PRIVATE`, `DRAFT`, `UNPUBLISHED`, and `ARCHIVED` content are excluded from public navigation surfaces.
-
-Public tag pages and public series pages are public read surfaces, but they remain `NO_INDEX`. They are not eligible for search, feed, or sitemap publication.
-
-Public translation links and hreflang alternates render only on public content detail pages. They must not render for `UNLISTED` content.
-
-`x-default` hreflang is intentionally absent until Persefonia has a durable default-language policy.
-
-Tag, series, and translation surfaces do not introduce search, feed, sitemap, or robots behavior beyond the existing noindex metadata required for public tag and series pages.
+Public translation links and hreflang alternates render only on public content detail pages, never for `UNLISTED` content. `x-default` hreflang is intentionally absent until Persefonia adopts a durable default-language policy.
 
 ## Consequences
 
-Listed public content has predictable relationship navigation.
-
-Direct URL only content remains shareable by URL without becoming discoverable through relationship surfaces.
+Listed public content has predictable relationship navigation, while direct URL only content remains shareable without becoming discoverable through relationship surfaces.
 
 Public tag and series pages can exist without implying indexing, search, feed, or sitemap eligibility.
 
-Future maintainers must keep relationship read models aligned with `PUBLISHED` plus `PUBLIC` exposure policy and must keep hreflang generation out of direct URL only content.
-
-Any future default-language policy must explicitly revisit hreflang behavior before adding `x-default`.
+Future maintainers must keep relationship read models aligned with `PUBLISHED` plus `PUBLIC` exposure rules and revisit hreflang explicitly before adding `x-default`.
 
 ## Alternatives considered
 
-- Include `UNLISTED` content in tag pages, series pages, or hreflang while keeping it out of indexes.
-- Render self-only hreflang on content without eligible alternates.
-- Add `x-default` before defining a default-language policy.
-- Treat tag and series pages as indexable because they are public routes.
-
-These alternatives were rejected because they weaken the direct URL only contract, create noisy or misleading metadata, or expand public discovery before the system has durable policy for those behaviors.
+- Include `UNLISTED` content in tag pages, series pages, or hreflang while keeping it out of indexes. Rejected because it weakens the direct URL only contract.
+- Render self-only hreflang on content without eligible alternates or add `x-default` prematurely. Rejected because it creates noisy or misleading metadata.
+- Treat tag and series pages as indexable because they are public routes. Rejected because it expands public discovery without durable policy.
 
 ## Review triggers
 
-- The meaning of `UNLISTED` changes.
+- The meaning of `UNLISTED` or public content visibility states changes.
 - A default-language policy is adopted.
 - Search, feed, sitemap, or robots behavior is introduced for tag, series, or translation surfaces.
-- Public relationship surfaces are expanded beyond tag pages, series pages, and translations.
-- Public content visibility states change.
+- Public relationship surfaces expand beyond tag pages, series pages, and translations.

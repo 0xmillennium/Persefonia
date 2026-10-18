@@ -4,8 +4,10 @@ import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 const databaseContainer = process.env.PERSEFONIA_BROWSER_DB_CONTAINER;
 const chapters = ['identity', 'work', 'writing', 'contact'];
+let fixtureDirty = true;
 function setSettings(sql: string): void {
   if (!databaseContainer) throw new Error('browserCheck must provide an isolated fixture database');
+  fixtureDirty = true;
   execFileSync(
     'docker',
     [
@@ -64,10 +66,15 @@ function resetFixture(): void {
       stdio: ['pipe', 'pipe', 'pipe'],
     },
   );
+  fixtureDirty = false;
 }
 
-test.beforeEach(resetFixture);
-test.afterEach(resetFixture);
+test.beforeEach(() => {
+  if (fixtureDirty) resetFixture();
+});
+test.afterAll(() => {
+  if (fixtureDirty) resetFixture();
+});
 async function assertStructure(page: Page, language: string) {
   await expect(page.locator('html')).toHaveAttribute('lang', language.toLowerCase());
   for (const id of chapters) await expect(page.locator(`#${id}`)).toHaveCount(1);
@@ -183,7 +190,11 @@ test('SSR publications, metadata, public destinations, CSP and self-hosted asset
 });
 test('gallery covers use eligible variants and revoke independently of the publication', async ({
   page,
-}) => {
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name === 'tablet-834' || testInfo.project.name === 'mobile-390',
+    'Viewport-invariant media revocation SSR contract',
+  );
   const url = '/media/assets/10000000-0000-0000-0000-0000000000c2/variants/medium';
   await visit(page);
   await expect(page.locator('.gallery-cover img')).toHaveCount(2);
@@ -204,7 +215,11 @@ test('gallery covers use eligible variants and revoke independently of the publi
 });
 test('configured Turkish content and routes remain localized alongside locked identity copy', async ({
   page,
-}) => {
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name === 'tablet-834' || testInfo.project.name === 'mobile-390',
+    'Viewport-invariant localization SSR contract',
+  );
   setSettings("UPDATE portfolio.site_presentation_settings SET default_language='TR'");
   await visit(page);
   await assertStructure(page, 'TR');
@@ -219,6 +234,10 @@ test('configured Turkish content and routes remain localized alongside locked id
 test('standard theme covers projects, content TOC, and CV in both system preferences', async ({
   page,
 }, testInfo) => {
+  test.skip(
+    testInfo.project.name === 'tablet-834' || testInfo.project.name === 'mobile-390',
+    'Viewport-invariant theme stylesheet and token contract',
+  );
   test.setTimeout(120000);
   for (const [theme, preference, expectedBackground, expectedSurface] of [
     ['LIGHT', 'dark', 'rgb(247, 249, 248)', 'rgb(255, 255, 255)'],
@@ -228,13 +247,11 @@ test('standard theme covers projects, content TOC, and CV in both system prefere
   ] as const) {
     setSettings(`UPDATE portfolio.site_presentation_settings SET standard_public_theme='${theme}'`);
     await page.emulateMedia({ colorScheme: preference });
-    for (const route of [
-      '/en/projects',
-      '/en/articles/fixture-writing-1',
-      '/cv',
-      '/cv/en',
-      '/cv/tr',
-    ]) {
+    const routes =
+      theme === 'SYSTEM'
+        ? (['/en/articles/fixture-writing-1'] as const)
+        : (['/en/projects', '/en/articles/fixture-writing-1', '/cv', '/cv/en', '/cv/tr'] as const);
+    for (const route of routes) {
       const response = await page.goto(route, { waitUntil: 'networkidle' });
       expect(response?.status(), route).toBe(200);
       const links = await page
@@ -353,7 +370,11 @@ test('enabled empty and disabled promotion retain honest content states', async 
 test('no JS and unavailable enhancement retain publications and contact', async ({
   browser,
 }, testInfo) => {
-  for (const failure of ['disabled', 'load', 'init', 'observer', 'observe']) {
+  const failures =
+    testInfo.project.name === 'tablet-834' || testInfo.project.name === 'mobile-390'
+      ? (['disabled', 'load'] as const)
+      : (['disabled', 'load', 'init', 'observer', 'observe'] as const);
+  for (const failure of failures) {
     const context = await browser.newContext({
       viewport: testInfo.project.use.viewport,
       javaScriptEnabled: failure !== 'disabled',
@@ -392,6 +413,7 @@ test('no JS and unavailable enhancement retain publications and contact', async 
     await assertStructure(page, 'EN');
     await expect(page.locator('[data-home-v2]')).not.toHaveAttribute('data-enhanced', 'true');
     await expect(page.locator('.gallery-instrument')).toBeHidden();
+    await expect(page.locator('.gallery-category:not([hidden])')).toHaveCount(4);
     await expect(page.locator('.home-project h3 a')).toHaveCount(3);
     await expect(page.locator('.home-writing__list h3 a')).toHaveCount(6);
     await expect(

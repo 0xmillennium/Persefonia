@@ -18,11 +18,12 @@ it.each([seed26, seed27, seed30, seed45, seed58, seed74])(
     let failure: string | null = null;
     for (let step = 0; step < 5400; step++) {
       core.stepFixed();
-      const s = core.getSnapshot();
-      failure = invariantFailure(s);
-      if (failure || s.rest) break;
+      failure = core.runtimeFailure();
+      if (failure || core.isRest()) break;
     }
+    const snapshot = core.getSnapshot();
+    failure ??= invariantFailure(snapshot);
     expect(failure, `seed ${seed.seed}`).toBeNull();
-    expect(core.getSnapshot().rest, `seed ${seed.seed}`).toBe(true);
+    expect(snapshot.rest, `seed ${seed.seed}`).toBe(true);
   },
 );
