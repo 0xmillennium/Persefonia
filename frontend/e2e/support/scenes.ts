@@ -7,27 +7,22 @@ export async function visit(page: Page) {
 }
 
 export async function position(page: Page, scene: string, p: number) {
-  await page.locator(`[data-scene="${scene}"]`).evaluate(async (node, p) => {
+  await page.locator(`[data-scene="${scene}"]`).evaluate((node, p) => {
     const entry =
       Number.parseFloat((node as HTMLElement).style.getPropertyValue('--gallery-entry-distance')) ||
       0;
     const rect = node.getBoundingClientRect();
-    scrollTo({
-      top: rect.top + scrollY + entry + (rect.height - entry) * p,
-      behavior: 'instant',
-    });
-    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    scrollTo(0, rect.top + scrollY + entry + (rect.height - entry) * p);
   }, p);
 }
 
 export async function writingPosition(page: Page, scene: string, offset: number) {
-  await page.locator(`[data-scene="${scene}"]`).evaluate(async (node, offset) => {
-    scrollTo({
-      top: Math.ceil(node.getBoundingClientRect().top + scrollY + offset),
-      behavior: 'instant',
-    });
-    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-  }, offset);
+  await page
+    .locator(`[data-scene="${scene}"]`)
+    .evaluate(
+      (node, offset) => scrollTo(0, Math.ceil(node.getBoundingClientRect().top + scrollY + offset)),
+      offset,
+    );
 }
 
 export async function selectFilm(page: Page) {
