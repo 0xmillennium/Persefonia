@@ -27,4 +27,11 @@ class FrontendBuildConfigurationArchitectureTest {
         assertThat(main).doesNotContain("from \"mermaid\"");
         assertThat(mermaidLoader).contains("from \"mermaid\"");
     }
+
+    @Test
+    void jtePrecompilationTargetsJava21Bytecode() throws IOException {
+        String appBuild = Files.readString(Path.of("build.gradle.kts")).replace('\'', '"');
+
+        assertThat(appBuild).contains("compileArgs.set(arrayOf(\"--release\", \"21\"))");
+    }
 }

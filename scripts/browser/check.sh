@@ -68,6 +68,10 @@ done
 curl --fail --silent "$PERSEFONIA_BROWSER_URL/robots.txt" > /dev/null
 docker exec -i "$container_name" psql --set ON_ERROR_STOP=1 -U persefonia_browser -d persefonia_browser \
   < "$project_root/frontend/e2e/fixtures/content.sql" > "$artifact_dir/fixture.log"
+if ! curl --fail --silent --show-error "$PERSEFONIA_BROWSER_URL/" > /dev/null; then
+  tail -100 "$artifact_dir/application.log" >&2
+  exit 1
+fi
 (
   cd "$project_root/frontend"
   npx playwright install --no-shell chromium firefox webkit

@@ -23,6 +23,7 @@ val precompiledJteDirectory = layout.buildDirectory.dir("generated/jte-classes")
 jte {
     precompile()
     targetDirectory.set(precompiledJteDirectory.map { it.asFile.toPath() })
+    compileArgs.set(arrayOf("--release", "21"))
 }
 
 val integrationTestSourceSet = sourceSets.create("integrationTest") {
