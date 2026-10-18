@@ -14,13 +14,13 @@ export class GlobeController {
   private orientation = new GlobeOrientation();
   private entrance = new GlobeEntrance();
   private camera = cameraFor(1, 1);
-  private input: GlobeInput;
-  private lifecycle: GlobeLifecycle;
-  private resize: ResizeObserver;
+  private input!: GlobeInput;
+  private lifecycle!: GlobeLifecycle;
+  private resize!: ResizeObserver;
   private abort = new AbortController();
   private reduced = matchMedia('(prefers-reduced-motion: reduce)');
   private hover: Vec3 | null = null;
-  private location: LocationPresentation;
+  private location!: LocationPresentation;
   private failure: string | null = null;
   private submitted = 0;
   private sceneActive = false;
@@ -34,151 +34,156 @@ export class GlobeController {
     private controlsRoot: ParentNode = stage.parentElement ?? stage,
   ) {
     this.canvas = stage.querySelector<HTMLCanvasElement>('canvas')!;
-    this.renderer = new GlobeRenderer(this.canvas, mask);
-    this.location = new LocationPresentation(stage);
-    this.input = new GlobeInput(
-      this.canvas,
-      () => this.camera,
-      this.orientation,
-      (reason) => {
-        if (this.orientation.pressed) this.entrance.finish();
-        if (reason === 'cancel' || this.input.gesture.phase === 'dragging')
-          this.location.pinned = false;
-        if (!this.input.hover || this.orientation.pressed) this.hover = null;
-        this.invalidate();
-      },
-      (x, y) => {
-        if (
-          this.location.visible &&
-          Math.hypot(x - this.location.projection.x, y - this.location.projection.y) < 32
-        ) {
-          this.location.pinned = !this.location.pinned;
-        }
-      },
-    );
-    this.lifecycle = new GlobeLifecycle(
-      stage,
-      (seconds) => this.draw(seconds),
-      () => {
-        this.input.cancel();
-        this.location.clear();
-      },
-    );
-    this.resize = new ResizeObserver(() => this.measure());
-    this.resize.observe(stage);
-    const options = { signal: this.abort.signal };
-    this.canvas.addEventListener(
-      'webglcontextlost',
-      (e) => {
-        e.preventDefault();
-        this.lifecycle.setAvailable(false);
-        this.entrance.finish();
-        this.renderer?.dispose();
-        this.lastResources = this.renderer?.resources ?? this.lastResources;
-        this.renderer = null;
-        this.fail('Graphics were interrupted. Location information remains available.');
-      },
-      options,
-    );
-    this.canvas.addEventListener(
-      'webglcontextrestored',
-      () => {
-        if (this.disposed) return;
-        try {
-          this.renderer = new GlobeRenderer(this.canvas, this.mask);
-          this.failure = null;
-          this.measure();
-          this.lifecycle.setAvailable(true);
-          this.controlsAvailable(true);
-        } catch (error) {
-          this.fail(`Graphics could not be restored: ${String(error)}`);
-        }
-      },
-      options,
-    );
-    window.addEventListener('resize', () => this.measure(), options);
-    this.canvas.addEventListener('keydown', () => this.entrance.finish(), options);
-    this.reduced.addEventListener('change', () => this.preferences(), options);
-    const pause = this.controlsRoot.querySelector<HTMLButtonElement>('#pause');
-    const toggleRotation = () => {
-      this.entrance.finish();
-      this.input.cancel();
-      this.orientation.paused = !this.orientation.paused;
-      this.preferences();
-    };
-    pause?.addEventListener('click', toggleRotation, options);
-    for (const [id, amount] of [
-      ['tilt-up', -0.12],
-      ['tilt-down', 0.12],
-    ] as const) {
-      this.controlsRoot.querySelector<HTMLButtonElement>(`#${id}`)?.addEventListener(
-        'click',
-        () => {
-          this.entrance.finish();
-          this.input.cancel();
-          this.orientation.drag(0, amount);
+    try {
+      this.renderer = new GlobeRenderer(this.canvas, mask);
+      this.location = new LocationPresentation(stage);
+      this.input = new GlobeInput(
+        this.canvas,
+        () => this.camera,
+        this.orientation,
+        (reason) => {
+          if (this.orientation.pressed) this.entrance.finish();
+          if (reason === 'cancel' || this.input.gesture.phase === 'dragging')
+            this.location.pinned = false;
+          if (!this.input.hover || this.orientation.pressed) this.hover = null;
           this.invalidate();
+        },
+        (x, y) => {
+          if (
+            this.location.visible &&
+            Math.hypot(x - this.location.projection.x, y - this.location.projection.y) < 32
+          ) {
+            this.location.pinned = !this.location.pinned;
+          }
+        },
+      );
+      this.lifecycle = new GlobeLifecycle(
+        stage,
+        (seconds) => this.draw(seconds),
+        () => {
+          this.input.cancel();
+          this.location.clear();
+        },
+      );
+      this.resize = new ResizeObserver(() => this.measure());
+      this.resize.observe(stage);
+      const options = { signal: this.abort.signal };
+      this.canvas.addEventListener(
+        'webglcontextlost',
+        (e) => {
+          e.preventDefault();
+          this.lifecycle.setAvailable(false);
+          this.entrance.finish();
+          this.renderer?.dispose();
+          this.lastResources = this.renderer?.resources ?? this.lastResources;
+          this.renderer = null;
+          this.fail('Graphics were interrupted. Location information remains available.');
         },
         options,
       );
-    }
-    const findLocation = () => {
-      this.entrance.finish();
-      this.input.cancel();
-      this.orientation.pitch = 0.3;
-      this.orientation.spin = (-ISTANBUL.longitude * Math.PI) / 180;
-      this.orientation.paused = true;
-      this.preferences();
-      this.location.pinned = true;
-      this.invalidate();
-    };
-    this.controlsRoot
-      .querySelector<HTMLButtonElement>('#find-location')
-      ?.addEventListener('click', findLocation, options);
-    this.canvas.addEventListener(
-      'keydown',
-      (event) => {
-        if (event.key !== ' ' && event.key !== 'Home') return;
-        event.preventDefault();
-        if (event.repeat) return;
-        if (event.key === 'Home') findLocation();
-        else toggleRotation();
-      },
-      options,
-    );
-    document.addEventListener(
-      'keydown',
-      (e) => {
-        if (e.key === 'Escape') {
-          this.entrance.finish();
-          this.location.clear();
-          this.invalidate();
-        }
-      },
-      options,
-    );
-    this.preferences();
-    this.measure();
-    this.controlsAvailable(true);
-    // Opt-in lifecycle probes for this isolated experiment. state() and RAF
-    // perform no WebGL metadata queries or pixel readback.
-    if (
-      this.diagnostics &&
-      (import.meta.env.DEV || new URLSearchParams(location.search).has('inspect'))
-    ) {
-      const contextProbe = this.renderer.gl.getExtension('WEBGL_lose_context');
-      window.__globeExperiment = {
-        state: () => this.state(),
-        dispose: () => this.dispose(),
-        contextLoss: () => {
-          if (!this.disposed) contextProbe?.loseContext();
+      this.canvas.addEventListener(
+        'webglcontextrestored',
+        () => {
+          if (this.disposed) return;
+          try {
+            this.renderer = new GlobeRenderer(this.canvas, this.mask);
+            this.failure = null;
+            this.measure();
+            this.lifecycle.setAvailable(true);
+            this.controlsAvailable(true);
+          } catch (error) {
+            this.fail(`Graphics could not be restored: ${String(error)}`);
+          }
         },
-        contextRestore: () => {
-          if (!this.disposed) contextProbe?.restoreContext();
-        },
+        options,
+      );
+      window.addEventListener('resize', () => this.measure(), options);
+      this.canvas.addEventListener('keydown', () => this.entrance.finish(), options);
+      this.reduced.addEventListener('change', () => this.preferences(), options);
+      const pause = this.controlsRoot.querySelector<HTMLButtonElement>('#pause');
+      const toggleRotation = () => {
+        this.entrance.finish();
+        this.input.cancel();
+        this.orientation.paused = !this.orientation.paused;
+        this.preferences();
       };
+      pause?.addEventListener('click', toggleRotation, options);
+      for (const [id, amount] of [
+        ['tilt-up', -0.12],
+        ['tilt-down', 0.12],
+      ] as const) {
+        this.controlsRoot.querySelector<HTMLButtonElement>(`#${id}`)?.addEventListener(
+          'click',
+          () => {
+            this.entrance.finish();
+            this.input.cancel();
+            this.orientation.drag(0, amount);
+            this.invalidate();
+          },
+          options,
+        );
+      }
+      const findLocation = () => {
+        this.entrance.finish();
+        this.input.cancel();
+        this.orientation.pitch = 0.3;
+        this.orientation.spin = (-ISTANBUL.longitude * Math.PI) / 180;
+        this.orientation.paused = true;
+        this.preferences();
+        this.location.pinned = true;
+        this.invalidate();
+      };
+      this.controlsRoot
+        .querySelector<HTMLButtonElement>('#find-location')
+        ?.addEventListener('click', findLocation, options);
+      this.canvas.addEventListener(
+        'keydown',
+        (event) => {
+          if (event.key !== ' ' && event.key !== 'Home') return;
+          event.preventDefault();
+          if (event.repeat) return;
+          if (event.key === 'Home') findLocation();
+          else toggleRotation();
+        },
+        options,
+      );
+      document.addEventListener(
+        'keydown',
+        (e) => {
+          if (e.key === 'Escape') {
+            this.entrance.finish();
+            this.location.clear();
+            this.invalidate();
+          }
+        },
+        options,
+      );
+      this.preferences();
+      this.measure();
+      this.controlsAvailable(true);
+      // Opt-in lifecycle probes for this isolated experiment. state() and RAF
+      // perform no WebGL metadata queries or pixel readback.
+      if (
+        this.diagnostics &&
+        (import.meta.env.DEV || new URLSearchParams(location.search).has('inspect'))
+      ) {
+        const contextProbe = this.renderer.gl.getExtension('WEBGL_lose_context');
+        window.__globeExperiment = {
+          state: () => this.state(),
+          dispose: () => this.dispose(),
+          contextLoss: () => {
+            if (!this.disposed) contextProbe?.loseContext();
+          },
+          contextRestore: () => {
+            if (!this.disposed) contextProbe?.restoreContext();
+          },
+        };
+      }
+      if (import.meta.hot) import.meta.hot.dispose(() => this.dispose());
+    } catch (error) {
+      this.dispose();
+      throw error;
     }
-    if (import.meta.hot) import.meta.hot.dispose(() => this.dispose());
   }
   private measure(): void {
     if (this.disposed) return;
@@ -308,15 +313,15 @@ export class GlobeController {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    this.lifecycle.dispose();
-    this.input.dispose();
-    this.resize.disconnect();
+    this.lifecycle?.dispose();
+    this.input?.dispose();
+    this.resize?.disconnect();
     this.abort.abort();
     this.renderer?.dispose();
     this.lastResources = this.renderer?.resources ?? this.lastResources;
     this.renderer = null;
     this.hover = null;
-    this.location.clear();
+    this.location?.clear();
     this.controlsAvailable(false);
     this.stage.dataset.ready = 'false';
     this.stage.style.removeProperty('--globe-focus-size');

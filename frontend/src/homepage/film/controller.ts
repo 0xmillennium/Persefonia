@@ -9,6 +9,7 @@ import { ScrollFilms } from './scroll-films';
 import {
   BackgroundTransport,
   isBackground,
+  isLoopBackground,
   isScrollFilm,
   nextBackground,
   type Background,
@@ -16,8 +17,24 @@ import {
 } from './backgrounds';
 import { ResponsiveLoop } from './responsive-loop';
 import { filmTier, loopTier } from './delivery';
+export interface FilmOptions {
+  root: HTMLElement;
+  ready: () => void;
+  selectionChanged: () => void;
+}
+
+export interface FilmFrameState {
+  progress: number;
+  alpha: number;
+  visible: boolean;
+  allowHold: boolean;
+  openingProgress: number;
+  now?: number;
+  fullyCovered?: boolean;
+}
+
 /** Approved transport and material; native scene coordinator is the only scroll owner. */
-export function mountFilm(root: HTMLElement, ready: () => void, selectionChanged: () => void) {
+export function mountFilm({ root, ready, selectionChanged }: FilmOptions) {
   const canvas = root.querySelector<HTMLCanvasElement>('[data-film-canvas]')!;
   const environment = root.querySelector<HTMLElement>('.home-environment')!;
   const status = root.querySelector<HTMLElement>('[data-film-status]')!;
@@ -92,16 +109,16 @@ export function mountFilm(root: HTMLElement, ready: () => void, selectionChanged
   );
   const posterPose = () => (expansion < 1 ? ('opening' as const) : ('final' as const));
   const presentationKey = (film: Background): BackgroundKey =>
-    film === 'waterfall'
-      ? `waterfall:${loop.revision}`
-      : (video.presentation(film, transport.desired, posterPose())?.key ??
-        `${film}:${transport.desired}`);
+    isScrollFilm(film)
+      ? (video.presentation(film, transport.desired, posterPose())?.key ??
+        `${film}:${transport.desired}`)
+      : `${film}:${loop.revision}`;
   const imageFor = (film: Background) =>
     isScrollFilm(film)
       ? video.presentation(film, transport.desired, posterPose())?.source
       : loop.image;
   const syncLoop = (effects = false) => {
-    const selected = transport.film === 'waterfall';
+    const selected = isLoopBackground(transport.film);
     const menu = document.documentElement.dataset.menuOpen === 'true';
     loop.setPlayback(
       selected && filmVisible && !covered && !suspended && !menu && !reduced.matches,
@@ -146,7 +163,7 @@ export function mountFilm(root: HTMLElement, ready: () => void, selectionChanged
       hold.preparing || prefetchedFrom === transport.film
         ? [transport.film, nextBackground(transport.film)]
         : [transport.film];
-    if (scenes.includes('waterfall')) loop.prepare();
+    if (scenes.some(isLoopBackground)) loop.prepare();
     video.setReduced(reduced.matches);
     for (const film of scenes.filter(isScrollFilm))
       video.request(film, transport.desired, posterPose());
@@ -243,7 +260,7 @@ export function mountFilm(root: HTMLElement, ready: () => void, selectionChanged
           bounds,
           filmVisible ? opacity : 0,
         );
-        loop.show(transport.film === 'waterfall', bounds, filmVisible ? opacity : 0);
+        loop.show(isLoopBackground(transport.film), bounds, filmVisible ? opacity : 0);
         canvas.style.opacity = '0';
         surfacePainted = false;
         delete root.dataset.gpuSheet;
@@ -334,12 +351,11 @@ export function mountFilm(root: HTMLElement, ready: () => void, selectionChanged
       sheetOpening = openingKey;
     }
     const displayed = transport.presented?.split(':');
-    const frameLabel =
-      transport.film === 'waterfall'
-        ? 'Waterfall · loop'
-        : displayed
-          ? `${displayed[0] === 'tree' ? 'Tree' : 'Robotic arm'} · ${String(Number(displayed[1]) + 1).padStart(3, '0')} / 192`
-          : 'Preparing first film frame';
+    const frameLabel = isLoopBackground(transport.film)
+      ? 'Waterfall · loop'
+      : displayed
+        ? `${displayed[0] === 'tree' ? 'Tree' : 'Robotic arm'} · ${String(Number(displayed[1]) + 1).padStart(3, '0')} / 192`
+        : 'Preparing first film frame';
     const scrollPresentation = isScrollFilm(transport.film)
       ? video.presentation(transport.film, transport.desired, posterPose())
       : undefined;
@@ -349,7 +365,7 @@ export function mountFilm(root: HTMLElement, ready: () => void, selectionChanged
         : '';
     const failureMessage =
       hold.failure ??
-      (transport.film === 'waterfall' && (loop.failed || loop.blocked)
+      (isLoopBackground(transport.film) && (loop.failed || loop.blocked)
         ? 'Waterfall · playback unavailable; still frame retained. Hold the background or select the film again to retry.'
         : isScrollFilm(transport.film) &&
             video.unavailable(transport.film, posterPose()) &&
@@ -359,7 +375,7 @@ export function mountFilm(root: HTMLElement, ready: () => void, selectionChanged
     const message = failureMessage || staticMessage || frameLabel;
     root.dataset.filmPresentation =
       scrollPresentation?.kind ??
-      (transport.film === 'waterfall' && loop.image
+      (isLoopBackground(transport.film) && loop.image
         ? loop.videoReady
           ? 'video'
           : 'poster'
@@ -406,7 +422,7 @@ export function mountFilm(root: HTMLElement, ready: () => void, selectionChanged
           hold.retry();
         }
         if (
-          (modality === 'pointer' ? transport.film : nextBackground(transport.film)) === 'waterfall'
+          isLoopBackground(modality === 'pointer' ? transport.film : nextBackground(transport.film))
         )
           loop.retry();
       },
@@ -466,15 +482,15 @@ export function mountFilm(root: HTMLElement, ready: () => void, selectionChanged
   root.setAttribute('aria-keyshortcuts', 'F');
   root.setAttribute('aria-describedby', 'film-instructions');
   return {
-    update(
-      progress: number,
-      alpha: number,
-      visible: boolean,
-      allowHold: boolean,
-      openingProgress: number,
+    update({
+      progress,
+      alpha,
+      visible,
+      allowHold,
+      openingProgress,
       now = performance.now(),
       fullyCovered = false,
-    ) {
+    }: FilmFrameState) {
       if (opacity !== alpha || filmVisible !== visible || expansion !== openingProgress)
         needsDraw = true;
       transport.setProgress(progress);

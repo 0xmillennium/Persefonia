@@ -3,7 +3,7 @@ import { GpuFluid } from './gpu-fluid';
 import type { LiquidField } from './field';
 import type { HoldMaterial } from '../hold/material';
 import type { Hold } from '../hold/state';
-import type { FrameKey, Film } from '../model';
+import type { FrameKey, Film } from '../backgrounds';
 type Aperture = readonly [number, number, number, number, number];
 type Circle = readonly [number, number, number];
 export interface Scene<Source extends string = Film> {

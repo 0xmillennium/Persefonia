@@ -1,4 +1,4 @@
-import { type Film } from './model';
+import type { Film } from './backgrounds';
 import { videoVersion } from 'virtual:home-media';
 import { FILM_READINESS_TIMEOUT, type FilmTier } from './delivery';
 interface Entry {

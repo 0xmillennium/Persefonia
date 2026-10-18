@@ -181,3 +181,32 @@ test('graphics interruption retains location content and restoration and teardow
   await expect(page.locator('#fallback')).toBeVisible();
   await expect(page.locator('#globe')).toHaveAttribute('tabindex', '-1');
 });
+
+test('globe recovers from a transient geography load failure when re-entering the scene without reload', async ({
+  page,
+}) => {
+  let maskRequests = 0;
+  await page.route('**/land-mask*.bin*', async (route) => {
+    maskRequests++;
+    if (maskRequests === 1) {
+      await route.fulfill({ status: 503, body: 'Service Unavailable' });
+      return;
+    }
+    await route.continue();
+  });
+
+  await visit(page);
+  const stage = page.locator('.location-system');
+  await position(page, 'location', 0.1);
+  await expect.poll(() => maskRequests).toBe(1);
+  await expect(stage).toHaveAttribute('data-ready', 'false');
+  await expect(page.locator('#fallback')).toBeVisible();
+  await expect(page.locator('#fallback')).toContainText('Istanbul, Türkiye');
+
+  // Leaving and re-entering the location scene triggers a controlled retry and mounts the globe
+  await position(page, 'hero', 0);
+  await position(page, 'location', 0.6);
+  await expect.poll(() => maskRequests).toBe(2);
+  await expect(stage).toHaveAttribute('data-ready', 'true');
+  await expect(page.locator('#fallback')).toBeHidden();
+});

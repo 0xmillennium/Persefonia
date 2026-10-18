@@ -2,14 +2,23 @@ import { collectionTuner } from './tuner';
 import { galleryIndex } from '../timeline/pacing';
 import { galleryDepth, galleryProgress, galleryRelease, gallerySettle } from './motion';
 
-export function mountGallery(
-  root: HTMLElement,
-  position: (progress: number) => void,
-  changed: () => void = () => {},
-  leave: (direction: number) => void = () => {},
-  tune: () => void = () => {},
+export interface GalleryOptions {
+  root: HTMLElement;
+  position: (progress: number) => void;
+  changed?: () => void;
+  leave?: (direction: number) => void;
+  tune?: () => void;
+  restoreCategory?: boolean;
+}
+
+export function mountGallery({
+  root,
+  position,
+  changed = () => {},
+  leave = () => {},
+  tune = () => {},
   restoreCategory = false,
-) {
+}: GalleryOptions) {
   const groups = [...root.querySelectorAll<HTMLElement>('.gallery-category')].map((node) => ({
     node,
     group: node.querySelector<HTMLElement>('.gallery-group'),

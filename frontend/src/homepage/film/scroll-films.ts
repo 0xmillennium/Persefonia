@@ -1,7 +1,7 @@
 import { posterVersion } from 'virtual:home-media';
 import { SeekFilm } from './seek-film';
 import { FILM_READINESS_TIMEOUT, type FilmTier } from './delivery';
-import type { Film } from './model';
+import type { Film } from './backgrounds';
 
 export type PosterPose = 'opening' | 'final';
 export interface FilmPresentation {
