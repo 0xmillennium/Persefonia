@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "sourceIdentity": "389b8ed97673df0c52366154ec9c416605cc9374d250233a294dbf8eae3ef6c0",
+  "sourceManifestHash": "5cb1a2c1553d87e710c1c0626dba0e9b1b574b2e9309f012be766f3d833fd5ba",
+  "encoder": "ffmpeg version 4.4.2-0ubuntu0.22.04.1 Copyright (c) 2000-2021 the FFmpeg developers",
+  "codec": "libx264",
+  "preset": "fast",
+  "crf": 16,
+  "pixelFormat": "yuv420p",
+  "fps": 30,
+  "frames": 192,
+  "gop": 3,
+  "bFrames": 0,
+  "threads": 2,
+  "tiers": [
+    960,
+    1600
+  ],
+  "films": [
+    "robotic-arm",
+    "tree"
+  ],
+  "identity": "c6c31d423d0d8e253bd2f4dbdaab4a6875844c8fa8a534b2827715b8de70caa0",
+  "entries": [
+    {
+      "name": "960/robotic-arm.mp4",
+      "bytes": 1907797,
+      "sha256": "2c8e0f34aebd77eb1981e3ea8e95f5b411e30c0181d0e48c45ae6544f7fefa52",
+      "keyframes": 64
+    },
+    {
+      "name": "960/tree.mp4",
+      "bytes": 7464032,
+      "sha256": "d0d15333d33f7de3aca87b94c62766747632ec65d4e9b2eddea99f4d276b3fb0",
+      "keyframes": 64
+    },
+    {
+      "name": "1600/robotic-arm.mp4",
+      "bytes": 4954813,
+      "sha256": "740f7306873a519884bf376677da724c244a6b7886ae97576ca42e355ff0c6a8",
+      "keyframes": 64
+    },
+    {
+      "name": "1600/tree.mp4",
+      "bytes": 19752676,
+      "sha256": "942a30a79d420b677be17702daeaa76ac7cccd0225a21410f291bc2d91e7ff65",
+      "keyframes": 64
+    }
+  ]
+}

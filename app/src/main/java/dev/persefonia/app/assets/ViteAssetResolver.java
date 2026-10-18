@@ -4,6 +4,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 
 import org.springframework.core.io.Resource;
 
@@ -29,9 +32,19 @@ public final class ViteAssetResolver implements FrontendAssetResolver {
 
     @Override
     public List<String> stylesheetPaths(String entry) {
-        return manifest.requiredEntry(entry).css().stream()
+        Set<String> stylesheets = new LinkedHashSet<>();
+        collectStylesheets(entry, new HashSet<>(), stylesheets);
+        return stylesheets.stream()
                 .map(ViteAssetResolver::assetPath)
                 .toList();
+    }
+
+    private void collectStylesheets(String name, Set<String> visited, Set<String> stylesheets) {
+        if (!visited.add(name)) return;
+        ViteManifestEntry entry = manifest.requiredEntry(name);
+        // Dependency styles precede entry overrides. Dynamic imports remain lazy.
+        entry.imports().forEach(imported -> collectStylesheets(imported, visited, stylesheets));
+        stylesheets.addAll(entry.css());
     }
 
     private static ViteManifest readManifest(ObjectMapper objectMapper, Resource manifestResource) {

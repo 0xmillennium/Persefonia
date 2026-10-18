@@ -1,5 +1,10 @@
 package dev.persefonia.contentpublishing.application.service;
 
+import dev.persefonia.contentpublishing.application.query.PublicContentGalleryMetadata;
+import dev.persefonia.contentpublishing.application.port.ContentTagVocabularyPort;
+import java.util.Optional;
+import java.util.List;
+
 import dev.persefonia.contentpublishing.application.discovery.ContentPublicRouteFactory;
 import dev.persefonia.contentpublishing.application.query.PublicContentBySourceQuery;
 import dev.persefonia.contentpublishing.application.query.PublicContentLookupResult;
@@ -14,10 +19,17 @@ import java.util.Objects;
 public final class PublicContentBySourceQueryHandler {
     private final ContentItemRepository items;
     private final ContentPublicRouteFactory routeFactory;
+    private final ContentTagVocabularyPort vocabulary;
 
     public PublicContentBySourceQueryHandler(ContentItemRepository items, ContentPublicRouteFactory routeFactory) {
+        this(items, routeFactory, null);
+    }
+
+    public PublicContentBySourceQueryHandler(ContentItemRepository items, ContentPublicRouteFactory routeFactory,
+            ContentTagVocabularyPort vocabulary) {
         this.items = Objects.requireNonNull(items, "items");
         this.routeFactory = Objects.requireNonNull(routeFactory, "routeFactory");
+        this.vocabulary = vocabulary;
     }
 
     public PublicContentLookupResult lookup(PublicContentBySourceQuery query) {
@@ -29,6 +41,23 @@ public final class PublicContentBySourceQueryHandler {
                         item, CanonicalPath.of(query.expectedPublicPath())))
                 .<PublicContentLookupResult>map(PublicContentLookupResult.Found::new)
                 .orElseGet(PublicContentLookupResult.NotFound::new);
+    }
+
+    /** Gallery metadata is available only for published, listed content at its current path. */
+    public Optional<String> galleryCover(PublicContentBySourceQuery query) {
+        return galleryMetadata(query).flatMap(metadata -> metadata.coverAssetId());
+    }
+
+    public Optional<PublicContentGalleryMetadata> galleryMetadata(PublicContentBySourceQuery query) {
+        Objects.requireNonNull(query, "query");
+        return items.findById(ContentId.from(query.contentItemId()))
+                .filter(item -> isPublicDirectRouteContent(item)
+                        && item.visibility() == ContentVisibility.PUBLIC)
+                .filter(item -> currentPublicPathMatches(item, query.expectedPublicPath()))
+                .map(item -> new PublicContentGalleryMetadata(
+                        item.metadata().ogImageAssetId().map(id -> id.value().toString()),
+                        vocabulary == null ? List.of() : vocabulary.findByIds(item.tagIds()).stream()
+                                .map(tag -> tag.name()).toList()));
     }
 
     private boolean isPublicDirectRouteContent(ContentItem item) {

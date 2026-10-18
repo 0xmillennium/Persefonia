@@ -66,8 +66,9 @@ class AdminSiteSettingsSecurityAndCacheTest {
                 .param("defaultLanguage", "EN")
                 .param("supportedTr", "true")
                 .param("supportedEn", "true")
-                .param("defaultTheme", "DARK")
-                .param("featuredProjectLimit", "4")
-                .param("latestWritingLimit", "6");
+                .param("standardPublicTheme", "DARK")
+                .param("featuredProjectLimit", "2")
+                .param("latestWritingLimit", "3")
+                .param("researchHighlightLimit", "3");
     }
 }

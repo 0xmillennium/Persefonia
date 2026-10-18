@@ -72,7 +72,7 @@ class DeliveryWorkflowContractTest {
             }
         }
         Map<String, Object> build = WorkflowDocument.map(workflow.step("publish-candidate", "Publish digest-only candidate").get("with"));
-        List<String> platforms = Files.readAllLines(Path.of("../docker/supported-platforms.txt")).stream()
+        List<String> platforms = Files.readAllLines(Path.of("../supported-platforms.txt")).stream()
                 .map(String::trim).filter(line -> !line.isBlank() && !line.startsWith("#")).toList();
         assertThat(List.of(((String) build.get("platforms")).split(","))).containsExactlyInAnyOrderElementsOf(platforms);
         Map<String, Object> strategy = WorkflowDocument.map(workflow.job("verify-candidate").get("strategy"));

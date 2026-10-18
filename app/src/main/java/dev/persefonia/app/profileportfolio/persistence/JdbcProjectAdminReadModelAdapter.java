@@ -68,7 +68,7 @@ public class JdbcProjectAdminReadModelAdapter implements ProjectAdminReadModel {
     public Optional<ProjectAdminDetails> findDetails(ProjectId projectId) {
         Objects.requireNonNull(projectId, "projectId");
         return jdbc().query("""
-                SELECT id, status, visibility, featured, sort_order, updated_at, version
+                SELECT id, status, visibility, featured, sort_order, updated_at, version, cover_asset_id
                 FROM portfolio.projects
                 WHERE id = :id
                 """, Map.of("id", projectId.value()), (resultSet, rowNumber) -> new ProjectAdminDetails(
@@ -82,7 +82,7 @@ public class JdbcProjectAdminReadModelAdapter implements ProjectAdminReadModel {
                 technologies(projectId.value()),
                 links(projectId.value()),
                 resultSet.getTimestamp("updated_at").toInstant(),
-                resultSet.getLong("version"))).stream().findFirst();
+                resultSet.getLong("version"), resultSet.getString("cover_asset_id"))).stream().findFirst();
     }
 
     private Set<TagId> tagIds(UUID projectId) {

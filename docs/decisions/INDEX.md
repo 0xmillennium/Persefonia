@@ -26,7 +26,7 @@ This directory is not a planning archive.
 - local scratch notes
 - documentation-only migration placeholders
 
-Temporary notes belong in `.local/TODO.md`.
+Temporary notes and working contracts belong in ignored `.local/` under [ADR 0034](0034-permit-structured-ignored-local-working-contracts.md). `.local/TODO.md` remains the working queue; `.local/design/` holds active design contracts, authority indexes, and decision ledgers. These documents do not become canonical authority automatically.
 
 ## Lifecycle
 
@@ -50,7 +50,7 @@ Use [TEMPLATE.md](TEMPLATE.md) for new decision records.
 
 - [ADR 0001: Record Architecture Decisions](0001-record-architecture-decisions.md) — establishes ADRs as the durable decision mechanism.
 - [ADR 0002: Keep Documentation Limited to Decision Records](0002-keep-documentation-limited-to-decision-records.md) — keeps committed documentation minimal until the project is mature enough for public maintainer guides.
-- [ADR 0003: Use Local Ignored TODO for Temporary Notes](0003-use-local-ignored-todo-for-temporary-notes.md) — defines `.local/TODO.md` as the private, uncommitted place for immature notes.
+- [ADR 0003: Use Local Ignored TODO for Temporary Notes](0003-use-local-ignored-todo-for-temporary-notes.md) — superseded by ADR 0034; records the historical TODO-only temporary-notes policy.
 - [ADR 0004: Use Modular Monolith with App Composition Root](0004-use-modular-monolith-with-app-composition-root.md) — keeps deployment simple while preserving internal boundaries.
 - [ADR 0005: Keep Domain Modules Framework-free](0005-keep-domain-modules-framework-free.md) — protects domain code from framework and infrastructure coupling.
 - [ADR 0006: Use Explicit SQL Migrations](0006-use-explicit-sql-migrations.md) — requires executable Flyway SQL migrations and forbids documentation-only migration placeholders.
@@ -73,11 +73,14 @@ Use [TEMPLATE.md](TEMPLATE.md) for new decision records.
 - [ADR 0023: Keep External Platform Services Outside the Persefonia Deployment Unit](0023-keep-external-platform-services-outside-the-persefonia-deployment-unit.md) — superseded by ADR 0028; records the historical deployment boundary with externally operated edge, identity, and mail services.
 - [ADR 0024: Support AMD64 and ARM64 Under One OCI Image Index](0024-support-amd64-and-arm64-under-one-oci-image-index.md) — defines one multi-platform OCI index digest as deployment authority for the first-class AMD64 and ARM64 runtime variants.
 - [ADR 0025: Deploy Qualified OCI Artifacts to the Single-Node Runtime over Authenticated SSH](0025-deploy-qualified-oci-artifacts-to-the-single-node-runtime-over-authenticated-ssh.md) — defines the authenticated deployment trust boundary and preserves host-owned runtime configuration and exact-digest artifact authority.
-
 - [ADR 0026: Use OIDC Group Admission with Refresh-Backed Admin Session Revalidation](0026-use-oidc-group-admission-with-refresh-backed-admin-session-revalidation.md) — requires group admission and five-minute fresh UserInfo/local authorization revalidation while keeping OAuth credentials session-scoped.
 - [ADR 0027: Require Explicit POSIX ACLs for Non-Root Compose File Secrets](0027-require-explicit-posix-acls-for-non-root-compose-file-secrets.md) — requires exact numeric UID read grants for file-backed secrets while preserving operator ownership and non-root containers.
-- [ADR 0028: Separate Application Delivery from Host Runtime Topology](0028-separate-application-delivery-from-host-runtime-topology.md) — owns application artifacts/contracts and delivery orchestration while production topology, dependency-server lifecycle, durable state, secrets, and host preflight belong to the external runtime.
+- [ADR 0028: Separate Application Delivery from Host Runtime Topology](0028-separate-application-delivery-from-host-runtime-topology.md) — superseded by ADR 0033; records the external production ownership boundary and historical application-only root Compose contract.
 - [ADR 0029: Execute Repository-Owned RC Deployment Orchestration Ephemerally over Authenticated SSH](0029-execute-repository-owned-rc-deployment-orchestration-ephemerally-over-authenticated-ssh.md) — superseded by ADR 0030; records the historical streamed payload with direct runtime access.
 - [ADR 0030: Route Deployment Runtime Operations Through a Narrow Host Privilege Gateway](0030-route-deployment-runtime-operations-through-a-narrow-host-privilege-gateway.md) — keeps repository-owned SSH orchestration while an externally owned, narrowly privileged gateway performs runtime operations.
 - [ADR 0031: Separate Repository Automation Verification from Application Tests](0031-separate-repository-automation-verification-from-application-tests.md) — separates deterministic automation source checks and contracts from application verification and establishes a stable CI gate.
 - [ADR 0032: Add CI/CD Foundation and Qualified-Artifact RC Redeployment](0032-add-ci-cd-foundation-and-qualified-artifact-rc-redeployment.md) — defines delivery qualification and exact-artifact operator redeployment through the existing RC contract.
+- [ADR 0033: Keep Production Runtime Topology External and Use Compose for Containerized Local Development](0033-keep-production-runtime-topology-external-and-use-compose-for-containerized-local-development.md) — makes root Compose a source-based local runtime while keeping production topology external and immutable OCI delivery authoritative.
+- [ADR 0034: Permit Structured Ignored Local Working Contracts](0034-permit-structured-ignored-local-working-contracts.md) — supersedes ADR 0003; permits temporary working contracts and design ledgers in ignored `.local/` while preserving committed ADR authority.
+- [ADR 0035: Resolve Gallery Media Through Public Application Contracts](0035-resolve-gallery-media-through-public-application-contracts.md) — reuses publication image relationships while retaining independent public content and processed-image eligibility.
+- [ADR 0036: Version Homepage Film Delivery Assets With the Application](0036-version-homepage-film-delivery-assets-with-the-application.md) — makes clean builds independent of ignored source media while retaining qualified, self-hosted delivery in the immutable release artifact.

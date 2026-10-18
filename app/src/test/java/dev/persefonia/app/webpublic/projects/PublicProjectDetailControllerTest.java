@@ -58,6 +58,19 @@ class PublicProjectDetailControllerTest {
     }
 
     @Test
+    void detailLinksActiveTagsOnlyWhenTheirPublicRouteExists() throws Exception {
+        var tag = tags.active("Engineering", "engineering");
+        var project = projects.add(ProjectRecord.project("tag-links", Visibility.PUBLIC, Status.ACTIVE, ContentLanguage.EN)
+                .tags(Set.of(tag)));
+        routes.addProjectFound("/en/projects/tag-links", project.value());
+        mockMvc.perform(get("/en/projects/tag-links")).andExpect(status().isOk())
+                .andExpect(content().string(not(containsString("href=\"/en/tags/engineering\""))));
+        routes.addTagFound("/en/tags/engineering", tag.value());
+        mockMvc.perform(get("/en/projects/tag-links")).andExpect(status().isOk())
+                .andExpect(content().string(containsString("href=\"/en/tags/engineering\">Engineering</a>")));
+    }
+
+    @Test
     void detailRendersPublicProjectOnlyThroughDiscoveryProjection() throws Exception {
         ProjectId projectId = projects.add(ProjectRecord.project("public-detail", Visibility.PUBLIC, Status.ACTIVE, ContentLanguage.TR));
         routes.addProjectFound("/tr/projects/public-detail", projectId.value());

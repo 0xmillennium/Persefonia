@@ -37,7 +37,7 @@ class PortfolioSiteSettingsSchemaTest {
 
     @Test
     void duplicateSingletonSettingsRowIsRejected() {
-        assertThatThrownBy(() -> insertSettings(UUID.randomUUID(), "TR", 3, 5))
+        assertThatThrownBy(() -> insertSettings(UUID.randomUUID(), "TR", 3, 3))
                 .isInstanceOf(SQLException.class);
     }
 
@@ -68,13 +68,41 @@ class PortfolioSiteSettingsSchemaTest {
                 """, SEEDED_SETTINGS_ID)).isInstanceOf(SQLException.class);
     }
 
+    @Test
+    void allPromotionLimitsRejectValuesAboveThree() {
+        for (String column : new String[] {"featured_project_limit", "latest_writing_limit", "research_highlight_limit"}) {
+            assertThatThrownBy(() -> PortfolioSql.update("UPDATE portfolio.site_presentation_settings SET " + column
+                    + " = 4 WHERE id = ?", SEEDED_SETTINGS_ID)).isInstanceOf(SQLException.class);
+        }
+    }
+
+    @Test
+    void upgradedSeedKeepsThemeAndNormalizesWritingLimit() throws SQLException {
+        assertThat(PortfolioSql.strings("""
+                SELECT standard_public_theme FROM portfolio.site_presentation_settings WHERE id = ?
+                """, SEEDED_SETTINGS_ID)).containsExactly("SYSTEM");
+        assertThat(PortfolioSql.count("""
+                SELECT count(*) FROM portfolio.site_presentation_settings
+                WHERE id = ? AND latest_writing_limit = 3 AND research_highlight_limit = 3 AND version = 0
+                """, SEEDED_SETTINGS_ID)).isEqualTo(1);
+    }
+
+    @Test
+    void freshSchemaIncludesHomepageDiscoveryIndex() throws SQLException {
+        assertThat(PortfolioSql.strings("""
+                SELECT indexname FROM pg_indexes
+                WHERE schemaname = 'discovery' AND tablename = 'discoverable_resources'
+                  AND indexname = 'ix_discoverable_resources_homepage_content'
+                """)).containsExactly("ix_discoverable_resources_homepage_content");
+    }
+
     private static void insertSettings(UUID id, String language, int featuredLimit, int writingLimit) throws SQLException {
         PortfolioSql.update("""
                 INSERT INTO portfolio.site_presentation_settings (
-                    id, singleton_key, site_name, default_language, default_theme,
-                    show_featured_projects, show_latest_writing, show_research_highlights,
-                    featured_project_limit, latest_writing_limit, updated_at, version
-                ) VALUES (?, true, 'Persefonia', ?, 'SYSTEM', true, true, false, ?, ?, ?, 0)
+                    id, singleton_key, site_name, default_language, standard_public_theme,
+                    promote_featured_projects, promote_latest_writing, promote_research_highlights,
+                    featured_project_limit, latest_writing_limit, research_highlight_limit, updated_at, version
+                ) VALUES (?, true, 'Persefonia', ?, 'SYSTEM', true, true, false, ?, ?, 3, ?, 0)
                 """, id, language, featuredLimit, writingLimit, OffsetDateTime.parse("2026-06-16T10:00:00Z"));
     }
 }

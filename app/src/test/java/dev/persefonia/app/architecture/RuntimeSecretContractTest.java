@@ -7,70 +7,96 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import org.junit.jupiter.api.Test;
 import org.yaml.snakeyaml.Yaml;
 
 class RuntimeSecretContractTest {
-    private static final List<Secret> SECRETS = List.of(
-            new Secret("postgres_password", "PERSEFONIA_POSTGRES_PASSWORD_FILE", "spring.datasource.password"),
-            new Secret("redis_password", "PERSEFONIA_REDIS_PASSWORD_FILE", "spring.data.redis.password"),
-            new Secret("contact_rate_limit_secret", "PERSEFONIA_CONTACT_RATE_LIMIT_SECRET_FILE",
-                    "persefonia.contact.rate-limit.secret"),
-            new Secret("oidc_client_secret", "PERSEFONIA_OIDC_CLIENT_SECRET_FILE",
-                    "spring.security.oauth2.client.registration.authelia.client-secret"),
-            new Secret("cloudflare_api_token", "PERSEFONIA_CLOUDFLARE_API_TOKEN_FILE",
-                    "persefonia.cache-purge.cloudflare.api-token"));
+    private static final List<String> SECRETS = List.of(
+            "postgres_password", "redis_password", "contact_rate_limit_secret",
+            "oidc_client_secret", "cloudflare_api_token", "smtp_password");
 
     @Test
     void applicationCredentialExamplesRemainTrackedAndRealSecretsStayIgnoredAndUntracked() throws Exception {
-        for (Secret secret : SECRETS) {
-            String name = secret.name();
+        try (var files = Files.list(Path.of("../secrets"))) {
+            assertThat(files.map(path -> path.getFileName().toString())
+                    .filter(name -> name.endsWith(".examples")).toList())
+                    .containsExactlyInAnyOrderElementsOf(SECRETS.stream().map(name -> name + ".examples").toList());
+        }
+        for (String name : SECRETS) {
             String real = "secrets/" + name;
             String example = real + ".examples";
             assertThat(Path.of("../" + example)).isRegularFile();
+            String exampleValue = Files.readString(Path.of("../" + example)).trim();
+            assertThat(exampleValue).isNotBlank().startsWith("fake").doesNotContain("<", ">", "REQUIRED", "TODO");
             assertThat(git("ls-files", "--", example).output()).isEqualTo(example + "\n");
             assertThat(git("check-ignore", "-q", real).status()).isZero();
             assertThat(git("check-ignore", "-q", example).status()).isEqualTo(1);
             assertThat(git("ls-files", "--", real).output()).isEmpty();
         }
-        assertThat(git("check-ignore", "-q", ".env.production").status()).isZero();
+        for (String local : List.of(".env", ".env.production", "compose.override.yaml", "compose.override.yml",
+                "secrets/another_real_secret", "secrets/smtp_password")) {
+            assertThat(git("check-ignore", "-q", local).status()).as(local).isZero();
+        }
     }
 
     @Test
-    void applicationFileSecretsPreserveTargetsWithoutPermissionRemapping() throws Exception {
+    void defaultLocalComposeUsesTrackedFileSecretsAndLocalProfileKeepsConfigtreeOptional() throws Exception {
         Map<?, ?> compose = new Yaml().load(Files.readString(Path.of("../compose.yaml")));
         Map<?, ?> services = (Map<?, ?>) compose.get("services");
         Map<?, ?> app = (Map<?, ?>) services.get("app");
-        assertThat(app.get("secrets")).isEqualTo(SECRETS.stream()
-                .map(secret -> Map.of("source", secret.name(), "target", secret.target())).toList());
+        Map<?, ?> postgres = (Map<?, ?>) services.get("postgres");
+        Map<?, ?> redis = (Map<?, ?>) services.get("redis");
+        assertThat(((Map<?, ?>) compose.get("secrets")).keySet().stream().map(Object::toString).toList())
+                .containsExactlyInAnyOrder("postgres_password", "redis_password", "contact_rate_limit_secret");
+        assertThat(app.get("secrets").toString())
+                .contains("spring.datasource.password", "spring.data.redis.password",
+                        "persefonia.contact.rate-limit.secret");
+        assertThat(postgres.get("secrets").toString()).contains("postgres_password");
+        assertThat(redis.get("secrets").toString()).contains("redis_password");
+        assertThat(((Map<?, ?>) postgres.get("environment")).get("POSTGRES_PASSWORD_FILE"))
+                .isEqualTo("/run/secrets/postgres_password");
+        for (Map<?, ?> service : List.of(app, postgres, redis)) {
+            Map<?, ?> environment = (Map<?, ?>) service.get("environment");
+            assertThat(environment.keySet().stream().map(Object::toString))
+                    .noneMatch(key -> key.matches(".*(?:PASSWORD|SECRET|TOKEN)$"));
+        }
+        assertThat(app.containsKey("env_file")).isFalse();
+        assertThat(Files.readString(Path.of("src/main/resources/application-local.yml")))
+                .contains("optional:configtree:/run/secrets/");
+        assertThat(Files.readString(Path.of("src/main/resources/application-docker.yml")))
+                .contains("configtree:/run/secrets/");
+        assertThat(Files.readString(Path.of("../compose.override.example.yaml")))
+                .contains("target: spring.mail.password", "PERSEFONIA_SMTP_PASSWORD_FILE")
+                .doesNotContain("redis_healthcheck_password", "traefik_password");
     }
 
     @Test
-    void environmentUsesExtensionlessRealSecretNamesAndComposeConsumesOnlyThoseInputs() throws Exception {
-        Properties environmentExample = new Properties();
-        try (var reader = Files.newBufferedReader(Path.of("../.env.example"))) {
-            environmentExample.load(reader);
+    void exampleEnvironmentContainsOnlySecretPathsAndNoRuntimeCredentialValues() throws Exception {
+        String environment = Files.readString(Path.of("../.env.example"));
+        for (String name : List.of("POSTGRES_PASSWORD", "REDIS_PASSWORD", "PERSEFONIA_CONTACT_RATE_LIMIT_SECRET")) {
+            assertThat(environment).doesNotContainPattern("(?m)^" + name + "=");
         }
-        Map<?, ?> secrets = (Map<?, ?>) ((Map<?, ?>) new Yaml()
-                .load(Files.readString(Path.of("../compose.yaml")))).get("secrets");
-        assertThat(secrets.keySet().stream().map(Object::toString).toList())
-                .containsExactlyInAnyOrderElementsOf(SECRETS.stream().map(Secret::name).toList());
-        for (Secret secret : SECRETS) {
-            assertThat(environmentExample.getProperty(secret.variable())).isEqualTo("./secrets/" + secret.name());
-            assertThat(((Map<?, ?>) secrets.get(secret.name())).get("file").toString())
-                    .startsWith("${" + secret.variable() + ":?").endsWith("}");
+        for (String name : List.of("PERSEFONIA_POSTGRES_PASSWORD_FILE", "PERSEFONIA_REDIS_PASSWORD_FILE",
+                "PERSEFONIA_CONTACT_RATE_LIMIT_SECRET_FILE")) {
+            assertThat(environment).containsPattern("(?m)^" + name + "=./secrets/[^\\n]+\\.examples$");
+        }
+        assertThat(environment).doesNotContain("PERSEFONIA_IMAGE_REF", "/var/lib/persefonia");
+        for (String name : List.of("postgres_password", "redis_password", "contact_rate_limit_secret")) {
+            String value = Files.readString(Path.of("../secrets/" + name + ".examples")).trim();
+            assertThat(value).isNotBlank().doesNotContain("<", ">", "REQUIRED", "TODO");
+            assertThat(environment).doesNotContain(value);
         }
     }
 
     @Test
-    void activeApplicationDescriptorsNeverUseExamplesOrObsoleteSecretFilenames() throws Exception {
-        for (String file : List.of("../compose.yaml", "../.env.example",
-                "src/main/resources/application-docker.yml", "src/main/resources/application-prod.yml")) {
+    void productionApplicationDescriptorsNeverUseExamplesOrObsoleteSecretFilenames() throws Exception {
+        for (String file : List.of(
+                "src/main/resources/application-local.yml", "src/main/resources/application-docker.yml",
+                "src/main/resources/application-prod.yml")) {
             String contents = Files.readString(Path.of(file));
             assertThat(contents).as(file).doesNotContain(".examples", "secrets/examples/");
-            for (Secret secret : SECRETS) {
-                assertThat(contents).as("%s secret paths", file).doesNotContain(secret.name() + ".txt");
+            for (String name : SECRETS) {
+                assertThat(contents).as("%s secret paths", file).doesNotContain(name + ".txt");
             }
         }
     }
@@ -86,5 +112,4 @@ class RuntimeSecretContractTest {
     }
 
     private record GitResult(int status, String output) {}
-    private record Secret(String name, String variable, String target) {}
 }

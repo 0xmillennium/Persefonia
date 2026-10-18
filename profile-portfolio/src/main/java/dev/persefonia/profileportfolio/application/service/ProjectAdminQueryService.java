@@ -58,7 +58,7 @@ public final class ProjectAdminQueryService {
                 project.technologies(),
                 project.links(),
                 project.updatedAt(),
-                project.version());
+                project.version(), project.coverAssetId());
     }
 
     private List<AdminProjectTagView> assignedTags(Set<TagId> ids) {

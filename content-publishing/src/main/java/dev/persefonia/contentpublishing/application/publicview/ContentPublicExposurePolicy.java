@@ -17,12 +17,18 @@ public final class ContentPublicExposurePolicy {
         Objects.requireNonNull(status, "status");
         Objects.requireNonNull(visibility, "visibility");
         Objects.requireNonNull(type, "type");
-        if (status != ContentStatus.PUBLISHED || visibility == ContentVisibility.PRIVATE) {
+        if (status != ContentStatus.PUBLISHED) {
             return ContentPublicExposureSnapshot.none();
         }
-        if (visibility == ContentVisibility.UNLISTED) {
-            return new ContentPublicExposureSnapshot(true, false, false, false);
-        }
-        return new ContentPublicExposureSnapshot(true, true, true, type != ContentType.PAGE);
+        boolean homepagePromotionEligible = switch (type) {
+            case ARTICLE, NOTE, RESEARCH -> true;
+            case PAGE -> false;
+        };
+        return switch (visibility) {
+            case PRIVATE -> ContentPublicExposureSnapshot.none();
+            case UNLISTED -> new ContentPublicExposureSnapshot(true, false, false, false, false);
+            case PUBLIC -> new ContentPublicExposureSnapshot(
+                    true, true, homepagePromotionEligible, true, type != ContentType.PAGE);
+        };
     }
 }

@@ -1,0 +1,23 @@
+.home-brand .writing-point[data-stroke='0'] {
+  offset-path: url('#nav-identity-writing-path-0');
+}
+
+.home-brand .writing-point[data-stroke='1'] {
+  offset-path: url('#nav-identity-writing-path-1');
+}
+
+.home-brand .writing-point[data-stroke='2'] {
+  offset-path: url('#nav-identity-writing-path-2');
+}
+
+.home-brand .writing-point[data-stroke='3'] {
+  offset-path: url('#nav-identity-writing-path-3');
+}
+
+.home-brand .writing-point[data-stroke='4'] {
+  offset-path: url('#nav-identity-writing-path-4');
+}
+
+.home-brand .period-point {
+  offset-path: url('#nav-identity-period-path');
+}

@@ -1,0 +1,32 @@
+[data-home-v2][data-enhanced='true'] .home-staircase {
+  display: flex;
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+[data-home-v2][data-enhanced='true'] .home-staircase i {
+  flex: 1;
+  background: var(--paper);
+  height: 100%;
+}
+
+[data-home-v2][data-enhanced='true'] [data-scene-wipe]::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--paper);
+  opacity: var(--curtain-solid, 0);
+}
+
+[data-home-v2][data-enhanced='true'] [data-scene-wipe] i {
+  background: rgba(52, 52, 52, 0.84);
+}
+
+@media (max-width: 640px) {
+  [data-scene-wipe] i:nth-child(n + 7) {
+    display: none;
+  }
+}

@@ -12,12 +12,13 @@ public record UpdateSitePresentationSettingsCommand(
         Set<String> supportedLanguages,
         String titleSuffix,
         String defaultMetaDescription,
-        String defaultTheme,
-        boolean showFeaturedProjects,
-        boolean showLatestWriting,
-        boolean showResearchHighlights,
+        String standardPublicTheme,
+        boolean promoteFeaturedProjects,
+        boolean promoteLatestWriting,
+        boolean promoteResearchHighlights,
         int featuredProjectLimit,
         int latestWritingLimit,
+        int researchHighlightLimit,
         Instant requestedAt) {
     public UpdateSitePresentationSettingsCommand {
         Objects.requireNonNull(actor, "actor");

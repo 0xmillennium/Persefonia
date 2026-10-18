@@ -34,7 +34,7 @@ class JdbcSitePresentationSettingsRepositoryAdapterTest extends PortfolioReposit
 
         SitePresentationSettings saved = settings.save(current);
 
-        assertThat(saved.defaultTheme()).isEqualTo(ThemePreference.DARK);
+        assertThat(saved.standardPublicTheme()).isEqualTo(ThemePreference.DARK);
         assertThat(saved.version().value()).isEqualTo(1);
     }
 }

@@ -118,14 +118,15 @@ class MediaBoundaryArchitectureTest {
 
     @Test
     void projectTemplatesDoNotExposeCoverAssetInternals() throws Exception {
-        for (Path root : List.of(
-                Path.of("src/main/jte/site/projects"),
-                Path.of("src/main/jte/admin/projects"))) {
-            assertThat(sourceText(root))
+        assertThat(sourceText(Path.of("src/main/jte/site/projects")))
                     .doesNotContain("coverAssetId")
                     .doesNotContain("defaultOgImageAssetId")
                     .doesNotContain("defaultOpenGraphImageAssetId");
+        // Authoring exposes a UUID attachment; public presentation receives eligible variants.
+        for (Path root : List.of(Path.of("src/main/jte/site"), Path.of("src/main/jte/admin/projects"))) {
+            assertThat(sourceText(root)).doesNotContain("storagePath", "storage_path", "AssetRepository");
         }
+        assertThat(sourceText(Path.of("src/main/jte/admin/projects"))).contains("coverAssetId");
     }
 
     @Test

@@ -4,7 +4,7 @@
 |---|---|
 | Status | Accepted |
 | Date | 2026-06-15 |
-| Scope | architecture / public routing |
+| Scope | architecture |
 | Supersedes | none |
 | Superseded by | none |
 
@@ -16,13 +16,7 @@ Reserving these projection shapes keeps links, migrations, and route resolution 
 
 ## Decision
 
-Public tag pages use the route shape:
-
-```text
-/{language}/tags/{tagSlug}
-```
-
-The accepted Discovery projection shape for tag pages is:
+Public tag pages use the route shape `/{language}/tags/{tagSlug}` with the accepted Discovery projection shape:
 
 ```text
 source_context = TAXONOMY
@@ -32,13 +26,7 @@ route_purpose = TAG_PAGE
 language = TR or EN
 ```
 
-Public series pages use the route shape:
-
-```text
-/{language}/series/{seriesSlug}
-```
-
-The accepted Discovery projection shape for series pages is:
+Public series pages use the route shape `/{language}/series/{seriesSlug}` with the accepted Discovery projection shape:
 
 ```text
 source_context = CONTENT_PUBLISHING

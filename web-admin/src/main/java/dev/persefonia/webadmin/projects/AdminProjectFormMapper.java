@@ -31,6 +31,7 @@ final class AdminProjectFormMapper {
     AdminProjectForm toForm(AdminProjectEditView view) {
         AdminProjectForm form = new AdminProjectForm();
         form.setStatus(view.status());
+        form.setCoverAssetId(view.coverAssetId());
         form.setVisibility(view.visibility());
         form.setFeatured(view.featured());
         form.setSortOrder(view.sortOrder() == null ? "" : view.sortOrder().toString());
@@ -56,7 +57,7 @@ final class AdminProjectFormMapper {
                 localizations(form),
                 technologies(form.getTechnologies()),
                 links(form.getLinks()),
-                now);
+                now, form.getCoverAssetId());
     }
 
     UpdateProjectCommand toUpdateCommand(
@@ -75,7 +76,7 @@ final class AdminProjectFormMapper {
                 localizations(form),
                 technologies(form.getTechnologies()),
                 links(form.getLinks()),
-                now);
+                now, form.getCoverAssetId());
     }
 
     private static void apply(AdminProjectForm form, AdminProjectLocalizationView localization) {

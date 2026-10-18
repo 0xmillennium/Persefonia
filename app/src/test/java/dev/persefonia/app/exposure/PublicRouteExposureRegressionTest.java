@@ -19,7 +19,7 @@ import org.springframework.context.annotation.Import;
                 "spring.autoconfigure.exclude=org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration",
                 "spring.flyway.enabled=false"
         })
-@Import(TestPortfolioSettingsFallbackConfiguration.class)
+@Import({TestPortfolioSettingsFallbackConfiguration.class, dev.persefonia.app.TestPublicRouteResolutionConfiguration.class})
 class PublicRouteExposureRegressionTest {
     @LocalServerPort
     private int applicationPort;

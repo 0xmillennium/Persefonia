@@ -16,7 +16,7 @@ class SitePresentationSettingsTest {
 
     @Test
     void atomicUpdateChangesPresentationThemeAndHomepageSettings() {
-        SitePresentationSettings settings = settings(Set.of(ContentLanguage.TR), ContentLanguage.TR, homepage(3, 5));
+        SitePresentationSettings settings = settings(Set.of(ContentLanguage.TR), ContentLanguage.TR, homepage(3, 3));
 
         settings.updateSettings(
                 SiteName.of("Portfolio"),
@@ -25,7 +25,7 @@ class SitePresentationSettingsTest {
                 TitleSuffix.of("| Works"),
                 SeoDescription.of("Independent software work."),
                 ThemePreference.DARK,
-                homepage(2, 4),
+                homepage(2, 3),
                 LATER);
 
         assertThat(settings.siteName().value()).isEqualTo("Portfolio");
@@ -33,14 +33,14 @@ class SitePresentationSettingsTest {
         assertThat(settings.supportedLanguages()).containsExactlyInAnyOrder(ContentLanguage.EN, ContentLanguage.TR);
         assertThat(settings.titleSuffix()).hasValue(TitleSuffix.of("| Works"));
         assertThat(settings.defaultMetaDescription()).hasValue(SeoDescription.of("Independent software work."));
-        assertThat(settings.defaultTheme()).isEqualTo(ThemePreference.DARK);
-        assertThat(settings.homepageSettings().featuredProjectLimit()).isEqualTo(PositiveInteger.of(2));
-        assertThat(settings.homepageSettings().latestWritingLimit()).isEqualTo(PositiveInteger.of(4));
+        assertThat(settings.standardPublicTheme()).isEqualTo(ThemePreference.DARK);
+        assertThat(settings.homepageSettings().featuredProjectLimit()).isEqualTo(HomepagePromotionLimit.of(2));
+        assertThat(settings.homepageSettings().latestWritingLimit()).isEqualTo(HomepagePromotionLimit.of(3));
     }
 
     @Test
     void atomicUpdateIncrementsVersionOnceAndChangesUpdatedAtOnce() {
-        SitePresentationSettings settings = settings(Set.of(ContentLanguage.TR), ContentLanguage.TR, homepage(3, 5));
+        SitePresentationSettings settings = settings(Set.of(ContentLanguage.TR), ContentLanguage.TR, homepage(3, 3));
 
         settings.updateSettings(
                 SiteName.of("Portfolio"),
@@ -58,7 +58,7 @@ class SitePresentationSettingsTest {
 
     @Test
     void atomicUpdateRejectsDefaultLanguageOutsideSupportedLanguages() {
-        SitePresentationSettings settings = settings(Set.of(ContentLanguage.TR), ContentLanguage.TR, homepage(3, 5));
+        SitePresentationSettings settings = settings(Set.of(ContentLanguage.TR), ContentLanguage.TR, homepage(3, 3));
 
         assertThatThrownBy(() -> settings.updateSettings(
                         SiteName.of("Portfolio"),
@@ -67,7 +67,7 @@ class SitePresentationSettingsTest {
                         null,
                         null,
                         ThemePreference.SYSTEM,
-                        homepage(3, 5),
+                        homepage(3, 3),
                         LATER))
                 .isInstanceOf(PortfolioValidationException.class);
     }
@@ -84,7 +84,7 @@ class SitePresentationSettingsTest {
                 null,
                 assetId,
                 ThemePreference.SYSTEM,
-                homepage(3, 5),
+                homepage(3, 3),
                 NOW);
 
         settings.updateSettings(
@@ -94,7 +94,7 @@ class SitePresentationSettingsTest {
                 null,
                 null,
                 ThemePreference.DARK,
-                homepage(4, 6),
+                homepage(2, 3),
                 LATER);
 
         assertThat(settings.defaultOpenGraphImageAssetId()).hasValue(assetId);
@@ -108,19 +108,19 @@ class SitePresentationSettingsTest {
 
     @Test
     void rejectsEmptySupportedLanguages() {
-        assertThatThrownBy(() -> settings(Set.of(), ContentLanguage.TR, homepage(3, 5)))
+        assertThatThrownBy(() -> settings(Set.of(), ContentLanguage.TR, homepage(3, 3)))
                 .isInstanceOf(PortfolioValidationException.class);
     }
 
     @Test
     void rejectsDefaultLanguageNotInSupportedLanguages() {
-        assertThatThrownBy(() -> settings(Set.of(ContentLanguage.EN), ContentLanguage.TR, homepage(3, 5)))
+        assertThatThrownBy(() -> settings(Set.of(ContentLanguage.EN), ContentLanguage.TR, homepage(3, 3)))
                 .isInstanceOf(PortfolioValidationException.class);
     }
 
     @Test
     void rejectsNonPositiveFeaturedProjectLimit() {
-        assertThatThrownBy(() -> homepage(0, 5))
+        assertThatThrownBy(() -> homepage(0, 3))
                 .isInstanceOf(PortfolioValidationException.class);
     }
 
@@ -128,6 +128,13 @@ class SitePresentationSettingsTest {
     void rejectsNonPositiveLatestWritingLimit() {
         assertThatThrownBy(() -> homepage(3, 0))
                 .isInstanceOf(PortfolioValidationException.class);
+    }
+
+    @Test
+    void rejectsPromotionLimitAboveThree() {
+        assertThatThrownBy(() -> homepage(4, 3)).isInstanceOf(PortfolioValidationException.class);
+        assertThatThrownBy(() -> homepage(3, 4)).isInstanceOf(PortfolioValidationException.class);
+        assertThatThrownBy(() -> HomepagePromotionLimit.of(4)).isInstanceOf(PortfolioValidationException.class);
     }
 
     private static SitePresentationSettings settings(
@@ -152,7 +159,7 @@ class SitePresentationSettingsTest {
                 true,
                 true,
                 false,
-                PositiveInteger.of(featuredLimit),
-                PositiveInteger.of(writingLimit));
+                HomepagePromotionLimit.of(featuredLimit),
+                HomepagePromotionLimit.of(writingLimit), HomepagePromotionLimit.of(3));
     }
 }

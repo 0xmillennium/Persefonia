@@ -69,7 +69,7 @@ class RedeployRcWorkflowContractTest {
                 automatic.step("resolve-qualified-artifact", "Resolve and verify qualified artifact").get("run"));
         assertThat((String) resolver.get("run"))
                 .contains("\"$EXPECTED_SOURCE_SHA\" \"$EXPECTED_IMAGE_DIGEST\" \"$GITHUB_REPOSITORY\"")
-                .contains("docker/supported-platforms.txt >> \"$GITHUB_OUTPUT\"");
+                .contains("supported-platforms.txt >> \"$GITHUB_OUTPUT\"");
         assertThat(WorkflowDocument.map(redeploy.job("resolve-qualified-artifact").get("outputs")))
                 .containsExactlyInAnyOrderEntriesOf(Map.of(
                         "source_sha", "${{ steps.artifact.outputs.source_sha }}",

@@ -4,7 +4,7 @@ import dev.persefonia.profileportfolio.domain.common.AssetId;
 import dev.persefonia.profileportfolio.domain.common.ContentLanguage;
 import dev.persefonia.profileportfolio.domain.common.Version;
 import dev.persefonia.profileportfolio.domain.settings.HomepageSettings;
-import dev.persefonia.profileportfolio.domain.settings.PositiveInteger;
+import dev.persefonia.profileportfolio.domain.settings.HomepagePromotionLimit;
 import dev.persefonia.profileportfolio.domain.settings.SeoDescription;
 import dev.persefonia.profileportfolio.domain.settings.SiteName;
 import dev.persefonia.profileportfolio.domain.settings.SitePresentationSettings;
@@ -27,13 +27,14 @@ final class SitePresentationSettingsPersistenceMapper {
                 nullable(resultSet.getString("title_suffix"), TitleSuffix::of),
                 nullable(resultSet.getString("default_meta_description"), SeoDescription::of),
                 nullable(resultSet.getObject("default_og_image_asset_id", UUID.class), AssetId::from),
-                ThemePreference.valueOf(resultSet.getString("default_theme")),
+                ThemePreference.valueOf(resultSet.getString("standard_public_theme")),
                 HomepageSettings.of(
-                        resultSet.getBoolean("show_featured_projects"),
-                        resultSet.getBoolean("show_latest_writing"),
-                        resultSet.getBoolean("show_research_highlights"),
-                        PositiveInteger.of(resultSet.getInt("featured_project_limit")),
-                        PositiveInteger.of(resultSet.getInt("latest_writing_limit"))),
+                        resultSet.getBoolean("promote_featured_projects"),
+                        resultSet.getBoolean("promote_latest_writing"),
+                        resultSet.getBoolean("promote_research_highlights"),
+                        HomepagePromotionLimit.of(resultSet.getInt("featured_project_limit")),
+                        HomepagePromotionLimit.of(resultSet.getInt("latest_writing_limit")),
+                        HomepagePromotionLimit.of(resultSet.getInt("research_highlight_limit"))),
                 timestamp(resultSet, "updated_at"),
                 Version.of(resultSet.getLong("version")));
     }

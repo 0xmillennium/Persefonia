@@ -10,8 +10,6 @@ import dev.persefonia.contentpublishing.application.discovery.ContentPublicRoute
 import dev.persefonia.contentpublishing.application.discovery.SeriesDiscoverabilityCoordinator;
 import dev.persefonia.contentpublishing.application.discovery.SeriesDiscoveryProjectionFactory;
 import dev.persefonia.contentpublishing.application.discovery.SeriesPublicRouteFactory;
-import dev.persefonia.contentpublishing.application.publicview.ContentPublicExposurePolicy;
-import dev.persefonia.contentpublishing.application.publicview.ContentPublicMutationFactsFactory;
 import dev.persefonia.contentpublishing.application.port.ContentPublishingEventPublisher;
 import dev.persefonia.contentpublishing.application.port.ContentTagVocabularyPort;
 import dev.persefonia.contentpublishing.application.port.PublicSeriesEntryReadModel;
@@ -19,9 +17,11 @@ import dev.persefonia.contentpublishing.application.port.PublicTaggedContentRead
 import dev.persefonia.contentpublishing.application.port.PublicTranslationReadModel;
 import dev.persefonia.contentpublishing.application.port.SeriesCandidateContentReadModel;
 import dev.persefonia.contentpublishing.application.port.TranslationCandidateContentReadModel;
+import dev.persefonia.contentpublishing.application.publicview.ContentPublicExposurePolicy;
+import dev.persefonia.contentpublishing.application.publicview.ContentPublicMutationFactsFactory;
 import dev.persefonia.contentpublishing.application.rendering.MarkdownRenderingService;
-import dev.persefonia.contentpublishing.application.service.ContentCommandService;
 import dev.persefonia.contentpublishing.application.service.ContentAdminQueryService;
+import dev.persefonia.contentpublishing.application.service.ContentCommandService;
 import dev.persefonia.contentpublishing.application.service.ContentDraftCommandHandler;
 import dev.persefonia.contentpublishing.application.service.ContentLifecycleCommandHandler;
 import dev.persefonia.contentpublishing.application.service.ContentPreviewQueryHandler;
@@ -29,9 +29,10 @@ import dev.persefonia.contentpublishing.application.service.ContentPublishComman
 import dev.persefonia.contentpublishing.application.service.ContentRevisionQueryHandler;
 import dev.persefonia.contentpublishing.application.service.ContentTagAssignmentService;
 import dev.persefonia.contentpublishing.application.service.PublicContentBySourceQueryHandler;
+import dev.persefonia.contentpublishing.application.service.PublicContentNavigationQueryService;
 import dev.persefonia.contentpublishing.application.service.PublicContentQueryHandler;
-import dev.persefonia.contentpublishing.application.service.PublicTaggedContentQueryHandler;
 import dev.persefonia.contentpublishing.application.service.PublicSeriesPageQueryService;
+import dev.persefonia.contentpublishing.application.service.PublicTaggedContentQueryHandler;
 import dev.persefonia.contentpublishing.application.service.PublicTranslationLinkQueryService;
 import dev.persefonia.contentpublishing.application.service.SeriesAdminQueryService;
 import dev.persefonia.contentpublishing.application.service.SeriesCommandService;
@@ -227,8 +228,16 @@ class ContentApplicationConfiguration {
     @Bean
     PublicContentBySourceQueryHandler publicContentBySourceQueryHandler(
             ContentItemRepository contentItems,
-            ContentPublicRouteFactory routeFactory) {
-        return new PublicContentBySourceQueryHandler(contentItems, routeFactory);
+            ContentPublicRouteFactory routeFactory, ContentTagVocabularyPort vocabulary) {
+        return new PublicContentBySourceQueryHandler(contentItems, routeFactory, vocabulary);
+    }
+
+    @Bean
+    PublicContentNavigationQueryService publicContentNavigationQueryService(
+            ContentItemRepository items, ContentTagVocabularyPort vocabulary, SeriesRepository series,
+            ContentPublicRouteFactory contentRoutes, SeriesPublicRouteFactory seriesRoutes) {
+        return new PublicContentNavigationQueryService(
+                items, vocabulary, series, contentRoutes, seriesRoutes);
     }
 
     @Bean

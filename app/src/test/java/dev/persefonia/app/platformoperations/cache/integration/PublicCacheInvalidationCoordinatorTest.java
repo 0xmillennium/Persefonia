@@ -26,7 +26,7 @@ class PublicCacheInvalidationCoordinatorTest {
                 List.of(new PublicUrl("/tr/tags/java")),
                 List.of(new PublicUrl("/tr/series/architecture")),
                 List.of(new PublicUrl("/tr/articles/current")), false));
-        var listed = new ContentPublicExposureSnapshot(true, true, true, true);
+        var listed = new ContentPublicExposureSnapshot(true, true, true, true, true);
         var facts = new ContentPublicMutationFacts(
                 ContentId.newId(), listed, listed,
                 Optional.of(new PublicUrl("/tr/articles/old")),
@@ -36,7 +36,7 @@ class PublicCacheInvalidationCoordinatorTest {
 
         assertThat(execution.requests).singleElement().satisfies(request ->
                 assertThat(request.targets()).extracting(target -> target.value()).containsExactly(
-                        "/feed.xml", "/sitemap.xml", "/tr/articles/current", "/tr/articles/old",
+                        "/", "/feed.xml", "/sitemap.xml", "/tr/articles/current", "/tr/articles/old",
                         "/tr/series/architecture", "/tr/tags/java"));
     }
 
@@ -49,7 +49,7 @@ class PublicCacheInvalidationCoordinatorTest {
                 .handle(new PublicCacheInvalidationSignal.ContentChanged(facts));
         assertThat(execution.requests).isEmpty();
 
-        var listed = new ContentPublicExposureSnapshot(true, true, true, true);
+        var listed = new ContentPublicExposureSnapshot(true, true, true, true, true);
         var publicFacts = new ContentPublicMutationFacts(
                 ContentId.newId(), listed, listed, Optional.of(new PublicUrl("/en/notes/a")),
                 Optional.of(new PublicUrl("/en/notes/a")));

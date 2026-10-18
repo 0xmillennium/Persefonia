@@ -50,7 +50,7 @@ class PublicCachePostCommitTimingTest {
                 new SpringTransactionSynchronizationPostCommitTaskExecutor(), coordinator);
 
         ContentId contentId = ContentId.newId();
-        var exposed = new ContentPublicExposureSnapshot(true, true, true, true);
+        var exposed = new ContentPublicExposureSnapshot(true, true, true, true, true);
         var facts = new ContentPublicMutationFacts(
                 contentId, ContentPublicExposureSnapshot.none(), exposed,
                 Optional.empty(), Optional.of(new PublicUrl("/en/articles/published")));

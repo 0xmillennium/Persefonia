@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 class FrontendBuildConfigurationArchitectureTest {
     @Test
     void viteUsesCodeSplittingAndRetainsMainAndMermaidEntries() throws IOException {
-        String config = Files.readString(Path.of("../frontend/vite.config.ts"));
+        String config = Files.readString(Path.of("../frontend/vite.config.ts")).replace('\'', '"');
 
         assertThat(config)
                 .doesNotContain("advancedChunks")
@@ -21,10 +21,17 @@ class FrontendBuildConfigurationArchitectureTest {
 
     @Test
     void mermaidRemainsOutsideMainEntry() throws IOException {
-        String main = Files.readString(Path.of("../frontend/src/main.ts"));
-        String mermaidLoader = Files.readString(Path.of("../frontend/src/mermaid-loader.ts"));
+        String main = Files.readString(Path.of("../frontend/src/main.ts")).replace('\'', '"');
+        String mermaidLoader = Files.readString(Path.of("../frontend/src/mermaid-loader.ts")).replace('\'', '"');
 
         assertThat(main).doesNotContain("from \"mermaid\"");
         assertThat(mermaidLoader).contains("from \"mermaid\"");
+    }
+
+    @Test
+    void jtePrecompilationTargetsJava21Bytecode() throws IOException {
+        String appBuild = Files.readString(Path.of("build.gradle.kts")).replace('\'', '"');
+
+        assertThat(appBuild).contains("compileArgs.set(arrayOf(\"--release\", \"21\"))");
     }
 }

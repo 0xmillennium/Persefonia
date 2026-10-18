@@ -75,6 +75,7 @@ public final class AdminSiteSettingsController {
                     form,
                     validator.featuredProjectLimit(form),
                     validator.latestWritingLimit(form),
+                    validator.researchHighlightLimit(form),
                     Instant.now()));
             return "redirect:/admin/settings/site?saved";
         } catch (SitePresentationSettingsApplicationException exception) {

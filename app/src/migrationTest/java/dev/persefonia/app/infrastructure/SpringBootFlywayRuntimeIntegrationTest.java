@@ -94,14 +94,16 @@ class SpringBootFlywayRuntimeIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM portfolio.site_presentation_settings", Integer.class))
                 .isEqualTo(1);
         var seed = jdbc.queryForMap("""
-                SELECT site_name, default_language, default_theme, featured_project_limit, latest_writing_limit
+                SELECT site_name, default_language, standard_public_theme, featured_project_limit,
+                       latest_writing_limit, research_highlight_limit
                 FROM portfolio.site_presentation_settings
                 """);
         assertThat(seed).containsEntry("site_name", "Persefonia")
                 .containsEntry("default_language", "TR")
-                .containsEntry("default_theme", "SYSTEM")
+                .containsEntry("standard_public_theme", "SYSTEM")
                 .containsEntry("featured_project_limit", 3)
-                .containsEntry("latest_writing_limit", 5);
+                .containsEntry("latest_writing_limit", 3)
+                .containsEntry("research_highlight_limit", 3);
         assertThat(jdbc.queryForList("SELECT language FROM portfolio.site_supported_languages", String.class))
                 .containsExactlyInAnyOrder("EN", "TR");
 

@@ -1,5 +1,6 @@
 package dev.persefonia.contentpublishing.domain.model.series.port;
 
+import dev.persefonia.contentpublishing.domain.content.ContentId;
 import dev.persefonia.contentpublishing.domain.content.ContentLanguage;
 import dev.persefonia.contentpublishing.domain.model.series.Series;
 import dev.persefonia.contentpublishing.domain.model.series.SeriesId;
@@ -18,4 +19,8 @@ public interface SeriesRepository {
     boolean existsByLanguageAndSlug(ContentLanguage language, SeriesSlug slug);
 
     List<SeriesSummary> findAllForAdmin();
+
+    /** Active series in this language containing the specified content, ordered by title and id. */
+    List<SeriesSummary> findActiveContaining(
+            ContentId contentId, ContentLanguage language);
 }

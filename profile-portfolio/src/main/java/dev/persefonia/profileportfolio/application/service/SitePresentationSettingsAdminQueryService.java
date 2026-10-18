@@ -32,12 +32,13 @@ public final class SitePresentationSettingsAdminQueryService {
                 settings.supportedLanguages().stream().map(ContentLanguage::name).collect(Collectors.toUnmodifiableSet()),
                 settings.titleSuffix().map(TitleSuffix::value).orElse(""),
                 settings.defaultMetaDescription().map(SeoDescription::value).orElse(""),
-                settings.defaultTheme().name(),
-                homepage.showFeaturedProjects(),
-                homepage.showLatestWriting(),
-                homepage.showResearchHighlights(),
+                settings.standardPublicTheme().name(),
+                homepage.promoteFeaturedProjects(),
+                homepage.promoteLatestWriting(),
+                homepage.promoteResearchHighlights(),
                 homepage.featuredProjectLimit().value(),
                 homepage.latestWritingLimit().value(),
+                homepage.researchHighlightLimit().value(),
                 settings.updatedAt(),
                 settings.version().value());
     }

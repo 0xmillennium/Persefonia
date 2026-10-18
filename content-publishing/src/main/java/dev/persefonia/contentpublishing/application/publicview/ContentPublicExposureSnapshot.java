@@ -3,10 +3,11 @@ package dev.persefonia.contentpublishing.application.publicview;
 public record ContentPublicExposureSnapshot(
         boolean directReachable,
         boolean listed,
+        boolean homepagePromotionEligible,
         boolean sitemapEligible,
         boolean feedEligible) {
 
     public static ContentPublicExposureSnapshot none() {
-        return new ContentPublicExposureSnapshot(false, false, false, false);
+        return new ContentPublicExposureSnapshot(false, false, false, false, false);
     }
 }

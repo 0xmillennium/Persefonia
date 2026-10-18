@@ -10,6 +10,7 @@ import dev.persefonia.profileportfolio.domain.cv.ActiveCvProfileId;
 import dev.persefonia.profileportfolio.domain.cv.ActiveCvProfileRepository;
 import dev.persefonia.profileportfolio.domain.cv.MediaAssetId;
 import dev.persefonia.profileportfolio.domain.settings.HomepageSettings;
+import dev.persefonia.profileportfolio.domain.settings.HomepagePromotionLimit;
 import dev.persefonia.profileportfolio.domain.settings.PositiveInteger;
 import dev.persefonia.profileportfolio.domain.settings.SiteName;
 import dev.persefonia.profileportfolio.domain.settings.SitePresentationSettings;
@@ -103,7 +104,7 @@ class PublicCvTestConfiguration {
                     null,
                     null,
                     ThemePreference.SYSTEM,
-                    HomepageSettings.of(true, true, false, PositiveInteger.of(3), PositiveInteger.of(5)),
+                    HomepageSettings.of(true, true, false, HomepagePromotionLimit.of(3), HomepagePromotionLimit.of(3), HomepagePromotionLimit.of(3)),
                     NOW));
         }
 

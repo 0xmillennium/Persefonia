@@ -1,0 +1,127 @@
+import { describe, it, expect } from 'vitest';
+import { LiquidField, FIELD } from '../rendering/field';
+import { PointerObserver, eligible } from '../input';
+function path(speed: number, events = 60): LiquidField {
+  const f = new LiquidField(1200, 800);
+  const total = 800;
+  for (let n = 1; n <= events; n++) {
+    const distance = total / events;
+    f.inject({ x: 100 + (total * n) / events, y: 400, vx: speed, vy: 0, speed, distance });
+    f.step(distance / speed);
+  }
+  return f;
+}
+describe('Liquid field and pointer sampling', () => {
+  it('LN-01/08 observes coordinates and physical velocity, bounded sharp reversals', () => {
+    const p = new PointerObserver();
+    expect(p.observe(10, 20, 10)).toBeNull();
+    expect(p.observe(110, 20, 110)).toMatchObject({ x: 110, y: 20, speed: 1000, vx: 1000 });
+    expect(p.observe(110, 20, 110)).toBeNull();
+    expect(p.observe(10, 20, 111)?.vx).toBe(-4500);
+    p.reset();
+    expect(p.observe(10, 20, 115)).toBeNull();
+    expect(p.observe(NaN, 20, 116)).toBeNull();
+  });
+  it('LN-02 slow forms are broader and fast strokes more elongated', () => {
+    const slow = new LiquidField(1200, 800),
+      fast = new LiquidField(1200, 800);
+    for (const [f, speed] of [
+      [slow, 150],
+      [fast, 3500],
+    ] as const) {
+      f.inject({ x: 600, y: 400, vx: speed, vy: 0, speed, distance: 30 });
+      f.step(1 / 60);
+    }
+    const s = slow.metrics(),
+      f = fast.metrics();
+    expect(s.varianceY).toBeGreaterThan(f.varianceY * 2);
+    expect(f.varianceX / f.varianceY).toBeGreaterThan((s.varianceX / s.varianceY) * 3);
+  });
+  it('LN-03/04/05 spatial memory dissipates fully without stationary injection', () => {
+    const f = path(1500);
+    const initial = f.energy;
+    expect(initial).toBeGreaterThan(0);
+    f.step(0.1);
+    expect(f.energy).toBeGreaterThan(0);
+    expect(f.energy).toBeLessThan(initial);
+    for (let i = 0; i < 300; i++) f.step(1 / 60);
+    expect(f.active).toBe(false);
+    expect(f.energy).toBe(0);
+    expect(f.injections).toBe(60);
+  });
+  it('LN-06 connected wakes merge and distant islands remain distinct', () => {
+    const f = new LiquidField(1200, 800);
+    const inject = (x: number) => f.inject({ x, y: 400, vx: 200, vy: 0, speed: 200, distance: 20 });
+    inject(200);
+    inject(600);
+    f.step(0.016);
+    expect(f.metrics().components).toBe(2);
+    for (let x = 220; x < 600; x += 15) inject(x);
+    f.step(0.016);
+    expect(f.metrics().components).toBe(1);
+  });
+  it('LN-08 event-rate-independent segment dosing has comparable field mass', () => {
+    const a = path(1200, 60).metrics(),
+      b = path(1200, 120).metrics();
+    expect(b.mass / a.mass).toBeGreaterThan(0.8);
+    expect(b.mass / a.mass).toBeLessThan(1.3);
+  });
+  it('LC-03 expired trails never return after suspended time', () => {
+    const f = path(1200);
+    f.step(30);
+    expect(f.energy).toBe(0);
+    expect(f.active).toBe(false);
+  });
+  it('transports independent pigment channels after release without adding input', () => {
+    const f = new LiquidField(1200, 800);
+    f.inject({ x: 600, y: 400, vx: 1200, vy: 0, speed: 1200, distance: 180 });
+    f.step(1 / 60);
+    const before = f.pigment.slice(),
+      initial = f.energy;
+    let bands = 0,
+      veins = 0;
+    for (let i = 0; i < before.length; i += 3) {
+      bands += before[i + 1]!;
+      veins += before[i + 2]!;
+    }
+    expect(bands).toBeGreaterThan(0);
+    expect(veins).toBeGreaterThan(0);
+    expect(veins).toBeLessThan(bands);
+    for (let i = 0; i < 12; i++) f.step(1 / 60);
+    expect(f.injections).toBe(1);
+    expect(f.energy).toBeLessThan(initial);
+    expect(f.pigment).not.toEqual(before);
+    expect(f.pigment.every(Number.isFinite)).toBe(true);
+  });
+  it('discards queued compatibility motion on suspension and retains fresh input after a stall', () => {
+    const f = new LiquidField(1200, 800);
+    const sample = { x: 600, y: 400, vx: 500, vy: 0, speed: 500, distance: 100 };
+    f.inject(sample);
+    f.discardPending();
+    f.step(0.02);
+    expect(f.energy).toBe(0);
+    f.inject(sample);
+    f.step(10);
+    expect(f.energy).toBeGreaterThan(0);
+    f.step(4.5);
+    expect(f.active).toBe(false);
+  });
+  it('bounds three-channel compatibility storage, clamps invalid input and resets cleanly', () => {
+    const f = new LiquidField(390, 844);
+    expect(f.bytes).toBeLessThan(FIELD.maxBytes);
+    f.inject({ x: NaN, y: 1, vx: 1, vy: 0, speed: 1, distance: 1 });
+    expect(f.injections).toBe(0);
+    f.clear();
+    expect(f.metrics().area).toBe(0);
+  });
+  it('PH input eligibility excludes secondary, nonprimary, controls and out-of-stage starts', () => {
+    expect(eligible(0, true, false, { x: 20, y: 20 }, 1200, 800)).toBe(true);
+    for (const [button, primary, excluded, point] of [
+      [2, true, false, { x: 20, y: 20 }],
+      [0, false, false, { x: 20, y: 20 }],
+      [0, true, true, { x: 20, y: 20 }],
+      [0, true, false, { x: -1, y: 20 }],
+    ] as const)
+      expect(eligible(button, primary, excluded, point, 1200, 800)).toBe(false);
+  });
+});

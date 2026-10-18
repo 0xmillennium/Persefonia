@@ -39,6 +39,21 @@ public class SecurityConfiguration {
             "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
                     + "object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'";
     static final String PERMISSIONS_POLICY = "camera=(), microphone=(), geolocation=(), payment=(), usb=()";
+    static final String[] PUBLIC_RESOURCE_GET_PATTERNS = {
+            "/",
+            "/theme.css",
+            "/sitemap.xml",
+            "/robots.txt",
+            "/feed.xml",
+            "/search",
+            "/contact",
+            "/cv",
+            "/cv/download",
+            "/cv/*",
+            "/cv/*/download",
+            "/assets/**",
+            "/media/assets/*/variants/*"
+    };
     static final String[] PUBLIC_CONTENT_GET_PATTERNS = {
             "/tr/articles/*",
             "/en/articles/*",
@@ -85,15 +100,9 @@ public class SecurityConfiguration {
                 .securityMatcher(new NegatedRequestMatcher(EndpointRequest.toAnyEndpoint()))
                 .authorizeHttpRequests(authorize -> authorize
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
-                        .requestMatchers(HttpMethod.GET, "/").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/sitemap.xml", "/robots.txt").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/feed.xml").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/search").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/contact").permitAll()
+                        .requestMatchers(HttpMethod.GET, PUBLIC_RESOURCE_GET_PATTERNS).permitAll()
+                        .requestMatchers(HttpMethod.HEAD, PUBLIC_RESOURCE_GET_PATTERNS).permitAll()
                         .requestMatchers(HttpMethod.POST, "/contact").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/cv", "/cv/download", "/cv/*", "/cv/*/download").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/assets/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/media/assets/*/variants/*").permitAll()
                         .requestMatchers(HttpMethod.GET, "/oauth2/authorization/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/login/oauth2/code/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/logout").authenticated()
@@ -102,9 +111,13 @@ public class SecurityConfiguration {
                         .requestMatchers("/admin/operations", "/admin/operations/**").hasRole("OWNER")
                         .requestMatchers("/admin", "/admin/**").authenticated()
                         .requestMatchers(HttpMethod.GET, PUBLIC_CONTENT_GET_PATTERNS).permitAll()
+                        .requestMatchers(HttpMethod.HEAD, PUBLIC_CONTENT_GET_PATTERNS).permitAll()
                         .requestMatchers(HttpMethod.GET, PUBLIC_TAG_GET_PATTERNS).permitAll()
+                        .requestMatchers(HttpMethod.HEAD, PUBLIC_TAG_GET_PATTERNS).permitAll()
                         .requestMatchers(HttpMethod.GET, PUBLIC_SERIES_GET_PATTERNS).permitAll()
+                        .requestMatchers(HttpMethod.HEAD, PUBLIC_SERIES_GET_PATTERNS).permitAll()
                         .requestMatchers(HttpMethod.GET, PUBLIC_PROJECT_GET_PATTERNS).permitAll()
+                        .requestMatchers(HttpMethod.HEAD, PUBLIC_PROJECT_GET_PATTERNS).permitAll()
                         .anyRequest().denyAll())
                 .securityContext(securityContext -> securityContext.securityContextRepository(contexts))
                 .csrf(Customizer.withDefaults())

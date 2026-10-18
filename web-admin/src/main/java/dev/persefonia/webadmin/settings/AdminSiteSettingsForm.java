@@ -7,12 +7,13 @@ public final class AdminSiteSettingsForm {
     private boolean supportedEn;
     private String titleSuffix = "";
     private String defaultMetaDescription = "";
-    private String defaultTheme = "SYSTEM";
-    private boolean showFeaturedProjects;
-    private boolean showLatestWriting;
-    private boolean showResearchHighlights;
+    private String standardPublicTheme = "SYSTEM";
+    private boolean promoteFeaturedProjects;
+    private boolean promoteLatestWriting;
+    private boolean promoteResearchHighlights;
     private String featuredProjectLimit = "3";
-    private String latestWritingLimit = "5";
+    private String latestWritingLimit = "3";
+    private String researchHighlightLimit = "3";
 
     public String getSiteName() {
         return siteName;
@@ -62,36 +63,36 @@ public final class AdminSiteSettingsForm {
         this.defaultMetaDescription = value(defaultMetaDescription);
     }
 
-    public String getDefaultTheme() {
-        return defaultTheme;
+    public String getStandardPublicTheme() {
+        return standardPublicTheme;
     }
 
-    public void setDefaultTheme(String defaultTheme) {
-        this.defaultTheme = value(defaultTheme);
+    public void setStandardPublicTheme(String standardPublicTheme) {
+        this.standardPublicTheme = value(standardPublicTheme);
     }
 
-    public boolean isShowFeaturedProjects() {
-        return showFeaturedProjects;
+    public boolean isPromoteFeaturedProjects() {
+        return promoteFeaturedProjects;
     }
 
-    public void setShowFeaturedProjects(boolean showFeaturedProjects) {
-        this.showFeaturedProjects = showFeaturedProjects;
+    public void setPromoteFeaturedProjects(boolean promoteFeaturedProjects) {
+        this.promoteFeaturedProjects = promoteFeaturedProjects;
     }
 
-    public boolean isShowLatestWriting() {
-        return showLatestWriting;
+    public boolean isPromoteLatestWriting() {
+        return promoteLatestWriting;
     }
 
-    public void setShowLatestWriting(boolean showLatestWriting) {
-        this.showLatestWriting = showLatestWriting;
+    public void setPromoteLatestWriting(boolean promoteLatestWriting) {
+        this.promoteLatestWriting = promoteLatestWriting;
     }
 
-    public boolean isShowResearchHighlights() {
-        return showResearchHighlights;
+    public boolean isPromoteResearchHighlights() {
+        return promoteResearchHighlights;
     }
 
-    public void setShowResearchHighlights(boolean showResearchHighlights) {
-        this.showResearchHighlights = showResearchHighlights;
+    public void setPromoteResearchHighlights(boolean promoteResearchHighlights) {
+        this.promoteResearchHighlights = promoteResearchHighlights;
     }
 
     public String getFeaturedProjectLimit() {
@@ -108,6 +109,14 @@ public final class AdminSiteSettingsForm {
 
     public void setLatestWritingLimit(String latestWritingLimit) {
         this.latestWritingLimit = value(latestWritingLimit);
+    }
+
+    public String getResearchHighlightLimit() {
+        return researchHighlightLimit;
+    }
+
+    public void setResearchHighlightLimit(String researchHighlightLimit) {
+        this.researchHighlightLimit = value(researchHighlightLimit);
     }
 
     private static String value(String value) {

@@ -88,6 +88,11 @@ public final class ProjectCommandService {
         this.publicFacts = Objects.requireNonNull(publicFacts, "publicFacts");
     }
 
+    private static dev.persefonia.profileportfolio.domain.common.AssetId coverAsset(String value) {
+        return value == null || value.isBlank() ? null
+                : dev.persefonia.profileportfolio.domain.common.AssetId.from(java.util.UUID.fromString(value.trim()));
+    }
+
     public ProjectMutationResult create(CreateProjectCommand command) {
         Objects.requireNonNull(command, "command");
         authorization.requireOwner(command.actor(), "portfolio.project.create");
@@ -104,7 +109,7 @@ public final class ProjectCommandService {
                     ProjectVisibility.valueOf(command.visibility()),
                     command.featured(),
                     optionalSortOrder(command.sortOrder()),
-                    null,
+                    coverAsset(command.coverAssetId()),
                     requestedTags,
                     technologies(command.technologies()),
                     links(command.links()),
@@ -133,6 +138,8 @@ public final class ProjectCommandService {
         try {
             List<ProjectLocalization> localizations = localizations(command.localizations());
             rejectDuplicateSlugs(project.id(), localizations, false);
+            var cover = command.coverAssetId() == null
+                    ? project.coverAssetId().orElse(null) : coverAsset(command.coverAssetId());
             project.updateDetails(
                     ProjectStatus.valueOf(command.status()),
                     ProjectVisibility.valueOf(command.visibility()),
@@ -143,7 +150,7 @@ public final class ProjectCommandService {
                     links(command.links()),
                     localizations,
                     defaultLanguage,
-                    command.requestedAt());
+                    command.requestedAt(), cover);
             Project saved = projects.save(project);
             discoverability.sync(saved);
             return new ProjectMutationResult(saved.id().value(), false, saved.updatedAt(), saved.version().value(),

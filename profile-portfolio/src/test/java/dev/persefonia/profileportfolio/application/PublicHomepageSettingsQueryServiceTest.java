@@ -7,6 +7,7 @@ import dev.persefonia.profileportfolio.application.exception.SitePresentationSet
 import dev.persefonia.profileportfolio.application.service.PublicHomepageSettingsQueryService;
 import dev.persefonia.profileportfolio.domain.common.ContentLanguage;
 import dev.persefonia.profileportfolio.domain.settings.HomepageSettings;
+import dev.persefonia.profileportfolio.domain.settings.HomepagePromotionLimit;
 import dev.persefonia.profileportfolio.domain.settings.PositiveInteger;
 import dev.persefonia.profileportfolio.domain.settings.SeoDescription;
 import dev.persefonia.profileportfolio.domain.settings.SiteName;
@@ -31,8 +32,7 @@ class PublicHomepageSettingsQueryServiceTest {
         assertThat(view.defaultLanguage()).isEqualTo("EN");
         assertThat(view.titleSuffix()).isEqualTo("| Portfolio");
         assertThat(view.defaultMetaDescription()).isEqualTo("Portfolio homepage.");
-        assertThat(view.defaultTheme()).isEqualTo("LIGHT");
-        assertThat(view.showFeaturedProjects()).isTrue();
+        assertThat(view.promoteFeaturedProjects()).isTrue();
         assertThat(view.featuredProjectLimit()).isEqualTo(2);
     }
 
@@ -63,7 +63,7 @@ class PublicHomepageSettingsQueryServiceTest {
                 SeoDescription.of("Portfolio homepage."),
                 null,
                 ThemePreference.LIGHT,
-                HomepageSettings.of(true, false, false, PositiveInteger.of(2), PositiveInteger.of(4)),
+                HomepageSettings.of(true, false, false, HomepagePromotionLimit.of(2), HomepagePromotionLimit.of(3), HomepagePromotionLimit.of(3)),
                 Instant.parse("2026-06-16T10:00:00Z"));
     }
 

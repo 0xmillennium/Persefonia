@@ -1,0 +1,207 @@
+.home-body .location-system[data-ready='true'] .location-globe canvas:focus-visible {
+  /* The visible spherical target owns its indicator, not the canvas bounds. */
+  outline: none;
+}
+
+.location-globe::after {
+  content: '';
+  display: none;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--globe-focus-size, 70%);
+  height: var(--globe-focus-size, 70%);
+  box-sizing: border-box;
+  transform: translate(-50%, -50%);
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.location-system[data-ready='true']
+  .location-globe:has(canvas:focus-visible:not([data-focus-input='pointer']))::after {
+  display: block;
+}
+
+@media (forced-colors: active) {
+  .location-globe::after {
+    border-color: CanvasText;
+  }
+}
+
+#marker {
+  position: absolute;
+  left: -5px;
+  top: -5px;
+  width: 10px;
+  height: 10px;
+  pointer-events: none;
+}
+
+.marker-core {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: #effff9;
+  box-shadow: 0 0 7px 3px #40c6a780;
+}
+
+.marker-signal {
+  position: absolute;
+  left: 5px;
+  top: 5px;
+  width: 0;
+  height: 0;
+  transform-origin: 0 0;
+}
+
+.marker-flare {
+  position: absolute;
+  left: -60px;
+  top: -60px;
+  width: 120px;
+  height: 120px;
+  background: radial-gradient(circle, #d4fff18c, #50cdb83d 15%, #30a39814 40%, transparent 70%);
+  opacity: 0;
+}
+
+.marker-echo {
+  position: absolute;
+  left: -5px;
+  top: -5px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #70f3d1;
+  box-shadow: 0 0 12px #4bd8c0;
+  opacity: 0;
+}
+
+.marker-echo:nth-of-type(3) {
+  background: #88dbeb;
+}
+
+.marker-trace {
+  position: absolute;
+  left: -84px;
+  top: 0;
+  width: 168px;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    #50cdb89c 20%,
+    #eeeae0 48%,
+    #7bedd7b3 70%,
+    transparent
+  );
+  opacity: 0;
+}
+
+.marker-lock {
+  position: absolute;
+  left: -37px;
+  top: -37px;
+  width: 74px;
+  height: 74px;
+  opacity: 0;
+}
+
+.marker-lock i {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border: 1px solid #b8f9e4;
+}
+
+.marker-lock i:nth-child(1) {
+  left: 0;
+  top: 0;
+  border-right: 0;
+  border-bottom: 0;
+}
+
+.marker-lock i:nth-child(2) {
+  right: 0;
+  top: 0;
+  border-left: 0;
+  border-bottom: 0;
+}
+
+.marker-lock i:nth-child(3) {
+  right: 0;
+  bottom: 0;
+  border-left: 0;
+  border-top: 0;
+}
+
+.marker-lock i:nth-child(4) {
+  left: 0;
+  bottom: 0;
+  border-right: 0;
+  border-top: 0;
+}
+
+.marker-pulse,
+.marker-echo-ring {
+  position: absolute;
+  left: -60px;
+  top: -60px;
+  width: 120px;
+  height: 120px;
+  border: 1px solid #c4f5e5;
+  border-radius: 50%;
+  opacity: 0;
+}
+
+.marker-echo-ring {
+  border-color: #63cbb7;
+}
+
+#location-panel {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 218px;
+  padding: 16px 18px;
+  color: #182821;
+  background: #eeeae0;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 120ms ease-out,
+    visibility 120ms;
+}
+
+#location-panel[data-open='true'] {
+  opacity: 1;
+  visibility: visible;
+  transition-duration: 180ms;
+}
+
+#location-panel::after {
+  content: '';
+  position: absolute;
+  left: var(--anchor, 50%);
+  bottom: -7px;
+  width: 14px;
+  height: 14px;
+  background: inherit;
+  transform: translateX(-50%) rotate(45deg);
+}
+
+#location-panel[data-side='below']::after {
+  top: -7px;
+  bottom: auto;
+}
+
+#location-panel p {
+  margin: 0 0 5px;
+  font-size: 13px;
+}
+
+#location-panel span {
+  font-size: 10px;
+  color: #435349;
+}

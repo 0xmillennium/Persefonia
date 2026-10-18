@@ -1,6 +1,8 @@
 @import dev.persefonia.profileportfolio.application.query.PublicProjectCardView
 @import dev.persefonia.webpublic.projects.PublicProjectListingPage
 @param PublicProjectListingPage page
+@param String publicNavigationScriptPath = null
+@param java.util.List<dev.persefonia.webpublic.navigation.PublicNavigationLink> navigationLinks = java.util.List.of()
 <!doctype html>
 <html lang="${page.htmlLanguage()}">
 <head>
@@ -11,11 +13,12 @@
     @template.site.components.canonicalLink(page.canonicalUrl())
     @template.site.components.robotsMeta(page.noindex())
     @template.site.components.openGraphTags("website", page.title(), page.copy().projectsMetaDescription(), page.canonicalUrl())
-    @template.site.components.stylesheetLinks(page.stylesheetPaths())
+    @template.site.components.standardPublicStyles(page.stylesheetPaths(), publicNavigationScriptPath)
     @template.site.components.feedDiscoveryLink()
 </head>
 <body>
     <a class="skip-link" href="#main-content">Skip to main content</a>
+    @template.site.components.publicHeader("/" + page.htmlLanguage() + "/projects", "projects")
     <main id="main-content" class="public-page">
         <header>
             <h1>${page.title()}</h1>
@@ -51,5 +54,6 @@
             </ol>
         @endif
     </main>
+    @template.site.components.publicFooter(navigationLinks)
 </body>
 </html>

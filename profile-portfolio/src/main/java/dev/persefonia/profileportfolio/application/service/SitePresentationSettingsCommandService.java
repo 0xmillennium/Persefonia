@@ -8,7 +8,7 @@ import dev.persefonia.profileportfolio.application.exception.SitePresentationSet
 import dev.persefonia.profileportfolio.domain.common.ContentLanguage;
 import dev.persefonia.profileportfolio.domain.common.PortfolioValidationException;
 import dev.persefonia.profileportfolio.domain.settings.HomepageSettings;
-import dev.persefonia.profileportfolio.domain.settings.PositiveInteger;
+import dev.persefonia.profileportfolio.domain.settings.HomepagePromotionLimit;
 import dev.persefonia.profileportfolio.domain.settings.SeoDescription;
 import dev.persefonia.profileportfolio.domain.settings.SiteName;
 import dev.persefonia.profileportfolio.domain.settings.SitePresentationSettings;
@@ -42,13 +42,14 @@ public final class SitePresentationSettingsCommandService {
                     languages(command.supportedLanguages()),
                     optionalTitleSuffix(command.titleSuffix()),
                     optionalSeoDescription(command.defaultMetaDescription()),
-                    ThemePreference.valueOf(command.defaultTheme()),
+                    ThemePreference.valueOf(command.standardPublicTheme()),
                     HomepageSettings.of(
-                            command.showFeaturedProjects(),
-                            command.showLatestWriting(),
-                            command.showResearchHighlights(),
-                            PositiveInteger.of(command.featuredProjectLimit()),
-                            PositiveInteger.of(command.latestWritingLimit())),
+                            command.promoteFeaturedProjects(),
+                            command.promoteLatestWriting(),
+                            command.promoteResearchHighlights(),
+                            HomepagePromotionLimit.of(command.featuredProjectLimit()),
+                            HomepagePromotionLimit.of(command.latestWritingLimit()),
+                            HomepagePromotionLimit.of(command.researchHighlightLimit())),
                     command.requestedAt());
             SitePresentationSettings saved = settings.save(current);
             return new SitePresentationSettingsUpdateResult(

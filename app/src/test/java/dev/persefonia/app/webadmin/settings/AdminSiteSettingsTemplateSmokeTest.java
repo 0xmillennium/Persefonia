@@ -58,7 +58,7 @@ class AdminSiteSettingsTemplateSmokeTest {
         mockMvc.perform(post("/admin/settings/site").with(owner).with(csrf())
                         .param("siteName", " ")
                         .param("defaultLanguage", "TR")
-                        .param("defaultTheme", "SYSTEM")
+                        .param("standardPublicTheme", "SYSTEM")
                         .param("featuredProjectLimit", "abc")
                         .param("latestWritingLimit", "5"))
                 .andExpect(status().isOk())

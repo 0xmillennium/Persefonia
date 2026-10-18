@@ -157,7 +157,7 @@ class QualifiedArtifactResolverContractTest {
                 .args(options.getOrDefault("SOURCE_SHA_OVERRIDE", SOURCE_SHA),
                         options.getOrDefault("EXPECTED_DIGEST_OVERRIDE", digest),
                         options.getOrDefault("REPOSITORY_OVERRIDE", REPOSITORY),
-                        Path.of("../docker/supported-platforms.txt").toAbsolutePath().toString())
+                        Path.of("../supported-platforms.txt").toAbsolutePath().toString())
                 .directory(fixture).pathPrepend(binaryDirectory)
                 .env("DOCKER_CONFIG", dockerDirectory.toString())
                 .env("FAKE_INDEX_FILE", indexFile.toString())

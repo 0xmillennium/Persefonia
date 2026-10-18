@@ -1,0 +1,143 @@
+/* The semantic base page owns its own stacking context before enhancement. */
+[data-home-v2]:not([data-enhanced='true']) {
+  isolation: isolate;
+}
+[data-home-v2]:not([data-enhanced='true']) .home-environment {
+  z-index: -1;
+}
+
+.home-environment {
+  position: absolute;
+  top: 110px;
+  right: 0;
+  left: 0;
+  width: 100%;
+  height: 100svh;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.home-cinema__image {
+  display: block;
+  position: absolute;
+  inset: 0;
+  border-radius: 0;
+  z-index: 1;
+  overflow: hidden;
+}
+
+.home-cinema__image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+[data-home-v2][data-gpu-sheet='true'] .home-cinema__image {
+  visibility: hidden;
+}
+
+.home-film,
+.film-presentation {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.film-presentation {
+  object-fit: cover;
+}
+
+.home-scene {
+  position: relative;
+  min-height: 100svh;
+  padding: 130px var(--gutter) 80px;
+}
+
+.scene-face {
+  position: relative;
+  width: 100%;
+}
+
+.hero-face {
+  padding: 14vh 0 10vh;
+}
+
+.home-overline {
+  font:
+    10px/1.5 'IBM Plex Mono',
+    monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--muted);
+}
+
+.hero-statement {
+  font-family: Archivo, Arial, sans-serif;
+  font-variation-settings:
+    'wdth' 85,
+    'wght' 650;
+  font-size: clamp(58px, 6.875vw, 110px);
+  line-height: 1.06;
+  letter-spacing: -0.045em;
+  -webkit-text-stroke: clamp(1.25px, 0.12vw, 2px) var(--paper);
+  paint-order: stroke fill;
+  margin: 55px 0 70px !important;
+  max-width: 10ch;
+}
+
+.home-body .hero-statement {
+  font-weight: 650;
+}
+
+.hero-statement em {
+  font-family: inherit;
+  font-weight: 650;
+  font-style: normal;
+  padding-left: 0;
+  text-transform: uppercase;
+}
+
+.hero-writing-row {
+  display: block;
+  position: relative;
+  width: max-content;
+  padding-block: 0.1em;
+  margin-block: -0.1em;
+  overflow: hidden;
+}
+
+.hero-writing-text {
+  display: block;
+  white-space: pre;
+}
+
+.hero-writing-visual {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.hero-writing-visual > span {
+  position: absolute;
+  display: block;
+  line-height: normal;
+  white-space: pre;
+}
+
+.hero-scroll {
+  font:
+    11px 'IBM Plex Mono',
+    monospace;
+  letter-spacing: 0.05em;
+}
+
+/* Empty cinematic beats have no reading purpose in the semantic document. */
+.home-scene[data-scene='breath'] {
+  display: none;
+}
+[data-home-v2][data-enhanced='true'][data-reduced='false'] [data-scene='breath'] {
+  display: block;
+}

@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "sourceHash": "aecfabf0acc0e198adda41c3512123612b92d4b9312c727cd57506a960a2fc6f",
+  "encoder": "ffmpeg version 4.4.2-0ubuntu0.22.04.1 Copyright (c) 2000-2021 the FFmpeg developers",
+  "codec": "libx264",
+  "preset": "slow",
+  "crf": 18,
+  "pixelFormat": "yuv420p",
+  "fps": 24,
+  "frames": 192,
+  "duration": 8,
+  "gop": 48,
+  "audio": false,
+  "tiers": [
+    1280,
+    1920
+  ],
+  "posterQuality": 88,
+  "identity": "20b91eb1f3cee7e29f3c827a74716c67a4a0f1a9642c0bdf02a9732903de23b3",
+  "entries": [
+    {
+      "name": "1280/waterfall.mp4",
+      "bytes": 6440993,
+      "sha256": "ae02c91355afb43988ff60de53b3e4c0696677761da5272a41cb3dbaea138745"
+    },
+    {
+      "name": "1280/waterfall.webp",
+      "bytes": 315142,
+      "sha256": "b374ad7264ff5b537681e1ffa67719541b020f1aebc4c62ef625720a670a1550"
+    },
+    {
+      "name": "1920/waterfall.mp4",
+      "bytes": 13942061,
+      "sha256": "030b83532d9ff98d46e95469716fd9f11e220187dd38d4c329e8cb8454facfc4"
+    },
+    {
+      "name": "1920/waterfall.webp",
+      "bytes": 633944,
+      "sha256": "a3337f90ab946b5d8e173e966d9d6f6dab10eb0fe929f82fb223beb07f29da05"
+    }
+  ]
+}

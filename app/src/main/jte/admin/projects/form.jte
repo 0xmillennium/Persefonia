@@ -35,6 +35,10 @@
 
             <label><input type="checkbox" name="featured" value="true" checked="${page.form().isFeatured()}"> Featured</label>
 
+            <label for="coverAssetId">Gallery cover image asset ID</label>
+            <input id="coverAssetId" name="coverAssetId" value="${page.form().getCoverAssetId()}">
+            <p>Attach an image from the media library. Only processed public image variants appear in the homepage gallery. Leave blank to remove the cover.</p>
+
             <label for="sortOrder">Sort order</label>
             <input id="sortOrder" name="sortOrder" inputmode="numeric" value="${page.form().getSortOrder()}">
 

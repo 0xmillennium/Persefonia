@@ -23,6 +23,26 @@ class JdbcSeriesRepositoryAdapterTest extends ContentPublishingRepositoryTestDat
     private static final Instant NOW = Instant.parse("2026-06-15T10:00:00Z");
 
     @Test
+    void publicMembershipLookupExcludesArchivedOtherLanguageAndUnrelatedSeries() {
+        ContentId content = saveContent("membership-content", ContentLanguage.EN);
+        Series active = series("membership-active", ContentLanguage.EN);
+        active.addEntry(SeriesEntryId.newId(), content, NOW.plusSeconds(1));
+        active = seriesRepository.save(active);
+        Series archived = series("membership-archived", ContentLanguage.EN);
+        archived.addEntry(SeriesEntryId.newId(), content, NOW.plusSeconds(1));
+        archived.archive(NOW.plusSeconds(2));
+        seriesRepository.save(archived);
+        Series translated = series("membership-translated", ContentLanguage.TR);
+        translated.addEntry(SeriesEntryId.newId(), content, NOW.plusSeconds(1));
+        seriesRepository.save(translated);
+        seriesRepository.save(series("membership-unrelated", ContentLanguage.EN));
+
+        assertThat(seriesRepository.findActiveContaining(content, ContentLanguage.EN))
+                .extracting(value -> value.id()).containsExactly(active.id());
+        assertThat(seriesRepository.findActiveContaining(ContentId.newId(), ContentLanguage.EN)).isEmpty();
+    }
+
+    @Test
     void persistsAndLoadsSeries() {
         Series saved = seriesRepository.save(series("repository-path", ContentLanguage.EN));
 

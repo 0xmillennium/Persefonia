@@ -5,14 +5,14 @@ import dev.persefonia.profileportfolio.application.service.ActiveCvPublicDownloa
 import dev.persefonia.profileportfolio.application.service.ActiveCvPublicQueryService;
 import dev.persefonia.profileportfolio.domain.cv.ActiveCvProfileRepository;
 import dev.persefonia.profileportfolio.domain.settings.SitePresentationSettingsRepository;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration(proxyBeanMethods = false)
 public class ActiveCvPublicApplicationConfiguration {
     @Bean
-    @ConditionalOnBean(ActiveCvPublicAssetPort.class)
+    @ConditionalOnProperty(prefix = "persefonia.media", name = "storage-root")
     ActiveCvPublicQueryService activeCvPublicQueryService(
             ActiveCvProfileRepository activeCvProfiles,
             SitePresentationSettingsRepository settings,
@@ -21,7 +21,7 @@ public class ActiveCvPublicApplicationConfiguration {
     }
 
     @Bean
-    @ConditionalOnBean(ActiveCvPublicAssetPort.class)
+    @ConditionalOnProperty(prefix = "persefonia.media", name = "storage-root")
     ActiveCvPublicDownloadService activeCvPublicDownloadService(
             ActiveCvProfileRepository activeCvProfiles,
             SitePresentationSettingsRepository settings,

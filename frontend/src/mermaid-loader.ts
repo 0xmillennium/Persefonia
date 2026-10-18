@@ -1,15 +1,15 @@
-import mermaid from "mermaid";
+import mermaid from 'mermaid';
 
 mermaid.initialize({
   startOnLoad: false,
-  securityLevel: "strict"
+  securityLevel: 'strict',
 });
 
 async function renderMermaid(): Promise<void> {
   try {
-    await mermaid.run({ querySelector: ".language-mermaid, .mermaid" });
+    await mermaid.run({ querySelector: '.language-mermaid, .mermaid' });
   } catch (error) {
-    console.warn("Mermaid rendering failed", error);
+    console.warn('Mermaid rendering failed', error);
   }
 }
 

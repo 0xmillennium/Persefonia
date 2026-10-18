@@ -1,0 +1,170 @@
+{
+  "schemaVersion": "2.0.0",
+  "name": "0xmillennium unified eight-fragment identity",
+  "units": "stage units, origin at the center of the parent rectangle",
+  "parent": {
+    "width": 116,
+    "height": 160,
+    "bounds": [
+      -58,
+      -80,
+      58,
+      80
+    ]
+  },
+  "curveTolerance": 0.12,
+  "quarterCurves": [
+    [
+      [
+        0.0,
+        -80
+      ],
+      [
+        16.474296359376,
+        -80.0
+      ],
+      [
+        27.958371552453,
+        -70.318581193702
+      ],
+      [
+        37.563704246629,
+        -57.843032080477
+      ]
+    ],
+    [
+      [
+        37.563704246629,
+        -57.843032080477
+      ],
+      [
+        38.314048991258,
+        -56.868473154564
+      ],
+      [
+        39.052928998105,
+        -55.876863477249
+      ],
+      [
+        39.781827509555,
+        -54.871486220076
+      ]
+    ],
+    [
+      [
+        39.781827509555,
+        -54.871486220076
+      ],
+      [
+        49.841520636259,
+        -40.996047424622
+      ],
+      [
+        58,
+        -24.498244818185
+      ],
+      [
+        58,
+        0.0
+      ]
+    ]
+  ],
+  "fragments": [
+    {
+      "id": "corner-top-right",
+      "family": "corner",
+      "mirror": [
+        1,
+        1
+      ],
+      "translation": [
+        17.446543049851634,
+        -20.652549211436643
+      ]
+    },
+    {
+      "id": "corner-top-left",
+      "family": "corner",
+      "mirror": [
+        -1,
+        1
+      ],
+      "translation": [
+        -17.446543049851634,
+        -20.652549211436643
+      ]
+    },
+    {
+      "id": "corner-bottom-left",
+      "family": "corner",
+      "mirror": [
+        -1,
+        -1
+      ],
+      "translation": [
+        -17.446543049851634,
+        20.652549211436643
+      ]
+    },
+    {
+      "id": "corner-bottom-right",
+      "family": "corner",
+      "mirror": [
+        1,
+        -1
+      ],
+      "translation": [
+        17.446543049851634,
+        20.652549211436643
+      ]
+    },
+    {
+      "id": "inner-top",
+      "family": "cap",
+      "mirror": [
+        1,
+        1
+      ],
+      "translation": [
+        0,
+        -14.22960805551914
+      ]
+    },
+    {
+      "id": "inner-bottom",
+      "family": "cap",
+      "mirror": [
+        1,
+        -1
+      ],
+      "translation": [
+        0,
+        14.22960805551914
+      ]
+    },
+    {
+      "id": "inner-right",
+      "family": "flank",
+      "mirror": [
+        1,
+        1
+      ],
+      "translation": [
+        9.240815519478593,
+        0
+      ]
+    },
+    {
+      "id": "inner-left",
+      "family": "flank",
+      "mirror": [
+        -1,
+        1
+      ],
+      "translation": [
+        -9.240815519478593,
+        0
+      ]
+    }
+  ]
+}

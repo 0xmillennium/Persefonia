@@ -9,6 +9,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
 
+@org.springframework.context.annotation.Import(dev.persefonia.app.TestPublicRouteResolutionConfiguration.class)
 @TestConfiguration(proxyBeanMethods = false)
 @Profile("public-contact-mvc-test")
 class PublicContactTestConfiguration {

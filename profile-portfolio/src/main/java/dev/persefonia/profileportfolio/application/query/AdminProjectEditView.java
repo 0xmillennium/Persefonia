@@ -16,7 +16,13 @@ public record AdminProjectEditView(
         List<AdminProjectTechnologyView> technologies,
         List<AdminProjectLinkView> links,
         Instant updatedAt,
-        long version) {
+        long version,
+        String coverAssetId) {
+    public AdminProjectEditView(UUID id, String status, String visibility, boolean featured, Integer sortOrder,
+            String defaultLanguage, List<AdminProjectTagView> assignedTags, List<AdminProjectLocalizationView> localizations,
+            List<AdminProjectTechnologyView> technologies, List<AdminProjectLinkView> links, Instant updatedAt, long version) {
+        this(id, status, visibility, featured, sortOrder, defaultLanguage, assignedTags, localizations, technologies, links, updatedAt, version, null);
+    }
     public AdminProjectEditView {
         assignedTags = List.copyOf(assignedTags);
         localizations = List.copyOf(localizations);

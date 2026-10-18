@@ -25,6 +25,7 @@ import dev.persefonia.profileportfolio.domain.project.ProjectId;
 import dev.persefonia.profileportfolio.domain.project.ProjectRepository;
 import dev.persefonia.profileportfolio.domain.project.ProjectSlug;
 import dev.persefonia.profileportfolio.domain.settings.HomepageSettings;
+import dev.persefonia.profileportfolio.domain.settings.HomepagePromotionLimit;
 import dev.persefonia.profileportfolio.domain.settings.PositiveInteger;
 import dev.persefonia.profileportfolio.domain.settings.SiteName;
 import dev.persefonia.profileportfolio.domain.settings.SitePresentationSettings;
@@ -57,6 +58,43 @@ class ProjectCommandServiceTest {
     private final Vocabulary vocabulary = new Vocabulary();
     private final RecordingUpdatePort updatePort = new RecordingUpdatePort();
     private final RecordingRemovePort removePort = new RecordingRemovePort();
+
+    @Test
+    void coverIsCreatedReplacedPreservedByLegacyCommandsAndExplicitlyRemoved() {
+        var service = service(ContentLanguage.TR);
+        var original = create(OWNER, false, "PRIVATE", Set.of(), "TR");
+        var first = UUID.randomUUID();
+        var created = service.create(new CreateProjectCommand(original.actor(), original.status(),
+                original.visibility(), original.featured(), original.sortOrder(), original.tagIds(),
+                original.localizations(), original.technologies(), original.links(), original.requestedAt(), first.toString()));
+        var id = ProjectId.from(created.projectId());
+        assertThat(projects.values.get(id).coverAssetId()).get().extracting(asset -> asset.value()).isEqualTo(first);
+        var replacement = UUID.randomUUID();
+        var command = update(id, Set.of());
+        long version = projects.values.get(id).version().value();
+        service.update(withCover(command, replacement.toString()));
+        assertThat(projects.values.get(id).version().value()).isEqualTo(version + 1);
+        service.update(command);
+        assertThat(projects.values.get(id).coverAssetId()).get().extracting(asset -> asset.value()).isEqualTo(replacement);
+        service.update(withCover(command, ""));
+        assertThat(projects.values.get(id).coverAssetId()).isEmpty();
+    }
+
+    @Test
+    void malformedCoverIsRejectedBeforePersistingProjectChanges() {
+        var service = service(ContentLanguage.TR);
+        var id = ProjectId.from(service.create(create(OWNER, false, "PRIVATE", Set.of(), "TR")).projectId());
+        var version = projects.values.get(id).version();
+        assertThatThrownBy(() -> service.update(withCover(update(id, Set.of()), "not-an-asset-id")))
+                .isInstanceOf(dev.persefonia.profileportfolio.application.exception.ProjectApplicationException.class);
+        assertThat(projects.values.get(id).version()).isEqualTo(version);
+    }
+
+    private static UpdateProjectCommand withCover(UpdateProjectCommand command, String cover) {
+        return new UpdateProjectCommand(command.actor(), command.projectId(), command.status(), command.visibility(),
+                command.featured(), command.sortOrder(), command.tagIds(), command.localizations(),
+                command.technologies(), command.links(), command.requestedAt(), cover);
+    }
 
     @Test
     void ownerCreatesProjectUsingConfiguredDefaultLanguageForFeaturedValidation() {
@@ -267,7 +305,7 @@ class ProjectCommandServiceTest {
                 null,
                 null,
                 ThemePreference.SYSTEM,
-                HomepageSettings.of(true, true, false, PositiveInteger.of(3), PositiveInteger.of(5)),
+                HomepageSettings.of(true, true, false, HomepagePromotionLimit.of(3), HomepagePromotionLimit.of(3), HomepagePromotionLimit.of(3)),
                 NOW);
     }
 

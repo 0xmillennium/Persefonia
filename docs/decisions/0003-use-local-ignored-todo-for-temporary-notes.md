@@ -2,11 +2,13 @@
 
 | Field | Value |
 |---|---|
-| Status | Accepted |
+| Status | Superseded |
 | Date | 2026-06-11 |
 | Scope | documentation |
 | Supersedes | none |
-| Superseded by | none |
+| Superseded by | ADR 0034 |
+
+Superseded by [ADR 0034](0034-permit-structured-ignored-local-working-contracts.md), which retains the ignored local workspace and ADR promotion boundary while permitting structured temporary working contracts and design decision ledgers.
 
 ## Context
 

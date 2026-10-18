@@ -4,39 +4,36 @@
 |---|---|
 | Status | Accepted |
 | Date | 2026-09-29 |
-| Scope | architecture / operations / deployment / supply-chain |
+| Scope | architecture / operations / security |
 | Supersedes | none |
 | Superseded by | none |
 
 ## Context
 
-Reliable application delivery requires a qualified artifact and a deployment path whose trust and runtime checks remain consistent when an operator intentionally retries an existing artifact. CI, Delivery, and automatic Deploy RC have already executed successfully on the real RC environment, but an explicit path for redeploying an already-qualified artifact was missing. Persefonia owns source verification, artifact qualification, Delivery, and deployment orchestration; Website-Stack owns privileged host and runtime mechanics.
+Reliable application delivery requires both automatic promotion of newly qualified artifacts and an operator-triggered redeployment path for an already-qualified artifact that preserves identical trust, provenance, and runtime verification boundaries.
 
 ## Decision
 
-The **CI/CD Foundation** is the repository's delivery and deployment contract. It comprises PR/master CI, fast production-automation validation, CI-produced BootJar handoff, Delivery without an application-source rebuild, immutable multi-platform OCI artifact qualification, provenance and supply-chain verification, exact-digest automatic RC deployment, pinned SSH host identity, a low-privilege deployment principal, the narrow Website-Stack runtime gateway, application-only mutation, PostgreSQL/Redis lifecycle preservation, exact configured and running image verification, application health verification, public ingress verification, and explicit operator redeployment of an already-qualified artifact.
+The repository's CI/CD Foundation comprises PR/master CI (`CI / Gate`), BootJar handoff to Delivery without source rebuild, multi-platform OCI image index qualification ([ADR 0024](0024-support-amd64-and-arm64-under-one-oci-image-index.md)), provenance verification, automatic Deploy RC over authenticated SSH via the narrow host gateway ([ADR 0030](0030-route-deployment-runtime-operations-through-a-narrow-host-privilege-gateway.md)), and explicit operator redeployment of an already-qualified artifact.
 
-An operator redeployment accepts only a qualified 40-character lowercase source SHA and a `sha256:` digest with 64 lowercase hexadecimal characters. The OCI repository is derived from the trusted GitHub repository context. Mutable tags and arbitrary repository references are not deployment authority. The existing source alias, registry index, supported-platform, digest/body, and GitHub-signed provenance checks re-establish qualification before any RC credential or mutation. The source alias is published only after Delivery's native platform and supply-chain verification, so binding the alias to the supplied digest also binds that qualification. The workflow uses its current trusted master revision for verification and deployment scripts, including when the artifact's source SHA is historical.
+Operator redeployment accepts only a 40-character lowercase Git commit SHA and a `sha256:<64-hex>` digest, deriving the OCI repository from the trusted GitHub context. Before entering the `rc` environment, the workflow re-verifies the `sha-<git-sha>` registry alias, multi-platform index, and GitHub-signed provenance against the supplied digest.
 
-Redeployment neither rebuilds the application or image nor starts a new Delivery run. It uses the same `rc` GitHub environment, pinned SSH target, deployment principal, deployment runner, Website-Stack gateway, and RC concurrency group as automatic deployment. The existing runner captures PostgreSQL and Redis identities before application mutation and requires them to remain unchanged; it verifies the exact configured image and running image identity, application health, and public ingress. A same-digest run may succeed without recreating the application container. Automatic rollback is not introduced.
-
-GitHub ruleset and branch-protection state, GitHub `rc` environment configuration, Cloudflare account configuration, Website-Stack topology, gateway implementation and sudo policy, and Traefik, Authelia, and Postfix internals remain externally owned. Their configuration is not duplicated here.
+Redeployment never rebuilds code or reruns Delivery. It shares the `rc` environment, concurrency group, SSH trust boundary, and `persefonia-runtimectl` orchestration with automatic Deploy RC: preserving PostgreSQL and Redis container IDs, verifying `app` health and exact running image identity, and running public HTTPS smoke checks without blind automatic rollback.
 
 ## Consequences
 
-RC has two trusted entry surfaces: automatic deployment of a newly qualified artifact and explicit replay of an already-qualified artifact. Both converge on one executable deployment implementation. Operators can retry or recover an application deployment without producing another artifact. The extra workflow must be kept aligned with the automatic workflow's trust and deployment contracts; automation tests enforce this relationship.
+RC deployment has two entry points—automatic post-Delivery promotion and explicit operator replay—that converge on one verified deployment implementation without rebuilding artifacts.
 
-This capability does not establish product or release readiness; application behavior requires independent qualification. The operator path also requires real RC acceptance after the workflow is merged before its live behavior can be considered verified.
+Automation tests enforce parity between the automatic and manual workflows, while host topology and GitHub environment rules remain externally owned.
 
 ## Alternatives considered
 
-- Rebuild or rerun Delivery to redeploy. Rejected because it would change artifact identity and repeat production work.
-- Use mutable tags or an operator-supplied repository. Rejected because they would weaken exact artifact authority.
-- Add a separate host deployment implementation. Rejected because it would split the accepted runtime and privilege contract.
+- Rebuild source or rerun Delivery to redeploy. Rejected because it creates a new digest instead of replaying the qualified artifact ([ADR 0022](0022-use-an-immutable-oci-image-as-the-deployable-release-artifact.md)).
+- Accept mutable tags or operator-supplied registry URLs. Rejected because they weaken exact artifact authority.
+- Maintain a separate deployment script for manual redeployment. Rejected because it would split the runtime and privilege contract.
 
 ## Review triggers
 
-- Artifact qualification, provenance, or source-alias policy changes.
-- The RC environment, SSH trust boundary, or Website-Stack gateway contract changes.
-- The supported platform set or deployment artifact authority changes.
-- The release qualification policy changes.
+- Artifact qualification, provenance, or `sha-<git-sha>` alias semantics change.
+- The `rc` environment, SSH trust boundary, or `persefonia-runtimectl` gateway contract changes.
+- Release qualification policy changes.

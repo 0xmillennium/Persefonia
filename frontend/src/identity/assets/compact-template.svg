@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-150 -160 300 320" aria-hidden="true" focusable="false">
+            <rect class="surface" x="-58" y="-80" width="116" height="160" />
+            <g class="registration">
+            <!-- FRAGMENT:corner-top-right -->
+            <!-- FRAGMENT:corner-top-left -->
+            <!-- FRAGMENT:corner-bottom-left -->
+            <!-- FRAGMENT:corner-bottom-right -->
+            <!-- FRAGMENT:inner-top -->
+            <!-- FRAGMENT:inner-bottom -->
+            <!-- FRAGMENT:inner-right -->
+            <!-- FRAGMENT:inner-left -->
+            </g>
+            <g class="m-mark">
+<!-- LETTERING -->
+            </g>
+          </svg>

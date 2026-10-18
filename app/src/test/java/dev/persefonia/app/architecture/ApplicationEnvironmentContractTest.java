@@ -14,32 +14,35 @@ import org.springframework.core.io.ClassPathResource;
 
 class ApplicationEnvironmentContractTest {
     @Test
-    void templateContainsOnlyApplicationInputsAndCompatibleDependencyDefaults() throws Exception {
+    void templateContainsNonSecretLocalInputsAndUsableSecretExamplePaths() throws Exception {
         Properties inputs = new Properties();
         try (var reader = Files.newBufferedReader(Path.of("../.env.example"))) {
             inputs.load(reader);
         }
         assertThat(inputs.stringPropertyNames()).containsExactlyInAnyOrder(
-                "PERSEFONIA_IMAGE_REF", "POSTGRES_DB", "POSTGRES_USER",
-                "PERSEFONIA_POSTGRES_HOST", "PERSEFONIA_POSTGRES_PORT",
-                "PERSEFONIA_REDIS_HOST", "PERSEFONIA_REDIS_PORT",
+                "PERSEFONIA_LOCAL_UID", "PERSEFONIA_LOCAL_GID", "PERSEFONIA_APP_PORT",
+                "PERSEFONIA_MANAGEMENT_PORT", "PERSEFONIA_POSTGRES_PORT", "PERSEFONIA_REDIS_HOST_PORT",
+                "PERSEFONIA_PUBLIC_BASE_URL", "POSTGRES_DB", "POSTGRES_USER",
+                "PERSEFONIA_REDIS_USERNAME", "PERSEFONIA_REDIS_KEY_PREFIX",
                 "PERSEFONIA_POSTGRES_PASSWORD_FILE", "PERSEFONIA_REDIS_PASSWORD_FILE",
-                "PERSEFONIA_CONTACT_RATE_LIMIT_SECRET_FILE", "PERSEFONIA_OIDC_CLIENT_SECRET_FILE",
-                "PERSEFONIA_CLOUDFLARE_API_TOKEN_FILE", "PERSEFONIA_REDIS_USERNAME",
-                "PERSEFONIA_REDIS_KEY_PREFIX", "PERSEFONIA_APP_PORT",
-                "PERSEFONIA_MANAGEMENT_PORT", "PERSEFONIA_MEDIA_HOST_PATH")
-                .doesNotContain("POSTGRES_PORT", "REDIS_PORT");
-        assertThat(inputs.getProperty("PERSEFONIA_POSTGRES_HOST")).isEqualTo("postgres");
-        assertThat(inputs.getProperty("PERSEFONIA_POSTGRES_PORT")).isEqualTo("5432");
-        assertThat(inputs.getProperty("PERSEFONIA_REDIS_HOST")).isEqualTo("redis");
-        assertThat(inputs.getProperty("PERSEFONIA_REDIS_PORT")).isEqualTo("6379");
+                "PERSEFONIA_CONTACT_RATE_LIMIT_SECRET_FILE")
+                .doesNotContain("PERSEFONIA_IMAGE_REF", "PERSEFONIA_MEDIA_HOST_PATH");
+        assertThat(inputs.getProperty("PERSEFONIA_LOCAL_UID")).isEqualTo("1000");
+        assertThat(inputs.getProperty("PERSEFONIA_LOCAL_GID")).isEqualTo("1000");
+        assertThat(inputs.getProperty("PERSEFONIA_PUBLIC_BASE_URL")).isEqualTo("http://localhost:8080");
         assertThat(inputs.getProperty("PERSEFONIA_REDIS_USERNAME")).isEqualTo("persefonia");
-        assertThat(inputs.getProperty("PERSEFONIA_REDIS_KEY_PREFIX")).isEqualTo("persefonia:rate-limit");
-        assertThat(inputs.getProperty("PERSEFONIA_OIDC_CLIENT_SECRET_FILE"))
-                .isEqualTo("./secrets/oidc_client_secret");
-        assertThat(inputs.getProperty("PERSEFONIA_CLOUDFLARE_API_TOKEN_FILE"))
-                .isEqualTo("./secrets/cloudflare_api_token");
+        for (String name : new String[] {"PERSEFONIA_POSTGRES_PASSWORD_FILE", "PERSEFONIA_REDIS_PASSWORD_FILE",
+                "PERSEFONIA_CONTACT_RATE_LIMIT_SECRET_FILE"}) {
+            assertThat(Path.of("../" + inputs.getProperty(name))).isRegularFile();
+        }
         assertThat(Path.of("../.env.production.example")).doesNotExist();
+    }
+
+    @Test
+    void localProfileRetainsOptionalFileSecrets() throws Exception {
+        String profile = Files.readString(Path.of("src/main/resources/application-local.yml"));
+        assertThat(profile).contains("optional:configtree:/run/secrets/", "${PERSEFONIA_DATASOURCE_URL}",
+                "${PERSEFONIA_DATASOURCE_USERNAME}").doesNotContain("PERSEFONIA_DATASOURCE_PASSWORD");
     }
 
     @Test

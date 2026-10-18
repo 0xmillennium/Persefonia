@@ -54,7 +54,8 @@ final class PublicCvMockMvcSupport {
                 new PublicContentResponseHeaders(),
                 new PublicContentViewModelFactory(new TestAssetResolver(), canonicalUrlFactory),
                 canonicalUrlFactory,
-                new NoOpPublicInsightsObservationGateway());
+                new NoOpPublicInsightsObservationGateway(),
+                new TestAssetResolver());
 
         MockMvc mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setViewResolvers(new JteViewResolver())
@@ -101,7 +102,7 @@ final class PublicCvMockMvcSupport {
             return (model, request, response) -> {
                 response.setContentType("text/html;charset=UTF-8");
                 StringOutput output = new StringOutput();
-                templateEngine.render(viewName + ".jte", model.get("page"), output);
+                templateEngine.render(viewName + ".jte", new java.util.HashMap<String, Object>(model), output);
                 response.getWriter().write(output.toString());
             };
         }

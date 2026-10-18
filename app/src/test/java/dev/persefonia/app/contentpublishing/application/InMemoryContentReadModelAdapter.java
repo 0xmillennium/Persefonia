@@ -68,6 +68,7 @@ public final class InMemoryContentReadModelAdapter implements
             @Override public Optional<Series> findById(SeriesId id) { return Optional.empty(); }
             @Override public Optional<Series> findByLanguageAndSlug(ContentLanguage language, SeriesSlug slug) { return Optional.empty(); }
             @Override public boolean existsByLanguageAndSlug(ContentLanguage language, SeriesSlug slug) { return false; }
+            @Override public List<SeriesSummary> findActiveContaining(ContentId id, ContentLanguage language) { return List.of(); }
             @Override public List<SeriesSummary> findAllForAdmin() { return List.of(); }
         };
     }

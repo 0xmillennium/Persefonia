@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+browser_suite="${PERSEFONIA_BROWSER_SUITE:-all}"
+case "$browser_suite" in
+  all|chromium|cross) ;;
+  *) printf 'Unknown browser suite: %s\n' "$browser_suite" >&2; exit 2 ;;
+esac
+artifact_dir="${PERSEFONIA_BROWSER_ARTIFACT_DIR:-$project_root/app/build/browser}"
+mkdir -p "$artifact_dir"
+media_dir="$artifact_dir/media"
+mkdir -p "$media_dir/original"
+mkdir -p "$media_dir/variants"
+cp "$project_root/frontend/e2e/fixtures/media/cover.webp" "$media_dir/original/browser-cover.webp"
+cp "$project_root/frontend/e2e/fixtures/media/cover.webp" "$media_dir/variants/browser-cover.webp"
+printf '%s\n' '%PDF-1.4' '1 0 obj << /Type /Catalog >> endobj' '%%EOF' > "$media_dir/original/browser-cv.pdf"
+container_name="persefonia-browser-$RANDOM-$$"
+postgres_image="${POSTGRES_IMAGE:-postgres:17.11-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73}"
+printf 'Browser PostgreSQL image: %s\n' "$postgres_image"
+app_pid=""
+cleanup() {
+  if [[ -n "$app_pid" ]]; then
+    kill "$app_pid" 2>/dev/null || true
+    wait "$app_pid" 2>/dev/null || true
+  fi
+  docker rm -f "$container_name" >/dev/null 2>&1 || true
+}
+trap cleanup EXIT
+
+docker run --detach --rm --name "$container_name" --publish 127.0.0.1::5432 \
+  --env POSTGRES_DB=persefonia_browser --env POSTGRES_USER=persefonia_browser \
+  --env POSTGRES_PASSWORD=browser_test_only "$postgres_image" > "$artifact_dir/postgres-container.txt"
+for _ in $(seq 1 60); do
+  if docker exec "$container_name" pg_isready -h 127.0.0.1 -U persefonia_browser -d persefonia_browser >/dev/null 2>&1; then
+    break
+  fi
+  sleep 1
+done
+docker exec "$container_name" pg_isready -h 127.0.0.1 -U persefonia_browser -d persefonia_browser
+port_mapping="$(docker port "$container_name" 5432/tcp)"
+db_port="${port_mapping##*:}"
+app_port="${PERSEFONIA_BROWSER_PORT:-18080}"
+export PERSEFONIA_BROWSER_URL="http://127.0.0.1:$app_port"
+export PERSEFONIA_BROWSER_DB_CONTAINER="$container_name"
+
+java -jar "$project_root/app/build/libs/persefonia.jar" \
+  --spring.profiles.active=test \
+  "--spring.datasource.url=jdbc:postgresql://127.0.0.1:$db_port/persefonia_browser" \
+  --spring.datasource.username=persefonia_browser \
+  --spring.datasource.password=browser_test_only \
+  "--site.public-base-url=$PERSEFONIA_BROWSER_URL" \
+  "--server.port=$app_port" \
+  --management.server.port=0 \
+  "--persefonia.media.storage-root=$media_dir" \
+  --management.health.redis.enabled=false > "$artifact_dir/application.log" 2>&1 &
+app_pid=$!
+for _ in $(seq 1 90); do
+  if curl --fail --silent "$PERSEFONIA_BROWSER_URL/robots.txt" > /dev/null; then
+    break
+  fi
+  if ! kill -0 "$app_pid" 2>/dev/null; then
+    tail -100 "$artifact_dir/application.log"
+    exit 1
+  fi
+  sleep 1
+done
+curl --fail --silent "$PERSEFONIA_BROWSER_URL/robots.txt" > /dev/null
+docker exec -i "$container_name" psql --set ON_ERROR_STOP=1 -U persefonia_browser -d persefonia_browser \
+  < "$project_root/frontend/e2e/fixtures/content.sql" > "$artifact_dir/fixture.log"
+if ! curl --fail --silent --show-error "$PERSEFONIA_BROWSER_URL/" > /dev/null; then
+  tail -100 "$artifact_dir/application.log" >&2
+  exit 1
+fi
+(
+  cd "$project_root/frontend"
+  npx playwright install --no-shell chromium firefox webkit
+  if [[ "$browser_suite" != cross ]]; then
+    npm run test:browser -- "$@"
+  fi
+  if [[ "$browser_suite" != chromium ]]; then
+    npm run test:browser:cross -- "$@"
+  fi
+)

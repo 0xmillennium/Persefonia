@@ -17,7 +17,7 @@ public final class SitePresentationSettings {
     private TitleSuffix titleSuffix;
     private SeoDescription defaultMetaDescription;
     private AssetId defaultOpenGraphImageAssetId;
-    private ThemePreference defaultTheme;
+    private ThemePreference standardPublicTheme;
     private HomepageSettings homepageSettings;
     private Instant updatedAt;
     private Version version;
@@ -30,7 +30,7 @@ public final class SitePresentationSettings {
             TitleSuffix titleSuffix,
             SeoDescription defaultMetaDescription,
             AssetId defaultOpenGraphImageAssetId,
-            ThemePreference defaultTheme,
+            ThemePreference standardPublicTheme,
             HomepageSettings homepageSettings,
             Instant updatedAt,
             Version version) {
@@ -41,7 +41,7 @@ public final class SitePresentationSettings {
         this.titleSuffix = titleSuffix;
         this.defaultMetaDescription = defaultMetaDescription;
         this.defaultOpenGraphImageAssetId = defaultOpenGraphImageAssetId;
-        this.defaultTheme = Objects.requireNonNull(defaultTheme, "defaultTheme");
+        this.standardPublicTheme = Objects.requireNonNull(standardPublicTheme, "standardPublicTheme");
         this.homepageSettings = Objects.requireNonNull(homepageSettings, "homepageSettings");
         this.updatedAt = Objects.requireNonNull(updatedAt, "updatedAt");
         this.version = Objects.requireNonNull(version, "version");
@@ -56,7 +56,7 @@ public final class SitePresentationSettings {
             TitleSuffix titleSuffix,
             SeoDescription defaultMetaDescription,
             AssetId defaultOpenGraphImageAssetId,
-            ThemePreference defaultTheme,
+            ThemePreference standardPublicTheme,
             HomepageSettings homepageSettings,
             Instant now) {
         return new SitePresentationSettings(
@@ -67,7 +67,7 @@ public final class SitePresentationSettings {
                 titleSuffix,
                 defaultMetaDescription,
                 defaultOpenGraphImageAssetId,
-                defaultTheme,
+                standardPublicTheme,
                 homepageSettings,
                 now,
                 Version.initial());
@@ -81,7 +81,7 @@ public final class SitePresentationSettings {
             TitleSuffix titleSuffix,
             SeoDescription defaultMetaDescription,
             AssetId defaultOpenGraphImageAssetId,
-            ThemePreference defaultTheme,
+            ThemePreference standardPublicTheme,
             HomepageSettings homepageSettings,
             Instant updatedAt,
             Version version) {
@@ -93,7 +93,7 @@ public final class SitePresentationSettings {
                 titleSuffix,
                 defaultMetaDescription,
                 defaultOpenGraphImageAssetId,
-                defaultTheme,
+                standardPublicTheme,
                 homepageSettings,
                 updatedAt,
                 version);
@@ -126,8 +126,8 @@ public final class SitePresentationSettings {
         markUpdated(now);
     }
 
-    public void changeTheme(ThemePreference defaultTheme, Instant now) {
-        this.defaultTheme = Objects.requireNonNull(defaultTheme, "defaultTheme");
+    public void changeTheme(ThemePreference standardPublicTheme, Instant now) {
+        this.standardPublicTheme = Objects.requireNonNull(standardPublicTheme, "standardPublicTheme");
         markUpdated(now);
     }
 
@@ -137,7 +137,7 @@ public final class SitePresentationSettings {
             Set<ContentLanguage> supportedLanguages,
             TitleSuffix titleSuffix,
             SeoDescription defaultMetaDescription,
-            ThemePreference defaultTheme,
+            ThemePreference standardPublicTheme,
             HomepageSettings homepageSettings,
             Instant now) {
         Objects.requireNonNull(now, "now");
@@ -149,7 +149,7 @@ public final class SitePresentationSettings {
         this.supportedLanguages = supportedLanguagesCopy;
         this.titleSuffix = titleSuffix;
         this.defaultMetaDescription = defaultMetaDescription;
-        this.defaultTheme = Objects.requireNonNull(defaultTheme, "defaultTheme");
+        this.standardPublicTheme = Objects.requireNonNull(standardPublicTheme, "standardPublicTheme");
         this.homepageSettings = Objects.requireNonNull(homepageSettings, "homepageSettings");
         markUpdated(now);
     }
@@ -196,8 +196,8 @@ public final class SitePresentationSettings {
         return Optional.ofNullable(defaultOpenGraphImageAssetId);
     }
 
-    public ThemePreference defaultTheme() {
-        return defaultTheme;
+    public ThemePreference standardPublicTheme() {
+        return standardPublicTheme;
     }
 
     public HomepageSettings homepageSettings() {

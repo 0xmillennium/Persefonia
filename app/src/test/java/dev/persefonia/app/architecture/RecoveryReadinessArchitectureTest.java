@@ -40,12 +40,8 @@ class RecoveryReadinessArchitectureTest {
     }
 
     @Test
-    void stepNineAddsNoMigrationOrCrossContextAssetForeignKey() throws Exception {
+    void recoveryMigrationsHaveNoCrossContextAssetForeignKey() throws Exception {
         Path migrations = Path.of("src/main/resources/db/migration");
-        try (var files = Files.list(migrations)) {
-            assertThat(files.map(path -> path.getFileName().toString()))
-                    .noneMatch(name -> name.startsWith("V22__"));
-        }
         for (String migration : java.util.List.of(
                 "V3__publishing.sql", "V4__discovery.sql", "V11__portfolio_core.sql",
                 "V16__active_cv_profile.sql")) {

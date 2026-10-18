@@ -1,0 +1,92 @@
+[data-home-v2][data-enhanced='true'] .gallery-face {
+  padding-top: 16svh;
+  perspective: 1800px;
+  overflow: hidden;
+  background: transparent;
+  opacity: var(--gallery-entry-opacity, 1);
+}
+
+[data-home-v2][data-enhanced='true'] .gallery-space {
+  height: 45svh;
+  perspective: 1800px;
+  margin-top: 15px;
+  transform-origin: 50% 50%;
+}
+
+[data-home-v2][data-enhanced='true'][data-reduced='false'] .gallery-card:not([data-front='true']) {
+  opacity: calc(
+    var(--gallery-depth-opacity, 1) * clamp(0, calc(1 - var(--gallery-exit, 0) * 4), 1)
+  );
+}
+
+[data-home-v2][data-enhanced='true'][data-reduced='false'] .gallery-cover {
+  filter: blur(var(--gallery-blur, 0px));
+}
+
+[data-home-v2][data-enhanced='true'][data-reduced='false'] .gallery-space {
+  touch-action: pan-y;
+  user-select: none;
+  cursor: grab;
+}
+
+[data-home-v2][data-enhanced='true'] [data-dragging='true'] .gallery-space {
+  cursor: grabbing;
+}
+
+[data-home-v2][data-enhanced='true'][data-reduced='false'] .footer-slot {
+  overflow: hidden;
+}
+
+.footer-rise {
+  display: block;
+}
+
+[data-home-v2][data-enhanced='true'] .gallery-category {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  transform-style: preserve-3d;
+}
+
+[data-home-v2][data-enhanced='true'] .gallery-group {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  margin: 0 !important;
+  width: 0;
+  height: 100%;
+  display: block;
+  transform-style: preserve-3d;
+}
+
+[data-home-v2][data-enhanced='true'] .gallery-card {
+  position: absolute;
+  left: calc(var(--card-width, min(26vw, 380px)) * -0.5);
+  top: 0;
+  width: var(--card-width, min(26vw, 380px));
+  max-width: 380px;
+  backface-visibility: hidden;
+  transform-origin: center;
+}
+
+[data-home-v2][data-enhanced='true'] .gallery-card article {
+  position: relative;
+}
+
+.gallery-card h3 a:hover {
+  color: var(--accent);
+}
+
+[data-home-v2][data-enhanced='true'] .gallery-card p:not(.home-writing__number) {
+  display: none;
+}
+
+[data-home-v2][data-enhanced='true'] .home-empty {
+  position: absolute;
+  top: 20%;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  max-width: 45ch;
+  width: 85%;
+}

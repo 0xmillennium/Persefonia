@@ -1,12 +1,16 @@
 package dev.persefonia.app.web;
 
+import dev.persefonia.discovery.application.contract.DiscoveryLanguage;
+import dev.persefonia.discovery.application.index.PublicHomepageContentEntry;
+import dev.persefonia.discovery.application.index.PublicHomepageContentQueryService;
 import dev.persefonia.profileportfolio.application.port.ProjectPublicReadModel;
 import dev.persefonia.profileportfolio.domain.common.ContentLanguage;
-import dev.persefonia.profileportfolio.domain.project.ProjectId;
-import dev.persefonia.profileportfolio.domain.project.ProjectSlug;
 import dev.persefonia.profileportfolio.domain.profile.PersonalProfile;
 import dev.persefonia.profileportfolio.domain.profile.PersonalProfileRepository;
 import dev.persefonia.profileportfolio.domain.profile.ProfileId;
+import dev.persefonia.profileportfolio.domain.project.ProjectId;
+import dev.persefonia.profileportfolio.domain.project.ProjectSlug;
+import dev.persefonia.profileportfolio.domain.settings.HomepagePromotionLimit;
 import dev.persefonia.profileportfolio.domain.settings.HomepageSettings;
 import dev.persefonia.profileportfolio.domain.settings.PositiveInteger;
 import dev.persefonia.profileportfolio.domain.settings.SeoDescription;
@@ -17,6 +21,7 @@ import dev.persefonia.profileportfolio.domain.settings.SitePresentationSettingsR
 import dev.persefonia.profileportfolio.domain.settings.ThemePreference;
 import dev.persefonia.profileportfolio.domain.settings.TitleSuffix;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -24,6 +29,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
 
+@org.springframework.context.annotation.Import(dev.persefonia.app.TestPublicRouteResolutionConfiguration.class)
 @TestConfiguration(proxyBeanMethods = false)
 @Profile("public-home-mvc-test")
 class PublicHomeTestConfiguration {
@@ -42,7 +48,7 @@ class PublicHomeTestConfiguration {
                     SeoDescription.of("Configured homepage description."),
                     null,
                     ThemePreference.LIGHT,
-                    HomepageSettings.of(true, true, true, PositiveInteger.of(3), PositiveInteger.of(5)),
+                    HomepageSettings.of(true, true, true, HomepagePromotionLimit.of(3), HomepagePromotionLimit.of(3), HomepagePromotionLimit.of(3)),
                     Instant.parse("2026-06-16T10:00:00Z"));
 
             @Override
@@ -92,8 +98,45 @@ class PublicHomeTestConfiguration {
         };
     }
 
+    @Bean
+    @Primary
+    StubHomepageContentQueryService publicHomeContentQueryService() {
+        return new StubHomepageContentQueryService();
+    }
+
+    static final class StubHomepageContentQueryService implements PublicHomepageContentQueryService {
+        private List<PublicHomepageContentEntry> writing = List.of();
+        private List<PublicHomepageContentEntry> research = List.of();
+
+        void setContent(List<PublicHomepageContentEntry> writing, List<PublicHomepageContentEntry> research) {
+            this.writing = List.copyOf(writing);
+            this.research = List.copyOf(research);
+        }
+
+        @Override
+        public List<PublicHomepageContentEntry> latestWriting(DiscoveryLanguage language, int limit) {
+            return language == DiscoveryLanguage.EN ? writing.stream().limit(limit).toList() : List.of();
+        }
+
+        @Override
+        public List<PublicHomepageContentEntry> latestArticles(DiscoveryLanguage language, int limit) {
+            return latestWriting(language, Integer.MAX_VALUE).stream().filter(entry -> entry.publicUrl().startsWith("/en/articles/")).limit(limit).toList();
+        }
+
+        @Override
+        public List<PublicHomepageContentEntry> latestNotes(DiscoveryLanguage language, int limit) {
+            return latestWriting(language, Integer.MAX_VALUE).stream().filter(entry -> entry.publicUrl().startsWith("/en/notes/")).limit(limit).toList();
+        }
+
+        @Override
+        public List<PublicHomepageContentEntry> latestResearch(DiscoveryLanguage language, int limit) {
+            return language == DiscoveryLanguage.EN ? research.stream().limit(limit).toList() : List.of();
+        }
+    }
+
     static final class PublicHomeProfileRepository implements PersonalProfileRepository {
         private PersonalProfile current;
+        private int activeReads;
 
         void setCurrent(PersonalProfile current) {
             this.current = current;
@@ -101,6 +144,7 @@ class PublicHomeTestConfiguration {
 
         void reset() {
             current = null;
+            activeReads = 0;
         }
 
         @Override
@@ -114,8 +158,11 @@ class PublicHomeTestConfiguration {
             return Optional.ofNullable(current).filter(profile -> profile.id().equals(id));
         }
 
+        int activeReads() { return activeReads; }
+
         @Override
         public Optional<PersonalProfile> findActiveProfile() {
+            activeReads++;
             return Optional.ofNullable(current).filter(profile -> profile.active());
         }
     }

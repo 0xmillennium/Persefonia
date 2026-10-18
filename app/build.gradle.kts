@@ -1,6 +1,7 @@
 import org.gradle.api.tasks.Exec
 import org.gradle.api.tasks.testing.Test
 import org.springframework.boot.gradle.tasks.bundling.BootJar
+import org.springframework.boot.gradle.tasks.run.BootRun
 
 plugins {
     alias(libs.plugins.spring.boot)
@@ -22,6 +23,7 @@ val precompiledJteDirectory = layout.buildDirectory.dir("generated/jte-classes")
 jte {
     precompile()
     targetDirectory.set(precompiledJteDirectory.map { it.asFile.toPath() })
+    compileArgs.set(arrayOf("--release", "21"))
 }
 
 val integrationTestSourceSet = sourceSets.create("integrationTest") {
@@ -156,6 +158,7 @@ val npmCi by tasks.registering(Exec::class) {
         frontendDirectory.file("package.json"),
         frontendDirectory.file("package-lock.json")
     )
+    inputs.property("nodePlatform", System.getProperty("os.name") + "-" + System.getProperty("os.arch"))
     outputs.dir(frontendDirectory.dir("node_modules"))
 }
 
@@ -164,10 +167,34 @@ val npmRunTypecheck by tasks.registering(Exec::class) {
     workingDir(frontendDirectory)
     commandLine("npm", "run", "typecheck")
     inputs.dir(frontendDirectory.dir("src"))
+    inputs.dir(frontendDirectory.dir("scripts"))
+    inputs.dir(frontendDirectory.dir("e2e"))
     inputs.files(
         frontendDirectory.file("package.json"),
-        frontendDirectory.file("tsconfig.json")
+        frontendDirectory.file("tsconfig.json"),
+        frontendDirectory.file("tsconfig.app.json"),
+        frontendDirectory.file("tsconfig.tooling.json"),
+        frontendDirectory.file("tsconfig.tests.json")
     )
+}
+
+val npmRunUnitTest by tasks.registering(Exec::class) {
+    group = "verification"
+    description = "Runs all frontend unit tests, including deterministic physics stress pipelines."
+    dependsOn(npmCi)
+    workingDir(frontendDirectory)
+    commandLine("npm", "run", "test:unit:all")
+    inputs.dir(frontendDirectory.dir("src"))
+    inputs.dir(frontendDirectory.dir("scripts"))
+    inputs.dir(frontendDirectory.dir("e2e"))
+    inputs.files(
+        frontendDirectory.file("package.json"),
+        frontendDirectory.file("vitest.config.ts")
+    )
+}
+
+tasks.check {
+    dependsOn(npmRunUnitTest)
 }
 
 val viteBuild by tasks.registering(Exec::class) {
@@ -175,6 +202,8 @@ val viteBuild by tasks.registering(Exec::class) {
     workingDir(frontendDirectory)
     commandLine("npm", "run", "build")
     inputs.dir(frontendDirectory.dir("src"))
+    inputs.dir(frontendDirectory.dir("public"))
+    inputs.dir(frontendDirectory.dir("scripts"))
     inputs.files(
         frontendDirectory.file("package.json"),
         frontendDirectory.file("vite.config.ts")
@@ -185,6 +214,12 @@ val viteBuild by tasks.registering(Exec::class) {
 tasks.processResources {
     dependsOn(viteBuild)
     from(generatedViteDirectory)
+}
+
+tasks.register<Exec>("browserCheck") {
+    dependsOn(tasks.named("bootJar"), npmCi)
+    workingDir(rootProject.layout.projectDirectory)
+    commandLine("bash", "scripts/browser/check.sh")
 }
 
 tasks.test {
@@ -204,6 +239,11 @@ tasks.named<BootJar>("bootJar") {
         include("**/*.class")
         into("BOOT-INF/classes")
     }
+}
+
+tasks.named<BootRun>("bootRun") {
+    dependsOn("precompileJte")
+    classpath += files(precompiledJteDirectory)
 }
 
 tasks.named("jar") {

@@ -103,7 +103,8 @@
                 <input id="ogTitle" name="ogTitle" maxlength="200" value="${page.form().getOgTitle()}">
                 <label for="ogDescription">Open Graph description</label>
                 <textarea id="ogDescription" name="ogDescription" maxlength="500">${page.form().getOgDescription()}</textarea>
-                <label for="ogImageAssetId">Open Graph image asset ID</label>
+                <label for="ogImageAssetId">Gallery cover / Open Graph image asset ID</label>
+                <p>Attach an image from the media library. Only processed public image variants appear in the homepage gallery.</p>
                 <input id="ogImageAssetId" name="ogImageAssetId" value="${page.form().getOgImageAssetId()}">
             @endif
             <button type="submit">${page.create() ? "Create draft" : "Save changes"}</button>

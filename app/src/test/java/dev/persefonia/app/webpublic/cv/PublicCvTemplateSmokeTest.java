@@ -36,6 +36,8 @@ class PublicCvTemplateSmokeTest {
                 .andExpect(content().string(containsString("Portfolio CV")))
                 .andExpect(content().string(containsString("Download cv-en.pdf")))
                 .andExpect(content().string(containsString("application/pdf")))
+                .andExpect(content().string(containsString("href=\"/assets/main-test.css\"")))
+                .andExpect(content().string(containsString("href=\"/theme.css\"")))
                 .andExpect(content().string(not(containsString("storagePath"))))
                 .andExpect(content().string(not(containsString("storage_path"))))
                 .andExpect(content().string(not(containsString("publicUrl"))))

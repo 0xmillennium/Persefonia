@@ -72,14 +72,14 @@ public class JdbcSitePresentationSettingsRepositoryAdapter implements SitePresen
         jdbc().update("""
                 INSERT INTO portfolio.site_presentation_settings (
                     id, singleton_key, site_name, default_language, title_suffix,
-                    default_meta_description, default_og_image_asset_id, default_theme,
-                    show_featured_projects, show_latest_writing, show_research_highlights,
-                    featured_project_limit, latest_writing_limit, updated_at, version
+                    default_meta_description, default_og_image_asset_id, standard_public_theme,
+                    promote_featured_projects, promote_latest_writing, promote_research_highlights,
+                    featured_project_limit, latest_writing_limit, research_highlight_limit, updated_at, version
                 ) VALUES (
                     :id, true, :siteName, :defaultLanguage, :titleSuffix,
-                    :defaultMetaDescription, :defaultOpenGraphImageAssetId, :defaultTheme,
-                    :showFeaturedProjects, :showLatestWriting, :showResearchHighlights,
-                    :featuredProjectLimit, :latestWritingLimit, :updatedAt, :version
+                    :defaultMetaDescription, :defaultOpenGraphImageAssetId, :standardPublicTheme,
+                    :promoteFeaturedProjects, :promoteLatestWriting, :promoteResearchHighlights,
+                    :featuredProjectLimit, :latestWritingLimit, :researchHighlightLimit, :updatedAt, :version
                 )
                 """, parameters(settings));
     }
@@ -96,12 +96,13 @@ public class JdbcSitePresentationSettingsRepositoryAdapter implements SitePresen
                     title_suffix = :titleSuffix,
                     default_meta_description = :defaultMetaDescription,
                     default_og_image_asset_id = :defaultOpenGraphImageAssetId,
-                    default_theme = :defaultTheme,
-                    show_featured_projects = :showFeaturedProjects,
-                    show_latest_writing = :showLatestWriting,
-                    show_research_highlights = :showResearchHighlights,
+                    standard_public_theme = :standardPublicTheme,
+                    promote_featured_projects = :promoteFeaturedProjects,
+                    promote_latest_writing = :promoteLatestWriting,
+                    promote_research_highlights = :promoteResearchHighlights,
                     featured_project_limit = :featuredProjectLimit,
                     latest_writing_limit = :latestWritingLimit,
+                    research_highlight_limit = :researchHighlightLimit,
                     updated_at = :updatedAt,
                     version = :version
                 WHERE id = :id AND version = :expectedVersion
@@ -121,12 +122,13 @@ public class JdbcSitePresentationSettingsRepositoryAdapter implements SitePresen
                 .addValue("titleSuffix", settings.titleSuffix().map(titleSuffix -> titleSuffix.value()).orElse(null))
                 .addValue("defaultMetaDescription", settings.defaultMetaDescription().map(seoDescription -> seoDescription.value()).orElse(null))
                 .addValue("defaultOpenGraphImageAssetId", settings.defaultOpenGraphImageAssetId().map(asset -> asset.value()).orElse(null))
-                .addValue("defaultTheme", settings.defaultTheme().name())
-                .addValue("showFeaturedProjects", homepage.showFeaturedProjects())
-                .addValue("showLatestWriting", homepage.showLatestWriting())
-                .addValue("showResearchHighlights", homepage.showResearchHighlights())
+                .addValue("standardPublicTheme", settings.standardPublicTheme().name())
+                .addValue("promoteFeaturedProjects", homepage.promoteFeaturedProjects())
+                .addValue("promoteLatestWriting", homepage.promoteLatestWriting())
+                .addValue("promoteResearchHighlights", homepage.promoteResearchHighlights())
                 .addValue("featuredProjectLimit", homepage.featuredProjectLimit().value())
                 .addValue("latestWritingLimit", homepage.latestWritingLimit().value())
+                .addValue("researchHighlightLimit", homepage.researchHighlightLimit().value())
                 .addValue("updatedAt", Timestamp.from(settings.updatedAt()))
                 .addValue("version", settings.version().value());
     }
@@ -150,9 +152,9 @@ public class JdbcSitePresentationSettingsRepositoryAdapter implements SitePresen
     private Optional<SitePresentationSettings> loadSettings(String whereClause, Map<String, Object> params) {
         String sql = """
                 SELECT id, site_name, default_language, title_suffix, default_meta_description,
-                       default_og_image_asset_id, default_theme, show_featured_projects,
-                       show_latest_writing, show_research_highlights, featured_project_limit,
-                       latest_writing_limit, updated_at, version
+                       default_og_image_asset_id, standard_public_theme, promote_featured_projects,
+                       promote_latest_writing, promote_research_highlights, featured_project_limit,
+                       latest_writing_limit, research_highlight_limit, updated_at, version
                 FROM portfolio.site_presentation_settings
                 WHERE %s
                 """.formatted(whereClause);

@@ -10,23 +10,19 @@
 
 ## Context
 
-Describe the long-term maintainability, security, architecture, persistence, operations, testing, or documentation problem that makes this decision necessary.
+State the durable maintainability, architecture, security, persistence, operations, testing, or documentation problem that makes this decision necessary.
 
-Keep the context short.
-
-Do not include execution history, temporary planning notes, or command output.
+Keep the context to two to four short sentences. Do not include execution history, point-in-time scaffolding notes, temporary planning notes, or command output.
 
 ## Decision
 
-State the decision clearly.
+State the architectural invariants, boundaries, and contracts clearly in short paragraphs.
 
-The decision should be specific enough for a future maintainer to tell whether a proposed change violates it.
+The decision must be specific enough for a future maintainer to tell whether a proposed change violates it, without duplicating implementation runbooks, CLI flags, or class-level specifications. Do not add `###` subsections. Keep the entire ADR within 420 words and 3,200 bytes.
 
 ## Consequences
 
-Explain the trade-offs.
-
-Include:
+Explain the trade-offs in short paragraphs:
 
 - what becomes easier
 - what becomes harder
@@ -34,10 +30,8 @@ Include:
 
 ## Alternatives considered
 
-List serious alternatives that were considered and rejected.
-
-Do not include fake alternatives.
+List serious alternatives that were considered and why each was rejected.
 
 ## Review triggers
 
-List the events that should cause this decision to be revisited.
+List the concrete events that require revisiting this decision.

@@ -5,10 +5,10 @@ public record PublicHomepageSettingsView(
         String defaultLanguage,
         String titleSuffix,
         String defaultMetaDescription,
-        String defaultTheme,
-        boolean showFeaturedProjects,
-        boolean showLatestWriting,
-        boolean showResearchHighlights,
+        boolean promoteFeaturedProjects,
+        boolean promoteLatestWriting,
+        boolean promoteResearchHighlights,
         int featuredProjectLimit,
-        int latestWritingLimit) {
+        int latestWritingLimit,
+        int researchHighlightLimit) {
 }

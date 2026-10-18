@@ -35,7 +35,7 @@ public final class PublicFeaturedProjectQueryService {
                         row.slug(),
                         routeFactory.publicUrl(language, ProjectSlug.of(row.slug())).value(),
                         row.technologies(),
-                        tags.activeTags(row.tagIds())))
+                        tags.activeTags(row.tagIds()), row.coverAssetId()))
                 .toList();
     }
 

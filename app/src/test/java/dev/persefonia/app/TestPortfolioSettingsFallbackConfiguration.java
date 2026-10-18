@@ -5,6 +5,7 @@ import dev.persefonia.profileportfolio.domain.profile.PersonalProfile;
 import dev.persefonia.profileportfolio.domain.profile.PersonalProfileRepository;
 import dev.persefonia.profileportfolio.domain.profile.ProfileId;
 import dev.persefonia.profileportfolio.domain.settings.HomepageSettings;
+import dev.persefonia.profileportfolio.domain.settings.HomepagePromotionLimit;
 import dev.persefonia.profileportfolio.domain.settings.PositiveInteger;
 import dev.persefonia.profileportfolio.domain.settings.SeoDescription;
 import dev.persefonia.profileportfolio.domain.settings.SiteName;
@@ -20,6 +21,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 
+@org.springframework.context.annotation.Import(TestPublicRouteResolutionConfiguration.class)
 @TestConfiguration(proxyBeanMethods = false)
 public class TestPortfolioSettingsFallbackConfiguration {
     @Bean
@@ -34,7 +36,7 @@ public class TestPortfolioSettingsFallbackConfiguration {
                 SeoDescription.of("Persefonia homepage."),
                 null,
                 ThemePreference.SYSTEM,
-                HomepageSettings.of(false, false, false, PositiveInteger.of(3), PositiveInteger.of(5)),
+                HomepageSettings.of(false, false, false, HomepagePromotionLimit.of(3), HomepagePromotionLimit.of(3), HomepagePromotionLimit.of(3)),
                 Instant.parse("2026-06-16T10:00:00Z"));
         return new SitePresentationSettingsRepository() {
             @Override

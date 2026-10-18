@@ -10,42 +10,34 @@
 
 ## Context
 
-Persefonia is about to grow operational state changes: mandatory audit records for important admin mutations, and cache invalidation for public surfaces when published content changes. These need a clear delivery model before any of them is implemented.
-
-Two side-effect kinds have different reliability needs. An audit record must exist exactly when an important admin mutation successfully commits, and it must never alter or authorize the business action. Cache purge touches external infrastructure, can fail or be slow, and must never roll back the business transaction that triggered it.
-
-A post-commit mechanism already exists. The contact workflow registers owner mail notification and an aggregate Insights observation through `PostCommitTaskExecutor`, which runs tasks only after the source transaction commits and isolates their failures from the business result. No general event bus, queue, or transactional outbox exists, and the Audit and Platform Operations modules are still empty scaffolding.
+Important admin mutations produce two distinct operational side effects with different reliability requirements. Mandatory audit records must exist if and only if the business mutation commits, whereas external side effects such as cache purge can fail or stall and must never roll back a committed business mutation.
 
 ## Decision
 
-Mandatory audit records for important admin mutations are appended in the same application transaction as the mutation, through Audit application ports. Source application services may depend on Audit application ports but never on Audit repositories or infrastructure.
+Mandatory audit records for important admin mutations are appended in the same application transaction as the source mutation through Audit application ports. Source application services may depend on Audit application ports, never on Audit repositories or infrastructure.
 
-Failure-prone operational side effects, cache purge first among them, are requested and executed after the source transaction commits, using the existing post-commit mechanism. Their failures never roll back the source business transaction; instead they are persisted and made visible to the owner, and they emit safe metrics and logs.
+Failure-prone external side effects—including cache purge, mail notification, and aggregate Insights observations—are scheduled through `PostCommitTaskExecutor` and run only after the source transaction commits. Their failures never roll back the business transaction; instead, failures are persisted for operational visibility and emit safe metrics and logs.
 
-A transactional outbox, queue, or retry scheduler is not implemented for this phase. The transactional outbox remains a deliberate future reliability option, not current debt.
-
-Real side-effect listeners must not be attached directly inside source command execution unless they are transactionally safe and explicitly reviewed. Audit appends qualify because they share the transaction; cache purge and external integrations do not and must run after commit.
+A transactional outbox, durable queue, or automatic retry scheduler is not required for this boundary and remains an optional future upgrade. Real side-effect listeners must not execute inside source command transactions unless they are transactionally safe same-database appends like Audit.
 
 ## Consequences
 
-Audit becomes a passive, same-transaction concern: when an important admin mutation commits, its audit record is already durable, with no separate delivery guarantee to build.
+Audit records commit atomically with their source mutations without requiring a separate delivery mechanism.
 
-Cache purge and similar external effects cannot corrupt business state, but they are best-effort. Their failures must produce operational visibility (persisted attempts, failure counters, owner-facing operations view) rather than silent loss or business rollback.
+External side effects cannot corrupt or roll back business state, though post-commit execution is best-effort and relies on persisted failure state and operator visibility.
 
-Source application services gain a dependency on Audit application ports and on post-commit scheduling, but stay free of Audit and Platform Operations infrastructure. The app composition root continues to own provider adapters and wiring.
-
-Future maintainers must remember: never attach external or failure-prone side effects to in-transaction command execution, and never persist secrets, tracking identifiers, or raw request data in audit or operations state. Adopting an outbox later is an additive reliability upgrade, not a correction of this decision.
+Future maintainers must keep external integrations out of in-transaction command execution and never persist secrets, tracking identifiers, or raw request payloads in audit or operational records.
 
 ## Alternatives considered
 
-- Append audit records after commit like cache purge. Rejected: a post-commit failure could lose an audit record for a successful mutation, weakening the audit guarantee.
-- Run cache purge inside the source transaction. Rejected: external infrastructure failure or latency would roll back or stall committed business changes.
-- Build a transactional outbox, queue, or retry scheduler now. Rejected: it widens scope well beyond current needs; same-transaction audit plus post-commit fail-open cache purge is sufficient for this phase.
-- Introduce a general event bus with real subscribers attached in-transaction. Rejected: it risks side effects firing before commit and couples contexts through listeners instead of explicit ports.
+- Append audit records after commit. Rejected because a post-commit failure could lose the audit record of a committed mutation.
+- Execute cache purge inside the source transaction. Rejected because external latency or failure would stall or roll back committed business state.
+- Build a transactional outbox or retry queue immediately. Rejected as unnecessary complexity when same-transaction audit and visible post-commit purge satisfy current requirements.
+- Use an in-transaction event bus with arbitrary subscribers. Rejected because listeners could trigger external side effects before commit.
 
 ## Review triggers
 
-- Audit append needs to span more than one transaction or context.
-- Cache purge requires delivery guarantees, ordering, or retries beyond best-effort.
-- A second failure-prone integration needs reliable post-commit delivery, justifying a transactional outbox.
-- Operational side effects need to run for actions that are not wrapped in a source transaction.
+- Audit appends need to span multiple transactions or datastores.
+- Cache purge requires delivery guarantees or automatic retries beyond best-effort.
+- Multiple external integrations require durable post-commit delivery, justifying a transactional outbox.
+- Operational side effects must run for actions outside a database transaction.

@@ -120,7 +120,7 @@ class DeployRcWorkflowContractTest {
                 .containsExactly("Resolve and verify qualified artifact");
         assertThat(resolver.get("run")).isEqualTo("./scripts/deploy/resolve-qualified-artifact.sh "
                 + "\"$EXPECTED_SOURCE_SHA\" \"$EXPECTED_IMAGE_DIGEST\" \"$GITHUB_REPOSITORY\" "
-                + "docker/supported-platforms.txt >> \"$GITHUB_OUTPUT\"");
+                + "supported-platforms.txt >> \"$GITHUB_OUTPUT\"");
         Map<String, Object> outputs = WorkflowDocument.map(workflow.job("resolve-qualified-artifact").get("outputs"));
         assertThat(outputs).containsOnlyKeys("source_sha", "image_name", "image_digest", "image_reference", "source_alias");
         for (String output : outputs.keySet()) {

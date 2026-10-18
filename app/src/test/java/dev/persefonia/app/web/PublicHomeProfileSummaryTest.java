@@ -58,20 +58,20 @@ class PublicHomeProfileSummaryTest {
     }
 
     @Test
-    void homepageWithActiveProfileInDefaultLanguageRendersSummaryAndValidatedLinks() throws Exception {
+    void homepageWithActiveProfileKeepsAuthoredIdentityWithoutRetiredProfileSection() throws Exception {
         profiles.setCurrent(profile(ContentLanguage.EN));
 
         mockMvc.perform(get("/"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("Enes")))
-                .andExpect(content().string(containsString("Profile short bio EN")))
+                .andExpect(content().string(containsString("0xmillennium")))
+                .andExpect(content().string(not(containsString("Enes"))))
+                .andExpect(content().string(not(containsString("Profile short bio EN"))))
                 .andExpect(content().string(containsString("Istanbul")))
-                .andExpect(content().string(containsString("href=\"https://example.test\"")))
-                .andExpect(content().string(containsString("rel=\"noopener noreferrer\"")))
+                .andExpect(content().string(not(containsString("href=\"https://example.test\""))))
                 .andExpect(content().string(not(containsString("Long profile bio"))))
                 .andExpect(content().string(not(containsString("CV"))))
                 .andExpect(content().string(not(containsString("Media"))))
-                .andExpect(content().string(not(containsString("Project"))));
+                .andExpect(content().string(not(containsString("Fake project"))));
     }
 
     @Test
@@ -82,6 +82,13 @@ class PublicHomeProfileSummaryTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(not(containsString("Profile short bio TR"))))
                 .andExpect(content().string(not(containsString("Enes"))));
+    }
+
+    @Test
+    void homepageDoesNotFetchRetiredProfileSummary() throws Exception {
+        profiles.setCurrent(profile(ContentLanguage.EN));
+        mockMvc.perform(get("/")).andExpect(status().isOk());
+        org.assertj.core.api.Assertions.assertThat(profiles.activeReads()).isZero();
     }
 
     private static PersonalProfile profile(ContentLanguage language) {
