@@ -105,6 +105,7 @@ test('physical identity responds to pointer contact and restores on scene exit',
   );
   await visit(page);
   await position(page, 'mark', 0.5);
+  await expect(page.locator('[data-physical-identity] .navigator')).toBeAttached();
   const fragments = page.locator('[data-physical-identity] polygon');
   await expect(fragments).toHaveCount(8);
   const transforms = () =>
