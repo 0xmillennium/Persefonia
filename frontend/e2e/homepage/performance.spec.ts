@@ -1,9 +1,11 @@
+import { startOnFilm } from '../support/homepage';
 import { expect, test } from '@playwright/test';
 import { visit, presented } from '../support/scenes';
 
 test('film scrolling bounds layout work and records task and frame intervals', async ({
   page,
 }, testInfo) => {
+  await startOnFilm(page);
   await visit(page);
   const session = await page.context().newCDPSession(page);
   await session.send('Performance.enable');
@@ -83,7 +85,8 @@ test('healthy startup keeps optional renderers lazy and the resting page stops s
   expect(frames).toBeLessThanOrEqual(2);
   expect(await page.locator('video').count()).toBe(1);
   expect(requests.filter((url) => /\/(physical|controller)-[^/]+\.js/.test(url))).toEqual([]);
-  expect(requests.filter((url) => /\/(home-loops|home-films)\//.test(url))).toEqual([]);
+  expect(requests.some((url) => /\/home-loops\/.*waterfall\.mp4/.test(url))).toBe(true);
+  expect(requests.filter((url) => /\/(home-videos|home-films)\//.test(url))).toEqual([]);
   await info.attach('startup-resource-budget', {
     body: JSON.stringify({ frames, videos: 1, requests }, null, 2),
     contentType: 'application/json',

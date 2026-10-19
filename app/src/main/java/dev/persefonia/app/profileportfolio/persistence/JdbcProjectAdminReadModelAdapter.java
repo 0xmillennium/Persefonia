@@ -71,18 +71,20 @@ public class JdbcProjectAdminReadModelAdapter implements ProjectAdminReadModel {
                 SELECT id, status, visibility, featured, sort_order, updated_at, version, cover_asset_id
                 FROM portfolio.projects
                 WHERE id = :id
-                """, Map.of("id", projectId.value()), (resultSet, rowNumber) -> new ProjectAdminDetails(
-                resultSet.getObject("id", UUID.class),
-                resultSet.getString("status"),
-                resultSet.getString("visibility"),
-                resultSet.getBoolean("featured"),
-                nullableInteger(resultSet, "sort_order"),
-                tagIds(projectId.value()),
-                localizations(projectId.value()),
-                technologies(projectId.value()),
-                links(projectId.value()),
-                resultSet.getTimestamp("updated_at").toInstant(),
-                resultSet.getLong("version"), resultSet.getString("cover_asset_id"))).stream().findFirst();
+                """, Map.of("id", projectId.value()), (resultSet, rowNumber) -> new ProjectDetailsHeader(
+                        resultSet.getObject("id", UUID.class),
+                        resultSet.getString("status"),
+                        resultSet.getString("visibility"),
+                        resultSet.getBoolean("featured"),
+                        nullableInteger(resultSet, "sort_order"),
+                        resultSet.getTimestamp("updated_at").toInstant(),
+                        resultSet.getLong("version"), resultSet.getString("cover_asset_id")))
+                .stream().findFirst()
+                .map(row -> new ProjectAdminDetails(
+                        row.id(), row.status(), row.visibility(), row.featured(), row.sortOrder(),
+                        tagIds(projectId.value()), localizations(projectId.value()),
+                        technologies(projectId.value()), links(projectId.value()),
+                        row.updatedAt(), row.version(), row.coverAssetId()));
     }
 
     private Set<TagId> tagIds(UUID projectId) {
@@ -101,15 +103,15 @@ public class JdbcProjectAdminReadModelAdapter implements ProjectAdminReadModel {
                 FROM portfolio.project_localizations
                 WHERE project_id = :projectId
                 ORDER BY language
-                """, Map.of("projectId", projectId), (resultSet, rowNumber) -> {
-            UUID localizationId = resultSet.getObject("id", UUID.class);
-            return new AdminProjectLocalizationView(
-                    resultSet.getString("language"),
-                    resultSet.getString("slug"),
-                    resultSet.getString("title"),
-                    resultSet.getString("summary"),
-                    sections(localizationId));
-        });
+                """, Map.of("projectId", projectId), (resultSet, rowNumber) -> new LocalizationHeader(
+                        resultSet.getObject("id", UUID.class),
+                        resultSet.getString("language"),
+                        resultSet.getString("slug"),
+                        resultSet.getString("title"),
+                        resultSet.getString("summary")))
+                .stream().map(row -> new AdminProjectLocalizationView(
+                        row.language(), row.slug(), row.title(), row.summary(), sections(row.id())))
+                .toList();
     }
 
     private List<AdminProjectCaseStudySectionView> sections(UUID localizationId) {
@@ -164,4 +166,9 @@ public class JdbcProjectAdminReadModelAdapter implements ProjectAdminReadModel {
         int value = resultSet.getInt(column);
         return resultSet.wasNull() ? null : value;
     }
+
+    private record ProjectDetailsHeader(UUID id, String status, String visibility, boolean featured,
+            Integer sortOrder, java.time.Instant updatedAt, long version, String coverAssetId) {}
+
+    private record LocalizationHeader(UUID id, String language, String slug, String title, String summary) {}
 }

@@ -7,6 +7,7 @@ export default defineConfig({
   testMatch: [
     '**/public/homepage.spec.ts',
     '**/homepage/film/video.spec.ts',
+    '**/homepage/loading.spec.ts',
     '**/public/public-shell.spec.ts',
     '**/fallback-visual.spec.ts',
     '**/homepage/gallery/directory.spec.ts',

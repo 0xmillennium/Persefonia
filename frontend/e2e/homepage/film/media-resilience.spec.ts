@@ -1,5 +1,8 @@
+import { startOnFilm } from '../../support/homepage';
 import { expect, test } from '@playwright/test';
 import { visit, presented, position, selectFilm } from '../../support/scenes';
+
+test.beforeEach(async ({ page }) => startOnFilm(page));
 
 test('a hung native film recovers through a static poster within the readiness deadline', async ({
   page,

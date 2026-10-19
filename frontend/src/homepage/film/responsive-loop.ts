@@ -1,3 +1,4 @@
+import type { MediaReadiness } from '../contracts/readiness';
 import { LoopFilm } from './loop-film';
 import type { LoopTier } from './delivery';
 
@@ -28,7 +29,7 @@ export class ResponsiveLoop {
   private create(tier: LoopTier) {
     const film = new LoopFilm(this.parent, tier, () => {
       if (this.disposed) return;
-      if (film === this.candidate && film.videoReady) {
+      if (film === this.candidate && (film.videoReady || film.readiness.state === 'static')) {
         this.current.dispose();
         this.current = film;
         this.candidate = null;
@@ -43,19 +44,22 @@ export class ResponsiveLoop {
     this.candidate?.dispose();
     this.candidate = null;
   }
-  prepare() {
+  prepare(reduced = false) {
     if (this.disposed) return;
     // Before first use there is no presentation to preserve.
     if (!this.current.prepared && this.current.tier !== this.tier) {
       this.current.dispose();
       this.current = this.create(this.tier);
     }
-    this.current.prepare();
+    this.current.prepare(0, reduced);
     if (this.current.tier !== this.tier && !this.candidate) {
       this.candidate = this.create(this.tier);
       this.candidate.suspend(this.suspended);
-      this.candidate.prepare(this.current.time);
     }
+    this.candidate?.prepare(this.current.time, reduced);
+  }
+  get readiness(): MediaReadiness {
+    return this.current.readiness;
   }
   get videoReady() {
     return this.current.videoReady;

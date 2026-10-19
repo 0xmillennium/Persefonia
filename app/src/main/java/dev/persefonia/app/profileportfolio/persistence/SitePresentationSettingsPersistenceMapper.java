@@ -18,12 +18,23 @@ import java.util.Set;
 import java.util.UUID;
 
 final class SitePresentationSettingsPersistenceMapper {
-    SitePresentationSettings toDomain(ResultSet resultSet, Set<ContentLanguage> supportedLanguages) throws SQLException {
-        return SitePresentationSettings.rehydrate(
+    record SettingsRow(
+            SitePresentationSettingsId id,
+            SiteName siteName,
+            ContentLanguage defaultLanguage,
+            TitleSuffix titleSuffix,
+            SeoDescription description,
+            AssetId ogImageAssetId,
+            ThemePreference theme,
+            HomepageSettings homepage,
+            Instant updatedAt,
+            Version version) {}
+
+    SettingsRow settingsRow(ResultSet resultSet) throws SQLException {
+        return new SettingsRow(
                 SitePresentationSettingsId.from(resultSet.getObject("id", UUID.class)),
                 SiteName.of(resultSet.getString("site_name")),
                 ContentLanguage.valueOf(resultSet.getString("default_language")),
-                supportedLanguages,
                 nullable(resultSet.getString("title_suffix"), TitleSuffix::of),
                 nullable(resultSet.getString("default_meta_description"), SeoDescription::of),
                 nullable(resultSet.getObject("default_og_image_asset_id", UUID.class), AssetId::from),
@@ -37,6 +48,21 @@ final class SitePresentationSettingsPersistenceMapper {
                         HomepagePromotionLimit.of(resultSet.getInt("research_highlight_limit"))),
                 timestamp(resultSet, "updated_at"),
                 Version.of(resultSet.getLong("version")));
+    }
+
+    SitePresentationSettings toDomain(SettingsRow row, Set<ContentLanguage> supportedLanguages) {
+        return SitePresentationSettings.rehydrate(
+                row.id(),
+                row.siteName(),
+                row.defaultLanguage(),
+                supportedLanguages,
+                row.titleSuffix(),
+                row.description(),
+                row.ogImageAssetId(),
+                row.theme(),
+                row.homepage(),
+                row.updatedAt(),
+                row.version());
     }
 
     private Instant timestamp(ResultSet resultSet, String column) throws SQLException {

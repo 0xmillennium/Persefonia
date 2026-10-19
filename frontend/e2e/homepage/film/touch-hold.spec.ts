@@ -1,4 +1,7 @@
+import { startOnFilm } from '../../support/homepage';
 import { expect, test, type Page } from '@playwright/test';
+
+test.beforeEach(async ({ page }) => startOnFilm(page));
 
 test.beforeEach(async ({ page }, info) => {
   test.skip(info.project.name !== 'mobile-390', 'Native touch input at phone size');

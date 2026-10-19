@@ -122,8 +122,9 @@ public class JdbcActiveCvProfileRepositoryAdapter implements ActiveCvProfileRepo
                 FROM portfolio.active_cv_profiles
                 WHERE %s
                 """.formatted(whereClause);
-        return jdbc().query(sql, params, (resultSet, rowNumber) ->
-                mapper.toDomain(resultSet, loadDocuments(resultSet.getObject("id", UUID.class)))).stream().findFirst();
+        return jdbc().query(sql, params, (resultSet, rowNumber) -> mapper.profileRow(resultSet))
+                .stream().findFirst()
+                .map(row -> mapper.toDomain(row, loadDocuments(row.id().value())));
     }
 
     private List<ActiveCvDocument> loadDocuments(UUID profileId) {

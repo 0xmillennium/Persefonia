@@ -1,6 +1,9 @@
 package dev.persefonia.app.identityaccess.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
+
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Instant;
@@ -42,6 +45,28 @@ class JdbcAdminAccountRepositoryAdapterTest {
 
     @AfterAll
     static void stopDatabase() {    }
+
+    @Test
+    void readsChildrenWithOnlyOneConnection() {
+        HikariConfig config = new HikariConfig();
+        config.setJdbcUrl(POSTGRES.getJdbcUrl());
+        config.setUsername(POSTGRES.getUsername());
+        config.setPassword(POSTGRES.getPassword());
+        config.setMaximumPoolSize(1);
+        config.setMinimumIdle(0);
+        config.setConnectionTimeout(2000);
+        try (var pool = new HikariDataSource(config)) {
+            var single = new JdbcAdminAccountRepositoryAdapter(new NamedParameterJdbcTemplate(pool));
+            AdminAccount saved = account("single-connection", "single@example.test", Set.of(AdminRole.OWNER, AdminRole.EDITOR));
+            repository.save(saved);
+            assertAccountMatches(single.findById(saved.id()).orElseThrow(), saved);
+            assertAccountMatches(single.findByOidcSubject(saved.oidcSubject()).orElseThrow(), saved);
+            assertAccountMatches(single.findByEmail(saved.email()).orElseThrow(), saved);
+            assertAccountMatches(single.findByNormalizedEmail(saved.normalizedEmail()).orElseThrow(), saved);
+            assertThat(pool.getHikariPoolMXBean().getActiveConnections()).isZero();
+            assertThat(pool.getHikariPoolMXBean().getThreadsAwaitingConnection()).isZero();
+        }
+    }
 
     @Test
     void saveInsertsAccountAndRoles() {

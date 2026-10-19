@@ -70,6 +70,30 @@ it('distinguishes continued native playback from a real stall despite delayed ti
   vi.advanceTimersByTime(FILM_READINESS_TIMEOUT);
   expect(loop.failed).toBe(true);
   expect(video.paused).toBe(true);
+  video.dispatchEvent(new Event('pause'));
+  expect(loop.failed).toBe(true);
   loop.dispose();
   expect(vi.getTimerCount()).toBe(0);
+});
+
+it('loads only the poster for reduced motion and lazily creates video after the preference changes', () => {
+  const loop = new LoopFilm(parent, 1280, vi.fn());
+  const create = vi.spyOn(document, 'createElement');
+  loop.prepare(0, true);
+  expect(create).not.toHaveBeenCalled();
+  expect(loop.prepared).toBe(true);
+  loop.prepare(0, false);
+  expect(create).toHaveBeenCalledTimes(1);
+  loop.dispose();
+});
+it('accepts a healthy video that decodes after the idle timeout without reload', () => {
+  const loop = new LoopFilm(parent, 1280, vi.fn());
+  loop.prepare();
+  vi.advanceTimersByTime(FILM_READINESS_TIMEOUT);
+  expect(loop.failed).toBe(true);
+  video.readyState = 4;
+  video.dispatchEvent(new Event('loadeddata'));
+  expect(loop.failed).toBe(false);
+  expect(loop.image).toBe(video);
+  loop.dispose();
 });

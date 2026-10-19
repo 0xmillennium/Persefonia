@@ -1,6 +1,9 @@
+import { startOnFilm } from '../support/homepage';
 import { expect, test } from '@playwright/test';
 import { visit, position } from '../support/scenes';
 import { difference, pixels } from '../support/pixels';
+
+test.beforeEach(async ({ page }) => startOnFilm(page));
 
 test('desktop tree panes retain their frame and dividers through navigator rendering and scroll reversal', async ({
   page,

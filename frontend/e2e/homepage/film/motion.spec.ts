@@ -1,5 +1,8 @@
+import { startOnFilm } from '../../support/homepage';
 import { expect, test } from '@playwright/test';
 import { visit, position, selectFilm, presented } from '../../support/scenes';
+
+test.beforeEach(async ({ page }) => startOnFilm(page));
 
 test('film scrubs from the first scroll, reverses and keeps selection progress', async ({
   page,

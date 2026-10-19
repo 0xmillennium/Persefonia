@@ -1,6 +1,10 @@
+import { startOnFilm } from '../../support/homepage';
 import { expect, test, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { pixels } from '../../support/pixels';
+
+test.beforeEach(async ({ page }) => startOnFilm(page));
+
 const posterVersion = JSON.parse(
   readFileSync(new URL('../../../public/home-posters/manifest.json', import.meta.url), 'utf8'),
 ).identity;

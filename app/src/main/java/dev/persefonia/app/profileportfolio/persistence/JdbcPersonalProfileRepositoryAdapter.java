@@ -221,11 +221,10 @@ public class JdbcPersonalProfileRepositoryAdapter implements PersonalProfileRepo
                 FROM portfolio.personal_profiles
                 WHERE %s
                 """.formatted(whereClause);
-        List<PersonalProfile> rows = jdbc().query(sql, params, (resultSet, rowNumber) -> {
-            UUID profileId = resultSet.getObject("id", UUID.class);
-            return mapper.toDomain(resultSet, loadLocalizations(profileId), loadExternalLinks(profileId));
-        });
-        return rows.stream().findFirst();
+        // Finish the parent query before loading children so a read needs only one pool connection.
+        return jdbc().query(sql, params, (resultSet, rowNumber) -> mapper.profileRow(resultSet))
+                .stream().findFirst()
+                .map(row -> mapper.toDomain(row, loadLocalizations(row.id().value()), loadExternalLinks(row.id().value())));
     }
 
     private List<ProfileLocalization> loadLocalizations(UUID profileId) {
@@ -234,14 +233,13 @@ public class JdbcPersonalProfileRepositoryAdapter implements PersonalProfileRepo
                 FROM portfolio.profile_localizations
                 WHERE profile_id = :profileId
                 ORDER BY language
-                """, Map.of("profileId", profileId), (resultSet, rowNumber) -> {
-            UUID localizationId = resultSet.getObject("id", UUID.class);
-            return mapper.localization(
-                    resultSet,
-                    loadFocusAreas(localizationId),
-                    loadEducationSummaries(localizationId),
-                    loadCurrentFocusItems(localizationId));
-        });
+                """, Map.of("profileId", profileId), (resultSet, rowNumber) -> mapper.localizationRow(resultSet))
+                .stream().map(row -> mapper.localization(
+                        row,
+                        loadFocusAreas(row.id().value()),
+                        loadEducationSummaries(row.id().value()),
+                        loadCurrentFocusItems(row.id().value())))
+                .toList();
     }
 
     private List<ExternalProfileLink> loadExternalLinks(UUID profileId) {

@@ -1,3 +1,5 @@
+import type { MediaReadiness } from '../contracts/readiness';
+import { videoReadiness } from './startup';
 import { loopVersion } from 'virtual:home-media';
 import { loadBitmap } from './loader';
 import { FILM_READINESS_TIMEOUT, type LoopTier } from './delivery';
@@ -20,6 +22,8 @@ export class LoopFilm {
   private deadline = 0;
   private playbackDeadline = 0;
   private suspended = false;
+  private reduced = false;
+  private recoverable = false;
   revision = 0;
   blocked = false;
   failed = false;
@@ -35,7 +39,7 @@ export class LoopFilm {
     return this.url('webp');
   }
   get prepared() {
-    return !!this.video;
+    return !!this.poster;
   }
   get videoReady() {
     return (
@@ -49,8 +53,31 @@ export class LoopFilm {
   get time() {
     return this.video?.currentTime ?? 0;
   }
-  prepare(time = 0) {
-    if (this.disposed || this.video) return;
+  prepare(time = 0, reduced = false) {
+    if (this.disposed) return;
+    this.reduced = reduced;
+    if (!this.poster) {
+      const poster = (this.poster = new Image());
+      poster.className = 'film-presentation';
+      poster.alt = '';
+      poster.hidden = true;
+      poster.src = this.posterUrl;
+      this.parent.prepend(poster);
+      void loadBitmap(this.posterUrl, this.abort.signal)
+        .then((image) => {
+          if (this.disposed) {
+            image.close();
+            return;
+          }
+          this.bitmap = image;
+          this.revision++;
+          this.changed();
+        })
+        .catch(() => {
+          /* A decoded video can still supply the presentation. */
+        });
+    }
+    if (reduced || this.video) return;
     const video = (this.video = document.createElement('video'));
     video.className = 'film-presentation';
     video.dataset.loopVideo = '';
@@ -58,26 +85,8 @@ export class LoopFilm {
     video.preload = 'auto';
     video.hidden = true;
     video.setAttribute('aria-hidden', 'true');
-    video.poster = this.url('webp');
-    const poster = (this.poster = new Image());
-    poster.className = 'film-presentation';
-    poster.alt = '';
-    poster.hidden = true;
-    poster.src = video.poster;
-    this.parent.prepend(video, poster);
-    void loadBitmap(video.poster, this.abort.signal)
-      .then((image) => {
-        if (this.disposed) {
-          image.close();
-          return;
-        }
-        this.bitmap = image;
-        this.revision++;
-        this.changed();
-      })
-      .catch(() => {
-        /* A decoded video can still supply the presentation. */
-      });
+    video.poster = this.posterUrl;
+    this.parent.prepend(video);
     const options = { signal: this.abort.signal };
     video.addEventListener(
       'loadedmetadata',
@@ -90,7 +99,16 @@ export class LoopFilm {
       video.addEventListener(
         name,
         () => {
-          if (this.videoReady) this.clearDeadline();
+          if (
+            name !== 'pause' &&
+            this.recoverable &&
+            !video.error &&
+            !video.seeking &&
+            video.readyState >= 2
+          ) {
+            this.failed = this.recoverable = false;
+          }
+          if (!video.error && !video.seeking && video.readyState >= 2) this.clearDeadline();
           if (name === 'playing') this.clearPlaybackDeadline();
           this.revision++;
           this.changed();
@@ -105,6 +123,17 @@ export class LoopFilm {
         },
         options,
       );
+    video.addEventListener(
+      'progress',
+      () => {
+        if (!this.failed && !this.suspended) {
+          this.clearDeadline();
+          this.waitForVideo();
+        }
+        this.changed();
+      },
+      options,
+    );
     let lastTime = 0;
     video.addEventListener(
       'timeupdate',
@@ -125,11 +154,19 @@ export class LoopFilm {
     this.waitForVideo();
   }
   get image(): HTMLVideoElement | ImageBitmap | undefined {
-    return this.videoReady ? this.video! : (this.bitmap ?? undefined);
+    return !this.reduced && this.videoReady ? this.video! : (this.bitmap ?? undefined);
+  }
+  get readiness(): MediaReadiness {
+    if (this.reduced)
+      return { state: this.bitmap ? 'static' : 'loading', progress: this.bitmap ? 1 : 0 };
+    if (this.failed || this.blocked)
+      return { state: this.bitmap ? 'fallback' : 'unavailable', progress: 0 };
+    if (!this.video) return { state: 'loading', progress: 0 };
+    return videoReadiness(this.video, this.videoReady, !this.video.paused && !this.pending);
   }
   setPlayback(allowed: boolean, observeFrames: boolean) {
     const video = this.video;
-    const wanted = allowed && !this.blocked && !this.failed;
+    const wanted = allowed && !this.reduced && !this.blocked && !this.failed;
     if (video && wanted !== this.wanted) {
       this.wanted = wanted;
       const intent = ++this.playIntent;
@@ -187,7 +224,7 @@ export class LoopFilm {
       this.deadline = window.setTimeout(() => {
         this.clearDeadline();
         if (this.videoReady) this.changed();
-        else this.fail();
+        else this.fail(true);
       }, FILM_READINESS_TIMEOUT);
   }
   private clearPlaybackDeadline() {
@@ -203,14 +240,15 @@ export class LoopFilm {
       if (this.videoReady && this.video?.currentTime !== time) {
         this.waitForPlayback();
         this.changed();
-      } else this.fail();
+      } else this.fail(true);
     }, FILM_READINESS_TIMEOUT);
   }
-  private fail() {
+  private fail(recoverable = false) {
     if (this.disposed || this.failed) return;
     this.clearDeadline();
     this.clearPlaybackDeadline();
     this.failed = true;
+    this.recoverable = recoverable;
     this.wanted = false;
     this.video?.pause();
     this.watch(false);
@@ -265,7 +303,7 @@ export class LoopFilm {
       });
   }
   show(visible: boolean, bounds: readonly number[], opacity: number) {
-    const videoReady = this.videoReady;
+    const videoReady = !this.reduced && this.videoReady;
     for (const node of [this.video, this.poster]) {
       if (!node) continue;
       node.hidden = !visible || (node === this.video ? !videoReady : videoReady || !this.bitmap);

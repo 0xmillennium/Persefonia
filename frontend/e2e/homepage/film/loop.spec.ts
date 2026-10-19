@@ -1,5 +1,8 @@
+import { startOnFilm } from '../../support/homepage';
 import { expect, test, type Page } from '@playwright/test';
 import { difference } from '../../support/pixels';
+
+test.beforeEach(async ({ page }) => startOnFilm(page));
 
 const errors = new WeakMap<Page, string[]>();
 test.beforeEach(({ page }) => {

@@ -10,9 +10,9 @@ export interface BackgroundDefinition<
 }
 
 export const BACKGROUNDS = [
+  { id: 'waterfall', playback: 'loop' },
   { id: 'robotic-arm', playback: 'scroll' },
   { id: 'tree', playback: 'scroll' },
-  { id: 'waterfall', playback: 'loop' },
 ] as const satisfies readonly BackgroundDefinition[];
 
 export type BackgroundEntry<Registry extends readonly BackgroundDefinition[] = typeof BACKGROUNDS> =

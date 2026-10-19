@@ -1,6 +1,9 @@
 package dev.persefonia.app.medialibrary.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
+
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dev.persefonia.medialibrary.domain.asset.AltText;
@@ -31,10 +34,39 @@ import dev.persefonia.medialibrary.domain.asset.VariantName;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.support.StaticListableBeanFactory;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import org.springframework.jdbc.support.JdbcTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.dao.DataIntegrityViolationException;
 
 class JdbcAssetRepositoryAdapterTest extends MediaLibraryRepositoryTestDatabase {
     private static final Instant NOW = Instant.parse("2026-06-18T10:00:00Z");
+
+    @Test
+    void readsChildrenWithOnlyOneConnection() {
+        HikariConfig config = new HikariConfig();
+        config.setJdbcUrl(POSTGRES.getJdbcUrl());
+        config.setUsername(POSTGRES.getUsername());
+        config.setPassword(POSTGRES.getPassword());
+        config.setMaximumPoolSize(1);
+        config.setMinimumIdle(0);
+        config.setConnectionTimeout(2000);
+        try (var pool = new HikariDataSource(config)) {
+            var beans = new StaticListableBeanFactory();
+            beans.addBean("jdbc", new NamedParameterJdbcTemplate(pool));
+            beans.addBean("transactions", new TransactionTemplate(new JdbcTransactionManager(pool)));
+            var single = new JdbcAssetRepositoryAdapter(beans.getBeanProvider(NamedParameterJdbcTemplate.class),
+                    beans.getBeanProvider(TransactionTemplate.class));
+            Asset saved = assets.save(processedImage("single-connection", AltText.of("Image"),
+                    DecorativeImageFlag.informative(), List.of(variant(VariantName.THUMBNAIL, "single")),
+                    List.of(validation("mime"))));
+            assertThat(single.findById(saved.id()).orElseThrow().variants()).hasSize(1);
+            assertThat(single.findByChecksum(saved.checksum()).orElseThrow().validationResults()).hasSize(1);
+            assertThat(pool.getHikariPoolMXBean().getActiveConnections()).isZero();
+            assertThat(pool.getHikariPoolMXBean().getThreadsAwaitingConnection()).isZero();
+        }
+    }
 
     @Test
     void savesAndReloadsPrivatePendingImage() {

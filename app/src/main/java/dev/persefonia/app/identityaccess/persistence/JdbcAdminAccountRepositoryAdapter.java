@@ -172,25 +172,29 @@ final class JdbcAdminAccountRepositoryAdapter implements AdminAccountRepository 
     }
 
     private Optional<AdminAccount> findOne(String sql, Map<String, ?> parameters) {
-        List<AdminAccount> accounts = jdbc.query(sql, parameters, this::mapAccount);
-        return accounts.stream().findFirst();
+        return jdbc.query(sql, parameters, this::mapAccountRow).stream().findFirst()
+                .map(row -> AdminAccount.rehydrate(
+                        row.id(), row.oidcSubject(), row.email(), row.normalizedEmail(), row.displayName(),
+                        loadRoles(row.id()), row.status(), row.lastLoginAt(), row.createdAt(), row.updatedAt(), row.version()));
     }
 
-    private AdminAccount mapAccount(ResultSet resultSet, int rowNumber) throws SQLException {
-        AdminAccountId id = AdminAccountId.of(resultSet.getObject("id", java.util.UUID.class));
-        return AdminAccount.rehydrate(
-                id,
+    private AccountRow mapAccountRow(ResultSet resultSet, int rowNumber) throws SQLException {
+        return new AccountRow(
+                AdminAccountId.of(resultSet.getObject("id", java.util.UUID.class)),
                 OidcSubject.of(resultSet.getString("oidc_subject")),
                 EmailAddress.of(resultSet.getString("email")),
                 NormalizedEmailAddress.of(resultSet.getString("normalized_email")),
                 DisplayName.of(resultSet.getString("display_name")),
-                loadRoles(id),
                 AdminAccountStatus.valueOf(resultSet.getString("status")),
                 instantOrNull(resultSet, "last_login_at"),
                 resultSet.getTimestamp("created_at").toInstant(),
                 resultSet.getTimestamp("updated_at").toInstant(),
                 Version.of(resultSet.getLong("version")));
     }
+
+    private record AccountRow(AdminAccountId id, OidcSubject oidcSubject, EmailAddress email,
+            NormalizedEmailAddress normalizedEmail, DisplayName displayName, AdminAccountStatus status,
+            Instant lastLoginAt, Instant createdAt, Instant updatedAt, Version version) {}
 
     private Set<AdminRole> loadRoles(AdminAccountId id) {
         List<AdminRole> roles = jdbc.query(

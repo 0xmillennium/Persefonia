@@ -166,7 +166,7 @@ test('SSR publications, metadata, public destinations, CSP and self-hosted asset
   expect(videos.length).toBeGreaterThan(0);
   expect(
     videos.every((url) =>
-      /^\/assets\/home-videos\/[a-f0-9]{64}\/(?:960|1600)\/(?:robotic-arm|tree)\.mp4$/.test(
+      /^\/assets\/(?:home-videos\/[a-f0-9]{64}\/(?:960|1600)\/(?:robotic-arm|tree)|home-loops\/[a-f0-9]{64}\/(?:1280|1920)\/waterfall)\.mp4$/.test(
         new URL(url).pathname,
       ),
     ),

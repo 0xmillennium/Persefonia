@@ -295,7 +295,7 @@ export class FilmPresentation {
     root.dataset.filmPresentation =
       scrollPresentation?.kind ??
       (isLoopBackground(transport.film) && loop.image
-        ? loop.videoReady
+        ? !reduced && loop.videoReady
           ? 'video'
           : 'poster'
         : isScrollFilm(transport.film) && video.unavailable(transport.film, posterPose())

@@ -33,7 +33,7 @@ class PortfolioSettingsUpgradeTest {
                             latest_writing_limit = 20, version = 8
                         """);
             }
-            configuration.target(MigrationVersion.LATEST);
+            configuration.target(MigrationVersion.fromVersion("22"));
             configuration.load().migrate();
             try (Connection connection = database.createConnection("");
                     var statement = connection.createStatement();

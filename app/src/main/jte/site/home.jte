@@ -164,7 +164,17 @@
         <output class="sr-only" data-film-notice lang="en" role="status" aria-live="polite"></output>
         <output data-hold-countdown class="hold-countdown" lang="en" aria-live="polite" hidden></output>
     </main>
-    <div class="home-loader" data-home-loader hidden role="status" aria-label="Preparing homepage"><div class="loader-sheet" aria-hidden="true"></div><div class="loader-aperture"></div><div data-loading-identity><button tabindex="-1" type="button" aria-hidden="true"><span class="identity-plane">@template.site.components.compactIdentity("loading-identity")</span><span class="floor-shadow"></span></button></div><output data-loading-progress>0 / 3</output><p>0xmillennium</p><div class="home-staircase" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+    <div class="home-loader" data-home-loader hidden role="status" aria-label="Preparing homepage" aria-atomic="true" lang="en">
+        <div class="loader-sheet" aria-hidden="true"></div>
+        <div class="loader-atmosphere" data-loader-fade aria-hidden="true"></div>
+        <div class="loader-progress-slot"><div class="loading-progress" data-loading-progress data-loader-rise role="progressbar" aria-label="Homepage preparation" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="loading-progress-fill" aria-hidden="true"></span></div></div>
+        <div class="loader-content">
+            <div class="loader-identity-slot" aria-hidden="true"><div data-loading-identity data-loader-rise><button tabindex="-1" type="button" aria-hidden="true"><span class="identity-plane">@template.site.components.compactIdentity("loading-identity")</span><span class="floor-shadow"></span></button></div></div>
+            <div class="loader-info"><p class="loader-description-slot" data-loader-rise><span class="loader-name">0XMILLENNIUM:</span> <em data-loading-description>A millennium spans 1,000 years. In hexadecimal, 1,000 becomes 0x3E8.</em></p><p class="loader-hint-slot"><span data-loading-hint data-loader-rise></span></p></div>
+        </div>
+        <span class="sr-only" data-loading-status>Preparing homepage</span>
+        <div class="home-staircase" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    </div>
     <script type="module" src="${page.scriptPath()}"></script>
 </body>
 </html>

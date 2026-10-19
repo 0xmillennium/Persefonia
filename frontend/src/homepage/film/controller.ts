@@ -1,3 +1,4 @@
+import type { MediaReadiness } from '../contracts/readiness';
 import { Hold } from './hold/state';
 import { HoldClock } from './hold/clock';
 import { HoldMaterial } from './hold/material';
@@ -18,7 +19,7 @@ import { ResponsiveLoop } from './responsive-loop';
 import { filmTier, loopTier } from './delivery';
 export interface FilmOptions {
   root: HTMLElement;
-  ready: () => void;
+  ready: (state: MediaReadiness) => void;
   selectionChanged: () => void;
   mediaChanged?: () => void;
 }
@@ -125,7 +126,7 @@ export function mountFilm({ root, ready, selectionChanged, mediaChanged }: FilmO
       hold.preparing || prefetchedFrom === transport.film
         ? [transport.film, nextBackground(transport.film)]
         : [transport.film];
-    if (scenes.some(isLoopBackground)) loop.prepare();
+    if (scenes.some(isLoopBackground)) loop.prepare(reduced.matches);
     video.setReduced(reduced.matches);
     for (const film of scenes.filter(isScrollFilm))
       video.request(film, transport.desired, posterPose());
@@ -207,7 +208,6 @@ export function mountFilm({ root, ready, selectionChanged, mediaChanged }: FilmO
         first
       ) {
         first = false;
-        ready();
       }
     } catch {
       presentation.disable();
@@ -218,6 +218,14 @@ export function mountFilm({ root, ready, selectionChanged, mediaChanged }: FilmO
     }
     if (!first) presentation.photo(transport, width, height, expansion, writingBounds);
     presentation.describe(transport, hold, reduced.matches, expansion);
+    const media = isScrollFilm(transport.film)
+      ? video.readiness(transport.film, transport.desired, posterPose())
+      : loop.readiness;
+    ready(
+      first && media.state !== 'unavailable'
+        ? { state: 'loading', progress: media.progress }
+        : media,
+    );
     if (fluid.active || hold.animating) wake();
     else previous = 0;
   };

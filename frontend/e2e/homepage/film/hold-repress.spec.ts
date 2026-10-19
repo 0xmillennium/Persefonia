@@ -1,7 +1,10 @@
+import { startOnFilm } from '../../support/homepage';
 import { expect, test } from '@playwright/test';
 import { visit } from '../../support/scenes';
 import { radiusFor } from '../../../src/homepage/film/rendering/shaders';
 import { HOLD } from '../../../src/homepage/film/hold/state';
+
+test.beforeEach(async ({ page }) => startOnFilm(page));
 
 type Mask = { width: number; height: number; pixels: Uint8Array };
 

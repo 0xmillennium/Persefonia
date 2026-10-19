@@ -77,6 +77,7 @@ export class SeekFilm {
     video.addEventListener(
       'progress',
       () => {
+        this.changed();
         if (this.suspended || entry.index === entry.desired) return;
         if (entry.failed) {
           if (entry.recoverable) {

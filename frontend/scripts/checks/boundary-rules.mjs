@@ -1,6 +1,7 @@
 const contracts = new Set([
   'homepage/film/model.ts',
   'homepage/contracts/progress.ts',
+  'homepage/contracts/readiness.ts',
   'homepage/contracts/choreography.ts',
   'homepage/contracts/gallery.ts',
 ]);

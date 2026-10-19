@@ -1,8 +1,11 @@
+import { startOnFilm } from '../../support/homepage';
 import { settleScroll } from '../../support/scroll';
 import { chooseCollection } from '../../support/gallery';
 import { expect, test } from '@playwright/test';
 import { visit, position, selectFilm } from '../../support/scenes';
 import { difference } from '../../support/pixels';
+
+test.beforeEach(async ({ page }) => startOnFilm(page));
 
 test('gallery wheel pulses select one adjacent item and release both boundaries', async ({
   page,

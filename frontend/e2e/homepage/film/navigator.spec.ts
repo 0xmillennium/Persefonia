@@ -1,7 +1,10 @@
+import { startOnFilm } from '../../support/homepage';
 import { expect, test } from '@playwright/test';
 import { visit, position, selectFilm } from '../../support/scenes';
 import { HOLD } from '../../../src/homepage/film/hold/state';
 import { difference, pixels } from '../../support/pixels';
+
+test.beforeEach(async ({ page }) => startOnFilm(page));
 
 test('navigator paints and then releases the photo outside the opening doorway', async ({
   page,

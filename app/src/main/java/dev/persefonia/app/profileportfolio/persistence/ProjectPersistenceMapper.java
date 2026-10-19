@@ -36,35 +36,75 @@ import java.util.Set;
 import java.util.UUID;
 
 final class ProjectPersistenceMapper {
-    Project toDomain(
-            ResultSet resultSet,
-            Set<TagId> tagIds,
-            List<ProjectTechnology> technologies,
-            List<ProjectLink> links,
-            List<ProjectLocalization> localizations) throws SQLException {
-        return Project.rehydrate(
+    record ProjectRow(
+            ProjectId id,
+            ProjectStatus status,
+            ProjectVisibility visibility,
+            boolean featured,
+            SortOrder sortOrder,
+            AssetId coverAssetId,
+            Instant createdAt,
+            Instant updatedAt,
+            Version version) {}
+
+    ProjectRow projectRow(ResultSet resultSet) throws SQLException {
+        return new ProjectRow(
                 ProjectId.from(resultSet.getObject("id", UUID.class)),
                 ProjectStatus.valueOf(resultSet.getString("status")),
                 ProjectVisibility.valueOf(resultSet.getString("visibility")),
                 resultSet.getBoolean("featured"),
                 nullableInteger(resultSet, "sort_order"),
                 nullable(resultSet.getObject("cover_asset_id", UUID.class), AssetId::from),
-                tagIds,
-                technologies,
-                links,
-                localizations,
                 timestamp(resultSet, "created_at"),
                 timestamp(resultSet, "updated_at"),
                 Version.of(resultSet.getLong("version")));
     }
 
-    ProjectLocalization localization(ResultSet resultSet, List<ProjectCaseStudySection> sections) throws SQLException {
-        return new ProjectLocalization(
+    Project toDomain(
+            ProjectRow row,
+            Set<TagId> tagIds,
+            List<ProjectTechnology> technologies,
+            List<ProjectLink> links,
+            List<ProjectLocalization> localizations) {
+        return Project.rehydrate(
+                row.id(),
+                row.status(),
+                row.visibility(),
+                row.featured(),
+                row.sortOrder(),
+                row.coverAssetId(),
+                tagIds,
+                technologies,
+                links,
+                localizations,
+                row.createdAt(),
+                row.updatedAt(),
+                row.version());
+    }
+
+    record LocalizationRow(
+            ProjectLocalizationId id,
+            ContentLanguage language,
+            ProjectSlug slug,
+            ProjectTitle title,
+            ProjectSummary summary) {}
+
+    LocalizationRow localizationRow(ResultSet resultSet) throws SQLException {
+        return new LocalizationRow(
                 ProjectLocalizationId.from(resultSet.getObject("id", UUID.class)),
                 ContentLanguage.valueOf(resultSet.getString("language")),
                 ProjectSlug.of(resultSet.getString("slug")),
                 ProjectTitle.of(resultSet.getString("title")),
-                ProjectSummary.of(resultSet.getString("summary")),
+                ProjectSummary.of(resultSet.getString("summary")));
+    }
+
+    ProjectLocalization localization(LocalizationRow row, List<ProjectCaseStudySection> sections) {
+        return new ProjectLocalization(
+                row.id(),
+                row.language(),
+                row.slug(),
+                row.title(),
+                row.summary(),
                 sections);
     }
 

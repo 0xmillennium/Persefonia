@@ -1,19 +1,32 @@
+import { startOnFilm } from '../support/homepage';
 import { expect, test } from '@playwright/test';
 
-test('a slow cold video replaces its poster without reloading the page', async ({ page }) => {
-  await page.route('**/home-videos/**/robotic-arm.mp4', async (route) => {
-    const response = await route.fetch();
-    await new Promise((resolve) => setTimeout(resolve, 7500));
-    await route.fulfill({ response });
+test.beforeEach(async ({ page }) => startOnFilm(page));
+
+test('a slow cold scroll film stays behind the opening screen until its video is ready', async ({
+  page,
+}) => {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
   });
-  await page.goto('/', { waitUntil: 'domcontentloaded' });
-  await expect(page.locator('[data-home-v2]')).toHaveAttribute('data-ready', 'true');
-  await expect(page.locator('[data-film-poster="opening"]')).toBeVisible();
-  await expect(page.locator('[data-home-v2]')).toHaveAttribute('data-film-presentation', 'video', {
-    timeout: 15000,
+  await page.route('**/home-videos/**/robotic-arm.mp4*', async (route) => {
+    await gate;
+    await route.continue();
   });
-  await expect(page.locator('video.film-presentation:visible')).toHaveCount(1);
-  await expect(page.locator('[data-film-poster="opening"]')).toBeHidden();
+  try {
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('[data-film-poster="opening"]')).toBeVisible();
+    await expect(page.locator('[data-home-v2]')).toHaveAttribute('data-startup-state', 'loading');
+    await expect(page.locator('[data-home-v2]')).not.toHaveAttribute('data-ready', 'true');
+    await expect(page.locator('[data-home-loader]')).toBeVisible();
+    release();
+    await expect(page.locator('[data-home-v2]')).toHaveAttribute('data-startup-state', 'ready');
+    await expect(page.locator('[data-home-loader]')).toBeHidden();
+    await expect(page.locator('[data-film-poster="opening"]')).toBeHidden();
+  } finally {
+    release();
+  }
 });
 
 test('toolbar-sized height changes fill the screen without changing story distances', async ({

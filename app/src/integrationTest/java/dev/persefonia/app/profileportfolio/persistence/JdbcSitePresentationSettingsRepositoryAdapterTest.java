@@ -19,6 +19,7 @@ class JdbcSitePresentationSettingsRepositoryAdapterTest extends PortfolioReposit
         SitePresentationSettings current = settings.findCurrent().orElseThrow();
 
         assertThat(current.id()).isEqualTo(SEED_ID);
+        assertThat(current.defaultLanguage()).isEqualTo(ContentLanguage.EN);
         assertThat(current.supportedLanguages()).containsExactlyInAnyOrder(ContentLanguage.TR, ContentLanguage.EN);
     }
 
@@ -30,11 +31,13 @@ class JdbcSitePresentationSettingsRepositoryAdapterTest extends PortfolioReposit
     @Test
     void saveUpdatesSettingsAndUsesDomainVersion() {
         SitePresentationSettings current = settings.findCurrent().orElseThrow();
+        long previousVersion = current.version().value();
         current.changeTheme(ThemePreference.DARK, Instant.parse("2026-06-16T11:00:00Z"));
 
         SitePresentationSettings saved = settings.save(current);
 
         assertThat(saved.standardPublicTheme()).isEqualTo(ThemePreference.DARK);
-        assertThat(saved.version().value()).isEqualTo(1);
+        assertThat(saved.version().value()).isEqualTo(previousVersion + 1);
+        assertThat(settings.findCurrent().orElseThrow().version()).isEqualTo(saved.version());
     }
 }

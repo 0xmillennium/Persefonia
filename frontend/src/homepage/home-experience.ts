@@ -290,7 +290,7 @@ function mountHomepage(scope: DisposalScope): () => void {
   scope.add(mobileMenu);
   film = mountFilm({
     root,
-    ready: () => readiness.ready('film'),
+    ready: (state) => readiness.media(state),
     selectionChanged: schedule,
     mediaChanged: schedule,
   });

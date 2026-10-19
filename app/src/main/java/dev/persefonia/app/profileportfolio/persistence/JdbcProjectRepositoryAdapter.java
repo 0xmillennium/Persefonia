@@ -267,15 +267,14 @@ public class JdbcProjectRepositoryAdapter implements ProjectRepository {
                 WHERE %s
                 ORDER BY projects.updated_at DESC, projects.id
                 """.formatted(whereClause);
-        return jdbc().query(sql, params, (resultSet, rowNumber) -> {
-            UUID projectId = resultSet.getObject("id", UUID.class);
-            return mapper.toDomain(
-                    resultSet,
-                    loadTagIds(projectId),
-                    loadTechnologies(projectId),
-                    loadLinks(projectId),
-                    loadLocalizations(projectId));
-        });
+        return jdbc().query(sql, params, (resultSet, rowNumber) -> mapper.projectRow(resultSet))
+                .stream().map(row -> mapper.toDomain(
+                        row,
+                        loadTagIds(row.id().value()),
+                        loadTechnologies(row.id().value()),
+                        loadLinks(row.id().value()),
+                        loadLocalizations(row.id().value())))
+                .toList();
     }
 
     private Set<TagId> loadTagIds(UUID projectId) {
@@ -312,10 +311,9 @@ public class JdbcProjectRepositoryAdapter implements ProjectRepository {
                 FROM portfolio.project_localizations
                 WHERE project_id = :projectId
                 ORDER BY language
-                """, Map.of("projectId", projectId), (resultSet, rowNumber) -> {
-            UUID localizationId = resultSet.getObject("id", UUID.class);
-            return mapper.localization(resultSet, loadSections(localizationId));
-        });
+                """, Map.of("projectId", projectId), (resultSet, rowNumber) -> mapper.localizationRow(resultSet))
+                .stream().map(row -> mapper.localization(row, loadSections(row.id().value())))
+                .toList();
     }
 
     private List<ProjectCaseStudySection> loadSections(UUID localizationId) {

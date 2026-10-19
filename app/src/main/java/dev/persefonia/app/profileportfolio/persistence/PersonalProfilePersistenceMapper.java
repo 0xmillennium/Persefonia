@@ -34,32 +34,66 @@ import java.util.List;
 import java.util.UUID;
 
 final class PersonalProfilePersistenceMapper {
-    PersonalProfile toDomain(
-            ResultSet resultSet,
-            List<ProfileLocalization> localizations,
-            List<ExternalProfileLink> links) throws SQLException {
-        return PersonalProfile.rehydrate(
+    record ProfileRow(
+            ProfileId id,
+            DisplayName displayName,
+            boolean active,
+            Instant createdAt,
+            Instant updatedAt,
+            Version version) {}
+
+    ProfileRow profileRow(ResultSet resultSet) throws SQLException {
+        return new ProfileRow(
                 ProfileId.from(resultSet.getObject("id", UUID.class)),
                 DisplayName.of(resultSet.getString("display_name")),
                 resultSet.getBoolean("active"),
-                localizations,
-                links,
                 timestamp(resultSet, "created_at"),
                 timestamp(resultSet, "updated_at"),
                 Version.of(resultSet.getLong("version")));
     }
 
-    ProfileLocalization localization(
-            ResultSet resultSet,
-            List<TechnicalFocusArea> focusAreas,
-            List<EducationSummary> educationSummaries,
-            List<CurrentFocusItem> currentFocusItems) throws SQLException {
-        return new ProfileLocalization(
+    PersonalProfile toDomain(
+            ProfileRow row,
+            List<ProfileLocalization> localizations,
+            List<ExternalProfileLink> links) {
+        return PersonalProfile.rehydrate(
+                row.id(),
+                row.displayName(),
+                row.active(),
+                localizations,
+                links,
+                row.createdAt(),
+                row.updatedAt(),
+                row.version());
+    }
+
+    record LocalizationRow(
+            ProfileLocalizationId id,
+            ContentLanguage language,
+            ShortBio shortBio,
+            LongBio longBio,
+            LocationText locationText) {}
+
+    LocalizationRow localizationRow(ResultSet resultSet) throws SQLException {
+        return new LocalizationRow(
                 ProfileLocalizationId.from(resultSet.getObject("id", UUID.class)),
                 ContentLanguage.valueOf(resultSet.getString("language")),
                 ShortBio.of(resultSet.getString("short_bio")),
                 LongBio.of(resultSet.getString("long_bio")),
-                nullable(resultSet.getString("location_text"), LocationText::of),
+                nullable(resultSet.getString("location_text"), LocationText::of));
+    }
+
+    ProfileLocalization localization(
+            LocalizationRow row,
+            List<TechnicalFocusArea> focusAreas,
+            List<EducationSummary> educationSummaries,
+            List<CurrentFocusItem> currentFocusItems) {
+        return new ProfileLocalization(
+                row.id(),
+                row.language(),
+                row.shortBio(),
+                row.longBio(),
+                row.locationText(),
                 focusAreas,
                 educationSummaries,
                 currentFocusItems);

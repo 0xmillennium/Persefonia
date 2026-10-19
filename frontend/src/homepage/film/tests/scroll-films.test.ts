@@ -199,3 +199,16 @@ it('shows a cold-start poster and replaces it when the video decodes without a r
   expect(films.presentation('robotic-arm', 0, 'opening')?.kind).toBe('video');
   films.dispose();
 });
+
+it('keeps a cold poster below normal readiness but recognizes intentional static and error fallbacks', async () => {
+  const films = new ScrollFilms(parent, 960, vi.fn());
+  films.request('tree', 0, 'opening');
+  images[0]!.resolve();
+  await Promise.resolve();
+  expect(films.readiness('tree', 0, 'opening').state).toBe('loading');
+  native.failed.mockReturnValue(true);
+  expect(films.readiness('tree', 0, 'opening').state).toBe('fallback');
+  films.setReduced(true);
+  expect(films.readiness('tree', 0, 'opening').state).toBe('static');
+  films.dispose();
+});

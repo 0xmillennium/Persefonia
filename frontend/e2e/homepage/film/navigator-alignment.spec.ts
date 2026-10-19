@@ -1,5 +1,8 @@
+import { startOnFilm } from '../../support/homepage';
 import { expect, test } from '@playwright/test';
 import { difference } from '../../support/pixels';
+
+test.beforeEach(async ({ page }) => startOnFilm(page));
 
 for (const [label, progress] of [
   ['photo and opening', 0],

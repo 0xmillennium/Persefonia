@@ -1,5 +1,8 @@
+import { startOnFilm } from '../../support/homepage';
 import { expect, test } from '@playwright/test';
 import { visit, position, presented } from '../../support/scenes';
+
+test.beforeEach(async ({ page }) => startOnFilm(page));
 
 test('the navigator uploads a replacement source even when the logical film pose is unchanged', async ({
   page,

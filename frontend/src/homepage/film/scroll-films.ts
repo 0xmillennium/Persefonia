@@ -1,3 +1,5 @@
+import type { MediaReadiness } from '../contracts/readiness';
+import { videoReadiness } from './startup';
 import { posterVersion } from 'virtual:home-media';
 import { SeekFilm } from './seek-film';
 import { FILM_READINESS_TIMEOUT, type FilmTier } from './delivery';
@@ -110,6 +112,14 @@ export class ScrollFilms {
       ready.find((p) => p.pose === pose) ??
       ready[0];
     if (poster) return { kind: 'poster', key: `${film}:${poster.pose}`, source: poster.image };
+  }
+  readiness(film: Film, index: number, pose: PosterPose): MediaReadiness {
+    const presentation = this.presentation(film, index, pose);
+    if (presentation?.kind === 'video')
+      return videoReadiness(presentation.source as HTMLVideoElement, true);
+    if (presentation?.kind === 'poster' && (this.reduced || this.video.failed(film)))
+      return { state: this.reduced ? 'static' : 'fallback', progress: this.reduced ? 1 : 0 };
+    return { state: this.unavailable(film, pose) ? 'unavailable' : 'loading', progress: 0 };
   }
   hasVisual(film: Film, index: number, pose: PosterPose) {
     return (

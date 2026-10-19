@@ -17,8 +17,8 @@ final class IntegrationBaselineRestorer {
                         promote_featured_projects, promote_latest_writing, promote_research_highlights,
                         featured_project_limit, latest_writing_limit, research_highlight_limit, updated_at, version
                     ) VALUES (
-                        '00000000-0000-0000-0000-000000000701', true, 'Persefonia', 'TR', NULL,
-                        NULL, NULL, 'SYSTEM', true, true, false, 3, 3, 3, CURRENT_TIMESTAMP, 0
+                        '00000000-0000-0000-0000-000000000701', true, 'Persefonia', 'EN', NULL,
+                        NULL, NULL, 'SYSTEM', true, true, false, 3, 3, 3, CURRENT_TIMESTAMP, 1
                     )
                     """);
             statement.executeUpdate("""
