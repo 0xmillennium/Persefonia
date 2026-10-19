@@ -104,10 +104,17 @@ test('globe draws the bounded land and ocean point sets and preserves framing af
     .toBeLessThan(1);
 });
 
-test('touch turns the globe without a focus box and yields vertical swipes to the page', async ({
+test('touch rotates both globe axes while swipes outside the sphere scroll the page', async ({
   page,
 }, info) => {
   test.skip(!info.project.use.isMobile, 'Real touch dispatch on the phone composition');
+  await page.addInitScript(() => {
+    const original = WebGL2RenderingContext.prototype.uniformMatrix3fv;
+    WebGL2RenderingContext.prototype.uniformMatrix3fv = function (location, transpose, data) {
+      Reflect.set(window, 'globePitchProbe', Number(Array.from(data)[5]));
+      return original.call(this, location, transpose, data);
+    };
+  });
   await visit(page);
   await position(page, 'location', 0.6);
   const stage = page.locator('.location-system');
@@ -131,9 +138,24 @@ test('touch turns the globe without a focus box and yields vertical swipes to th
       await page.locator('.location-globe').evaluate((n) => getComputedStyle(n, '::after').display),
     ).toBe('none');
     const before = await page.evaluate(() => scrollY);
+    const pitch = await page.evaluate(() => Reflect.get(window, 'globePitchProbe') as number);
     await contact('touchStart');
+    await contact('touchMove', x, y + 40);
     await contact('touchMove', x, y + 70);
-    await contact('touchMove', x, y + 120);
+    await expect(stage).toHaveAttribute('data-pressed', 'true');
+    await contact('touchEnd');
+    await expect
+      .poll(() =>
+        page.evaluate(
+          (initial) => Math.abs(Reflect.get(window, 'globePitchProbe') - initial),
+          pitch,
+        ),
+      )
+      .toBeGreaterThan(0.05);
+    expect(await page.evaluate(() => scrollY)).toBe(before);
+    await contact('touchStart', bounds.x + 2, y);
+    await contact('touchMove', bounds.x + 2, y + 70);
+    await contact('touchMove', bounds.x + 2, y + 120);
     await contact('touchEnd');
     await expect.poll(() => page.evaluate(() => scrollY)).toBeLessThan(before - 20);
     await expect(page.locator('[data-hold-countdown]')).toBeHidden();

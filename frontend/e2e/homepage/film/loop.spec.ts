@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { difference } from './support/pixels';
+import { difference } from '../../support/pixels';
 
 const errors = new WeakMap<Page, string[]>();
 test.beforeEach(({ page }) => {

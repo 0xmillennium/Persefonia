@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
-import { visit } from '../support/scenes';
-import { radiusFor } from '../../src/homepage/film/rendering/shaders';
-import { HOLD } from '../../src/homepage/film/hold/state';
+import { visit } from '../../support/scenes';
+import { radiusFor } from '../../../src/homepage/film/rendering/shaders';
+import { HOLD } from '../../../src/homepage/film/hold/state';
 
 type Mask = { width: number; height: number; pixels: Uint8Array };
 

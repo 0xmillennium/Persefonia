@@ -1,4 +1,4 @@
-import { chooseCollection } from './support/gallery';
+import { chooseCollection } from '../support/gallery';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
@@ -62,7 +62,7 @@ function resetFixture(): void {
       'persefonia_browser',
     ],
     {
-      input: readFileSync(new URL('./fixtures/content.sql', import.meta.url)),
+      input: readFileSync(new URL('../fixtures/content.sql', import.meta.url)),
       stdio: ['pipe', 'pipe', 'pipe'],
     },
   );

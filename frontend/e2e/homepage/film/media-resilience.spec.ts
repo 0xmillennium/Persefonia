@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { visit, presented, position, selectFilm } from '../support/scenes';
+import { visit, presented, position, selectFilm } from '../../support/scenes';
 
 test('a hung native film recovers through a static poster within the readiness deadline', async ({
   page,

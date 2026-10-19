@@ -76,22 +76,23 @@ describe('single input owner and recent momentum', () => {
     g.release(1, 10030);
     expect(o.angularSpeed).toBeGreaterThan(3);
   });
-  it('yields vertical touch movement to scrolling, with no tilt or fling', () => {
+  it('rotates vertical touch within the claimed sphere without introducing yaw fling', () => {
     const o = new GlobeOrientation(),
       g = new GlobeGesture(o);
     g.press(sample(0, 0, 0, true), 300);
-    expect(g.move(sample(2, 40, 30, true))).toBe('scroll');
+    expect(g.move(sample(0, 40, 30, true))).toBe('dragging');
     expect(o.spin).toBe(-0.5);
-    expect(o.pitch).toBe(0.3);
+    expect(o.pitch).toBeGreaterThan(0.3);
+    expect(g.release(1, 40).tap).toBe(false);
     expect(o.excessSpeed).toBe(0);
     expect(g.owner).toBeNull();
   });
-  it('claims horizontal touch while retaining pitch and avoids drag-as-tap', () => {
+  it('supports combined horizontal and vertical touch without drag-as-tap', () => {
     const o = new GlobeOrientation(),
       g = new GlobeGesture(o);
     g.press(sample(0, 0, 0, true), 300);
     expect(g.move(sample(40, 2, 30, true))).toBe('dragging');
-    expect(o.pitch).toBe(0.3);
+    expect(o.pitch).toBeGreaterThan(0.3);
     expect(g.release(1, 40).tap).toBe(false);
   });
 });

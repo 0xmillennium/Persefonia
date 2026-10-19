@@ -1,5 +1,6 @@
 import { focusNavigation } from '../../shared/focus';
-import { footerRowProgress, windowProgress } from '../timeline/pacing';
+import { footerRowProgress } from './motion';
+import { windowProgress } from '../contracts/progress';
 
 export function mountFooter(root: HTMLElement) {
   const menu = [...root.querySelectorAll<HTMLElement>('.location-links nav a')];

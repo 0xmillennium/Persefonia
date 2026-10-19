@@ -1,14 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { galleryIndex } from '../timeline/pacing';
+import { galleryIndex } from '../contracts/gallery';
+import { galleryDepth, galleryRelease, gallerySettle } from './motion';
 import {
-  galleryDepth,
   galleryProgress,
-  galleryRelease,
-  gallerySettle,
   galleryEntrance,
   galleryTravelProgress,
   galleryTravelPosition,
-} from './motion';
+} from '../contracts/gallery';
 import { galleryCurtain } from '../writing/later';
 
 describe('gallery direct manipulation', () => {
@@ -65,13 +63,17 @@ describe('gallery direct manipulation', () => {
     expect(galleryProgress(0, 1)).toBe(0.5);
   });
   it('settles a resting release to the nearest card and projects a bounded fling in either direction', () => {
-    expect(galleryRelease(0.7, 0, 5)).toBe(1);
-    expect(galleryRelease(0.3, 5, 5)).toBe(1);
-    expect(galleryRelease(1.7, -5, 5)).toBe(1);
-    expect(galleryRelease(-4, -100, 5)).toBe(-4);
-    expect(galleryRelease(8, 100, 5)).toBe(8);
-    expect(galleryRelease(0, 5, 0)).toBe(0);
-    expect(galleryRelease(0, 0, 1)).toBe(0);
+    expect(galleryRelease(0.7, 0, 5).to).toBe(1);
+    expect(galleryRelease(0.3, 5, 5).to).toBe(1);
+    expect(galleryRelease(1.7, -5, 5).to).toBe(1);
+    expect(galleryRelease(-4, -100, 5).to).toBe(-4);
+    expect(galleryRelease(8, 100, 5).to).toBe(8);
+    expect(galleryRelease(0, 5, 0).to).toBe(0);
+    expect(galleryRelease(0, 0, 1).to).toBe(0);
+    expect(galleryRelease(0, -100, 5).to).toBe(0);
+    expect(galleryRelease(4, 100, 5).to).toBe(4);
+    expect(galleryRelease(-0.7, -100, 5).to).toBe(-1);
+    expect(galleryRelease(1, 100, 10).to).toBe(4);
   });
   it('has frame-rate independent settling and reverses toward a new target without jumping', () => {
     const at30 = gallerySettle(0, 1, 1 / 30);

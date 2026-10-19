@@ -1,8 +1,8 @@
-import { settleScroll } from '../support/scroll';
-import { chooseCollection } from '../support/gallery';
+import { settleScroll } from '../../support/scroll';
+import { chooseCollection } from '../../support/gallery';
 import { expect, test } from '@playwright/test';
-import { visit, position, selectFilm } from '../support/scenes';
-import { difference } from '../support/pixels';
+import { visit, position, selectFilm } from '../../support/scenes';
+import { difference } from '../../support/pixels';
 
 test('gallery wheel pulses select one adjacent item and release both boundaries', async ({
   page,

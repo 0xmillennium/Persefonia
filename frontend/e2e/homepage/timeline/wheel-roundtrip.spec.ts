@@ -1,4 +1,4 @@
-import { settleScroll } from './support/scroll';
+import { settleScroll } from '../../support/scroll';
 import { expect, test, type Page } from '@playwright/test';
 
 async function settled(page: Page) {

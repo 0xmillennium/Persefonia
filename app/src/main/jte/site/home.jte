@@ -155,7 +155,7 @@
       </div>
       <p id="fallback">Istanbul, Türkiye · 41.0082° N, 28.9784° E<br>The interactive globe requires JavaScript and WebGL 2.</p>
     </div>
-    <p id="globe-instructions" class="sr-only">Drag to turn and tilt. On touch screens, swipe horizontally to turn and scroll vertically. When the globe is focused, use arrow keys to turn and tilt, Space to pause or resume rotation, and Home to find Istanbul.</p>
+    <p id="globe-instructions" class="sr-only">Drag to turn and tilt. On touch screens, drag the globe to turn and tilt; swipe outside the globe to scroll. When the globe is focused, use arrow keys to turn and tilt, Space to pause or resume rotation, and Home to find Istanbul.</p>
 </div>
             <div class="location-strip"><span>${page.ownerAlias()} / Persefonia</span><a href="/search">${page.copy().searchPublished()}</a>@for(var link : navigationLinks)<a lang="en" href="${link.url()}">${link.label()}</a>@endfor<a href="#identity">${page.copy().backToTop()} ↑</a></div>
         </div></section>

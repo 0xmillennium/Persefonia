@@ -1,8 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
-import { pixels } from './support/pixels';
+import { pixels } from '../../support/pixels';
 const posterVersion = JSON.parse(
-  readFileSync(new URL('../public/home-posters/manifest.json', import.meta.url), 'utf8'),
+  readFileSync(new URL('../../../public/home-posters/manifest.json', import.meta.url), 'utf8'),
 ).identity;
 async function frame(page: Page, index: number, wait = true) {
   await page.evaluate((index) => {

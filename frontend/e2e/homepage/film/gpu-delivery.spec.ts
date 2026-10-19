@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { visit, position, presented } from '../support/scenes';
+import { visit, position, presented } from '../../support/scenes';
 
 test('the navigator uploads a replacement source even when the logical film pose is unchanged', async ({
   page,

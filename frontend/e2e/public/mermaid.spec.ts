@@ -1,13 +1,13 @@
 import { expect, test } from '@playwright/test';
 import { readFileSync } from 'node:fs';
-import { openHomepage } from './support/homepage';
+import { openHomepage } from '../support/homepage';
 
 /** Exercise the actual dedicated entry under the application's existing CSP. */
 test('the isolated diagram bundle renders flowcharts and sequence diagrams', async ({ page }) => {
   await openHomepage(page);
   const manifest = JSON.parse(
     readFileSync(
-      new URL('../../app/build/generated/vite/static/assets/.vite/manifest.json', import.meta.url),
+      new URL('../../../app/build/generated/vite/static/assets/.vite/manifest.json', import.meta.url),
       'utf8',
     ),
   );

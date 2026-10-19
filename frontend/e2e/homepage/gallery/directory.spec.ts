@@ -1,4 +1,4 @@
-import { openHomepage } from './support/homepage';
+import { openHomepage } from '../../support/homepage';
 import { expect, test, type Page } from '@playwright/test';
 
 test.afterEach(({}, info) => {
@@ -137,7 +137,7 @@ test('fresh tuner wheel gestures stay local, through wrapping, while page-starte
   expect(await page.evaluate(() => scrollY)).toBe(y);
 });
 
-test('drag previews the scale, commits on release, cancels cleanly, and keyboard/reduced motion remain usable', async ({
+test('a paused drag commits the nearest name after settling, cancels cleanly, and keyboard/reduced motion remain usable', async ({
   page,
 }, info) => {
   await visit(page);
@@ -148,6 +148,8 @@ test('drag previews the scale, commits on release, cancels cleanly, and keyboard
   await page.mouse.move(box.x + box.width * 0.35, box.y + 29, { steps: 8 });
   await expect(page.locator('.tuner-name')).toHaveText('Articles');
   await expect(root(page)).toHaveAttribute('data-category', 'projects');
+  // A deliberate pause distinguishes precise placement from a momentum flick.
+  await page.waitForTimeout(130);
   await page.mouse.up();
   await expect(root(page)).toHaveAttribute('data-category', 'articles');
   await expect(page.locator('.collection-options')).toBeHidden();
@@ -271,6 +273,7 @@ test('touch drags tune horizontally while vertical swipes scroll the page', asyn
     });
   await touch('touchStart', x, y);
   for (let i = 1; i <= 8; i++) await touch('touchMove', x - (box.width * 0.35 * i) / 8, y + 1);
+  await page.waitForTimeout(130);
   await touch('touchEnd', 0, 0);
   await expect(root(page)).toHaveAttribute('data-category', 'articles');
   await at(page, 0);

@@ -1,5 +1,6 @@
 import { slitPosition } from '../../shared/motion/reveal';
-import { windowProgress, CURTAIN_START, GALLERY_HANDOFF } from '../timeline/pacing';
+import { windowProgress } from '../contracts/progress';
+import { CURTAIN_START, GALLERY_HANDOFF } from '../contracts/choreography';
 
 const SVG = 'http://www.w3.org/2000/svg';
 const easeOut = (p: number) => 1 - Math.pow(1 - p, 5);

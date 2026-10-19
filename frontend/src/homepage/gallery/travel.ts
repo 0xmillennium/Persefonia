@@ -1,4 +1,4 @@
-import { galleryTravelPosition } from './motion';
+import { galleryTravelPosition } from '../contracts/gallery';
 
 /** Card travel may be rebased by tuning; the authored curtain geometry stays fixed. */
 export class GalleryTravel {

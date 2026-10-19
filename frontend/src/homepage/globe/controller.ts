@@ -188,6 +188,7 @@ export class GlobeController {
   private measure(): void {
     if (this.disposed) return;
     this.camera = cameraFor(this.stage.clientWidth, this.stage.clientHeight);
+    this.stage.style.setProperty('--globe-hit-size', `${this.camera.radius * 2}px`);
     this.stage.style.setProperty('--globe-focus-size', `${this.camera.radius * 2 + 16}px`);
     this.location.measure();
     this.renderer?.resize(this.camera, devicePixelRatio);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { collectionStop, nearestCollectionStop } from './tuner';
+import { collectionStop, nearestCollectionStop } from './tuner-stops';
 
 describe('looping collection tuner', () => {
   it('cycles through complete turns in both directions without clamping or negative indices', () => {

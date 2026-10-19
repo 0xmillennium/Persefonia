@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { difference } from './support/pixels';
+import { difference } from '../../support/pixels';
 
 for (const [label, progress] of [
   ['photo and opening', 0],

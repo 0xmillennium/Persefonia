@@ -1,3 +1,12 @@
+.home-viewport-probe {
+  position: fixed;
+  inset: 0 auto auto 0;
+  width: 100%;
+  height: 100svh;
+  visibility: hidden;
+  pointer-events: none;
+}
+
 /* Enhancement replaces scene presentation only; SSR retains every publication and route. */
 
 [data-home-v2][data-enhanced='true'] .home-scene {
@@ -28,13 +37,13 @@
 
 [data-home-v2][data-enhanced='true'] [data-scene='gallery'] {
   height: calc(
-    var(--gallery-distance, 4) * 100svh + var(--gallery-entry-distance, 0px) +
-      var(--gallery-tail-distance, 0px)
+    var(--gallery-distance, 4) * var(--story-viewport-height, 100svh) +
+      var(--gallery-entry-distance, 0px) + var(--gallery-tail-distance, 0px)
   );
 }
 
 [data-home-v2][data-enhanced='true'] [data-scene='location'] {
-  height: 200svh;
+  height: calc(2 * var(--story-viewport-height, 100svh));
 }
 
 [data-home-v2][data-enhanced='true'] .scene-face {
@@ -190,5 +199,12 @@
     .capability-face
     .capabilities {
     --capability-trunk: 52vw;
+  }
+}
+
+@supports (height: 100dvh) {
+  [data-home-v2][data-enhanced='true'] .scene-face,
+  [data-home-v2][data-enhanced='true'] .home-environment {
+    height: 100dvh;
   }
 }

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { visit, position, selectFilm, presented } from '../support/scenes';
+import { visit, position, selectFilm, presented } from '../../support/scenes';
 
 test('film scrubs from the first scroll, reverses and keeps selection progress', async ({
   page,

@@ -1,4 +1,4 @@
-import { openHomepage } from './support/homepage';
+import { openHomepage } from '../../support/homepage';
 import { expect, test, type Page } from '@playwright/test';
 
 const root = (page: Page) => page.locator('[data-scene="gallery"]');

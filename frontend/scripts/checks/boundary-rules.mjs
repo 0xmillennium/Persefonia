@@ -1,12 +1,15 @@
 const contracts = new Set([
   'homepage/film/model.ts',
-  'homepage/timeline/pacing.ts',
-  'homepage/gallery/motion.ts',
+  'homepage/contracts/progress.ts',
+  'homepage/contracts/choreography.ts',
+  'homepage/contracts/gallery.ts',
 ]);
 export function featureEdgeAllowed(from, to) {
   const owner = (path) => /^homepage\/([^/]+)\//.exec(path)?.[1];
   const a = owner(from),
     b = owner(to);
+  if (a === 'contracts' && b && b !== 'contracts') return false;
+  if (a && !b && to.startsWith('homepage/')) return false;
   return !a || !b || a === b || contracts.has(to);
 }
 export function importCycles(graph) {

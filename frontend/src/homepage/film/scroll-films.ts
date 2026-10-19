@@ -46,7 +46,8 @@ export class ScrollFilms {
   request(film: Film, index: number, pose: PosterPose) {
     if (this.disposed || this.suspended) return;
     if (!this.reduced) this.video.request(film, index);
-    if (this.reduced || this.video.failed(film)) this.preparePoster(film, pose);
+    if (this.reduced || index === 191 || this.video.failed(film) || !this.video.hasVisual(film))
+      this.preparePoster(film, pose);
   }
   private watch(poster: Poster) {
     if (poster.ready || poster.failed || poster.deadline || this.suspended) return;
@@ -118,6 +119,9 @@ export class ScrollFilms {
   }
   failed(film: Film) {
     return !this.reduced && this.video.failed(film);
+  }
+  frameInterval(film: Film) {
+    return this.video.frameInterval(film);
   }
   unavailable(film: Film, pose: PosterPose) {
     return (

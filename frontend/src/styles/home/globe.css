@@ -205,3 +205,20 @@
   font-size: 10px;
   color: #435349;
 }
+
+/* Claim rotation only within the visible sphere; surrounding canvas keeps native pan. */
+.globe-touch-surface {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--globe-hit-size, 70%);
+  height: var(--globe-hit-size, 70%);
+  transform: translate(-50%, -50%);
+  clip-path: circle(50%);
+  touch-action: pinch-zoom;
+  pointer-events: none;
+}
+
+.location-system[data-ready='true'] .globe-touch-surface {
+  pointer-events: auto;
+}

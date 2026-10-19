@@ -1,5 +1,5 @@
 import { focusNavigation } from '../../shared/focus';
-import { windowProgress } from '../timeline/pacing';
+import { windowProgress } from '../contracts/progress';
 import { slitPosition } from '../../shared/motion/reveal';
 
 /** The heading and tuner share the writing gates, independently of card travel. */

@@ -1,6 +1,6 @@
-import { chooseCollection } from './support/gallery';
+import { chooseCollection } from '../../support/gallery';
 import { expect, test, type Page } from '@playwright/test';
-import { settleScroll } from './support/scroll';
+import { settleScroll } from '../../support/scroll';
 
 async function visit(page: Page) {
   await page.goto('/', { waitUntil: 'networkidle' });
@@ -254,7 +254,8 @@ test('hold hint follows eligibility, disappears over links and during a press, a
   await expect(page.locator('.home-pointer')).toBeHidden();
 });
 
-test('a short fast gallery flick continues toward the next card after release', async ({
+// Controlled-clock release coverage checks deterministic motion and announcements, not hardware pacing.
+test('a fast gallery flick coasts to a bounded card and announces only after settling', async ({
   page,
 }, info) => {
   test.skip(!!info.project.use.hasTouch, 'Controlled fine-pointer release velocity');
@@ -263,20 +264,50 @@ test('a short fast gallery flick continues toward the next card after release', 
   await gallery(page);
   const point = await dragPoint(page);
   await page.clock.pauseAt(await page.evaluate(() => Date.now() + 50));
-  await page.mouse.move(point.x, point.y);
-  await page.mouse.down();
-  await page.mouse.move(point.x - point.spacing * 0.3, point.y);
+  const input = await page.context().newCDPSession(page);
+  const time = Date.now() / 1000;
+  const end = point.x - point.spacing * 0.8;
+  // Native input timestamps control release speed independently of GPU/driver latency.
+  await input.send('Input.dispatchMouseEvent', {
+    type: 'mousePressed',
+    x: point.x,
+    y: point.y,
+    button: 'left',
+    buttons: 1,
+    clickCount: 1,
+    timestamp: time,
+  });
+  await page.clock.runFor(40);
+  await input.send('Input.dispatchMouseEvent', {
+    type: 'mouseMoved',
+    x: end,
+    y: point.y,
+    button: 'left',
+    buttons: 1,
+    timestamp: time + 0.04,
+  });
   await expect(page.locator('[data-scene="gallery"]')).toHaveAttribute('data-dragging', 'true');
   await expect(page.locator('[data-gallery-position]')).toHaveText('1 / 3');
-  await page.mouse.up();
+  await page.clock.runFor(10);
+  await input.send('Input.dispatchMouseEvent', {
+    type: 'mouseReleased',
+    x: end,
+    y: point.y,
+    button: 'left',
+    buttons: 0,
+    clickCount: 1,
+    timestamp: time + 0.05,
+  });
+  await input.detach();
   await page.clock.runFor(16);
-  await expect(page.locator('[data-gallery-position]')).toHaveText('2 / 3');
-  await page.clock.runFor(500);
+  await expect(page.locator('[data-gallery-position]')).toHaveText('1 / 3');
+  await page.clock.fastForward(1000);
+  await expect(page.locator('[data-gallery-position]')).toHaveText('3 / 3');
   await expect
     .poll(() =>
       page
         .locator('.gallery-category:not([hidden]) .gallery-card')
-        .nth(1)
+        .nth(2)
         .evaluate((node) =>
           Math.hypot(
             new DOMMatrix(getComputedStyle(node).transform).m41,
