@@ -124,7 +124,8 @@ test('desktop waterfall has four capsules aligned at their centers and preserves
       ),
     );
   await page.evaluate(() => dispatchEvent(new Event('scroll')));
-  await page.clock.runFor(64);
+  // Advance the virtual clock through the bounded cinematic catch-up.
+  await page.clock.runFor(320);
   await expect(sheet).not.toHaveCSS('mask-image', mask);
   expect(await video.boundingBox()).toEqual(bounds);
   await page.screenshot({ path: info.outputPath('waterfall-four-expanding.png') });
@@ -132,7 +133,8 @@ test('desktop waterfall has four capsules aligned at their centers and preserves
     scrollTo(0, 0);
     dispatchEvent(new Event('scroll'));
   });
-  await page.clock.runFor(64);
+  // Advance the virtual clock through the bounded cinematic catch-up.
+  await page.clock.runFor(320);
   await expect(sheet).toHaveCSS('mask-image', mask);
 });
 

@@ -1,6 +1,6 @@
 import { startOnFilm } from '../../support/homepage';
 import { expect, test } from '@playwright/test';
-import { visit, position, selectFilm, presented } from '../../support/scenes';
+import { visit, position, selectFilm, presented, settlePresentation } from '../../support/scenes';
 
 test.beforeEach(async ({ page }) => startOnFilm(page));
 
@@ -186,12 +186,13 @@ test('all canonical scene states reverse without one-shot progression', async ({
   await visit(page);
   for (const name of ['statements', 'capabilities', 'mark', 'gallery']) {
     await position(page, name, 0.35);
-    await page.waitForTimeout(150);
+    await settlePresentation(page);
     const face = page.locator(`[data-scene="${name}"] .scene-face`);
     const first = await face.getAttribute('style');
     await position(page, name, 0.7);
+    await settlePresentation(page);
     await position(page, name, 0.35);
-    await page.waitForTimeout(150);
+    await settlePresentation(page);
     expect(await face.getAttribute('style')).toBe(first);
     await page.screenshot({ path: testInfo.outputPath(`${name}-reversible.png`) });
   }

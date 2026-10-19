@@ -35,14 +35,31 @@ async function enter(page: Page) {
   await expect(tuner(page)).toBeVisible();
 }
 
-async function pointer(page: Page, touch: boolean) {
-  const session = touch ? await page.context().newCDPSession(page) : null;
+async function pointer(page: Page, touch: boolean, timed = false) {
+  const session = touch || timed ? await page.context().newCDPSession(page) : null;
+  let timestamp = 0,
+    lastX = 0,
+    lastY = 0;
   return {
     async down(x: number, y: number) {
-      if (session)
-        await session.send('Input.dispatchTouchEvent', {
+      lastX = x;
+      lastY = y;
+      timestamp = Math.max(Date.now() / 1000, timestamp + 0.016);
+      if (touch)
+        await session!.send('Input.dispatchTouchEvent', {
           type: 'touchStart',
           touchPoints: [{ x, y, id: 1 }],
+          ...(timed ? { timestamp } : {}),
+        });
+      else if (session)
+        await session.send('Input.dispatchMouseEvent', {
+          type: 'mousePressed',
+          x,
+          y,
+          button: 'left',
+          buttons: 1,
+          clickCount: 1,
+          timestamp,
         });
       else {
         await page.mouse.move(x, y);
@@ -50,16 +67,44 @@ async function pointer(page: Page, touch: boolean) {
       }
     },
     async move(x: number, y: number) {
-      if (session)
-        await session.send('Input.dispatchTouchEvent', {
+      lastX = x;
+      lastY = y;
+      timestamp += 0.016;
+      if (touch)
+        await session!.send('Input.dispatchTouchEvent', {
           type: 'touchMove',
           touchPoints: [{ x, y, id: 1 }],
+          ...(timed ? { timestamp } : {}),
+        });
+      else if (session)
+        await session.send('Input.dispatchMouseEvent', {
+          type: 'mouseMoved',
+          x,
+          y,
+          button: 'left',
+          buttons: 1,
+          timestamp,
         });
       else await page.mouse.move(x, y);
     },
     async up() {
-      if (session)
-        await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      timestamp += 0.016;
+      if (touch)
+        await session!.send('Input.dispatchTouchEvent', {
+          type: 'touchEnd',
+          touchPoints: [],
+          ...(timed ? { timestamp } : {}),
+        });
+      else if (session)
+        await session.send('Input.dispatchMouseEvent', {
+          type: 'mouseReleased',
+          x: lastX,
+          y: lastY,
+          button: 'left',
+          buttons: 0,
+          clickCount: 1,
+          timestamp,
+        });
       else await page.mouse.up();
     },
     async dispose() {
@@ -146,8 +191,11 @@ test('touching a spinning tuner catches it and a tap opens the menu without a de
 test('a gallery flick advances with page position, brakes at the last card, and can be caught without opening a link', async ({
   page,
 }, info) => {
+  // Native timestamps and a controlled animation clock isolate gesture velocity
+  // from CI/driver latency; pointer capture and click suppression remain native.
+  await page.clock.install();
   await enter(page);
-  const input = await pointer(page, !!info.project.use.hasTouch);
+  const input = await pointer(page, !!info.project.use.hasTouch, true);
   const cover = (await page
     .locator('.gallery-card[data-front="true"] .gallery-cover')
     .boundingBox())!;
@@ -164,37 +212,46 @@ test('a gallery flick advances with page position, brakes at the last card, and 
     Math.min(page.viewportSize()!.width - spacing - 30, cover.x + cover.width * 0.4),
   );
   const y = cover.y + cover.height * 0.5;
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 50));
   try {
     const origin = await page.evaluate(() => scrollY);
     await input.down(x, y);
     for (let i = 1; i <= 4; i++) {
       await input.move(x + (spacing * 1.4 * i) / 4, y);
-      await page.waitForTimeout(12);
+      await page.clock.runFor(16);
     }
     await input.up();
     await expect(root(page)).toHaveAttribute('data-gallery-motion', 'coasting');
     const releasedY = await page.evaluate(() => scrollY);
     expect(releasedY).toBeGreaterThan(origin);
+    await page.clock.runFor(80);
     await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(releasedY + 5);
+    await page.clock.runFor(1000);
     await expect(root(page)).not.toHaveAttribute('data-gallery-motion');
     await expect(root(page)).toHaveAttribute('data-gallery-index', '2');
     await expect(root(page)).toHaveAttribute('data-gallery-empty', 'false');
     const landed = await page.evaluate(() => scrollY);
-    await page.waitForTimeout(250);
+    await page.clock.runFor(250);
     expect(await page.evaluate(() => scrollY)).toBe(landed);
     // Start a reverse fling, catch it, and ensure the catching tap cannot navigate.
     await input.down(x + spacing, y);
-    await page.waitForTimeout(20);
+    await page.clock.runFor(16);
     await input.move(x + spacing * 0.2, y);
     await input.up();
     await expect(root(page)).toHaveAttribute('data-gallery-motion', 'coasting');
     await input.down(x, y);
     await expect(root(page)).not.toHaveAttribute('data-gallery-motion');
     const caught = await root(page).getAttribute('data-gallery-index');
-    await page.waitForTimeout(150);
+    await page.clock.runFor(150);
     expect(await root(page).getAttribute('data-gallery-index')).toBe(caught);
     await input.up();
+    // Releasing the catch settles the held fractional position to its nearest card.
+    await page.clock.runFor(320);
     await expect(root(page)).not.toHaveAttribute('data-gallery-motion');
+    await expect(root(page)).toHaveAttribute(
+      'data-gallery-index',
+      String(Math.round(Number(caught))),
+    );
     await expect(page).toHaveURL('/');
   } finally {
     await input.dispose();

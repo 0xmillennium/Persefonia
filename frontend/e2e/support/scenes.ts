@@ -23,6 +23,30 @@ export async function writingPosition(page: Page, scene: string, offset: number)
       (node, offset) => scrollTo(0, Math.ceil(node.getBoundingClientRect().top + scrollY + offset)),
       offset,
     );
+  await settlePresentation(page);
+}
+
+/** Wait for cinematic catch-up at the measured native position, not a guessed delay. */
+export async function settlePresentation(page: Page) {
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const root = document.querySelector<HTMLElement>('[data-home-v2]');
+        if (root?.dataset.enhanced !== 'true' || root.dataset.reduced === 'true') return 0;
+        const region = [...root.querySelectorAll<HTMLElement>('[data-scene]')].find((node) => {
+          const box = node.getBoundingClientRect();
+          return box.top <= 0 && box.bottom > 0;
+        });
+        if (!region) return Infinity;
+        const box = region.getBoundingClientRect();
+        const face = region.querySelector<HTMLElement>('.scene-face')!;
+        const actual = Number.parseFloat(face.style.getPropertyValue('--local-progress'));
+        return face.dataset.visible === 'true' && Number.isFinite(actual)
+          ? Math.abs(actual - Math.max(0, Math.min(1, -box.top / box.height)))
+          : Infinity;
+      }),
+    )
+    .toBeLessThan(0.000001);
 }
 
 export async function selectFilm(page: Page) {

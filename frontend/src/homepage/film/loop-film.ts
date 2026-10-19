@@ -12,6 +12,7 @@ export class LoopFilm {
   private abort = new AbortController();
   private disposed = false;
   private wanted = false;
+  private playbackAllowed = true;
   private watching = false;
   private frame = 0;
   private nativeFrames = false;
@@ -162,9 +163,16 @@ export class LoopFilm {
     if (this.failed || this.blocked)
       return { state: this.bitmap ? 'fallback' : 'unavailable', progress: 0 };
     if (!this.video) return { state: 'loading', progress: 0 };
-    return videoReadiness(this.video, this.videoReady, !this.video.paused && !this.pending);
+    // A restored gallery deliberately pauses its covered film. Decode/buffer
+    // readiness must not wait for playback that this scene explicitly forbids.
+    return videoReadiness(
+      this.video,
+      this.videoReady,
+      !this.playbackAllowed || (!this.video.paused && !this.pending),
+    );
   }
   setPlayback(allowed: boolean, observeFrames: boolean) {
+    this.playbackAllowed = allowed;
     const video = this.video;
     const wanted = allowed && !this.reduced && !this.blocked && !this.failed;
     if (video && wanted !== this.wanted) {

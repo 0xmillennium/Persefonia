@@ -404,6 +404,8 @@ test('the cylinder loops both ways with previous and next names, without resetti
   await page.mouse.down();
   await page.mouse.move(box.x + box.width * 0.65, box.y + 28, { steps: 8 });
   await expect(page.locator('.tuner-name')).toHaveText('Research');
+  // This checks a deliberate single-stop drag; flick momentum is covered separately.
+  await page.waitForTimeout(120);
   await page.mouse.up();
   await expect(root(page)).toHaveAttribute('data-category', 'research');
   await stop(-5);

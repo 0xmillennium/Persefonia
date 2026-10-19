@@ -1,4 +1,6 @@
 import { chooseCollection } from '../support/gallery';
+import { homepageReady } from '../support/homepage';
+import { settlePresentation } from '../support/scenes';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
@@ -96,7 +98,7 @@ async function scene(page: Page, name: string, p = name === 'gallery' ? 0.55 : 0
         ),
       p,
     );
-  await page.waitForTimeout(100);
+  await settlePresentation(page);
 }
 test('SSR publications, metadata, public destinations, CSP and self-hosted assets', async ({
   page,
@@ -427,6 +429,7 @@ test('no JS and unavailable enhancement retain publications and contact', async 
 });
 test('keyboard navigation, contrast and category input', async ({ page }) => {
   await visit(page);
+  await homepageReady(page);
   await page.keyboard.press('Tab');
   await expect(page.getByRole('link', { name: 'Skip to main content' })).toBeFocused();
   await page.keyboard.press('Enter');

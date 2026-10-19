@@ -27,7 +27,10 @@ test('gallery wheel pulses select one adjacent item and release both boundaries'
           (node as HTMLElement).style.getPropertyValue('--gallery-entry-distance'),
         ) || 0),
     );
-  expect(galleryHeight).toBeCloseTo(page.viewportSize()!.height * 4.6, 1);
+  expect(galleryHeight).toBeCloseTo(
+    page.viewportSize()!.height * (info.project.use.hasTouch ? 2.5 : 4.6),
+    1,
+  );
   for (const [delta, label] of [
     [120, '2 / 3'],
     [240, '3 / 3'],
