@@ -43,7 +43,10 @@ class PipelineHandoffWorkflowContractTest {
         assertThat(((String) upload.get("path")).lines().toList())
                 .containsExactly("app/build/ci/persefonia.jar", "app/build/ci/persefonia.jar.sha256");
         assertThat(ci.step("verify", "Verify BootJar").get("run"))
-                .isEqualTo("./scripts/ci/verify-bootjar.sh app/build/libs/persefonia.jar app/build/ci");
+                .isEqualTo("""
+                        ./scripts/ci/verify-bootjar.sh app/build/libs/persefonia.jar app/build/ci
+                        printf '%s\\n' "$GITHUB_SHA" > app/build/ci/source-sha.txt
+                        """);
 
         Map<String, Object> download = delivery.step("publish-candidate", "Download verified BootJar");
         assertThat((String) download.get("uses")).startsWith("actions/download-artifact@");

@@ -3,7 +3,7 @@
 @param String publicNavigationScriptPath = null
 @param java.util.List<dev.persefonia.webpublic.navigation.PublicNavigationLink> navigationLinks = java.util.List.of()
 <!doctype html>
-<html class="home-document" lang="${page.defaultLanguage().toLowerCase(java.util.Locale.ROOT)}">
+<html class="home-document" lang="${page.htmlLanguage()}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -134,7 +134,7 @@
             <output class="sr-only" data-gallery-position aria-live="polite"></output>
         </div></section>
         <section class="home-scene home-contact" id="contact" data-scene="location" aria-labelledby="contact-title"><div class="scene-face location-face">
-            <div class="location-links"><h2 id="contact-title" class="sr-only">${page.copy().contactTitle()}</h2><nav aria-label="Explore"><a href="/${page.defaultLanguage().toLowerCase(java.util.Locale.ROOT)}/projects">${page.copy().projects()}</a><a href="/search">${page.copy().writing()}</a><a href="/contact">${page.copy().contact()}</a></nav><p>Istanbul, Türkiye</p><a class="contact-entry" href="/contact">${page.copy().getInTouch()} ↗</a></div>
+            <div class="location-links"><h2 id="contact-title" class="sr-only">${page.copy().contactTitle()}</h2><nav aria-label="Explore"><a href="/${page.htmlLanguage()}/projects">${page.copy().projects()}</a><a href="/search">${page.copy().writing()}</a><a href="/contact">${page.copy().contact()}</a></nav><p>Istanbul, Türkiye</p><a class="contact-entry" href="/contact">${page.copy().getInTouch()} ↗</a></div>
             <div class="location-system">    <div class="location-globe" data-input-owner>
       <canvas role="img" id="globe" aria-label="Interactive Earth. Use arrow keys to rotate and tilt." aria-describedby="globe-instructions" tabindex="-1"></canvas>
       <span id="marker" aria-hidden="true" hidden>

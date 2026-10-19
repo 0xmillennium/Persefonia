@@ -462,7 +462,10 @@ test('keyboard navigation, contrast and category input', async ({ page }) => {
 test('continuous resize and orientation preserve composition and all routes', async ({
   page,
 }, testInfo) => {
-  test.skip(testInfo.project.name !== 'desktop-1440');
+  test.skip(
+    testInfo.project.name !== 'desktop-1440',
+    'Continuous responsive sweep sampled on desktop',
+  );
   await visit(page);
   for (const [width, height] of [
     [320, 640],

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dev.persefonia.automation.support.WorkflowDocument;
+import dev.persefonia.automation.support.CommandRunner;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -127,7 +128,7 @@ class CiWorkflowContractTest {
 
     @Test
     void automationFailsBeforeApplicationInfrastructureStarts() {
-        assertThat(workflow.jobs()).containsOnlyKeys("automation", "verify", "browser", "gate");
+        assertThat(workflow.jobs()).containsOnlyKeys("automation", "verify", "browser", "browser-receipts", "gate");
         Map<String, Object> automation = workflow.job("automation");
         Map<String, Object> verify = workflow.job("verify");
         assertThat(WorkflowDocument.map(automation.get("permissions")))
@@ -196,7 +197,7 @@ class CiWorkflowContractTest {
                 .containsSubsequence("Build and test", "Verify production frontend ownership and generated assets",
                         "Set up Temurin Java 21", "Verify Java 21 compatibility", "Upload browser qualification input");
         assertThat(ci.step("verify", "Build and test").get("run"))
-                .asString().contains("applicationCheck", ":app:bootJar");
+                .isEqualTo("python3 scripts/ci/measure.py build-and-test app/build/ci/timings.jsonl ./gradlew --no-daemon --stacktrace clean applicationCheck :app:bootJar --profile");
         assertThat(ci.step("verify", "Verify production frontend ownership and generated assets").get("run"))
                 .asString().contains("npm run check:boundaries", "npm run check:generated", "npm run format:check");
         assertBrowserQualification(ci);
@@ -214,11 +215,20 @@ class CiWorkflowContractTest {
         Map<String, Object> strategy = WorkflowDocument.map(ci.job("browser").get("strategy"));
         assertThat(strategy.get("fail-fast")).isEqualTo(false);
         var matrix = WorkflowDocument.list(WorkflowDocument.map(strategy.get("matrix")).get("include"));
-        assertThat(matrix.stream().map(WorkflowDocument::map)).containsExactlyInAnyOrder(
+        var expected = new java.util.ArrayList<Map<String, Object>>();
+        for (var group : List.of(
                 Map.of("name", "desktop", "suite", "chromium", "project", "desktop-1440"),
                 Map.of("name", "tablet", "suite", "chromium", "project", "tablet-834"),
-                Map.of("name", "mobile", "suite", "chromium", "project", "mobile-390"),
-                Map.of("name", "firefox-webkit", "suite", "cross", "project", "*"));
+                Map.of("name", "mobile", "suite", "chromium", "project", "mobile-390"))) {
+            for (int shard = 1; shard <= 2; shard++) {
+                expected.add(Map.of("name", group.get("name") + "-" + shard + "of2", "suite", group.get("suite"),
+                        "project", group.get("project"), "shard", shard + "/2"));
+            }
+        }
+        expected.add(Map.of("name", "firefox-1of1", "suite", "cross", "project", "firefox-desktop", "shard", "1/1"));
+        expected.add(Map.of("name", "webkit-1of1", "suite", "cross", "project", "webkit-desktop", "shard", "1/1"));
+        assertThat(matrix.stream().map(WorkflowDocument::map).toList()).containsExactlyInAnyOrderElementsOf(expected);
+        assertThat(strategy.get("max-parallel")).isEqualTo(8);
         assertThat(ci.steps("browser").stream().map(WorkflowDocument::map)
                 .map(step -> (String) step.get("name")))
                 .containsSubsequence("Set up Temurin Java 21", "Set up Node 22", "Download verified BootJar",
@@ -240,26 +250,60 @@ class CiWorkflowContractTest {
                 "BOOT-INF/classes/static/assets/.vite/manifest.json");
         assertThat(stage.indexOf("sha256sum --check")).isLessThan(stage.indexOf("cp app/build/ci"));
         assertThat(ci.step("browser", "Install browser matrix").get("run"))
-                .asString().contains("npm ci", "playwright install --with-deps --no-shell chromium firefox webkit");
+                .asString().contains("npm ci --prefix frontend", "scripts/ci/measure.py").doesNotContain("playwright install");
         var qualification = ci.step("browser", "Qualify production homepage and browser matrix");
         assertThat(qualification.get("run")).asString()
                 .contains("bash scripts/browser/check.sh --project \"$BROWSER_PROJECT\"");
         assertThat(WorkflowDocument.map(qualification.get("env")))
                 .containsEntry("PERSEFONIA_BROWSER_SUITE", "${{ matrix.suite }}")
+                .containsEntry("PERSEFONIA_BROWSER_SHARD", "${{ matrix.shard }}")
                 .containsEntry("BROWSER_PROJECT", "${{ matrix.project }}");
+    }
+
+    @Test
+    void browserReceiptsRequireIndependentCompleteDiscoveryAndExactArtifactIdentity() {
+        var receipts = workflow.job("browser-receipts");
+        assertThat(receipts.get("if")).isEqualTo("always()");
+        assertThat(WorkflowDocument.list(receipts.get("needs"))).containsExactlyInAnyOrder("verify", "browser");
+        assertThat(workflow.step("browser-receipts", "Reconcile independent discovery and execution").get("run"))
+                .asString().contains("npm ci --prefix frontend", "browser-join.mjs");
+        var download = WorkflowDocument.map(workflow.step("browser-receipts", "Download browser receipts").get("with"));
+        assertThat(download).containsEntry("pattern", "persefonia-browser-receipt-*-${{ github.sha }}")
+                .containsEntry("merge-multiple", true);
+        assertThat(WorkflowDocument.map(workflow.step("browser", "Upload browser verification receipts").get("with")))
+                .containsEntry("if-no-files-found", "error").containsEntry("retention-days", 14);
+        assertThat(workflow.step("browser", "Upload browser verification receipts").get("if")).isEqualTo("always()");
+        assertThat(workflow.step("verify", "Verify BootJar").get("run")).asString().contains("source-sha.txt", "$GITHUB_SHA");
+        assertThat(workflow.step("browser", "Stage verified browser artifact").get("run")).asString().contains("source-sha.txt", "$GITHUB_SHA");
     }
 
     @Test
     void stableGateRequiresAllResultsAndHasNoRepositoryOrSecretAccess() {
         Map<String, Object> gate = workflow.job("gate");
-        assertThat(WorkflowDocument.list(gate.get("needs"))).containsExactlyInAnyOrder("automation", "verify", "browser");
+        assertThat(WorkflowDocument.list(gate.get("needs"))).containsExactlyInAnyOrder("automation", "verify", "browser", "browser-receipts");
         assertThat(gate.get("if")).isEqualTo("always()");
         assertThat(WorkflowDocument.map(gate.get("permissions"))).isEmpty();
         assertThat(gate).doesNotContainKeys("services", "environment");
         assertThat(workflow.steps("gate")).hasSize(1);
         Map<String, Object> step = WorkflowDocument.map(workflow.steps("gate").getFirst());
         assertThat(step).doesNotContainKeys("uses", "secrets");
-        assertThat(WorkflowDocument.map(step.get("env"))).containsKeys("AUTOMATION_RESULT", "VERIFY_RESULT", "BROWSER_RESULT");
-        assertThat((String) step.get("run")).contains("$AUTOMATION_RESULT", "$VERIFY_RESULT", "$BROWSER_RESULT", "success");
+        assertThat(WorkflowDocument.map(step.get("env"))).containsKeys("AUTOMATION_RESULT", "VERIFY_RESULT", "BROWSER_RESULT", "RECEIPTS_RESULT");
+        assertThat((String) step.get("run")).contains("$AUTOMATION_RESULT", "$VERIFY_RESULT", "$BROWSER_RESULT", "$RECEIPTS_RESULT", "success");
+    }
+
+    @Test
+    void gateRejectsMissingFailedCancelledAndSkippedMandatoryWork() throws Exception {
+        String script = (String) WorkflowDocument.map(workflow.steps("gate").getFirst()).get("run");
+        Map<String, String> passing = Map.of("AUTOMATION_RESULT", "success", "VERIFY_RESULT", "success",
+                "BROWSER_RESULT", "success", "RECEIPTS_RESULT", "success");
+        assertThat(CommandRunner.command("bash").args("-e", "-c", script).env(passing).run().status()).isZero();
+        for (String dependency : passing.keySet()) {
+            for (String result : List.of("", "failure", "cancelled", "skipped")) {
+                var values = new java.util.HashMap<>(passing);
+                values.put(dependency, result);
+                assertThat(CommandRunner.command("bash").args("-e", "-c", script).env(values).run().status())
+                        .as(dependency + "=" + result).isNotZero();
+            }
+        }
     }
 }

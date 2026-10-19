@@ -1,7 +1,12 @@
 import { compactIdentity } from '../identity/compact/controller';
 import { exitStaircase } from '../shared/motion/staircase';
 import type { MediaReadiness } from './contracts/readiness';
-import { STARTUP_DEADLINE, startupState, type StartupPhase } from './loading/state';
+import {
+  STARTUP_DEADLINE,
+  startupState,
+  type StartupPhase,
+  type ImagePreparation,
+} from './loading/state';
 import { loadingView } from './loading/view';
 
 /** Coordinates usable startup, cinematic readiness and bounded graceful degradation. */
@@ -17,9 +22,9 @@ export function homepageReadiness(
   const touch = matchMedia('(pointer: coarse)');
   let disposed = false,
     font = false,
-    image = false,
     expired = false,
     released = false;
+  let image: ImagePreparation = 'pending';
   let phase: StartupPhase = 'loading';
   let media: MediaReadiness = { state: 'loading', progress: 0 };
   let identity: ReturnType<typeof compactIdentity> | null = null;
@@ -54,7 +59,7 @@ export function homepageReadiness(
     if (next.phase === 'loading') return;
     phase = next.phase;
     root.dataset.mediaFailure = String(phase === 'fallback' || phase === 'unavailable');
-    if (phase !== 'unavailable') root.dataset.ready = 'true';
+    if (phase !== 'unavailable' && image === 'ready') root.dataset.ready = 'true';
     view.phase(phase);
     clearTimeout(deadline);
     clearTimeout(hint);
@@ -82,6 +87,7 @@ export function homepageReadiness(
   root.dataset.startupState = 'loading';
   return {
     media(value: MediaReadiness) {
+      if (disposed) return;
       media = value;
       reconcile();
     },
@@ -90,17 +96,21 @@ export function homepageReadiness(
     },
     track(hero: HTMLImageElement) {
       void document.fonts.ready.then(() => {
+        if (disposed) return;
         font = true;
         reconcile();
       });
       void hero
         .decode()
         .then(() => {
-          image = true;
+          if (disposed) return;
+          image = 'ready';
           reconcile();
         })
         .catch(() => {
-          if (!disposed) root.dataset.mediaFailure = 'true';
+          if (disposed) return;
+          image = 'failed';
+          reconcile();
         });
     },
     hide,

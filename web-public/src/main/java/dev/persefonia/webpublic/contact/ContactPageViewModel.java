@@ -1,5 +1,6 @@
 package dev.persefonia.webpublic.contact;
 
+import dev.persefonia.webpublic.PublicDocument;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -15,7 +16,7 @@ public record ContactPageViewModel(
         Map<String, String> fieldErrors,
         String message,
         boolean submitted,
-        CsrfToken csrfToken) {
+        CsrfToken csrfToken) implements PublicDocument {
     public ContactPageViewModel {
         Objects.requireNonNull(title, "title must not be null");
         Objects.requireNonNull(description, "description must not be null");

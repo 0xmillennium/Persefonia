@@ -9,6 +9,15 @@ case "$browser_suite" in
 esac
 artifact_dir="${PERSEFONIA_BROWSER_ARTIFACT_DIR:-$project_root/app/build/browser}"
 mkdir -p "$artifact_dir"
+export PERSEFONIA_TIMINGS_FILE="$artifact_dir/timings.jsonl"
+: > "$PERSEFONIA_TIMINGS_FILE"
+provision_project='*'
+if [[ $# -eq 2 && "${1:-}" == --project ]]; then
+  provision_project="$2"
+fi
+python3 "$project_root/scripts/ci/measure.py" browser-provision "$PERSEFONIA_TIMINGS_FILE" \
+  bash "$project_root/scripts/browser/provision.sh" "$browser_suite" "$provision_project"
+phase_started_ns=$(date +%s%N)
 media_dir="$artifact_dir/media"
 mkdir -p "$media_dir/original"
 mkdir -p "$media_dir/variants"
@@ -38,6 +47,8 @@ for _ in $(seq 1 60); do
   sleep 1
 done
 docker exec "$container_name" pg_isready -h 127.0.0.1 -U persefonia_browser -d persefonia_browser
+python3 "$project_root/scripts/ci/record-timing.py" "$PERSEFONIA_TIMINGS_FILE" database "$phase_started_ns"
+phase_started_ns=$(date +%s%N)
 port_mapping="$(docker port "$container_name" 5432/tcp)"
 db_port="${port_mapping##*:}"
 app_port="${PERSEFONIA_BROWSER_PORT:-18080}"
@@ -66,15 +77,22 @@ for _ in $(seq 1 90); do
   sleep 1
 done
 curl --fail --silent "$PERSEFONIA_BROWSER_URL/robots.txt" > /dev/null
+python3 "$project_root/scripts/ci/record-timing.py" "$PERSEFONIA_TIMINGS_FILE" application "$phase_started_ns"
+phase_started_ns=$(date +%s%N)
 docker exec -i "$container_name" psql --set ON_ERROR_STOP=1 -U persefonia_browser -d persefonia_browser \
   < "$project_root/frontend/e2e/fixtures/content.sql" > "$artifact_dir/fixture.log"
 if ! curl --fail --silent --show-error "$PERSEFONIA_BROWSER_URL/" > /dev/null; then
   tail -100 "$artifact_dir/application.log" >&2
   exit 1
 fi
+python3 "$project_root/scripts/ci/record-timing.py" "$PERSEFONIA_TIMINGS_FILE" fixtures "$phase_started_ns"
 (
   cd "$project_root/frontend"
-  npx playwright install --no-shell chromium firefox webkit
+  # Opt-in local receipts use the same guarded runner without requesting CI's OS provisioning.
+  if [[ -n "${CI:-}" || -n "${PERSEFONIA_BROWSER_RECEIPTS:-}" ]]; then
+    node scripts/verification/browser-run.mjs "$browser_suite" "$@"
+    exit
+  fi
   if [[ "$browser_suite" != cross ]]; then
     npm run test:browser -- "$@"
   fi

@@ -1,5 +1,6 @@
 package dev.persefonia.webpublic.cv;
 
+import dev.persefonia.webpublic.PublicDocument;
 import dev.persefonia.profileportfolio.application.query.ActiveCvPublicView;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -17,7 +18,7 @@ public record PublicCvPage(
         String sizeLabel,
         String selectedAt,
         String assetUpdatedAt,
-        List<String> stylesheetPaths) {
+        List<String> stylesheetPaths) implements PublicDocument {
     private static final DateTimeFormatter DATE_FORMATTER =
             DateTimeFormatter.ofPattern("yyyy-MM-dd").withZone(ZoneOffset.UTC);
 
@@ -56,5 +57,9 @@ public record PublicCvPage(
         }
         long kib = Math.round(sizeBytes / 1024.0);
         return kib + " KB";
+    }
+    @Override
+    public String htmlLanguage() {
+        return language.toLowerCase(java.util.Locale.ROOT);
     }
 }

@@ -1,5 +1,6 @@
 package dev.persefonia.webpublic.series;
 
+import dev.persefonia.webpublic.PublicDocument;
 import java.util.List;
 import java.util.Objects;
 
@@ -13,7 +14,7 @@ public record PublicSeriesPage(
         String canonicalUrl,
         boolean noindex,
         List<String> stylesheetPaths,
-        List<PublicSeriesEntryView> entries) {
+        List<PublicSeriesEntryView> entries) implements PublicDocument {
     public PublicSeriesPage {
         Objects.requireNonNull(title, "title");
         Objects.requireNonNull(slug, "slug");

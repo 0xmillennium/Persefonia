@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ScrollFilms } from '../scroll-films';
+import { Hold, HOLD } from '../hold/state';
 import { FILM_READINESS_TIMEOUT } from '../delivery';
 const native = vi.hoisted(() => ({
   request: vi.fn(),
@@ -91,7 +92,7 @@ it('uses an explicit static pose after failure, and retains it during another po
   films.dispose();
   expect(vi.getTimerCount()).toBe(0);
 });
-it('retains the usable poster while a higher resolution prepares or fails', async () => {
+it('retains the usable poster through timeout and adopts a healthy late preferred resolution', async () => {
   native.failed.mockReturnValue(true);
   const films = new ScrollFilms(parent, 960, vi.fn());
   films.request('tree', 50, 'final');
@@ -101,9 +102,10 @@ it('retains the usable poster while a higher resolution prepares or fails', asyn
   films.request('tree', 50, 'final');
   expect(films.presentation('tree', 50, 'final')?.source).toBe(images[0]);
   vi.advanceTimersByTime(FILM_READINESS_TIMEOUT);
+  expect(films.presentation('tree', 50, 'final')?.source).toBe(images[0]);
   images[1]!.resolve();
   await Promise.resolve();
-  expect(films.presentation('tree', 50, 'final')?.source).toBe(images[0]);
+  expect(films.presentation('tree', 50, 'final')?.source).toBe(images[1]);
   films.dispose();
 });
 it('bounds stalled posters and retries only on explicit demand', async () => {
@@ -211,4 +213,112 @@ it('keeps a cold poster below normal readiness but recognizes intentional static
   films.setReduced(true);
   expect(films.readiness('tree', 0, 'opening').state).toBe('static');
   films.dispose();
+});
+
+it('recovers the same timed-out reduced-motion entry without a download or retry', async () => {
+  const changed = vi.fn(),
+    films = new ScrollFilms(parent, 960, changed);
+  films.setReduced(true);
+  films.request('tree', 0, 'opening');
+  vi.advanceTimersByTime(FILM_READINESS_TIMEOUT);
+  expect(films.readiness('tree', 0, 'opening').state).toBe('unavailable');
+  for (let i = 0; i < 4; i++) films.request('tree', 0, 'opening');
+  images[0]!.resolve();
+  await Promise.resolve();
+  expect(films.readiness('tree', 0, 'opening').state).toBe('static');
+  expect(films.hasError).toBe(false);
+  expect(images).toHaveLength(1);
+  expect(changed).toHaveBeenCalledTimes(2);
+  films.dispose();
+});
+it('ignores obsolete retry completions and does not replace the selected source or preferred tier', async () => {
+  const changed = vi.fn(),
+    films = new ScrollFilms(parent, 960, changed);
+  films.setReduced(true);
+  films.request('tree', 0, 'opening');
+  vi.advanceTimersByTime(FILM_READINESS_TIMEOUT);
+  films.retry();
+  films.request('tree', 0, 'opening');
+  changed.mockClear();
+  images[0]!.resolve();
+  await Promise.resolve();
+  expect(changed).not.toHaveBeenCalled();
+  expect(films.presentation('tree', 0, 'opening')).toBeUndefined();
+  films.setTier(1600);
+  films.request('tree', 0, 'opening');
+  images[2]!.resolve();
+  await Promise.resolve();
+  images[1]!.resolve();
+  await Promise.resolve();
+  expect(films.presentation('tree', 0, 'opening')?.source).toBe(images[2]);
+  films.request('robotic-arm', 0, 'opening');
+  films.show('robotic-arm', 0, 'opening', [0, 0, 100, 100], 1);
+  expect(images[1]!.hidden).toBe(true);
+  expect(images[2]!.hidden).toBe(true);
+  films.dispose();
+});
+it('keeps permanent rejection terminal and retains the lower tier through a preferred failure', async () => {
+  const films = new ScrollFilms(parent, 960, vi.fn());
+  films.setReduced(true);
+  films.request('tree', 0, 'opening');
+  images[0]!.resolve();
+  await Promise.resolve();
+  films.setTier(1600);
+  films.request('tree', 0, 'opening');
+  images[1]!.reject();
+  await Promise.resolve();
+  await Promise.resolve();
+  vi.advanceTimersByTime(FILM_READINESS_TIMEOUT * 2);
+  expect(films.presentation('tree', 0, 'opening')?.source).toBe(images[0]);
+  expect(images).toHaveLength(2);
+  films.dispose();
+});
+
+it.each(['cancelled', 'expired'] as const)(
+  'late incoming readiness cannot commit a %s hold',
+  async (intent) => {
+    const films = new ScrollFilms(parent, 960, vi.fn()),
+      hold = new Hold();
+    films.setReduced(true);
+    films.request('tree', 0, 'opening');
+    hold.select({ x: 0, y: 0 });
+    vi.advanceTimersByTime(FILM_READINESS_TIMEOUT);
+    if (intent === 'cancelled') hold.cancel();
+    else hold.step(HOLD.readinessTimeout + 1, false, 1, true);
+    images[0]!.resolve();
+    await Promise.resolve();
+    expect(films.readiness('tree', 0, 'opening').state).toBe('static');
+    for (let i = 0; i < 200; i++) expect(hold.step(1 / 60, true, 1, true)).toBe(false);
+    expect(hold.phase).toBe('IDLE');
+    films.dispose();
+  },
+);
+
+it('ignores a late obsolete higher tier but retains one that was already displayed during resize', async () => {
+  const films = new ScrollFilms(parent, 1600, vi.fn());
+  films.setReduced(true);
+  films.request('tree', 0, 'opening');
+  films.setTier(960);
+  films.request('tree', 0, 'opening');
+  images[0]!.resolve();
+  await Promise.resolve();
+  expect(films.presentation('tree', 0, 'opening')).toBeUndefined();
+  images[1]!.resolve();
+  await Promise.resolve();
+  expect(films.presentation('tree', 0, 'opening')?.source).toBe(images[1]);
+  films.setTier(1600);
+  films.show('tree', 0, 'opening', [0, 0, 100, 100], 1);
+  films.setTier(960);
+  expect(films.presentation('tree', 0, 'opening')?.source).toBe(images[1]);
+  films.dispose();
+  const retained = new ScrollFilms(parent, 1600, vi.fn());
+  retained.setReduced(true);
+  retained.request('tree', 0, 'opening');
+  images[2]!.resolve();
+  await Promise.resolve();
+  retained.show('tree', 0, 'opening', [0, 0, 100, 100], 1);
+  retained.setTier(960);
+  retained.request('tree', 0, 'opening');
+  expect(retained.presentation('tree', 0, 'opening')?.source).toBe(images[2]);
+  retained.dispose();
 });

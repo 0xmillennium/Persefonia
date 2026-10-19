@@ -82,12 +82,23 @@ export function restoreNavigationCover() {
 }
 export function navigationCover(root: HTMLElement, signal: AbortSignal) {
   let presentation: ReturnType<typeof cover> | null = null;
-  let timer = 0;
+  let pending = false;
+  let timer = 0,
+    firstFrame = 0,
+    secondFrame = 0,
+    intent = 0;
   const release = () => {
+    intent++;
+    cancelAnimationFrame(firstFrame);
+    cancelAnimationFrame(secondFrame);
+    firstFrame = secondFrame = 0;
     clearTimeout(timer);
     presentation?.dispose();
     presentation = null;
+    if (pending) clearNavigationMarker();
+    pending = false;
   };
+  signal.addEventListener('abort', release, { once: true });
   root.addEventListener(
     'click',
     (e) => {
@@ -101,7 +112,8 @@ export function navigationCover(root: HTMLElement, signal: AbortSignal) {
         e.shiftKey
       )
         return;
-      const anchor = (e.target as Element).closest<HTMLAnchorElement>('a[href]');
+      const anchor =
+        e.target instanceof Element ? e.target.closest<HTMLAnchorElement>('a[href]') : null;
       if (!anchor || anchor.target || anchor.hasAttribute('download')) return;
       const url = new URL(anchor.href);
       if (
@@ -109,19 +121,34 @@ export function navigationCover(root: HTMLElement, signal: AbortSignal) {
         (url.pathname === location.pathname && url.search === location.search)
       )
         return;
+      release();
       if (!rememberNavigation(url.href)) return;
+      pending = true;
       try {
-        release();
         presentation = cover();
         // A failed/stopped document request must not leave the source covered.
         timer = window.setTimeout(release, 12000);
       } catch (error) {
+        pending = false;
         clearNavigationMarker();
         console.error('Navigation presentation unavailable', error);
         return;
       }
       e.preventDefault();
-      requestAnimationFrame(() => requestAnimationFrame(() => location.assign(url.href)));
+      const current = intent;
+      firstFrame = requestAnimationFrame(() => {
+        firstFrame = 0;
+        if (signal.aborted || current !== intent) return;
+        secondFrame = requestAnimationFrame(() => {
+          secondFrame = 0;
+          if (signal.aborted || current !== intent) return;
+          // Invalidate the side effect before assigning, even if a callback is delivered twice.
+          intent++;
+          // The destination owns the marker after native navigation has been committed.
+          pending = false;
+          location.assign(url.href);
+        });
+      });
     },
     { signal },
   );

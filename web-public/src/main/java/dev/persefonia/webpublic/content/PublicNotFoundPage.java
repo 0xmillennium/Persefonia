@@ -1,5 +1,6 @@
 package dev.persefonia.webpublic.content;
 
+import dev.persefonia.webpublic.PublicDocument;
 import java.util.List;
 import java.util.Objects;
 
@@ -7,7 +8,7 @@ public record PublicNotFoundPage(
         String title,
         String message,
         boolean noindex,
-        List<String> stylesheetPaths) {
+        List<String> stylesheetPaths) implements PublicDocument {
     public PublicNotFoundPage {
         title = Objects.requireNonNull(title, "title");
         message = Objects.requireNonNull(message, "message");

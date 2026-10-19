@@ -1,5 +1,6 @@
 package dev.persefonia.webpublic.search;
 
+import dev.persefonia.webpublic.PublicDocument;
 import java.util.List;
 import java.util.Objects;
 
@@ -18,7 +19,7 @@ public record PublicSearchPage(
         String previousPageUrl,
         String nextPageUrl,
         String canonicalUrl,
-        List<String> stylesheetPaths) {
+        List<String> stylesheetPaths) implements PublicDocument {
     public PublicSearchPage {
         query = Objects.requireNonNull(query, "query");
         normalizedQuery = Objects.requireNonNull(normalizedQuery, "normalizedQuery");

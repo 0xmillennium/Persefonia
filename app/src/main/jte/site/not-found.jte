@@ -3,7 +3,7 @@
 @param String publicNavigationScriptPath = null
 @param java.util.List<dev.persefonia.webpublic.navigation.PublicNavigationLink> navigationLinks = java.util.List.of()
 <!doctype html>
-<html lang="en">
+<html lang="${page.htmlLanguage()}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">

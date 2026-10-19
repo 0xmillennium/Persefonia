@@ -46,6 +46,23 @@ class PublicContentTranslationRenderingTest extends PublicContentMvcTestSupport 
     }
 
     @Test
+    void localizedContentLanguageMatchesTheDocumentForBothClientPreferences() throws Exception {
+        for (ContentLanguage language : ContentLanguage.values()) {
+            String code = language.name().toLowerCase(java.util.Locale.ROOT);
+            String path = "/" + code + "/articles/language-test";
+            addProjected(PublicContentTestItems.publishedPublic(ContentType.ARTICLE, language,
+                    "articles", "language-test"), path);
+            for (String preference : List.of("en-US", "tr-TR")) {
+                mockMvc.perform(get(path).header("Accept-Language", preference))
+                        .andExpect(status().isOk())
+                        .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                                .string("Content-Language", code))
+                        .andExpect(content().string(containsString("<html lang=\"" + code + "\">")));
+            }
+        }
+    }
+
+    @Test
     void publicContentPageRendersVisibleTranslationLink() throws Exception {
         ContentItem turkish = PublicContentTestItems.publishedPublic(
                 ContentType.ARTICLE, ContentLanguage.TR, "articles", "merhaba");

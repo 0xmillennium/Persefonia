@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { visit } from '../support/scenes';
 
 const root = '[data-home-v2]';
 const loader = '[data-home-loader]';
@@ -171,4 +172,121 @@ test('leaving during the bar exit cancels every pending loader animation', async
     await page.locator(loader).evaluate((node) => node.getAnimations({ subtree: true }).length),
   ).toBe(0);
   await expect(page.locator('video')).toHaveCount(0);
+});
+
+for (const reduced of [false, true]) {
+  for (const failure of ['abort', '404', 'corrupt'] as const) {
+    test(`settled hero ${failure} releases usable ${reduced ? 'static' : 'video'} fallback promptly`, async ({
+      page,
+    }) => {
+      await page.emulateMedia({ reducedMotion: reduced ? 'reduce' : 'no-preference' });
+      await page.route('**/assets/cloudy-turquoise-*.webp', async (route) => {
+        if (failure === 'abort') await route.abort();
+        else
+          await route.fulfill({
+            status: failure === '404' ? 404 : 200,
+            contentType: 'image/webp',
+            body: 'invalid image',
+          });
+      });
+      await page.goto('/', { waitUntil: 'domcontentloaded' });
+      // Native alternative has actually prepared; the hero failure must not add the 12s deadline.
+      if (reduced) await expect(page.locator('img[src$="/waterfall.webp"]')).toBeVisible();
+      else
+        await expect
+          .poll(() =>
+            page.locator('video[data-loop-video]').evaluate((node) => {
+              const video = node as HTMLVideoElement;
+              return video.readyState >= 2 && !video.paused;
+            }),
+          )
+          .toBe(true);
+      await expect(page.locator(root)).toHaveAttribute('data-startup-state', 'fallback', {
+        timeout: 1500,
+      });
+      await expect(page.locator(loader)).toBeHidden({ timeout: 3000 });
+      await expect(page.locator(root)).not.toHaveAttribute('data-ready', 'true');
+      await expect(page.locator(root)).toHaveAttribute('data-media-failure', 'true');
+      await expect(page.locator('.hero-statement')).toBeVisible();
+    });
+  }
+}
+
+test('pending hero decode stays loading and a delayed healthy response completes normally', async ({
+  page,
+}) => {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.route('**/assets/cloudy-turquoise-*.webp', async (route) => {
+    await gate;
+    await route.continue();
+  });
+  try {
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('img[src$="/waterfall.webp"]')).toBeVisible();
+    await expect(page.locator(root)).toHaveAttribute('data-startup-state', 'loading');
+    await expect(page.locator(loader)).toBeVisible();
+    release();
+    await expect(page.locator(root)).toHaveAttribute('data-startup-state', 'static');
+    await expect(page.locator(loader)).toBeHidden();
+  } finally {
+    release();
+  }
+});
+
+test('homepage visits use actual readiness while unrelated network work remains pending', async ({
+  page,
+}) => {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route('**/robots.txt?qualification-pending', async (route) => {
+    await gate;
+    await route.continue();
+  });
+  await page.addInitScript(() =>
+    document.addEventListener('DOMContentLoaded', () => {
+      void fetch('/robots.txt?qualification-pending');
+    }),
+  );
+  let complete = false;
+  const visiting = visit(page).then(() => {
+    complete = true;
+  });
+  try {
+    await expect.poll(() => complete).toBe(true);
+    await expect(page.locator(root)).toHaveAttribute('data-ready', 'true');
+    await expect(page.locator(loader)).toBeHidden();
+  } finally {
+    release();
+    await visiting;
+  }
+});
+
+test('homepage visits do not accept a stationary but unprepared hero', async ({ page }) => {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route('**/assets/cloudy-turquoise-*.webp', async (route) => {
+    await gate;
+    await route.continue();
+  });
+  let complete = false;
+  const visiting = visit(page).then(() => {
+    complete = true;
+  });
+  try {
+    await expect(page.locator(root)).toHaveAttribute('data-startup-state', 'loading');
+    await expect(page.locator(loader)).toBeVisible();
+    expect(complete).toBe(false);
+  } finally {
+    release();
+    await visiting;
+  }
+  expect(complete).toBe(true);
 });

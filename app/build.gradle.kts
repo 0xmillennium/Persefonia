@@ -160,6 +160,9 @@ val npmCi by tasks.registering(Exec::class) {
     )
     inputs.property("nodePlatform", System.getProperty("os.name") + "-" + System.getProperty("os.arch"))
     outputs.dir(frontendDirectory.dir("node_modules"))
+    // Effective npm configuration, lifecycle scripts and native packages are not a reusable
+    // output contract. Reinstall deterministically rather than fingerprinting node_modules.
+    outputs.upToDateWhen { false }
 }
 
 val npmRunTypecheck by tasks.registering(Exec::class) {
@@ -183,7 +186,7 @@ val npmRunUnitTest by tasks.registering(Exec::class) {
     description = "Runs all frontend unit tests, including deterministic physics stress pipelines."
     dependsOn(npmCi)
     workingDir(frontendDirectory)
-    commandLine("npm", "run", "test:unit:all")
+    commandLine("node", "scripts/verification/unit-run.mjs")
     inputs.dir(frontendDirectory.dir("src"))
     inputs.dir(frontendDirectory.dir("scripts"))
     inputs.dir(frontendDirectory.dir("e2e"))
@@ -206,9 +209,16 @@ val viteBuild by tasks.registering(Exec::class) {
     inputs.dir(frontendDirectory.dir("scripts"))
     inputs.files(
         frontendDirectory.file("package.json"),
+        frontendDirectory.file("package-lock.json"),
         frontendDirectory.file("vite.config.ts")
     )
+    inputs.files(frontendDirectory.asFileTree.matching {
+        include("tsconfig*.json", ".npmrc")
+    })
     outputs.dir(generatedViteDirectory)
+    // Always revalidate media and regenerate from the freshly installed toolchain. Exec
+    // outputs are not placed in a build cache; mandatory checks never reuse a success stamp.
+    outputs.upToDateWhen { false }
 }
 
 tasks.processResources {
