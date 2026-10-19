@@ -77,13 +77,13 @@ class PortfolioSiteSettingsSchemaTest {
     }
 
     @Test
-    void upgradedSeedKeepsThemeAndNormalizesWritingLimit() throws SQLException {
+    void upgradedSeedUsesEnglishAndKeepsThemeAndNormalizedWritingLimit() throws SQLException {
         assertThat(PortfolioSql.strings("""
                 SELECT standard_public_theme FROM portfolio.site_presentation_settings WHERE id = ?
                 """, SEEDED_SETTINGS_ID)).containsExactly("SYSTEM");
         assertThat(PortfolioSql.count("""
                 SELECT count(*) FROM portfolio.site_presentation_settings
-                WHERE id = ? AND latest_writing_limit = 3 AND research_highlight_limit = 3 AND version = 0
+                WHERE id = ? AND latest_writing_limit = 3 AND research_highlight_limit = 3 AND version = 1 AND default_language = 'EN'
                 """, SEEDED_SETTINGS_ID)).isEqualTo(1);
     }
 

@@ -1,4 +1,4 @@
-import { clamp } from '../timeline/pacing';
+import { clamp } from '../contracts/progress';
 
 /** The left side reaches each row's upper slit before the right side. */
 export function writingPull(progress: number, position: number, row: number): number {

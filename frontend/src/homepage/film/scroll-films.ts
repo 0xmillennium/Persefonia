@@ -1,3 +1,5 @@
+import type { MediaReadiness } from '../contracts/readiness';
+import { videoReadiness } from './startup';
 import { posterVersion } from 'virtual:home-media';
 import { SeekFilm } from './seek-film';
 import { FILM_READINESS_TIMEOUT, type FilmTier } from './delivery';
@@ -46,7 +48,8 @@ export class ScrollFilms {
   request(film: Film, index: number, pose: PosterPose) {
     if (this.disposed || this.suspended) return;
     if (!this.reduced) this.video.request(film, index);
-    if (this.reduced || this.video.failed(film)) this.preparePoster(film, pose);
+    if (this.reduced || index === 191 || this.video.failed(film) || !this.video.hasVisual(film))
+      this.preparePoster(film, pose);
   }
   private watch(poster: Poster) {
     if (poster.ready || poster.failed || poster.deadline || this.suspended) return;
@@ -110,6 +113,14 @@ export class ScrollFilms {
       ready[0];
     if (poster) return { kind: 'poster', key: `${film}:${poster.pose}`, source: poster.image };
   }
+  readiness(film: Film, index: number, pose: PosterPose): MediaReadiness {
+    const presentation = this.presentation(film, index, pose);
+    if (presentation?.kind === 'video')
+      return videoReadiness(presentation.source as HTMLVideoElement, true);
+    if (presentation?.kind === 'poster' && (this.reduced || this.video.failed(film)))
+      return { state: this.reduced ? 'static' : 'fallback', progress: this.reduced ? 1 : 0 };
+    return { state: this.unavailable(film, pose) ? 'unavailable' : 'loading', progress: 0 };
+  }
   hasVisual(film: Film, index: number, pose: PosterPose) {
     return (
       !!this.presentation(film, index, pose) ||
@@ -118,6 +129,9 @@ export class ScrollFilms {
   }
   failed(film: Film) {
     return !this.reduced && this.video.failed(film);
+  }
+  frameInterval(film: Film) {
+    return this.video.frameInterval(film);
   }
   unavailable(film: Film, pose: PosterPose) {
     return (

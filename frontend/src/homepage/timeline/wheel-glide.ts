@@ -1,4 +1,4 @@
-import { clamp } from './pacing';
+import { clamp } from '../contracts/progress';
 
 export class WheelGlide {
   active = false;

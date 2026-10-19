@@ -6,6 +6,11 @@ const fixture = vi.hoisted(() => {
     revision = 0;
     prepared = false;
     videoReady = false;
+    reduced = false;
+    staticReady = false;
+    get readiness() {
+      return { state: this.reduced && this.staticReady ? 'static' : 'loading', progress: 0 };
+    }
     time = 0;
     failed = false;
     blocked = false;
@@ -18,7 +23,8 @@ const fixture = vi.hoisted(() => {
     ) {
       created.push(this);
     }
-    prepare() {
+    prepare(_time = 0, reduced = false) {
+      this.reduced = reduced;
       this.prepared = true;
     }
     setPlayback(_allowed: boolean, observe: boolean) {
@@ -50,5 +56,21 @@ it('observes a watch-start revision immediately and never aliases a replacement 
   replacement.revision = fixture.created[0]!.revision;
   replacement.changed();
   expect(loop.revision).toBeGreaterThan(old);
+  loop.dispose();
+});
+
+it('applies a live reduced-motion change to a pending replacement and promotes its static image', () => {
+  const loop = new ResponsiveLoop({} as HTMLElement, 1280, vi.fn());
+  loop.prepare();
+  loop.setTier(1920);
+  loop.prepare();
+  const replacement = fixture.created[1]!;
+  const dispose = vi.spyOn(fixture.created[0]!, 'dispose');
+  loop.prepare(true);
+  expect(replacement.reduced).toBe(true);
+  replacement.staticReady = true;
+  replacement.changed();
+  expect(dispose).toHaveBeenCalledOnce();
+  expect(loop.readiness.state).toBe('static');
   loop.dispose();
 });

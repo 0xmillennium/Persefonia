@@ -35,16 +35,12 @@ export class GlobeGesture {
     this.orientation.press();
     return true;
   }
-  move(sample: PointerSample): 'ignored' | 'pressed' | 'dragging' | 'scroll' {
+  move(sample: PointerSample): 'ignored' | 'pressed' | 'dragging' {
     if (sample.id !== this.owner || !this.first || !this.last) return 'ignored';
     const totalX = sample.x - this.first.x,
       totalY = sample.y - this.first.y;
     if (this.phase === 'pressed') {
       if (Math.hypot(totalX, totalY) < 5) return 'pressed';
-      if (sample.touch && Math.abs(totalY) > Math.abs(totalX)) {
-        this.cancel();
-        return 'scroll';
-      }
       this.phase = 'dragging';
     }
     const dx = sample.x - this.last.x,
@@ -56,7 +52,7 @@ export class GlobeGesture {
     if (sample.time - this.last.time > 100) {
       this.history = [{ time: sample.time - 100, yaw: this.yaw, inferred: true }];
     }
-    this.orientation.drag(yaw, sample.touch ? 0 : (dy * 0.8) / this.radius);
+    this.orientation.drag(yaw, (dy * 0.8) / this.radius);
     this.yaw += yaw;
     if (Math.abs(dx) > 0.01) this.lastMovement = sample.time;
     this.history.push({ time: sample.time, yaw: this.yaw });

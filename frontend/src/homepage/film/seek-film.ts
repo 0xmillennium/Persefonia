@@ -2,12 +2,18 @@ import type { Film } from './backgrounds';
 import { videoVersion } from 'virtual:home-media';
 import { FILM_READINESS_TIMEOUT, type FilmTier } from './delivery';
 interface Entry {
+  film: Film;
   video: HTMLVideoElement;
   tier: FilmTier;
   desired: number;
   index: number;
   pending: number;
+  pendingSince: number;
+  interval: number;
   failed: boolean;
+  recoverable: boolean;
+  retries: number;
+  recovery: number;
   attempt: number;
   deadline: number;
   abort: AbortController;
@@ -35,19 +41,31 @@ export class SeekFilm {
     video.hidden = true;
     video.setAttribute('aria-hidden', 'true');
     const entry: Entry = {
+      film,
       video,
       tier: this.tier,
       desired: index,
       index: -1,
       pending: -1,
+      pendingSince: 0,
+      interval: 1000 / 30,
       failed: false,
+      recoverable: false,
+      retries: 0,
+      recovery: 0,
       attempt: 0,
       deadline: 0,
       abort: new AbortController(),
     };
     const options = { signal: entry.abort.signal };
     const settled = () => {
-      if (this.disposed || entry.failed || video.seeking || video.readyState < 2) return;
+      if (
+        this.disposed ||
+        (entry.failed && !entry.recoverable) ||
+        video.seeking ||
+        video.readyState < 2
+      )
+        return;
       this.seek(entry, entry.desired);
       this.promote(film);
       this.changed();
@@ -55,6 +73,24 @@ export class SeekFilm {
     video.addEventListener('loadeddata', settled, options);
     video.addEventListener('seeked', settled, options);
     video.addEventListener('error', () => this.fail(entry), options);
+    video.addEventListener('loadedmetadata', () => this.seek(entry, entry.desired), options);
+    video.addEventListener(
+      'progress',
+      () => {
+        this.changed();
+        if (this.suspended || entry.index === entry.desired) return;
+        if (entry.failed) {
+          if (entry.recoverable) {
+            this.clearRecovery(entry);
+            this.recover(entry);
+          }
+          return;
+        }
+        this.clearDeadline(entry);
+        this.watch(entry);
+      },
+      options,
+    );
     video.src = this.source(film, entry);
     this.parent.prepend(video);
     this.watch(entry);
@@ -86,26 +122,43 @@ export class SeekFilm {
   }
   private seek(entry: Entry, index: number) {
     entry.desired = index;
-    if (entry.failed) return;
+    if (entry.failed && !entry.recoverable) return;
     this.reconcile(entry);
     if (
       entry.video.readyState >= 1 &&
+      !entry.video.seeking &&
       entry.pending !== index &&
-      (entry.index !== index || entry.video.seeking)
+      entry.index !== index
     ) {
       entry.pending = index;
+      entry.pendingSince = performance.now();
       entry.video.currentTime = (index + 0.25) / 30;
     }
     if (entry.index !== index || entry.video.seeking) this.watch(entry);
   }
   private reconcile(entry: Entry) {
     const video = entry.video;
-    if (this.disposed || entry.failed || video.error || video.seeking || video.readyState < 2)
+    if (
+      this.disposed ||
+      (entry.failed && !entry.recoverable) ||
+      video.error ||
+      video.seeking ||
+      video.readyState < 2
+    )
       return;
     // Browser state can settle before its queued seeked event is delivered.
     entry.index = Math.min(191, Math.floor(video.currentTime * 30 + 0.0001));
+    if (entry.pending === entry.index) {
+      const elapsed = Math.max(1000 / 60, Math.min(100, performance.now() - entry.pendingSince));
+      entry.interval = entry.interval * 0.8 + elapsed * 0.2;
+    }
     entry.pending = -1;
     this.clearDeadline(entry);
+    if (entry.index === entry.desired && entry.recoverable) {
+      entry.failed = false;
+      entry.recoverable = false;
+      this.clearRecovery(entry);
+    }
   }
   private promote(film: Film) {
     const entry = this.replacements.get(film);
@@ -148,7 +201,43 @@ export class SeekFilm {
       }
     }
     entry.failed = true;
+    entry.recoverable = timedOut;
+    this.recover(entry);
     this.changed();
+  }
+  private recover(entry: Entry) {
+    // Give an idle request another readiness interval before retrying once.
+    // Progress or healthy late readiness preserves the original download.
+    if (
+      this.suspended ||
+      entry.recovery ||
+      entry.retries >= 1 ||
+      (!entry.recoverable && entry.video.error?.code !== 2)
+    )
+      return;
+    entry.recovery = window.setTimeout(
+      () => {
+        entry.recovery = 0;
+        entry.retries++;
+        this.restart(entry);
+        this.changed();
+      },
+      entry.recoverable ? FILM_READINESS_TIMEOUT : 250,
+    );
+  }
+  private clearRecovery(entry: Entry) {
+    clearTimeout(entry.recovery);
+    entry.recovery = 0;
+  }
+  private restart(entry: Entry) {
+    this.clearDeadline(entry);
+    this.clearRecovery(entry);
+    entry.failed = entry.recoverable = false;
+    entry.index = entry.pending = -1;
+    entry.attempt++;
+    entry.video.src = this.source(entry.film, entry);
+    entry.video.load();
+    this.watch(entry);
   }
   get(film: Film, index: number) {
     this.promote(film);
@@ -169,26 +258,29 @@ export class SeekFilm {
   hasVisual(film: Film) {
     return (this.entries.get(film)?.index ?? -1) >= 0;
   }
+  frameInterval(film: Film) {
+    return this.entries.get(film)?.interval ?? 1000 / 30;
+  }
   get hasError() {
     return [...this.entries.values(), ...this.replacements.values()].some((entry) => entry.failed);
   }
   retry() {
-    for (const [film, entry] of [...this.entries, ...this.replacements]) {
+    for (const entry of [...this.entries.values(), ...this.replacements.values()]) {
       if (!entry.failed) continue;
-      this.clearDeadline(entry);
-      entry.failed = false;
-      entry.index = entry.pending = -1;
-      entry.attempt++;
-      entry.video.src = this.source(film, entry);
-      entry.video.load();
-      this.watch(entry);
+      entry.retries = 0;
+      this.restart(entry);
     }
   }
   suspend(value: boolean) {
     this.suspended = value;
     for (const entry of [...this.entries.values(), ...this.replacements.values()]) {
-      if (value) this.clearDeadline(entry);
-      else if (entry.index !== entry.desired || entry.video.seeking) this.watch(entry);
+      if (value) {
+        this.clearDeadline(entry);
+        this.clearRecovery(entry);
+      } else {
+        if (entry.failed) this.recover(entry);
+        if (entry.index !== entry.desired || entry.video.seeking) this.watch(entry);
+      }
     }
   }
   show(film: Film | null, bounds: readonly number[], opacity: number) {
@@ -204,6 +296,7 @@ export class SeekFilm {
   }
   private release(entry: Entry) {
     this.clearDeadline(entry);
+    this.clearRecovery(entry);
     entry.abort.abort();
     entry.video.removeAttribute('src');
     entry.video.load();

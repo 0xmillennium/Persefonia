@@ -1,9 +1,10 @@
 import { compactIdentity } from '../identity/compact/controller';
 import { exitStaircase } from '../shared/motion/staircase';
+import type { MediaReadiness } from './contracts/readiness';
+import { STARTUP_DEADLINE, startupState, type StartupPhase } from './loading/state';
+import { loadingView } from './loading/view';
 
-type Resource = 'font' | 'image' | 'film';
-
-/** Owns readiness, the bounded loader deadline and its asynchronous animation. */
+/** Coordinates usable startup, cinematic readiness and bounded graceful degradation. */
 export function homepageReadiness(
   root: HTMLElement,
   loader: HTMLElement,
@@ -11,9 +12,16 @@ export function homepageReadiness(
   reduced: MediaQueryList,
   onReady: () => void,
 ) {
-  const progress = loader.querySelector<HTMLOutputElement>('[data-loading-progress]')!;
-  const settled = new Set<Resource>();
-  let disposed = false;
+  const abort = new AbortController();
+  const view = loadingView(loader, reduced);
+  const touch = matchMedia('(pointer: coarse)');
+  let disposed = false,
+    font = false,
+    image = false,
+    expired = false,
+    released = false;
+  let phase: StartupPhase = 'loading';
+  let media: MediaReadiness = { state: 'loading', progress: 0 };
   let identity: ReturnType<typeof compactIdentity> | null = null;
   if (!historyVisit) {
     loader.hidden = false;
@@ -26,11 +34,9 @@ export function homepageReadiness(
   };
   async function exit() {
     if (loader.hidden) return;
-    await document.fonts.ready;
+    // Clear the clipped content before the cover reveals the homepage.
+    await view.exit();
     if (disposed) return;
-    loader
-      .querySelectorAll<HTMLElement>('.loader-aperture,[data-loading-identity],output,p')
-      .forEach((node) => (node.hidden = true));
     await exitStaircase(
       [...loader.querySelectorAll<HTMLElement>('.home-staircase i')],
       reduced.matches,
@@ -39,48 +45,74 @@ export function homepageReadiness(
     );
     if (!disposed) hide();
   }
-  const ready = (resource: Resource) => {
-    if (disposed || settled.has(resource)) return;
-    settled.add(resource);
-    progress.value = `${settled.size} / 3`;
-    if (settled.size === 3) {
-      clearTimeout(deadline);
-      root.dataset.ready = 'true';
+  const reconcile = () => {
+    if (disposed || (released && phase !== 'fallback' && phase !== 'unavailable')) return;
+    const next = startupState(font, image, media, expired);
+    if (released && next.phase !== 'ready' && next.phase !== 'static') return;
+    root.dataset.startupState = next.phase;
+    if (!released) view.progress(next.progress);
+    if (next.phase === 'loading') return;
+    phase = next.phase;
+    root.dataset.mediaFailure = String(phase === 'fallback' || phase === 'unavailable');
+    if (phase !== 'unavailable') root.dataset.ready = 'true';
+    view.phase(phase);
+    clearTimeout(deadline);
+    clearTimeout(hint);
+    if (!released) {
+      released = true;
       onReady();
       void exit();
     }
   };
   const deadline = window.setTimeout(() => {
-    if (settled.size < 3) {
-      root.dataset.mediaFailure = 'true';
-      hide();
-    }
-  }, 12000);
-  return {
-    ready,
-    get complete() {
-      return settled.size === 3;
+    expired = true;
+    reconcile();
+  }, STARTUP_DEADLINE);
+  const hint = window.setTimeout(() => {
+    if (!disposed && !released) view.hint(touch.matches);
+  }, 3000);
+  touch.addEventListener(
+    'change',
+    () => {
+      if (!disposed && !released && performance.now() - started >= 3000) view.hint(touch.matches);
     },
-    track(image: HTMLImageElement) {
-      void document.fonts.ready.then(() => ready('font'));
-      void image
+    { signal: abort.signal },
+  );
+  const started = performance.now();
+  root.dataset.startupState = 'loading';
+  return {
+    media(value: MediaReadiness) {
+      media = value;
+      reconcile();
+    },
+    get complete() {
+      return released;
+    },
+    track(hero: HTMLImageElement) {
+      void document.fonts.ready.then(() => {
+        font = true;
+        reconcile();
+      });
+      void hero
         .decode()
-        .then(() => ready('image'))
+        .then(() => {
+          image = true;
+          reconcile();
+        })
         .catch(() => {
-          if (disposed) return;
-          root.dataset.mediaFailure = 'true';
-          progress.value = 'Hero image unavailable';
+          if (!disposed) root.dataset.mediaFailure = 'true';
         });
     },
     hide,
     dispose() {
       if (disposed) return;
       disposed = true;
+      abort.abort();
       clearTimeout(deadline);
-      delete root.dataset.ready;
-      delete root.dataset.mediaFailure;
-      for (const animation of loader.getAnimations({ subtree: true })) animation.cancel();
+      clearTimeout(hint);
+      view.dispose();
       hide();
+      for (const name of ['ready', 'mediaFailure', 'startupState']) delete root.dataset[name];
     },
   };
 }

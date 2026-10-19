@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
-  galleryIndex,
   openingState,
-  regionProgress,
   filmRange,
   writingPacing,
   writingBeat,
   footerPhase,
-  footerRowProgress,
   FILM_SCROLL_STEP,
 } from './pacing';
+import { galleryIndex } from '../contracts/gallery';
+import { regionProgress } from '../contracts/progress';
+import { footerRowProgress } from '../footer/motion';
 import { filmCoverBox } from '../film/cutouts';
 import { frameAt } from '../film/model';
 import { galleryCurtain } from '../writing/later';

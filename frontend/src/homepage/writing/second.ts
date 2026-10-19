@@ -1,4 +1,4 @@
-import { clamp } from '../timeline/pacing';
+import { clamp } from '../contracts/progress';
 
 /** The reference spreads word starts across a window while overlapping their motion. */
 function wordPhase(progress: number, index: number, count: number, share: number): number {

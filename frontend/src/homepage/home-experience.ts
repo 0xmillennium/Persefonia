@@ -1,10 +1,13 @@
+import { homepagePresentation } from './presentation';
 import { homepageReadiness } from './readiness';
 import { GalleryHandoff } from './gallery/handoff';
 import { homepageHistory } from './timeline/history';
-import { measureRegions, type SceneGeometry } from './timeline/geometry';
+import { HomepageMeasurements } from './timeline/measurements';
+import { FilmHandoff } from './timeline/film-handoff';
+import { FilmPacing } from './timeline/film-pacing';
 import { sceneState } from './timeline/scene-state';
+import { storyViewport } from './timeline/viewport';
 import { DisposalScope } from '../shared/disposal';
-import { focusNavigation } from '../shared/focus';
 import { mountFilm } from './film/controller';
 import { mobileNavigation } from './navigation/mobile-menu';
 import { lazyPhysicalIdentity } from '../identity/lazy';
@@ -15,19 +18,16 @@ import { lazyGlobe } from './globe/lazy';
 import { siteName, letterReels } from './navigation/lettering';
 import { pointerMarker } from './navigation/pointer';
 import {
-  regionProgress,
-  windowProgress,
   filmRange,
   writingPacing,
   writingBeat,
   footerPhase,
-  CURTAIN_START,
   HOMEPAGE_SCROLL_SPEED,
-  GALLERY_HANDOFF,
 } from './timeline/pacing';
+import { windowProgress } from './contracts/progress';
+import { GALLERY_HANDOFF } from './contracts/choreography';
 import { navigationCover } from '../navigation/cover';
 import { scrollNavigation } from './timeline/scroll-navigation';
-import { galleryTravelProgress } from './gallery/motion';
 import { firstWriting } from './writing/first';
 import { secondWriting } from './writing/second';
 import { galleryWriting } from './gallery/writing';
@@ -48,45 +48,25 @@ function mountHomepage(scope: DisposalScope): () => void {
   const root: HTMLElement = found;
   const lifetime = new AbortController(),
     options = { signal: lifetime.signal };
-  const historyState = homepageHistory();
+  const viewport = storyViewport(root);
+  scope.add(() => viewport.dispose());
+  const historyState = homepageHistory({
+    viewport: () => ({ y: scrollY, width: viewport.width, height: viewport.height }),
+  });
+  const touch = matchMedia('(pointer: coarse)');
   scope.add(() => historyState.dispose());
   const pacing = writingPacing();
-  const distances = {
-    '--first-writing-distance': pacing.hero,
-    '--statement-writing-distance': pacing.statement,
-    '--writing-distance': pacing.body,
-    '--writing-gap': pacing.gap,
-  };
-  const clearDistances = () => {
-    for (const property of Object.keys(distances)) root.style.removeProperty(property);
-  };
   scope.add(() => {
     lifetime.abort();
-    clearDistances();
     delete root.dataset.enhanced;
     delete root.dataset.film;
     delete root.dataset.filmBackdrop;
-    root.querySelectorAll<HTMLElement>('.scene-face').forEach((face) => {
-      face.inert = false;
-      delete face.dataset.visible;
-      for (const property of [
-        'transform',
-        'clip-path',
-        'z-index',
-        '--local-progress',
-        '--gallery-exit',
-        '--gallery-entry-opacity',
-      ])
-        face.style.removeProperty(property);
-    });
   });
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
-  const measuredSizes = new WeakMap<Element, string>();
-  const sizeOf = (node: Element) => `${node.clientWidth}:${node.clientHeight}`;
   // Explicit gallery measurements already include their own layout writes.
   const observer = new ResizeObserver((entries) => {
-    if (entries.some((entry) => measuredSizes.get(entry.target) !== sizeOf(entry.target)))
-      measure();
+    if (entries.some((entry) => entry.target === root && measurements.changed(root))) measure();
+    else if (entries.some((entry) => measurements.changed(entry.target))) resizeSurfaces();
   });
   scope.add(() => observer.disconnect());
   const regions = [...root.querySelectorAll<HTMLElement>('[data-scene]')].map((node) => ({
@@ -160,9 +140,6 @@ function mountHomepage(scope: DisposalScope): () => void {
   });
   const wipe = root.querySelector<HTMLElement>('[data-scene-wipe]')!;
   const curtainBars = [...wipe.querySelectorAll<HTMLElement>('i')];
-  let curtainCount = curtainBars.length;
-  let curtainHeight = innerHeight,
-    galleryEntryDistance = 0;
   let disposed = false,
     raf = 0,
     suspended = false;
@@ -188,8 +165,6 @@ function mountHomepage(scope: DisposalScope): () => void {
   const galleryText = galleryWriting(galleryRegion.node);
   scope.add(() => galleryText.dispose());
   const gallerySpace = galleryRegion.node.querySelector<HTMLElement>('.gallery-space')!;
-  let galleryClipLeft = 0,
-    galleryClipTop = 0;
   scope.add(() => {
     gallerySpace.style.removeProperty('clip-path');
     galleryRegion.node.style.removeProperty('--gallery-tail-distance');
@@ -204,7 +179,6 @@ function mountHomepage(scope: DisposalScope): () => void {
     historyState.restoring,
   );
   const travel = handoff.travel;
-  const galleryPosition = (p: number) => travel.position(p);
   const galleryFirst = () => travel.first();
   const galleryStep = () => travel.step();
   const travelFirst = () => travel.travelFirst();
@@ -212,7 +186,7 @@ function mountHomepage(scope: DisposalScope): () => void {
   const travelPosition = (p: number) => travel.travelPosition(p, gallery.count);
   const galleryCue = () =>
     Math.ceil(filmRange(filmRegion.top, filmRegion.height, markRegion.top, markRegion.height).end) +
-    curtainHeight * GALLERY_HANDOFF.cue;
+    measurements.curtainHeight * GALLERY_HANDOFF.cue;
   const galleryBoundary = (direction: number) =>
     direction < 0 ? markRegion.top + pacing.transition + pacing.reading : locationRegion.top;
   function moveGallery(top: number, transition: boolean) {
@@ -273,67 +247,37 @@ function mountHomepage(scope: DisposalScope): () => void {
       force,
     );
   }
-  let geometry: Readonly<Record<string, SceneGeometry>> = Object.freeze({});
+  const filmHandoff = new FilmHandoff();
+  const filmPacing = new FilmPacing();
+  const measurements = new HomepageMeasurements({
+    root,
+    regions,
+    environment,
+    curtainBars,
+    gallerySpace,
+    viewport,
+    reduced,
+    touch,
+    travel,
+    count: () => gallery.count,
+  });
+  scope.add(() => measurements.dispose());
+  const presentation = homepagePresentation(root, regions, measurements);
+  scope.add(() => presentation.dispose());
   function measure(preserveGlide = false) {
-    const measuredY = scrollY;
     if (!preserveGlide) scrolling.cancel();
-    galleryEntryDistance = 0;
-    galleryRegion.node.style.setProperty('--gallery-entry-distance', '0px');
-    galleryRegion.node.style.setProperty('--gallery-tail-distance', '0px');
-    const count = Math.max(
-      ...[...root.querySelectorAll('.gallery-group')].map((g) => g.children.length),
-      1,
-    );
-    galleryRegion.node.style.setProperty(
-      '--gallery-distance',
-      String((3 + (count + 8) * 1.4) / HOMEPAGE_SCROLL_SPEED),
-    );
-    if (reduced.matches) clearDistances();
-    else
-      for (const [property, distance] of Object.entries(distances))
-        root.style.setProperty(property, `${distance}px`);
-    const readRegions = () => {
-      geometry = measureRegions(regions, scrollY);
-    };
-    readRegions();
-    curtainHeight = innerHeight;
-    if (!reduced.matches) {
-      const playback = filmRange(
-        filmRegion.top,
-        filmRegion.height,
-        markRegion.top,
-        markRegion.height,
-      );
-      galleryEntryDistance = Math.max(
-        0,
-        Math.ceil(playback.end) +
-          curtainHeight * GALLERY_HANDOFF.entryDistance -
-          galleryRegion.top -
-          galleryRegion.height * 0.12,
-      );
-      galleryRegion.node.style.setProperty('--gallery-entry-distance', `${galleryEntryDistance}px`);
-      readRegions();
-    }
-    travel.measure(galleryRegion.top, galleryRegion.height, galleryEntryDistance);
-    if (!reduced.matches) {
-      const tail = Math.max(0, travelEnd() - galleryPosition(0.82));
-      galleryRegion.node.style.setProperty('--gallery-tail-distance', `${tail}px`);
-      readRegions();
-      if (tail > 0 && scrollY < measuredY) scrollTo({ top: measuredY, behavior: 'instant' });
-    }
+    measurements.measure();
     film?.resize();
     writing.measure();
     perspective.measure();
-    const galleryBox = gallerySpace.getBoundingClientRect();
-    galleryClipLeft = galleryBox.left;
-    galleryClipTop = galleryBox.top;
-    curtainCount = curtainBars.filter((bar) => getComputedStyle(bar).display !== 'none').length;
-    for (const node of [root, environment]) measuredSizes.set(node, sizeOf(node));
+    measurements.resizeSurface();
     schedule();
     restorePosition();
   }
   function restorePosition() {
     historyState.restore(readiness.complete, (y) => {
+      filmPacing.reset();
+      filmHandoff.skip();
       measure();
       scrollTo({ top: y, behavior: 'instant' });
       schedule();
@@ -346,8 +290,9 @@ function mountHomepage(scope: DisposalScope): () => void {
   scope.add(mobileMenu);
   film = mountFilm({
     root,
-    ready: () => readiness.ready('film'),
+    ready: (state) => readiness.media(state),
     selectionChanged: schedule,
+    mediaChanged: schedule,
   });
   scope.add(() => film.dispose());
   readiness.track(image);
@@ -361,7 +306,7 @@ function mountHomepage(scope: DisposalScope): () => void {
     if (disposed || suspended) return;
     // Keep the derived presentation flag consistent with the current query.
     // Scene wakeups and BFCache restoration reconcile it as well as change
-    // notifications; stale derived state must not control measured geometry.
+    // notifications; stale derived state must not control measured measurements.geometry.
     const reducedState = String(reduced.matches);
     if (root.dataset.reduced !== reducedState) {
       root.dataset.reduced = reducedState;
@@ -376,11 +321,18 @@ function mountHomepage(scope: DisposalScope): () => void {
       measure(true);
     root.dataset.film = film.film;
     marker.refresh();
-    const y = scrollY,
-      firstBeat = writingBeat(y, filmRegion.top, true);
+    const range = filmRange(filmRegion.top, filmRegion.height, markRegion.top, markRegion.height);
+    if (reduced.matches) filmPacing.reset();
+    const cinematicY = reduced.matches
+      ? scrollY
+      : filmPacing.sample(scrollY, range.start, range.end, film.frameInterval, now);
+    const y = reduced.matches
+      ? scrollY
+      : filmHandoff.sample(cinematicY, range.end, film.finalReady, now);
+    if (filmPacing.moving || y !== scrollY) schedule();
+    const firstBeat = writingBeat(y, filmRegion.top, true);
     writing.update(firstBeat.exit, reduced.matches);
     if (reduced.matches) {
-      gallerySpace.style.removeProperty('clip-path');
       galleryText.update(1, 0, true);
       perspective.update(1, 0, true);
       later.third(1, 0, true);
@@ -395,22 +347,7 @@ function mountHomepage(scope: DisposalScope): () => void {
         openingProgress: 0,
         now,
       });
-      root.querySelector<HTMLElement>('[data-scene-wipe]')!.hidden = true;
-      for (const region of regions) {
-        region.face.dataset.visible = 'true';
-        region.face.inert = false;
-        for (const name of [
-          'clip-path',
-          'transform',
-          'z-index',
-          '--gallery-exit',
-          '--gallery-entry-opacity',
-        ])
-          region.face.style.removeProperty(name);
-        region.face
-          .querySelectorAll<HTMLElement>('.home-overline,.hero-scroll')
-          .forEach((node) => node.style.removeProperty('visibility'));
-      }
+      presentation.reduced();
       gallery.active(false);
       physical.active(false);
       globe.approach(y + innerHeight >= locationRegion.top - innerHeight);
@@ -420,7 +357,7 @@ function mountHomepage(scope: DisposalScope): () => void {
       save();
       return;
     }
-    const frame = sceneState(y, geometry, {
+    const frame = sceneState(y, measurements.geometry, {
       end: travelEnd(),
       boundary: galleryBoundary(1),
       cue: galleryCue(),
@@ -428,12 +365,12 @@ function mountHomepage(scope: DisposalScope): () => void {
       authoredFirst: galleryFirst(),
       step: galleryStep(),
       count: gallery.count,
-      columns: curtainCount,
+      columns: measurements.curtainCount,
     });
-    const { expansion, entrance, galleryExit } = frame;
+    const { expansion, entrance } = frame;
     const galleryP = frame.galleryProgress;
     const coverPhase = entrance.phase;
-    const wipeBands = galleryCurtain(coverPhase, curtainCount);
+    const wipeBands = galleryCurtain(coverPhase, measurements.curtainCount);
     const curtainSolid = entrance.darkness;
     const locationPhase = footerPhase(y, locationRegion.top, locationRegion.height, innerHeight);
     const locationLead = innerHeight * 0.1;
@@ -455,70 +392,22 @@ function mountHomepage(scope: DisposalScope): () => void {
     perspective.update(secondBeat.entry, secondBeat.exit, false);
     later.third(thirdBeat.entry, thirdBeat.exit, false);
     later.fourth(fourthBeat.entry, fourthBeat.exit, frame.logo, false);
-    for (const region of regions) {
-      const p = regionProgress(y, region.top, region.height);
-      const lead =
-        region.name === 'gallery'
-          ? markRegion.height * 0.12
-          : region.name === 'location'
-            ? locationLead
-            : region.name === 'mark'
-              ? pacing.gap
-              : 0;
-      const visible = y >= region.top - lead && y < region.top + region.height;
-      region.face.dataset.visible = String(visible);
-      const unavailable =
-        !visible ||
-        (region.name === 'gallery' &&
-          ((y < Math.round(travelFirst()) &&
-            gallery.empty &&
-            (gallery.count > 0 || entrance.opacity === 0)) ||
-            galleryExit >= 0.5));
-      if (unavailable && region.face.contains(document.activeElement)) {
-        focusNavigation();
-      }
-      region.face.inert = unavailable;
-      if (region.name === 'gallery') {
-        gallery.update(galleryTravelProgress(y, travelFirst(), galleryStep(), gallery.count));
-        gallery.active(!unavailable);
-      }
-      if (!visible) continue;
-      region.face.style.setProperty('--local-progress', String(p));
-      if (region.name === 'hero') {
-        region.face
-          .querySelectorAll<HTMLElement>('.home-overline,.hero-scroll')
-          .forEach((node) => (node.style.visibility = firstBeat.exit > 0.12 ? 'hidden' : ''));
-      }
-      if (region.name === 'gallery') {
-        region.face.style.setProperty('--gallery-entry-opacity', String(entrance.opacity));
-        region.face.style.setProperty('--gallery-exit', String(galleryExit));
-        region.face.style.clipPath = 'none';
-        if (wipeBands.at(-1)! < 1) {
-          const frontier = wipeBands.flatMap((p, i) => [
-            `${(i * innerWidth) / curtainCount - galleryClipLeft}px ${(1 - p) * curtainHeight - galleryClipTop}px`,
-            `${((i + 1) * innerWidth) / curtainCount - galleryClipLeft}px ${(1 - p) * curtainHeight - galleryClipTop}px`,
-          ]);
-          gallerySpace.style.clipPath = `polygon(0 100%,${frontier.join(',')},100% 100%)`;
-          region.face.style.zIndex = '11';
-        } else {
-          gallerySpace.style.clipPath = 'none';
-          region.face.style.zIndex = '11';
-        }
-      }
-      if (region.name === 'location')
-        region.face.style.transform = `translateY(${-Math.max(0, y - (region.top + region.height - innerHeight))}px)`;
-    }
+    presentation.render({
+      y,
+      firstExit: firstBeat.exit,
+      first: travelFirst(),
+      step: galleryStep(),
+      gap: pacing.gap,
+      frame,
+      wipeBands,
+      gallery,
+    });
     physical.active(
       later.settled &&
         y >= markRegion.top &&
         y < markRegion.top + markRegion.height &&
         !document.hidden,
     );
-    wipe.hidden = coverPhase <= CURTAIN_START;
-    wipe.style.setProperty('--curtain-solid', String(curtainSolid));
-    wipeBands.forEach((p, i) => {
-      (wipe.children[i] as HTMLElement).style.transform = `translateY(${(1 - p) * 100}%)`;
-    });
     globe.approach(y >= locationRegion.top - locationLead - innerHeight);
     globe.active(
       globeActive && y >= locationRegion.top && y < locationRegion.top + locationRegion.height,
@@ -528,7 +417,23 @@ function mountHomepage(scope: DisposalScope): () => void {
   window.addEventListener('scroll', schedule, { ...options, passive: true });
   // Both directions traverse the same measured stops, including section handoffs.
   // Fine trackpad deltas, native touch and keys retain native scrolling.
-  window.addEventListener('resize', () => measure(), { ...options, passive: true });
+  function resizeSurfaces() {
+    measurements.resizeSurface();
+    film?.resize(true);
+    schedule();
+  }
+  const resized = () => {
+    if (viewport.refresh()) {
+      const region = regions.find((r) => scrollY >= r.top && scrollY < r.top + r.height);
+      const progress = region ? (scrollY - region.top) / Math.max(1, region.height) : 0;
+      measure();
+      if (region) scrollTo({ top: region.top + progress * region.height, behavior: 'instant' });
+      filmPacing.reset();
+    } else resizeSurfaces();
+  };
+  window.addEventListener('resize', resized, { ...options, passive: true });
+  window.visualViewport?.addEventListener('resize', resizeSurfaces, { ...options, passive: true });
+  touch.addEventListener('change', () => measure(), options);
   window.addEventListener(
     'pointermove',
     (e) => {
@@ -555,6 +460,8 @@ function mountHomepage(scope: DisposalScope): () => void {
         e.preventDefault();
         scrolling.cancel();
         historyState.cancel();
+        filmHandoff.skip();
+        filmPacing.reset();
         window.scrollTo({ top: travelFirst(), behavior: 'instant' });
         // Make the destination available before transferring keyboard focus.
         cancelAnimationFrame(raf);
@@ -568,6 +475,8 @@ function mountHomepage(scope: DisposalScope): () => void {
     'change',
     () => {
       root.dataset.reduced = String(reduced.matches);
+      filmPacing.reset();
+      filmHandoff.skip();
       measure();
     },
     options,

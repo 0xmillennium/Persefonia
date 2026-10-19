@@ -1,10 +1,11 @@
+import type { MediaReadiness } from '../contracts/readiness';
 import { Hold } from './hold/state';
 import { HoldClock } from './hold/clock';
 import { HoldMaterial } from './hold/material';
 import { LiquidField } from './rendering/field';
-import { Renderer } from './rendering/renderer';
+import { FilmPresentation } from './presentation';
 import { filmGestures } from './gestures';
-import { applyHeroOpening, filmCoverBox, heroOpening, type HeroWritingBounds } from './cutouts';
+import type { HeroWritingBounds } from './cutouts';
 import { ScrollFilms } from './scroll-films';
 import {
   BackgroundTransport,
@@ -13,14 +14,14 @@ import {
   isScrollFilm,
   nextBackground,
   type Background,
-  type BackgroundKey,
 } from './backgrounds';
 import { ResponsiveLoop } from './responsive-loop';
 import { filmTier, loopTier } from './delivery';
 export interface FilmOptions {
   root: HTMLElement;
-  ready: () => void;
+  ready: (state: MediaReadiness) => void;
   selectionChanged: () => void;
+  mediaChanged?: () => void;
 }
 
 export interface FilmFrameState {
@@ -34,15 +35,11 @@ export interface FilmFrameState {
 }
 
 /** Approved transport and material; native scene coordinator is the only scroll owner. */
-export function mountFilm({ root, ready, selectionChanged }: FilmOptions) {
+export function mountFilm({ root, ready, selectionChanged, mediaChanged }: FilmOptions) {
   const canvas = root.querySelector<HTMLCanvasElement>('[data-film-canvas]')!;
   const environment = root.querySelector<HTMLElement>('.home-environment')!;
-  const status = root.querySelector<HTMLElement>('[data-film-status]')!;
-  const notice = root.querySelector<HTMLOutputElement>('[data-film-notice]')!;
   const instructions = root.querySelector<HTMLElement>('#film-instructions')!;
-  const countdown = root.querySelector<HTMLElement>('[data-hold-countdown]')!;
   const sheetImage = root.querySelector<HTMLImageElement>('[data-hero-image]')!;
-  const sheet = root.querySelector<HTMLElement>('.home-cinema__image')!;
   const abort = new AbortController(),
     options = { signal: abort.signal };
   const transport = new BackgroundTransport(),
@@ -75,8 +72,7 @@ export function mountFilm({ root, ready, selectionChanged }: FilmOptions) {
   };
   let writingBounds = measureWriting();
   let width = viewport.width,
-    height = viewport.height,
-    renderer: Renderer<BackgroundKey, Background> | null = null;
+    height = viewport.height;
   let material = new HoldMaterial(width, height),
     field = new LiquidField(width, height);
   let raf = 0,
@@ -90,16 +86,12 @@ export function mountFilm({ root, ready, selectionChanged }: FilmOptions) {
     first = true,
     failed = false;
   let covered = false;
-  let needsDraw = true,
-    surfacePainted = false;
-  let sheetGeneration = 0,
-    sheetSource = '';
   let expansion = 0;
-  let sheetOpening = '';
   let prefetchedFrom: Background | null = null;
   const video = new ScrollFilms(root.querySelector<HTMLElement>('.home-environment')!, tier, () => {
     request();
     wake();
+    mediaChanged?.();
   });
   let loopDelivery = loopTier(width, height);
   const loop = new ResponsiveLoop(
@@ -108,15 +100,7 @@ export function mountFilm({ root, ready, selectionChanged }: FilmOptions) {
     () => wake(),
   );
   const posterPose = () => (expansion < 1 ? ('opening' as const) : ('final' as const));
-  const presentationKey = (film: Background): BackgroundKey =>
-    isScrollFilm(film)
-      ? (video.presentation(film, transport.desired, posterPose())?.key ??
-        `${film}:${transport.desired}`)
-      : `${film}:${loop.revision}`;
-  const imageFor = (film: Background) =>
-    isScrollFilm(film)
-      ? video.presentation(film, transport.desired, posterPose())?.source
-      : loop.image;
+  const presentation = new FilmPresentation(root, canvas, video, loop, () => wake());
   const syncLoop = (effects = false) => {
     const selected = isLoopBackground(transport.film);
     const menu = document.documentElement.dataset.menuOpen === 'true';
@@ -133,27 +117,6 @@ export function mountFilm({ root, ready, selectionChanged }: FilmOptions) {
     attributes: true,
     attributeFilter: ['data-menu-open'],
   });
-  async function loadSheet() {
-    const target = renderer;
-    if (!target || sheetSource === sheetImage.currentSrc) return;
-    const generation = ++sheetGeneration;
-    try {
-      await sheetImage.decode();
-      const source = sheetImage.currentSrc;
-      const bitmap = await createImageBitmap(sheetImage);
-      try {
-        if (disposed || renderer !== target || generation !== sheetGeneration) return;
-        target.setSheet(bitmap);
-        sheetSource = source;
-        needsDraw = true;
-        wake();
-      } finally {
-        bitmap.close();
-      }
-    } catch {
-      /* The DOM photo and its static cutout remain the fallback. */
-    }
-  }
   const request = () => {
     // A history return can start beyond the film region. Prepare and
     // submit its restored target once so readiness and reverse re-entry
@@ -163,33 +126,21 @@ export function mountFilm({ root, ready, selectionChanged }: FilmOptions) {
       hold.preparing || prefetchedFrom === transport.film
         ? [transport.film, nextBackground(transport.film)]
         : [transport.film];
-    if (scenes.some(isLoopBackground)) loop.prepare();
+    if (scenes.some(isLoopBackground)) loop.prepare(reduced.matches);
     video.setReduced(reduced.matches);
     for (const film of scenes.filter(isScrollFilm))
       video.request(film, transport.desired, posterPose());
   };
   const initialize = () => {
-    needsDraw = true;
-    surfacePainted = false;
-    renderer?.dispose();
-    renderer = null;
-    sheetSource = '';
-    delete root.dataset.gpuSheet;
     try {
-      if (!reduced.matches) {
-        renderer = new Renderer<BackgroundKey, Background>(canvas, false, true);
-        renderer.resize(width, height);
-      }
-      canvas.hidden = !renderer;
+      presentation.initialize(width, height, reduced.matches);
       failed = false;
     } catch {
-      renderer?.dispose();
-      renderer = null;
-      canvas.hidden = true;
+      presentation.disable();
       failed = true;
     }
     request();
-    void loadSheet();
+    void presentation.loadSheet();
     wake();
   };
   const wake = () => {
@@ -200,11 +151,8 @@ export function mountFilm({ root, ready, selectionChanged }: FilmOptions) {
     if (disposed || suspended) return;
     // Browser preference state can precede its queued change notification.
     // No scheduled scene may keep a GPU surface alive after reduced motion wins.
-    if (reduced.matches && renderer) {
-      renderer.dispose();
-      renderer = null;
-      canvas.hidden = true;
-      delete root.dataset.gpuSheet;
+    if (reduced.matches && presentation.available) {
+      presentation.disable();
       hold.reset();
       field.clear();
       request();
@@ -215,181 +163,69 @@ export function mountFilm({ root, ready, selectionChanged }: FilmOptions) {
     if (instructions.textContent !== instruction) instructions.textContent = instruction;
     const elapsed = previous ? (now - previous) / 1000 : 0;
     previous = now;
-    const fluid = renderer?.fluid ?? field;
+    const fluid = presentation.fluid ?? field;
     const fluidChanged = fluid.active,
       holdChanged = hold.animating;
-    const uploads = renderer?.uploads;
-    syncLoop(!!renderer && !reduced.matches && (fluid.active || hold.animating));
+    const uploads = presentation.uploads;
+    syncLoop(presentation.available && !reduced.matches && (fluid.active || hold.animating));
     fluid.step(elapsed);
     material.step(hold);
-    const activeKey = presentationKey(transport.film),
-      nextKey = presentationKey(nextBackground(transport.film));
-    const active = imageFor(transport.film);
-    const next = hold.preparing ? imageFor(nextBackground(transport.film)) : undefined;
-    const paired = !!active && !!next;
     try {
+      const paired = presentation.prepare(transport, hold, fluid.active, posterPose());
       if (
-        renderer &&
-        (fluid.active ||
-          hold.animating ||
-          (isScrollFilm(transport.film) && video.failed(transport.film)))
+        hold.step(
+          clock.frame(now),
+          paired,
+          material.coverage,
+          reduced.matches || !presentation.available,
+        )
       ) {
-        if (active && (hold.phase !== 'REVEALING' || paired)) renderer.upload(0, activeKey, active);
-        if (paired) renderer.upload(1, nextKey, next!);
-      }
-      if (hold.step(clock.frame(now), paired, material.coverage, reduced.matches || !renderer)) {
         transport.switchFilm();
-        renderer?.swap();
-        syncLoop(!!renderer && !reduced.matches && (fluid.active || hold.animating));
+        presentation.swap();
+        syncLoop(presentation.available && !reduced.matches && (fluid.active || hold.animating));
         selectionChanged();
         request();
       }
       material.step(hold);
-      const key = presentationKey(transport.film);
-      const bounds = filmCoverBox(width, height, transport.film);
-      const nativeAvailable = isScrollFilm(transport.film)
-        ? video.hasVisual(transport.film, transport.desired, posterPose())
-        : !!loop.image;
-      const native =
-        nativeAvailable && (reduced.matches || !renderer || (!fluid.active && !hold.animating));
-      if (native) {
-        video.show(
-          isScrollFilm(transport.film) ? transport.film : null,
-          transport.desired,
-          posterPose(),
-          bounds,
-          filmVisible ? opacity : 0,
-        );
-        loop.show(isLoopBackground(transport.film), bounds, filmVisible ? opacity : 0);
-        canvas.style.opacity = '0';
-        surfacePainted = false;
-        delete root.dataset.gpuSheet;
-        needsDraw = true;
-        if (imageFor(transport.film) && transport.present(key) && first) {
-          first = false;
-          ready();
-        }
-      } else {
-        if (renderer?.residentKeys[0] === key) canvas.style.opacity = '';
-        const draw =
-          (surfacePainted || renderer?.residentKeys[0] === key) &&
-          (needsDraw ||
-            fluidChanged ||
-            holdChanged ||
-            fluid.active ||
-            hold.animating ||
-            renderer?.uploads !== uploads);
-        const opening = heroOpening(width, height, expansion, transport.film, writingBounds);
-        const incoming = heroOpening(
+      if (
+        presentation.render({
+          transport,
+          hold,
+          material,
+          fluid,
           width,
           height,
           expansion,
-          nextBackground(transport.film),
           writingBounds,
-        );
-        const submitted =
-          draw &&
-          renderer?.draw({
-            field: fluid,
-            material,
-            hold,
-            time: now / 1000,
-            reveal: hold.phase === 'REVEALING',
-            reduced: reduced.matches,
-            current: transport.film,
-            next: nextBackground(transport.film),
-            aperture: renderer.hasSheet ? opening.box : undefined,
-            circles: renderer.hasSheet ? opening.circles : undefined,
-            nextAperture: renderer.hasSheet ? incoming.box : undefined,
-            nextCircles: renderer.hasSheet ? incoming.circles : undefined,
-            extraAperture: renderer.hasSheet ? opening.extraBox : undefined,
-            nextExtraAperture: renderer.hasSheet ? incoming.extraBox : undefined,
-            dividers: renderer.hasSheet ? opening.dividers : undefined,
-            nextDividers: renderer.hasSheet ? incoming.dividers : undefined,
-            capsules: renderer.hasSheet ? opening.capsules : undefined,
-            nextCapsules: renderer.hasSheet ? incoming.capsules : undefined,
-            filmBounds: bounds,
-            nextFilmBounds: filmCoverBox(width, height, nextBackground(transport.film)),
-            imageOpacity: filmVisible ? opacity : 0,
-          });
-        if (submitted) {
-          needsDraw = false;
-          surfacePainted = true;
-        }
-        if (submitted && renderer?.residentKeys[0] === key) {
-          video.show(null, transport.desired, posterPose(), bounds, 0);
-          loop.show(false, bounds, 0);
-          canvas.hidden = false;
-          transport.present(key);
-          // The gallery curtain covers this entire environment. Keep
-          // fluid state alive underneath so a quick reversal reveals it.
-          if (renderer.hasSheet) root.dataset.gpuSheet = 'true';
-          if (first) {
-            first = false;
-            ready();
-          }
-        }
+          reduced: reduced.matches,
+          filmVisible,
+          opacity,
+          now,
+          fluidChanged,
+          holdChanged,
+          uploads,
+        }) &&
+        first
+      ) {
+        first = false;
       }
     } catch {
-      renderer?.dispose();
-      renderer = null;
-      canvas.hidden = true;
-      delete root.dataset.gpuSheet;
+      presentation.disable();
       hold.reset();
       failed = true;
       request();
       wake();
     }
-    const openingKey = `${transport.film}:${width}:${height}:${expansion}:${JSON.stringify(writingBounds)}`;
-    if (!first && sheetOpening !== openingKey) {
-      applyHeroOpening(
-        sheet,
-        width,
-        height,
-        heroOpening(width, height, expansion, transport.film, writingBounds),
-      );
-      sheetOpening = openingKey;
-    }
-    const displayed = transport.presented?.split(':');
-    const frameLabel = isLoopBackground(transport.film)
-      ? 'Waterfall · loop'
-      : displayed
-        ? `${displayed[0] === 'tree' ? 'Tree' : 'Robotic arm'} · ${String(Number(displayed[1]) + 1).padStart(3, '0')} / 192`
-        : 'Preparing first film frame';
-    const scrollPresentation = isScrollFilm(transport.film)
-      ? video.presentation(transport.film, transport.desired, posterPose())
-      : undefined;
-    const staticMessage =
-      scrollPresentation?.kind === 'poster'
-        ? `${transport.film === 'tree' ? 'Tree' : 'Robotic arm'} · static ${scrollPresentation.key.endsWith(':opening') ? 'opening' : 'final'} poster.${reduced.matches ? '' : ' Select the film again to retry.'}`
-        : '';
-    const failureMessage =
-      hold.failure ??
-      (isLoopBackground(transport.film) && (loop.failed || loop.blocked)
-        ? 'Waterfall · playback unavailable; still frame retained. Hold the background or select the film again to retry.'
-        : isScrollFilm(transport.film) &&
-            video.unavailable(transport.film, posterPose()) &&
-            !scrollPresentation
-          ? 'Film unavailable. Content and navigation remain available; select the film again to retry.'
-          : '');
-    const message = failureMessage || staticMessage || frameLabel;
-    root.dataset.filmPresentation =
-      scrollPresentation?.kind ??
-      (isLoopBackground(transport.film) && loop.image
-        ? loop.videoReady
-          ? 'video'
-          : 'poster'
-        : isScrollFilm(transport.film) && video.unavailable(transport.film, posterPose())
-          ? 'unavailable'
-          : 'loading');
-    if (status.textContent !== message) status.textContent = message;
-    const announcement = failureMessage || (!reduced.matches ? staticMessage : '');
-    if (notice.textContent !== announcement) notice.textContent = announcement;
-    countdown.hidden = hold.countdown === null;
-    if (hold.countdown !== null) {
-      countdown.textContent = String(hold.countdown);
-      countdown.style.transform = `translate(${hold.center.x}px,${hold.center.y}px)`;
-    }
+    if (!first) presentation.photo(transport, width, height, expansion, writingBounds);
+    presentation.describe(transport, hold, reduced.matches, expansion);
+    const media = isScrollFilm(transport.film)
+      ? video.readiness(transport.film, transport.desired, posterPose())
+      : loop.readiness;
+    ready(
+      first && media.state !== 'unavailable'
+        ? { state: 'loading', progress: media.progress }
+        : media,
+    );
     if (fluid.active || hold.animating) wake();
     else previous = 0;
   };
@@ -414,7 +250,7 @@ export function mountFilm({ root, ready, selectionChanged }: FilmOptions) {
       request,
       changed: wake,
       invalidate() {
-        needsDraw = true;
+        presentation.invalidate();
       },
       retry(modality) {
         if (video.hasError) {
@@ -431,7 +267,7 @@ export function mountFilm({ root, ready, selectionChanged }: FilmOptions) {
         request();
       },
       motion(sample) {
-        (renderer?.fluid ?? field).inject(sample);
+        (presentation.fluid ?? field).inject(sample);
       },
     },
   );
@@ -441,15 +277,12 @@ export function mountFilm({ root, ready, selectionChanged }: FilmOptions) {
     () => {
       release();
       hold.reset();
-      (renderer?.fluid ?? field).clear();
+      (presentation.fluid ?? field).clear();
       if (reduced.matches) {
-        renderer?.dispose();
-        renderer = null;
-        canvas.hidden = true;
-        delete root.dataset.gpuSheet;
-      } else if (!renderer) initialize();
+        presentation.disable();
+      } else if (!presentation.available) initialize();
       request();
-      needsDraw = true;
+      presentation.invalidate();
       wake();
     },
     options,
@@ -459,10 +292,7 @@ export function mountFilm({ root, ready, selectionChanged }: FilmOptions) {
     (e) => {
       e.preventDefault();
       release();
-      renderer?.dispose();
-      renderer = null;
-      canvas.hidden = true;
-      delete root.dataset.gpuSheet;
+      presentation.disable();
       hold.reset();
       request();
       wake();
@@ -473,7 +303,7 @@ export function mountFilm({ root, ready, selectionChanged }: FilmOptions) {
   sheetImage.addEventListener(
     'load',
     () => {
-      void loadSheet();
+      void presentation.loadSheet();
     },
     options,
   );
@@ -482,6 +312,14 @@ export function mountFilm({ root, ready, selectionChanged }: FilmOptions) {
   root.setAttribute('aria-keyshortcuts', 'F');
   root.setAttribute('aria-describedby', 'film-instructions');
   return {
+    get frameInterval() {
+      return isScrollFilm(transport.film) ? video.frameInterval(transport.film) : 1000 / 30;
+    },
+    get finalReady() {
+      if (!isScrollFilm(transport.film)) return true;
+      const last = video.presentation(transport.film, 191, 'final');
+      return last?.key === `${transport.film}:191` || last?.key === `${transport.film}:final`;
+    },
     update({
       progress,
       alpha,
@@ -492,7 +330,7 @@ export function mountFilm({ root, ready, selectionChanged }: FilmOptions) {
       fullyCovered = false,
     }: FilmFrameState) {
       if (opacity !== alpha || filmVisible !== visible || expansion !== openingProgress)
-        needsDraw = true;
+        presentation.invalidate();
       transport.setProgress(progress);
       opacity = alpha;
       filmVisible = visible;
@@ -504,29 +342,31 @@ export function mountFilm({ root, ready, selectionChanged }: FilmOptions) {
       cancelAnimationFrame(raf);
       tick(now);
     },
-    resize() {
+    resize(preserveGesture = false) {
       const bounds = environment.getBoundingClientRect();
       const nextWriting = measureWriting();
       if (JSON.stringify(writingBounds) !== JSON.stringify(nextWriting)) {
         writingBounds = nextWriting;
-        needsDraw = true;
+        presentation.invalidate();
         wake();
       }
       if (width === bounds.width && height === bounds.height) return;
       width = bounds.width;
       height = bounds.height;
-      tier = filmTier(width, height, tier);
-      video.setTier(tier);
-      loopDelivery = loopTier(width, height, loopDelivery);
-      loop.setTier(loopDelivery);
+      if (!preserveGesture) {
+        tier = filmTier(width, height, tier);
+        video.setTier(tier);
+        loopDelivery = loopTier(width, height, loopDelivery);
+        loop.setTier(loopDelivery);
+        release();
+        hold.reset();
+        clock.reset();
+      }
       request();
-      release();
-      hold.reset();
-      clock.reset();
       material = new HoldMaterial(width, height);
       field = new LiquidField(width, height);
-      renderer?.resize(width, height);
-      needsDraw = true;
+      presentation.resize(width, height);
+      presentation.invalidate();
       wake();
     },
     suspend() {
@@ -548,8 +388,8 @@ export function mountFilm({ root, ready, selectionChanged }: FilmOptions) {
       suspended = false;
       video.suspend(false);
       loop.suspend(false);
-      needsDraw = true;
-      (renderer?.fluid ?? field).step((performance.now() - pausedAt) / 1000);
+      presentation.invalidate();
+      (presentation.fluid ?? field).step((performance.now() - pausedAt) / 1000);
       request();
       wake();
     },
@@ -573,19 +413,11 @@ export function mountFilm({ root, ready, selectionChanged }: FilmOptions) {
       cancelAnimationFrame(raf);
       video.dispose();
       loop.dispose();
-      renderer?.dispose();
-      canvas.hidden = true;
+      presentation.dispose();
       field.clear();
-      sheetGeneration++;
-      delete root.dataset.gpuSheet;
-      delete root.dataset.filmPresentation;
-      notice.textContent = '';
       instructions.hidden = true;
       root.removeAttribute('aria-keyshortcuts');
       root.removeAttribute('aria-describedby');
-      sheet.style.removeProperty('clip-path');
-      sheet.style.removeProperty('mask-image');
-      sheet.style.removeProperty('mask-composite');
     },
   };
 }

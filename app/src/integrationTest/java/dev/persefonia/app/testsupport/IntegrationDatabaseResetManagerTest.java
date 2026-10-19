@@ -35,7 +35,7 @@ class IntegrationDatabaseResetManagerTest {
             assertThat(singleString(connection, "SELECT site_name FROM portfolio.site_presentation_settings"))
                     .isEqualTo("Persefonia");
             assertThat(singleString(connection, "SELECT default_language FROM portfolio.site_presentation_settings"))
-                    .isEqualTo("TR");
+                    .isEqualTo("EN");
             assertThat(singleLong(connection, "SELECT count(*) FROM portfolio.site_supported_languages"))
                     .isEqualTo(2);
             assertThat(singleLong(connection, "SELECT count(*) FROM portfolio.active_cv_profiles"))

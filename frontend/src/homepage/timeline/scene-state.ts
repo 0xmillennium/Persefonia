@@ -1,12 +1,6 @@
-import {
-  filmRange,
-  openingState,
-  regionProgress,
-  writingBeat,
-  writingPacing,
-  windowProgress,
-} from './pacing';
-import { galleryEntrance, galleryTravelProgress } from '../gallery/motion';
+import { filmRange, openingState, writingBeat, writingPacing } from './pacing';
+import { regionProgress, windowProgress } from '../contracts/progress';
+import { galleryEntrance, galleryTravelProgress } from '../contracts/gallery';
 import type { SceneGeometry } from './geometry';
 
 const pacing = writingPacing();

@@ -66,7 +66,8 @@ afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
 });
-it('healthy seeking does not request posters', () => {
+it('healthy seeking retains an existing video without requesting posters', () => {
+  native.hasVisual.mockReturnValue(true);
   const films = new ScrollFilms(parent, 960, vi.fn());
   films.request('tree', 10, 'final');
   expect(native.request).toHaveBeenCalledWith('tree', 10);
@@ -185,5 +186,29 @@ it('reports terminal reduced-motion poster failure without opening a video decod
   await Promise.resolve();
   expect(films.unavailable('tree', 'opening')).toBe(true);
   expect(native.request).not.toHaveBeenCalled();
+  films.dispose();
+});
+
+it('shows a cold-start poster and replaces it when the video decodes without a reload', async () => {
+  const films = new ScrollFilms(parent, 960, vi.fn());
+  films.request('robotic-arm', 0, 'opening');
+  images[0]!.resolve();
+  await Promise.resolve();
+  expect(films.presentation('robotic-arm', 0, 'opening')?.kind).toBe('poster');
+  native.get.mockReturnValue({} as HTMLVideoElement);
+  expect(films.presentation('robotic-arm', 0, 'opening')?.kind).toBe('video');
+  films.dispose();
+});
+
+it('keeps a cold poster below normal readiness but recognizes intentional static and error fallbacks', async () => {
+  const films = new ScrollFilms(parent, 960, vi.fn());
+  films.request('tree', 0, 'opening');
+  images[0]!.resolve();
+  await Promise.resolve();
+  expect(films.readiness('tree', 0, 'opening').state).toBe('loading');
+  native.failed.mockReturnValue(true);
+  expect(films.readiness('tree', 0, 'opening').state).toBe('fallback');
+  films.setReduced(true);
+  expect(films.readiness('tree', 0, 'opening').state).toBe('static');
   films.dispose();
 });

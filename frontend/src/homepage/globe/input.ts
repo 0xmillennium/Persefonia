@@ -6,6 +6,7 @@ export class GlobeInput {
   readonly gesture: GlobeGesture;
   hover: { x: number; y: number } | null = null;
   private abort = new AbortController();
+  private surface: HTMLDivElement;
 
   constructor(
     private canvas: HTMLCanvasElement,
@@ -15,6 +16,11 @@ export class GlobeInput {
     private tapped: (x: number, y: number) => void = () => {},
   ) {
     this.gesture = new GlobeGesture(orientation);
+    this.surface = document.createElement('div');
+    this.surface.className = 'globe-touch-surface';
+    this.surface.setAttribute('aria-hidden', 'true');
+    const target = canvas.parentElement!;
+    target.append(this.surface);
     const options = { signal: this.abort.signal };
     document.addEventListener(
       'keydown',
@@ -34,10 +40,16 @@ export class GlobeInput {
         touch: e.pointerType === 'touch',
       };
     };
-    canvas.addEventListener(
+    target.addEventListener(
       'pointerdown',
       (e) => {
-        if (e.button !== 0 || !e.isPrimary) return;
+        if (
+          canvas.tabIndex < 0 ||
+          e.button !== 0 ||
+          !e.isPrimary ||
+          (e.target as Element).closest('a,button,input')
+        )
+          return;
         canvas.dataset.focusInput = 'pointer';
         const s = sample(e);
         if (!sphereIntersection(s.x, s.y, this.camera())) return;
@@ -47,22 +59,21 @@ export class GlobeInput {
           // Keep keyboard continuation available without showing a pointer ring.
           e.preventDefault();
           canvas.focus({ preventScroll: true });
-          canvas.setPointerCapture(s.id);
         }
+        this.surface.setPointerCapture(s.id);
         this.changed();
       },
       options,
     );
-    canvas.addEventListener(
+    target.addEventListener(
       'pointermove',
       (e) => {
         const s = sample(e);
         if (this.gesture.owner !== null) {
           const result = this.gesture.move(s);
           if (result === 'ignored') return;
-          if (result === 'scroll') this.cancel();
-          if (result === 'dragging' && !canvas.hasPointerCapture(s.id))
-            canvas.setPointerCapture(s.id);
+          if (result === 'dragging' && !this.surface.hasPointerCapture(s.id))
+            this.surface.setPointerCapture(s.id);
         } else if (e.pointerType !== 'touch') {
           this.hover = { x: s.x, y: s.y };
         }
@@ -70,13 +81,13 @@ export class GlobeInput {
       },
       options,
     );
-    canvas.addEventListener(
+    target.addEventListener(
       'pointerup',
       (e) => {
         const s = sample(e),
           release = this.gesture.release(s.id, s.time);
         if (!release.handled) return;
-        if (canvas.hasPointerCapture(s.id)) canvas.releasePointerCapture(s.id);
+        if (this.surface.hasPointerCapture(s.id)) this.surface.releasePointerCapture(s.id);
         this.hover = s.touch ? null : { x: s.x, y: s.y };
         if (s.touch && release.tap) this.tapped(s.x, s.y);
         this.changed();
@@ -84,7 +95,7 @@ export class GlobeInput {
       options,
     );
     for (const type of ['pointercancel', 'lostpointercapture'] as const) {
-      canvas.addEventListener(
+      target.addEventListener(
         type,
         (e) => {
           if (e.pointerId === this.gesture.owner) this.cancel();
@@ -92,7 +103,7 @@ export class GlobeInput {
         options,
       );
     }
-    canvas.addEventListener(
+    target.addEventListener(
       'pointerleave',
       () => {
         if (this.gesture.owner === null) {
@@ -131,12 +142,13 @@ export class GlobeInput {
     const id = this.gesture.owner;
     this.gesture.cancel();
     this.hover = null;
-    if (id !== null && this.canvas.hasPointerCapture(id)) this.canvas.releasePointerCapture(id);
+    if (id !== null && this.surface.hasPointerCapture(id)) this.surface.releasePointerCapture(id);
     this.changed('cancel');
   }
   dispose(): void {
-    this.abort.abort();
     this.cancel();
+    this.abort.abort();
+    this.surface.remove();
     delete this.canvas.dataset.focusInput;
   }
 }

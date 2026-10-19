@@ -99,7 +99,7 @@ class SpringBootFlywayRuntimeIntegrationTest {
                 FROM portfolio.site_presentation_settings
                 """);
         assertThat(seed).containsEntry("site_name", "Persefonia")
-                .containsEntry("default_language", "TR")
+                .containsEntry("default_language", "EN")
                 .containsEntry("standard_public_theme", "SYSTEM")
                 .containsEntry("featured_project_limit", 3)
                 .containsEntry("latest_writing_limit", 3)

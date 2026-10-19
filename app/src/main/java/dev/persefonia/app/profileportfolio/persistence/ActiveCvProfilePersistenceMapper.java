@@ -15,13 +15,27 @@ import java.util.List;
 import java.util.UUID;
 
 final class ActiveCvProfilePersistenceMapper {
-    ActiveCvProfile toDomain(ResultSet profileRow, List<ActiveCvDocument> documents) throws SQLException {
-        return ActiveCvProfile.rehydrate(
+    record ProfileRow(
+            ActiveCvProfileId id,
+            Instant createdAt,
+            Instant updatedAt,
+            Version version) {}
+
+    ProfileRow profileRow(ResultSet profileRow) throws SQLException {
+        return new ProfileRow(
                 ActiveCvProfileId.from(profileRow.getObject("id", UUID.class)),
-                documents,
                 timestamp(profileRow, "created_at"),
                 timestamp(profileRow, "updated_at"),
                 Version.of(profileRow.getLong("version")));
+    }
+
+    ActiveCvProfile toDomain(ProfileRow row, List<ActiveCvDocument> documents) {
+        return ActiveCvProfile.rehydrate(
+                row.id(),
+                documents,
+                row.createdAt(),
+                row.updatedAt(),
+                row.version());
     }
 
     ActiveCvDocument document(ResultSet resultSet) throws SQLException {

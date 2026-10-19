@@ -1,6 +1,9 @@
+import { startOnFilm } from '../support/homepage';
 import { expect, test } from '@playwright/test';
 import { visit, position } from '../support/scenes';
 import { difference, pixels } from '../support/pixels';
+
+test.beforeEach(async ({ page }) => startOnFilm(page));
 
 test('desktop tree panes retain their frame and dividers through navigator rendering and scroll reversal', async ({
   page,
@@ -56,19 +59,22 @@ test('desktop tree panes retain their frame and dividers through navigator rende
   await page.clock.fastForward(5000);
   await position(page, 'hero', 0.3);
   await page.evaluate(() => dispatchEvent(new Event('scroll')));
-  await page.clock.runFor(64);
+  // Advance the virtual clock through the bounded cinematic catch-up.
+  await page.clock.runFor(320);
   await expect(sheet).not.toHaveCSS('mask-image', initial);
   expect(await video.boundingBox()).toEqual(bounds);
   await page.screenshot({ path: info.outputPath('tree-panes-expanding.png') });
   // Cross the completion boundary despite native scroll rounding.
   await position(page, 'hero', 0.43);
   await page.evaluate(() => dispatchEvent(new Event('scroll')));
-  await page.clock.runFor(64);
+  // Advance the virtual clock through the bounded cinematic catch-up.
+  await page.clock.runFor(320);
   await expect(sheet).toHaveCSS('mask-image', 'none');
   expect(await video.boundingBox()).toEqual(bounds);
   await position(page, 'hero', 0);
   await page.evaluate(() => dispatchEvent(new Event('scroll')));
-  await page.clock.runFor(64);
+  // Advance the virtual clock through the bounded cinematic catch-up.
+  await page.clock.runFor(320);
   await expect(sheet).toHaveCSS('mask-image', initial);
 });
 
@@ -131,12 +137,14 @@ test('mobile tree has equal centered windows above and below the writing in nati
   await page.clock.fastForward(5000);
   await position(page, 'hero', 0.3);
   await page.evaluate(() => dispatchEvent(new Event('scroll')));
-  await page.clock.runFor(64);
+  // Advance the virtual clock through the bounded cinematic catch-up.
+  await page.clock.runFor(320);
   await expect(sheet).not.toHaveCSS('mask-image', initial);
   expect(await video.boundingBox()).toEqual(bounds);
   await position(page, 'hero', 0);
   await page.evaluate(() => dispatchEvent(new Event('scroll')));
-  await page.clock.runFor(64);
+  // Advance the virtual clock through the bounded cinematic catch-up.
+  await page.clock.runFor(320);
   await expect(sheet).toHaveCSS('mask-image', initial);
 });
 

@@ -1,6 +1,9 @@
+import { startOnFilm } from '../support/homepage';
 import { expect, test } from '@playwright/test';
 import { visit, position, writingPosition, presented } from '../support/scenes';
 import { difference } from '../support/pixels';
+
+test.beforeEach(async ({ page }) => startOnFilm(page));
 
 test('second statement resolves from word blobs and exits through individual slits', async ({
   page,

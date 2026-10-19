@@ -158,9 +158,9 @@ public class JdbcSitePresentationSettingsRepositoryAdapter implements SitePresen
                 FROM portfolio.site_presentation_settings
                 WHERE %s
                 """.formatted(whereClause);
-        List<SitePresentationSettings> rows = jdbc().query(sql, params, (resultSet, rowNumber) ->
-                mapper.toDomain(resultSet, loadSupportedLanguages(resultSet.getObject("id", UUID.class))));
-        return rows.stream().findFirst();
+        return jdbc().query(sql, params, (resultSet, rowNumber) -> mapper.settingsRow(resultSet))
+                .stream().findFirst()
+                .map(row -> mapper.toDomain(row, loadSupportedLanguages(row.id().value())));
     }
 
     private Set<ContentLanguage> loadSupportedLanguages(UUID settingsId) {

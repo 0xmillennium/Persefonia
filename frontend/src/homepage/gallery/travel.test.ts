@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { GalleryTravel } from './travel';
-import { galleryIndex } from '../timeline/pacing';
+import { touchGalleryDistance } from '../timeline/pacing';
+import { galleryIndex } from '../contracts/gallery';
 
 describe('measured gallery travel', () => {
   it('centers a newly tuned collection at the current position without moving the curtain', () => {
@@ -35,4 +36,16 @@ describe('measured gallery travel', () => {
     expect(travel.pathCount).toBe(8);
     expect(travel.travelFirst()).toBe(travel.first());
   });
+});
+
+it('centers the first touch card after one viewport of reversible travel', () => {
+  for (const count of [1, 3, 12, 30]) {
+    const travel = new GalleryTravel(count);
+    const top = 5000,
+      height = 740;
+    travel.measure(top, touchGalleryDistance(count) * height, 0);
+    const center = travel.first() + 3 * travel.step();
+    expect(center - top).toBeCloseTo(height, 8);
+    expect(travel.travelPosition(4 / (count + 7), count)).toBeCloseTo(center, 8);
+  }
 });

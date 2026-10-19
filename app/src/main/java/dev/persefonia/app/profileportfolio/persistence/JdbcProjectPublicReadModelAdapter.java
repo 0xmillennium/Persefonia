@@ -69,17 +69,16 @@ public class JdbcProjectPublicReadModelAdapter implements ProjectPublicReadModel
                 """, Map.of(
                 "projectId", projectId.value(),
                 "language", language.name(),
-                "slug", expectedSlug.value()), (resultSet, rowNumber) -> {
-            UUID localizationId = resultSet.getObject("localization_id", UUID.class);
-            return new ProjectDetailRow(
-                    resultSet.getString("title"),
-                    resultSet.getString("summary"),
-                    resultSet.getString("slug"),
-                    tagIds(projectId.value()),
-                    technologies(projectId.value()),
-                    links(projectId.value()),
-                    sections(localizationId));
-        }).stream().findFirst();
+                "slug", expectedSlug.value()), (resultSet, rowNumber) -> new ProjectDetailHeader(
+                        resultSet.getObject("localization_id", UUID.class),
+                        resultSet.getString("title"),
+                        resultSet.getString("summary"),
+                        resultSet.getString("slug")))
+                .stream().findFirst()
+                .map(row -> new ProjectDetailRow(
+                        row.title(), row.summary(), row.slug(),
+                        tagIds(projectId.value()), technologies(projectId.value()),
+                        links(projectId.value()), sections(row.localizationId())));
     }
 
     @Override
@@ -225,4 +224,6 @@ public class JdbcProjectPublicReadModelAdapter implements ProjectPublicReadModel
 
     private record ProjectTechnologyRow(UUID projectId, PublicProjectTechnologyView technology) {
     }
+
+    private record ProjectDetailHeader(UUID localizationId, String title, String summary, String slug) {}
 }

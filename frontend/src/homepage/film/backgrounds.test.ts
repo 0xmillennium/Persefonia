@@ -13,9 +13,9 @@ import {
 describe('mixed playback selection and metadata-driven classification', () => {
   it('classifies every registered source from explicit playback metadata', () => {
     expect(BACKGROUNDS).toEqual([
+      { id: 'waterfall', playback: 'loop' },
       { id: 'robotic-arm', playback: 'scroll' },
       { id: 'tree', playback: 'scroll' },
-      { id: 'waterfall', playback: 'loop' },
     ]);
     for (const entry of BACKGROUNDS) {
       expect(isBackground(entry.id)).toBe(true);
@@ -39,12 +39,13 @@ describe('mixed playback selection and metadata-driven classification', () => {
       expect(transport.desired).toBe(frame);
       transport.switchFilm();
     }
-    expect(seen).toEqual(['robotic-arm', 'tree', 'waterfall', 'robotic-arm']);
+    expect(seen).toEqual(['waterfall', 'robotic-arm', 'tree', 'waterfall']);
     expect(nextBackground('waterfall')).toBe('robotic-arm');
   });
 
   it('rejects stale scroll frames while allowing successive decoded loop revisions', () => {
     const transport = new BackgroundTransport();
+    transport.restore('robotic-arm');
     transport.setProgress(1);
     expect(transport.present('robotic-arm:0')).toBe(false);
     expect(transport.present('robotic-arm:191')).toBe(true);
@@ -113,6 +114,6 @@ describe('mixed playback selection and metadata-driven classification', () => {
     transport.restore('invalid-source' as never);
     expect(transport.film).toBe('tree');
     expect(transport.presented).toBe('tree:0');
-    expect(nextBackground('invalid-source' as never)).toBe('robotic-arm');
+    expect(nextBackground('invalid-source' as never)).toBe('waterfall');
   });
 });

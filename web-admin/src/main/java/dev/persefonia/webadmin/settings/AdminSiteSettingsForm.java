@@ -2,7 +2,7 @@ package dev.persefonia.webadmin.settings;
 
 public final class AdminSiteSettingsForm {
     private String siteName = "";
-    private String defaultLanguage = "TR";
+    private String defaultLanguage = "EN";
     private boolean supportedTr;
     private boolean supportedEn;
     private String titleSuffix = "";

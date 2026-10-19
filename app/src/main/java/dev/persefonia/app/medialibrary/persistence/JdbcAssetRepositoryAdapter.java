@@ -214,10 +214,9 @@ public class JdbcAssetRepositoryAdapter implements AssetRepository {
                 FROM media.assets assets
                 WHERE %s
                 """.formatted(whereClause);
-        return jdbc().query(sql, parameters, (resultSet, rowNumber) -> {
-            UUID assetId = resultSet.getObject("id", UUID.class);
-            return mapper.toDomain(resultSet, loadVariants(assetId), loadValidationResults(assetId));
-        }).stream().findFirst();
+        return jdbc().query(sql, parameters, (resultSet, rowNumber) -> mapper.assetRow(resultSet))
+                .stream().findFirst()
+                .map(row -> mapper.toDomain(row, loadVariants(row.id().value()), loadValidationResults(row.id().value())));
     }
 
     private List<AssetVariant> loadVariants(UUID assetId) {

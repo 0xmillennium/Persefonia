@@ -29,18 +29,33 @@ import dev.persefonia.medialibrary.domain.asset.VariantName;
 import dev.persefonia.medialibrary.domain.asset.Version;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
 public final class AssetPersistenceMapper {
-    Asset toDomain(
-            ResultSet resultSet,
-            List<AssetVariant> variants,
-            List<AssetValidationResult> validationResults) throws SQLException {
-        Integer width = nullableInteger(resultSet, "image_width");
-        Integer height = nullableInteger(resultSet, "image_height");
-        ImageDimensions dimensions = imageDimensions(width, height);
-        return Asset.rehydrate(
+    record AssetRow(
+            AssetId id,
+            OriginalFilename originalFilename,
+            StoredFilename storedFilename,
+            StoragePath storagePath,
+            PublicAssetUrl publicUrl,
+            ContentTypeName contentType,
+            FileExtension fileExtension,
+            FileSize size,
+            Checksum checksum,
+            AssetKind kind,
+            AssetVisibility visibility,
+            ImageDimensions dimensions,
+            AltText altText,
+            DecorativeImageFlag decorative,
+            ProcessingStatus status,
+            Instant createdAt,
+            Instant updatedAt,
+            Version version) {}
+
+    AssetRow assetRow(ResultSet resultSet) throws SQLException {
+        return new AssetRow(
                 AssetId.from(resultSet.getObject("id", UUID.class)),
                 OriginalFilename.of(resultSet.getString("original_filename")),
                 StoredFilename.of(resultSet.getString("stored_filename")),
@@ -52,15 +67,40 @@ public final class AssetPersistenceMapper {
                 Checksum.of(resultSet.getString("checksum")),
                 AssetKind.valueOf(resultSet.getString("kind")),
                 AssetVisibility.valueOf(resultSet.getString("visibility")),
-                dimensions,
+                imageDimensions(nullableInteger(resultSet, "image_width"), nullableInteger(resultSet, "image_height")),
                 nullableString(resultSet, "alt_text", AltText::of),
                 new DecorativeImageFlag(resultSet.getBoolean("decorative")),
                 ProcessingStatus.valueOf(resultSet.getString("processing_status")),
-                variants,
-                validationResults,
                 resultSet.getTimestamp("created_at").toInstant(),
                 resultSet.getTimestamp("updated_at").toInstant(),
                 Version.of(resultSet.getLong("version")));
+    }
+
+    Asset toDomain(
+            AssetRow row,
+            List<AssetVariant> variants,
+            List<AssetValidationResult> validationResults) {
+        return Asset.rehydrate(
+                row.id(),
+                row.originalFilename(),
+                row.storedFilename(),
+                row.storagePath(),
+                row.publicUrl(),
+                row.contentType(),
+                row.fileExtension(),
+                row.size(),
+                row.checksum(),
+                row.kind(),
+                row.visibility(),
+                row.dimensions(),
+                row.altText(),
+                row.decorative(),
+                row.status(),
+                variants,
+                validationResults,
+                row.createdAt(),
+                row.updatedAt(),
+                row.version());
     }
 
     AssetVariant variant(ResultSet resultSet) throws SQLException {
