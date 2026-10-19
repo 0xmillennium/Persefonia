@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { visit, position } from '../support/scenes';
+import { visit, position, settlePresentation } from '../support/scenes';
 
 test('compact identity activation reaches the authored M and resets accessibly', async ({
   page,
@@ -41,7 +41,7 @@ test('logo entrance retraces each piece when scrolling backward and stops with t
       const y = node.getBoundingClientRect().top + scrollY - gap + gap * p;
       scrollTo(0, p === 0 ? Math.floor(y) : Math.ceil(y));
     }, p);
-    await page.waitForTimeout(50);
+    await settlePresentation(page);
   };
   await at(0);
   const closed = await state();
@@ -105,20 +105,36 @@ test('physical identity responds to pointer contact and restores on scene exit',
   );
   await visit(page);
   await position(page, 'mark', 0.5);
+  // Physics preloads before the scene is interactive. Wait for cinematic
+  // catch-up and the unclipped entrance before measuring and sending input.
+  await settlePresentation(page);
   await expect(page.locator('[data-physical-identity] .navigator')).toBeAttached();
+  await expect(page.locator('[data-identity-slot][clip-path]')).toHaveCount(0);
   const fragments = page.locator('[data-physical-identity] polygon');
   await expect(fragments).toHaveCount(8);
   const transforms = () =>
     fragments.evaluateAll((nodes) => nodes.map((node) => node.getAttribute('transform')));
   const before = await transforms();
-  const box = (await fragments.nth(6).boundingBox())!;
-  await page.mouse.move(box.x - 35, box.y + box.height / 2);
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 5 });
-  await expect.poll(transforms).not.toEqual(before);
+  const strike = async () => {
+    const box = (await fragments.nth(6).boundingBox())!;
+    await page.mouse.move(box.x - 35, box.y + box.height / 2);
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 5 });
+    await expect(page.locator('[data-physical-identity] .navigator')).toHaveAttribute(
+      'visibility',
+      'visible',
+    );
+    await expect.poll(transforms).not.toEqual(before);
+  };
+  await strike();
   await expect(page.locator('[data-hold-countdown]')).toBeHidden();
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await expect.poll(transforms).toEqual(before);
   await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await expect(page.locator('[data-home-v2]')).toHaveAttribute('data-reduced', 'false');
+  await settlePresentation(page);
+  // Displace the logo again so departure must perform its own reset.
+  await strike();
   await position(page, 'gallery', 0.3);
+  await settlePresentation(page);
   await expect.poll(transforms).toEqual(before);
 });
