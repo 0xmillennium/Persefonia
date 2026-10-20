@@ -265,6 +265,65 @@ test('the tuner and its choices fit intermediate widths and short viewports', as
   }
 });
 
+test('gallery hash navigation keeps its first wheel step when viewport resize delivery is delayed', async ({
+  page,
+}) => {
+  await page.clock.install();
+  await page.addInitScript(() => {
+    let held = false;
+    const pending: (() => void)[] = [];
+    const subscribe = window.addEventListener.bind(window);
+    window.addEventListener = ((
+      type: string,
+      listener: EventListenerOrEventListenerObject | null,
+      options?: boolean | AddEventListenerOptions,
+    ) => {
+      if (!listener) return;
+      subscribe(
+        type,
+        type === 'resize'
+          ? (event: Event) => {
+              const invoke = () =>
+                typeof listener === 'function'
+                  ? listener.call(window, event)
+                  : listener.handleEvent(event);
+              if (held) pending.push(invoke);
+              else invoke();
+            }
+          : listener,
+        options,
+      );
+    }) as typeof window.addEventListener;
+    Object.assign(window, {
+      deferHomepageResize: () => (held = true),
+      pendingHomepageResizes: () => pending.length,
+      flushHomepageResizes: () => {
+        held = false;
+        for (const invoke of pending.splice(0)) invoke();
+      },
+    });
+  });
+  await visit(page);
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
+  await page.evaluate(() => Reflect.get(window, 'deferHomepageResize')());
+  await page.setViewportSize({ width: 1280, height: 850 });
+  await expect
+    .poll(() => page.evaluate(() => Reflect.get(window, 'pendingHomepageResizes')()))
+    .toBeGreaterThan(0);
+  await page
+    .locator('.home-nav a[href="#work"]')
+    .evaluate((node) => (node as HTMLAnchorElement).click());
+  await page.clock.runFor(1000);
+  await at(page, -3);
+  await page.mouse.move(20, 650);
+  await page.mouse.wheel(0, 120);
+  // Deliver the queued native resize during the wheel glide, before it settles.
+  await page.clock.runFor(60);
+  await page.evaluate(() => Reflect.get(window, 'flushHomepageResizes')());
+  await page.clock.runFor(1000);
+  await at(page, -2);
+});
+
 test('touch drags tune horizontally while vertical swipes scroll the page', async ({
   page,
 }, info) => {
