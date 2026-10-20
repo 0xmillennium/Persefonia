@@ -3,15 +3,12 @@ import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import * as zlib from 'node:zlib';
 import { sources } from './contracts.mjs';
+import { mediaWorkspace } from './source-input.mjs';
 
-export const sourceFrames = fileURLToPath(
-  new URL('../../../.local/media/home/scroll-frames/', import.meta.url),
-);
-export const output = fileURLToPath(
-  new URL('../../../.local/media/home/prepared-scroll/', import.meta.url),
-);
+export const sourceFrames = () => `${mediaWorkspace()}/source-frames`;
+export const preparedOutput = () => `${mediaWorkspace()}/prepared/`;
 export const films = ['robotic-arm', 'tree'];
-export function sourceSequence(film, directory = sourceFrames) {
+export function sourceSequence(film, directory = sourceFrames()) {
   const { directory: folder, digits } = sources[film];
   return {
     folder: `${directory}/${folder}`,
@@ -77,7 +74,7 @@ export function inspectPng(buffer, label, expected = [3840, 2160]) {
     sha256: createHash('sha256').update(buffer).digest('hex'),
   };
 }
-export async function validate(directory = sourceFrames) {
+export async function validate(directory = sourceFrames()) {
   const manifest = { version: 1, frames: 192, width: 3840, height: 2160, films: {} };
   for (const film of films) {
     const { folder, names: expected } = sourceSequence(film, directory);
@@ -98,6 +95,7 @@ export async function validate(directory = sourceFrames) {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   try {
     const manifest = await validate();
+    const output = preparedOutput();
     await mkdir(output, { recursive: true });
     await writeFile(`${output}source-validation.json`, JSON.stringify(manifest, null, 2));
     console.log(

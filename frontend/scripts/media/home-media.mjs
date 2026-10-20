@@ -2,7 +2,9 @@ import { readFile, mkdir, writeFile, stat } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { sourceArguments, externalSource } from './source-input.mjs';
 const root = fileURLToPath(new URL('../../../', import.meta.url));
+const source = await externalSource(sourceArguments(['source']).source);
 const destination = `${root}frontend/public`;
 await mkdir(destination, { recursive: true });
 const receipt = {};
@@ -10,7 +12,6 @@ for (const [name, filter] of [
   ['cloudy-turquoise-desktop', 'scale=1920:-1:flags=lanczos'],
   ['cloudy-turquoise-portrait', 'scale=-1:1920:flags=lanczos,crop=1080:1920'],
 ]) {
-  const source = `${root}.local/media/home/hero/cloudy turquoise.jpg`;
   const fingerprint = createHash('sha256')
     .update(await readFile(source))
     .digest('hex');

@@ -4,8 +4,9 @@ import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { hash } from './delivery.mjs';
 import { consumeMedia } from './frames-preflight.mjs';
-import { output } from './frames-source.mjs';
+import { preparedOutput } from './frames-source.mjs';
 
+const output = preparedOutput();
 const frames = `${output}media/`;
 const destination = fileURLToPath(new URL('../../public/home-videos/', import.meta.url));
 const source = await consumeMedia();

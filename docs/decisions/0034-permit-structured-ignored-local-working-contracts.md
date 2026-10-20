@@ -2,11 +2,13 @@
 
 | Field | Value |
 |---|---|
-| Status | Accepted |
+| Status | Superseded |
 | Date | 2026-10-05 |
 | Scope | documentation |
 | Supersedes | ADR 0003 |
-| Superseded by | none |
+| Superseded by | ADR 0037 |
+
+Superseded by [ADR 0037](0037-bound-ignored-local-workspaces-to-active-task-context.md), which retains structured local context while bounding it to active tasks with explicit retention conditions.
 
 ## Context
 

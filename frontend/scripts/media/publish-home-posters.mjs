@@ -1,11 +1,11 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { consumeMedia } from './frames-preflight.mjs';
-import { output } from './frames-source.mjs';
+import { preparedOutput } from './frames-source.mjs';
 import { hash, webpDimensions } from './delivery.mjs';
 
 // Explicit publication copies qualified opening/final poses, never a runtime sequence.
-const prepared = `${output}media/`;
+const prepared = `${preparedOutput()}media/`;
 const destination = fileURLToPath(new URL('../../public/home-posters/', import.meta.url));
 const source = await consumeMedia();
 const contract = {

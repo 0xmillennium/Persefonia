@@ -1,10 +1,12 @@
 import { fileURLToPath } from 'node:url';
 import { readFile, mkdir, writeFile, rename, rm, mkdtemp, copyFile } from 'node:fs/promises';
 import { execFileSync, spawn } from 'node:child_process';
-import { validate, output, films, sourceSequence } from './frames-source.mjs';
+import { validate, preparedOutput, films, sourceSequence } from './frames-source.mjs';
+import { mediaWorkspace } from './source-input.mjs';
 import { hash, inventory, runFfmpeg } from './delivery.mjs';
 import { preparation } from './contracts.mjs';
 import { sourceMetadata } from './frames-preflight.mjs';
+const output = preparedOutput();
 const metadataBefore = await sourceMetadata();
 const source = await validate();
 await mkdir(output, { recursive: true });
@@ -20,6 +22,7 @@ const contract = {
   ...preparation,
   encoderVersion,
   pythonVersions,
+  originalVideos: JSON.parse(await readFile(`${mediaWorkspace()}/original-videos.json`, 'utf8')),
 };
 const identity = hash(JSON.stringify(contract)),
   media = `${output}media`,
