@@ -17,6 +17,15 @@ if [[ $# -eq 2 && "${1:-}" == --project ]]; then
 fi
 python3 "$project_root/scripts/ci/measure.py" browser-provision "$PERSEFONIA_TIMINGS_FILE" \
   bash "$project_root/scripts/browser/provision.sh" "$browser_suite" "$provision_project"
+browser_display=()
+if [[ "$OSTYPE" == linux* && -z "${DISPLAY:-}" && "$browser_suite" != chromium && "$provision_project" != webkit-desktop ]]; then
+  # Firefox still needs a display for software WebGL when launched headless.
+  if ! command -v xvfb-run >/dev/null; then
+    echo 'Firefox WebGL requires xvfb-run. Provision with PERSEFONIA_BROWSER_WITH_DEPS=1.' >&2
+    exit 1
+  fi
+  browser_display=(xvfb-run --auto-servernum)
+fi
 phase_started_ns=$(date +%s%N)
 media_dir="$artifact_dir/media"
 mkdir -p "$media_dir/original"
@@ -90,13 +99,13 @@ python3 "$project_root/scripts/ci/record-timing.py" "$PERSEFONIA_TIMINGS_FILE" f
   cd "$project_root/frontend"
   # Opt-in local receipts use the same guarded runner without requesting CI's OS provisioning.
   if [[ -n "${CI:-}" || -n "${PERSEFONIA_BROWSER_RECEIPTS:-}" ]]; then
-    node scripts/verification/browser-run.mjs "$browser_suite" "$@"
+    "${browser_display[@]}" node scripts/verification/browser-run.mjs "$browser_suite" "$@"
     exit
   fi
   if [[ "$browser_suite" != cross ]]; then
-    npm run test:browser -- "$@"
+    "${browser_display[@]}" npm run test:browser -- "$@"
   fi
   if [[ "$browser_suite" != chromium ]]; then
-    npm run test:browser:cross -- "$@"
+    "${browser_display[@]}" npm run test:browser:cross -- "$@"
   fi
 )

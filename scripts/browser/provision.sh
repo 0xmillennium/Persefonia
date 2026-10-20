@@ -25,3 +25,13 @@ fi
 cd "$project_root/frontend"
 # Direct installed CLI prevents npx from fetching a different Playwright version.
 node node_modules/playwright/cli.js "${args[@]}" "${engines[@]}"
+if [[ "$OSTYPE" == linux* && ( -n "${CI:-}" || -n "${PERSEFONIA_BROWSER_WITH_DEPS:-}" ) && " ${engines[*]} " == *" firefox "* ]]; then
+  # Playwright 1.57's Ubuntu 24.04 Firefox dependencies omit the system H.264
+  # decoder. Xvfb also needs xauth when supplying Firefox's software GL display.
+  packages=(apt-get install -y --no-install-recommends ffmpeg xauth)
+  if (( EUID == 0 )); then
+    "${packages[@]}"
+  else
+    sudo "${packages[@]}"
+  fi
+fi
