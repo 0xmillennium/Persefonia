@@ -18,6 +18,7 @@ export class LoopFilm {
   private nativeFrames = false;
   private previousFrame = -1;
   private pending = false;
+  private checkUntil = 0;
   private playIntent = 0;
   private attempt = 0;
   private deadline = 0;
@@ -113,6 +114,7 @@ export class LoopFilm {
           if (name === 'playing') this.clearPlaybackDeadline();
           this.revision++;
           this.changed();
+          this.watchReadiness(true);
         },
         options,
       );
@@ -132,6 +134,7 @@ export class LoopFilm {
           this.waitForVideo();
         }
         this.changed();
+        this.watchReadiness(true);
       },
       options,
     );
@@ -158,7 +161,9 @@ export class LoopFilm {
     return !this.reduced && this.videoReady ? this.video! : (this.bitmap ?? undefined);
   }
   get readiness(): MediaReadiness {
-    if (this.reduced)
+    // A covered scene can open with its prepared still. WebKit may expose no
+    // buffered ranges until this intentionally paused video actually plays.
+    if (this.reduced || (!this.playbackAllowed && this.bitmap))
       return { state: this.bitmap ? 'static' : 'loading', progress: this.bitmap ? 1 : 0 };
     if (this.failed || this.blocked)
       return { state: this.bitmap ? 'fallback' : 'unavailable', progress: 0 };
@@ -210,6 +215,7 @@ export class LoopFilm {
       }
     }
     this.watch(wanted && observeFrames);
+    this.watchReadiness();
   }
   retry() {
     if (this.disposed || (!this.blocked && !this.failed)) return;
@@ -226,6 +232,26 @@ export class LoopFilm {
   private clearDeadline() {
     clearTimeout(this.deadline);
     this.deadline = 0;
+  }
+  private watchReadiness(refresh = false) {
+    if (refresh) this.checkUntil = performance.now() + FILM_READINESS_TIMEOUT;
+    if (
+      this.deadline ||
+      this.disposed ||
+      this.suspended ||
+      !this.videoReady ||
+      performance.now() >= this.checkUntil ||
+      this.readiness.state !== 'loading'
+    )
+      return;
+    // Native buffered ranges can appear after the last media event, including
+    // while covered and paused. Check only during this bounded preparation window.
+    this.deadline = window.setTimeout(() => {
+      this.deadline = 0;
+      if (this.disposed || this.suspended) return;
+      if (this.readiness.state !== 'loading') this.changed();
+      else this.watchReadiness();
+    }, 100);
   }
   private waitForVideo() {
     if (!this.deadline && !this.suspended && !this.failed && !this.videoReady)
@@ -270,6 +296,7 @@ export class LoopFilm {
     } else if (this.prepared) {
       this.waitForVideo();
       if (this.wanted && this.video?.paused) this.waitForPlayback();
+      this.watchReadiness(true);
     }
   }
   private watch(value: boolean) {

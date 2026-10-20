@@ -35,11 +35,17 @@ afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
 });
-function setup() {
+function setup(fontSetReady?: Promise<void>) {
   const fonts = deferred(),
     image = deferred();
-  vi.stubGlobal('document', { fonts: { ready: fonts.promise } });
-  const root = { dataset: {} } as HTMLElement;
+  const faces = [
+    { status: 'loading', loaded: fonts.promise },
+    { status: 'unloaded', loaded: new Promise<void>(() => {}) },
+  ];
+  vi.stubGlobal('document', {
+    fonts: Object.assign(faces, { ready: fontSetReady ?? fonts.promise }),
+  });
+  const root = { dataset: {}, getBoundingClientRect: vi.fn() } as unknown as HTMLElement;
   const loader = {
     hidden: false,
     querySelector: () => ({}),
@@ -56,6 +62,18 @@ function setup() {
   owner.track({ decode: () => image.promise } as HTMLImageElement);
   return { owner, root, loader, onReady, fonts, image };
 }
+it('accepts requested fonts and a usable poster while document font readiness waits on unrelated loading', async () => {
+  const s = setup(new Promise<void>(() => {}));
+  s.owner.media({ state: 'fallback', progress: 0 });
+  s.image.resolve();
+  s.fonts.resolve();
+  await flush();
+  expect(s.root.dataset.startupState).toBe('fallback');
+  expect(s.root.dataset.ready).toBe('true');
+  expect(s.onReady).toHaveBeenCalledTimes(1);
+  expect(s.loader.hidden).toBe(true);
+  s.owner.dispose();
+});
 it.each(['video', 'static'] as const)(
   'preserves delayed successful %s startup and font ordering',
   async (state) => {

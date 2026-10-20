@@ -95,7 +95,11 @@ export function homepageReadiness(
       return released;
     },
     track(hero: HTMLImageElement) {
-      void document.fonts.ready.then(() => {
+      // Flush layout so used faces are requested, then settle those requests.
+      // FontFaceSet.ready can wait for unrelated media/document loading in WebKit.
+      root.getBoundingClientRect();
+      const requestedFonts = [...document.fonts].filter((face) => face.status !== 'unloaded');
+      void Promise.allSettled(requestedFonts.map((face) => face.loaded)).then(() => {
         if (disposed) return;
         font = true;
         reconcile();

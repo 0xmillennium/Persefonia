@@ -60,7 +60,6 @@ test('waterfall is the default and measured progress bar waits for native playba
       info.project.use.hasTouch ? 'Swipe to explore' : 'Scroll to explore',
       { timeout: 4500 },
     );
-    await page.screenshot({ path: info.outputPath('opening-bar.png') });
     release();
     await expect(page.locator(root)).toHaveAttribute('data-startup-state', 'ready');
     await expect(page.locator('[data-loading-progress]')).toHaveAttribute('data-progress', '100');
@@ -82,6 +81,9 @@ test('waterfall is the default and measured progress bar waits for native playba
         .locator('video[data-loop-video]')
         .evaluate((node) => (node as HTMLVideoElement).paused),
     ).toBe(false);
+    // Playwright waits for document font readiness when capturing. A held media
+    // request can keep that promise pending in WebKit; capture after release.
+    await page.screenshot({ path: info.outputPath('opening-ready.png') });
     await page.locator(root).focus();
     await page.keyboard.press('f');
     await expect(page.locator(root)).toHaveAttribute('data-film', 'robotic-arm');

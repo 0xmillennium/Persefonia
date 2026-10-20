@@ -14,6 +14,14 @@ import { filmCoverBox } from '../film/cutouts';
 import { frameAt } from '../film/model';
 import { galleryCurtain } from '../writing/later';
 describe('native scene geometry', () => {
+  it('keeps the integer film boundary stable across native layout rounding at different scroll positions', () => {
+    // Firefox reports the same authored mark with different float precision when scrolled.
+    for (const markTop of [4201.199951171875, 4201.2001953125]) {
+      expect(Math.ceil(filmRange(0, 640.4, markTop, 1560).end)).toBe(5730);
+    }
+    // Real subpixel boundaries still round upward when positioning the curtain.
+    expect(Math.ceil(filmRange(0, 640.4, 4201.21, 1560).end)).toBe(5731);
+  });
   it('covers wide, tall and intermediate viewports with an undistorted 16:9 film', () => {
     for (const [width, height] of [
       [1440, 900],

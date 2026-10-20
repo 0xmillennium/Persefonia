@@ -24,7 +24,7 @@ export default defineConfig({
       name: 'firefox-desktop',
       use: {
         ...devices['Desktop Firefox'],
-        channel: undefined,
+        browserName: 'firefox',
         viewport: { width: 1440, height: 900 },
       },
     },
@@ -32,7 +32,7 @@ export default defineConfig({
       name: 'webkit-desktop',
       use: {
         ...devices['Desktop Safari'],
-        channel: undefined,
+        browserName: 'webkit',
         viewport: { width: 1440, height: 900 },
       },
     },
