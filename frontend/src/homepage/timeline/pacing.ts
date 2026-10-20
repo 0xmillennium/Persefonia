@@ -16,8 +16,12 @@ export function filmRange(
   markTop: number,
   markHeight: number,
 ) {
-  const start = heroTop,
-    end = markTop + markHeight * CURTAIN_START;
+  const start = heroTop;
+  const measuredEnd = markTop + markHeight * CURTAIN_START;
+  // Native rect precision varies with scroll position. Do not let sub-millipixel
+  // noise around an integer move the curtain's ceil-rounded boundary by a pixel.
+  const integerEnd = Math.round(measuredEnd);
+  const end = Math.abs(measuredEnd - integerEnd) < 0.001 ? integerEnd : measuredEnd;
   return { start, end, step: (end - start) / (FRAME_COUNT - 1) };
 }
 /** Shared reading and transition budgets for the four authored writing scenes. */

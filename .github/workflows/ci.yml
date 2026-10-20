@@ -56,6 +56,17 @@ jobs:
       - name: Verify build did not modify tracked files
         run: git diff --exit-code
 
+      - name: Index automation verification evidence
+        run: python3 scripts/ci/verification-summary.py automation
+
+      - name: Upload automation verification receipt
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: persefonia-automation-receipt-${{ github.sha }}
+          path: automation-tests/build/verification.json
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Upload automation diagnostics
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -142,13 +153,15 @@ jobs:
             supported-platforms.txt contains
 
       - name: Build and test
-        run: ./gradlew --no-daemon --stacktrace clean applicationCheck :app:bootJar
+        run: python3 scripts/ci/measure.py build-and-test app/build/ci/timings.jsonl ./gradlew --no-daemon --stacktrace clean applicationCheck :app:bootJar --profile
 
       - name: Verify build did not modify tracked files
         run: git diff --exit-code
 
       - name: Verify BootJar
-        run: ./scripts/ci/verify-bootjar.sh app/build/libs/persefonia.jar app/build/ci
+        run: |
+          ./scripts/ci/verify-bootjar.sh app/build/libs/persefonia.jar app/build/ci
+          printf '%s\n' "$GITHUB_SHA" > app/build/ci/source-sha.txt
 
       - name: Verify production frontend ownership and generated assets
         run: |
@@ -165,6 +178,23 @@ jobs:
 
       - name: Verify Java 21 compatibility
         run: ./scripts/ci/verify-java21-runtime.sh app/build/ci/persefonia.jar
+
+      - name: Index mandatory verification evidence
+        run: python3 scripts/ci/verification-summary.py
+
+      - name: Upload verification reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: persefonia-verification-${{ github.sha }}
+          path: |
+            build/reports/profile/**
+            app/build/ci/timings.jsonl
+            app/build/ci/verification.json
+            frontend/test-results/unit*.json
+            frontend/test-results/segmented-identity/*summary.json
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Upload build diagnostics
         if: failure()
@@ -196,6 +226,7 @@ jobs:
           path: |
             app/build/ci/persefonia.jar
             app/build/ci/persefonia.jar.sha256
+            app/build/ci/source-sha.txt
           if-no-files-found: error
           retention-days: 1
 
@@ -219,20 +250,41 @@ jobs:
       contents: read
     strategy:
       fail-fast: false
+      max-parallel: 8
       matrix:
         include:
-          - name: desktop
+          - name: desktop-1of2
             suite: chromium
-            project: desktop-1440
-          - name: tablet
+            project: 'desktop-1440'
+            shard: '1/2'
+          - name: desktop-2of2
             suite: chromium
-            project: tablet-834
-          - name: mobile
+            project: 'desktop-1440'
+            shard: '2/2'
+          - name: tablet-1of2
             suite: chromium
-            project: mobile-390
-          - name: firefox-webkit
+            project: 'tablet-834'
+            shard: '1/2'
+          - name: tablet-2of2
+            suite: chromium
+            project: 'tablet-834'
+            shard: '2/2'
+          - name: mobile-1of2
+            suite: chromium
+            project: 'mobile-390'
+            shard: '1/2'
+          - name: mobile-2of2
+            suite: chromium
+            project: 'mobile-390'
+            shard: '2/2'
+          - name: firefox-1of1
             suite: cross
-            project: '*'
+            project: 'firefox-desktop'
+            shard: '1/1'
+          - name: webkit-1of1
+            suite: cross
+            project: 'webkit-desktop'
+            shard: '1/1'
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -260,25 +312,34 @@ jobs:
 
       - name: Stage verified browser artifact
         run: |
+          test "$(cat app/build/ci/source-sha.txt)" = "$GITHUB_SHA"
           (cd app/build/ci && sha256sum --check persefonia.jar.sha256)
           mkdir -p app/build/libs app/build/generated/vite/static/assets/.vite
           cp app/build/ci/persefonia.jar app/build/libs/persefonia.jar
           unzip -p app/build/libs/persefonia.jar BOOT-INF/classes/static/assets/.vite/manifest.json > app/build/generated/vite/static/assets/.vite/manifest.json
 
       - name: Install browser matrix
-        run: |
-          cd frontend
-          npm ci
-          npx playwright install --with-deps --no-shell chromium firefox webkit
+        run: python3 scripts/ci/measure.py npm-ci app/build/browser/npm-timing.jsonl npm ci --prefix frontend
 
       - name: Qualify production homepage and browser matrix
         env:
           PERSEFONIA_BROWSER_SUITE: ${{ matrix.suite }}
+          PERSEFONIA_BROWSER_SHARD: ${{ matrix.shard }}
           BROWSER_PROJECT: ${{ matrix.project }}
+          PERSEFONIA_NPM_TIMINGS_FILE: app/build/browser/npm-timing.jsonl
         run: bash scripts/browser/check.sh --project "$BROWSER_PROJECT"
 
       - name: Verify checks did not modify tracked files
         run: git diff --exit-code
+
+      - name: Upload browser verification receipts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: persefonia-browser-receipt-${{ matrix.name }}-${{ github.sha }}
+          path: app/build/browser/verification/*-receipt.json
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Upload browser diagnostics
         if: failure()
@@ -292,6 +353,61 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+  browser-receipts:
+    name: Browser receipts
+    if: always()
+    needs: [verify, browser]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Require completed browser jobs
+        env:
+          VERIFY_RESULT: ${{ needs.verify.result }}
+          BROWSER_RESULT: ${{ needs.browser.result }}
+        run: |
+          test "$VERIFY_RESULT" = success
+          test "$BROWSER_RESULT" = success
+
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node 22
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Download verified BootJar
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: persefonia-browser-input-${{ github.sha }}
+          path: app/build/ci
+
+      - name: Download browser receipts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: persefonia-browser-receipt-*-${{ github.sha }}
+          path: app/build/browser/verification
+          merge-multiple: true
+
+      - name: Reconcile independent discovery and execution
+        run: |
+          npm ci --prefix frontend
+          node frontend/scripts/verification/browser-join.mjs
+
+      - name: Upload browser acceptance
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: persefonia-browser-acceptance-${{ github.sha }}
+          path: app/build/browser/verification/browser-acceptance.json
+          if-no-files-found: error
+          retention-days: 14
+
   gate:
     name: Gate
     if: always()
@@ -299,6 +415,7 @@ jobs:
       - automation
       - verify
       - browser
+      - browser-receipts
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions: {}
@@ -308,7 +425,9 @@ jobs:
           AUTOMATION_RESULT: ${{ needs.automation.result }}
           VERIFY_RESULT: ${{ needs.verify.result }}
           BROWSER_RESULT: ${{ needs.browser.result }}
+          RECEIPTS_RESULT: ${{ needs.browser-receipts.result }}
         run: |
           test "$AUTOMATION_RESULT" = success
           test "$VERIFY_RESULT" = success
           test "$BROWSER_RESULT" = success
+          test "$RECEIPTS_RESULT" = success

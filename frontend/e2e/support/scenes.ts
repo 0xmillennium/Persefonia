@@ -2,7 +2,7 @@ import { expect, type Page } from '@playwright/test';
 import { homepageReady } from './homepage';
 
 export async function visit(page: Page) {
-  await page.goto('/', { waitUntil: 'networkidle' });
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
   await homepageReady(page);
 }
 

@@ -92,8 +92,13 @@ test('logo entrance retraces each piece when scrolling backward and stops with t
       .evaluate((node) => node.getAnimations({ subtree: true }).length),
   ).toBe(0);
   await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await expect(page.locator('[data-home-v2]')).toHaveAttribute('data-reduced', 'false');
   await at(0.45);
-  await expect.poll(state).toEqual(partial);
+  // Re-measuring after a mode change can vary native matrices below a thousandth
+  // of a pixel; clip state and ordinary forward/backward retracing remain exact.
+  await expect
+    .poll(state)
+    .toEqual(partial.map((piece) => ({ ...piece, y: expect.closeTo(piece.y, 3) })));
 });
 
 test('physical identity responds to pointer contact and restores on scene exit', async ({

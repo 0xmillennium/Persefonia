@@ -26,7 +26,7 @@ This directory is not a planning archive.
 - local scratch notes
 - documentation-only migration placeholders
 
-Temporary notes and working contracts belong in ignored `.local/` under [ADR 0034](0034-permit-structured-ignored-local-working-contracts.md). `.local/TODO.md` remains the working queue; `.local/design/` holds active design contracts, authority indexes, and decision ledgers. These documents do not become canonical authority automatically.
+Temporary notes and working contracts belong in ignored `.local/` under [ADR 0037](0037-bound-ignored-local-workspaces-to-active-task-context.md). `.local/TODO.md` remains the working queue; `.local/tooling/DESIGN-TOOLCHAIN.md` holds concise operational guidance; `.local/work/<task>/` holds active task contracts, approval provenance and necessary evidence with explicit removal conditions. These documents do not become canonical authority automatically.
 
 ## Lifecycle
 
@@ -81,6 +81,8 @@ Use [TEMPLATE.md](TEMPLATE.md) for new decision records.
 - [ADR 0031: Separate Repository Automation Verification from Application Tests](0031-separate-repository-automation-verification-from-application-tests.md) — separates deterministic automation source checks and contracts from application verification and establishes a stable CI gate.
 - [ADR 0032: Add CI/CD Foundation and Qualified-Artifact RC Redeployment](0032-add-ci-cd-foundation-and-qualified-artifact-rc-redeployment.md) — defines delivery qualification and exact-artifact operator redeployment through the existing RC contract.
 - [ADR 0033: Keep Production Runtime Topology External and Use Compose for Containerized Local Development](0033-keep-production-runtime-topology-external-and-use-compose-for-containerized-local-development.md) — makes root Compose a source-based local runtime while keeping production topology external and immutable OCI delivery authoritative.
-- [ADR 0034: Permit Structured Ignored Local Working Contracts](0034-permit-structured-ignored-local-working-contracts.md) — supersedes ADR 0003; permits temporary working contracts and design ledgers in ignored `.local/` while preserving committed ADR authority.
+- [ADR 0034: Permit Structured Ignored Local Working Contracts](0034-permit-structured-ignored-local-working-contracts.md) — superseded by ADR 0037; records the historical structured local-contract policy that superseded ADR 0003.
 - [ADR 0035: Resolve Gallery Media Through Public Application Contracts](0035-resolve-gallery-media-through-public-application-contracts.md) — reuses publication image relationships while retaining independent public content and processed-image eligibility.
-- [ADR 0036: Version Homepage Film Delivery Assets With the Application](0036-version-homepage-film-delivery-assets-with-the-application.md) — makes clean builds independent of ignored source media while retaining qualified, self-hosted delivery in the immutable release artifact.
+- [ADR 0036: Version Homepage Film Delivery Assets With the Application](0036-version-homepage-film-delivery-assets-with-the-application.md) — superseded by ADR 0038; records the original versioned film/poster delivery and ignored local-source publication policy.
+- [ADR 0037: Bound Ignored Local Workspaces to Active Task Context](0037-bound-ignored-local-workspaces-to-active-task-context.md) — supersedes ADR 0034; bounds local context to TODO, concise tooling guidance and active tasks with explicit evidence-retention conditions.
+- [ADR 0038: Keep Original Media External and Publish Versioned Delivery Assets](0038-keep-original-media-external-and-publish-versioned-delivery-assets.md) — supersedes ADR 0036; keeps originals external and intermediates disposable while preserving qualified, self-hosted delivery and source-independent builds.

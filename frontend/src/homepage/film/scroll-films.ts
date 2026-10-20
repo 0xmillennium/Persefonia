@@ -18,6 +18,7 @@ interface Poster {
   image: HTMLImageElement;
   ready: boolean;
   failed: boolean;
+  timedOut: boolean;
   disposed: boolean;
   deadline: number;
 }
@@ -52,11 +53,12 @@ export class ScrollFilms {
       this.preparePoster(film, pose);
   }
   private watch(poster: Poster) {
-    if (poster.ready || poster.failed || poster.deadline || this.suspended) return;
+    if (poster.ready || poster.failed || poster.timedOut || poster.deadline || this.suspended)
+      return;
     poster.deadline = window.setTimeout(() => {
       poster.deadline = 0;
       if (poster.disposed || this.disposed) return;
-      poster.failed = true;
+      poster.timedOut = true;
       this.changed();
     }, FILM_READINESS_TIMEOUT);
   }
@@ -76,6 +78,7 @@ export class ScrollFilms {
       image,
       ready: false,
       failed: false,
+      timedOut: false,
       disposed: false,
       deadline: 0,
     };
@@ -90,6 +93,7 @@ export class ScrollFilms {
         clearTimeout(poster.deadline);
         poster.deadline = 0;
         poster.ready = true;
+        poster.timedOut = false;
         this.changed();
       })
       .catch(() => {
@@ -106,7 +110,15 @@ export class ScrollFilms {
       if (video) return { kind: 'video', key: `${film}:${index}`, source: video };
       if (!this.video.failed(film) && this.video.hasVisual(film)) return;
     }
-    const ready = [...this.posters.values()].filter((p) => p.film === film && p.ready);
+    const ready = [...this.posters.values()].filter(
+      (p) =>
+        p.film === film &&
+        p.ready &&
+        !p.disposed &&
+        // Retain an already displayed tier during resize, but never promote a late,
+        // obsolete higher tier over the current responsive request.
+        (p.tier <= this.tier || !p.image.hidden),
+    );
     const poster =
       ready.find((p) => p.tier === this.tier && p.pose === pose) ??
       ready.find((p) => p.pose === pose) ??
@@ -134,19 +146,19 @@ export class ScrollFilms {
     return this.video.frameInterval(film);
   }
   unavailable(film: Film, pose: PosterPose) {
+    const poster = this.posters.get(`${film}:${this.tier}:${pose}`);
     return (
-      (this.reduced || this.video.failed(film)) &&
-      (this.posters.get(`${film}:${this.tier}:${pose}`)?.failed ?? false)
+      (this.reduced || this.video.failed(film)) && !!poster && (poster.failed || poster.timedOut)
     );
   }
   get hasError() {
-    return this.video.hasError || [...this.posters.values()].some((p) => p.failed);
+    return this.video.hasError || [...this.posters.values()].some((p) => p.failed || p.timedOut);
   }
   retry() {
     this.attempt++;
     this.video.retry();
     for (const [key, poster] of this.posters)
-      if (poster.failed) {
+      if (poster.failed || poster.timedOut) {
         this.release(poster);
         this.posters.delete(key);
       }

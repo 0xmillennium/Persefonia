@@ -2,11 +2,13 @@
 
 | Field | Value |
 |---|---|
-| Status | Accepted |
+| Status | Superseded |
 | Date | 2026-10-18 |
 | Scope | architecture / operations / testing |
 | Supersedes | none |
-| Superseded by | none |
+| Superseded by | ADR 0038 |
+
+Superseded by ADR 0038; see the [index](INDEX.md).
 
 ## Context
 

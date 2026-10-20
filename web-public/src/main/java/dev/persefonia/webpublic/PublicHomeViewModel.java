@@ -28,7 +28,7 @@ public record PublicHomeViewModel(
         Map<String, PublicHomeCoverView> galleryCovers,
         Map<String, List<String>> galleryTags,
         String scriptPath,
-        List<String> stylesheetPaths) {
+        List<String> stylesheetPaths) implements PublicDocument {
     public PublicHomeViewModel {
         galleryCovers = Map.copyOf(galleryCovers);
         galleryTags = galleryTags.entrySet().stream().collect(Collectors.toUnmodifiableMap(
@@ -61,5 +61,9 @@ public record PublicHomeViewModel(
     public Optional<PublicHomeCoverView> writingNavigationCover() {
         return latestWriting.stream().map(entry -> galleryCovers.get(entry.publicUrl()))
                 .filter(Objects::nonNull).findFirst();
+    }
+    @Override
+    public String htmlLanguage() {
+        return defaultLanguage.toLowerCase(java.util.Locale.ROOT);
     }
 }

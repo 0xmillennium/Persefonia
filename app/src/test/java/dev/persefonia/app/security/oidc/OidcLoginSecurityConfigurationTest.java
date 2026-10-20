@@ -73,6 +73,24 @@ class OidcLoginSecurityConfigurationTest {
     }
 
     @Test
+    void publicMissPolicyDoesNotGrantControllerAccessOrChangeUnsafeAndPrivateRequests() throws Exception {
+        for (String path : java.util.List.of("/unknown", "/unregistered-public-controller", "/contact/", "/tr/contact", "/de/projects")) {
+            mockMvc.perform(get(path)).andExpect(status().isNotFound()).andExpect(header().doesNotExist("Location"));
+            mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.head(path))
+                    .andExpect(status().isNotFound());
+            mockMvc.perform(get(path).with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user("reader")))
+                    .andExpect(status().isNotFound());
+            mockMvc.perform(post(path)).andExpect(status().isForbidden());
+            mockMvc.perform(post(path).with(csrf())).andExpect(status().is3xxRedirection());
+        }
+        for (String path : java.util.List.of("/admin", "/admin/content", "/error", "/internal/status", "/api/private", "/media/private")) {
+            mockMvc.perform(get(path)).andExpect(status().is3xxRedirection());
+        }
+        mockMvc.perform(get("/admin/analytics").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user("reader")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void unauthenticatedAdminRedirectsToAutheliaAuthorizationWhenClientRegistrationExists() throws Exception {
         mockMvc.perform(get("/admin"))
                 .andExpect(status().is3xxRedirection())
@@ -152,6 +170,11 @@ class OidcLoginSecurityConfigurationTest {
 
     @RestController
     static class AuthorityTestController {
+        @GetMapping("/unregistered-public-controller")
+        String unregistered() {
+            throw new AssertionError("A route outside the public allowlist must never execute");
+        }
+
         @GetMapping("/admin/operations/authority-test")
         String authority() {
             return "authorized";

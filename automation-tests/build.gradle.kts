@@ -8,3 +8,10 @@ dependencies {
     testImplementation("org.snakeyaml:snakeyaml-engine:2.10")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.13.4")
 }
+
+tasks.test {
+    // Contracts inspect executable repository files, their absence, and git's tracked
+    // inventory. Compiled test classes alone cannot describe that changing input set.
+    outputs.upToDateWhen { false }
+    outputs.cacheIf { false }
+}

@@ -115,18 +115,28 @@ test('quick swipes retain native scrolling and do not complete a film hold', asy
 });
 
 test('release and browser cancellation stop an unfinished hold', async ({ page }) => {
+  // Native input and trace round trips can outlast an unfinished press on a busy
+  // runner. Own the gesture clock while retaining actual browser touch events.
+  await page.clock.install();
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
   const finger = await touch(page),
     countdown = page.locator('[data-hold-countdown]');
   await finger.start();
+  await page.clock.runFor(300);
   await expect(countdown).toBeVisible();
-  await page.waitForTimeout(300);
+  await expect(countdown).toHaveText('3');
   await finger.end();
+  await page.clock.fastForward(4000);
+  await page.clock.runFor(32);
   await expect(countdown).toBeHidden();
-  await page.waitForTimeout(900);
+  await expect(page.locator('[data-home-v2]')).toHaveAttribute('data-film', 'robotic-arm');
   await finger.start();
+  await page.clock.runFor(300);
   await expect(countdown).toBeVisible();
-  await page.waitForTimeout(300);
+  await expect(countdown).toHaveText('3');
   await finger.cancel();
+  await page.clock.fastForward(4000);
+  await page.clock.runFor(32);
   await expect(countdown).toBeHidden();
   await expect(page.locator('[data-home-v2]')).toHaveAttribute('data-film', 'robotic-arm');
   await finger.detach();

@@ -1,5 +1,6 @@
 package dev.persefonia.webpublic.content;
 
+import dev.persefonia.webpublic.PublicDocument;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -29,7 +30,7 @@ public record PublicContentPage(
         Optional<String> mermaidScriptPath,
         List<PublicContentHeadingView> headings,
         List<PublicContentTranslationLinkView> translationLinks,
-        List<PublicContentHreflangLinkView> hreflangLinks) {
+        List<PublicContentHreflangLinkView> hreflangLinks) implements PublicDocument {
     public PublicContentPage {
         title = Objects.requireNonNull(title, "title");
         displayTitle = Objects.requireNonNull(displayTitle, "displayTitle");

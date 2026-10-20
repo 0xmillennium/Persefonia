@@ -155,10 +155,23 @@ test('a paused drag commits the nearest name after settling, cancels cleanly, an
   await expect(page.locator('.collection-options')).toBeHidden();
   expect(await curtain(page)).toEqual(before);
   await page.mouse.move(box.x + box.width * 0.7, box.y + 28);
+  // Cancel the native gesture: Firefox's mouse pointer ID is 0, not Chromium's 1.
+  const pointer = await tuner(page).evaluateHandle((node) => {
+    const gesture = { id: -1 };
+    node.addEventListener(
+      'pointerdown',
+      (event) => (gesture.id = (event as PointerEvent).pointerId),
+      { once: true },
+    );
+    return gesture;
+  });
   await page.mouse.down();
   await page.mouse.move(box.x + box.width * 0.35, box.y + 29, { steps: 5 });
   await expect(page.locator('.tuner-name')).toHaveText('Notes');
-  await tuner(page).dispatchEvent('pointercancel', { pointerId: 1 });
+  const pointerId = await pointer.evaluate((gesture) => gesture.id);
+  expect(pointerId).toBeGreaterThanOrEqual(0);
+  await tuner(page).dispatchEvent('pointercancel', { pointerId });
+  await pointer.dispose();
   await page.mouse.up();
   await expect(page.locator('.tuner-name')).toHaveText('Articles');
   await expect(root(page)).toHaveAttribute('data-category', 'articles');
@@ -252,6 +265,65 @@ test('the tuner and its choices fit intermediate widths and short viewports', as
   }
 });
 
+test('gallery hash navigation keeps its first wheel step when viewport resize delivery is delayed', async ({
+  page,
+}) => {
+  await page.clock.install();
+  await page.addInitScript(() => {
+    let held = false;
+    const pending: (() => void)[] = [];
+    const subscribe = window.addEventListener.bind(window);
+    window.addEventListener = ((
+      type: string,
+      listener: EventListenerOrEventListenerObject | null,
+      options?: boolean | AddEventListenerOptions,
+    ) => {
+      if (!listener) return;
+      subscribe(
+        type,
+        type === 'resize'
+          ? (event: Event) => {
+              const invoke = () =>
+                typeof listener === 'function'
+                  ? listener.call(window, event)
+                  : listener.handleEvent(event);
+              if (held) pending.push(invoke);
+              else invoke();
+            }
+          : listener,
+        options,
+      );
+    }) as typeof window.addEventListener;
+    Object.assign(window, {
+      deferHomepageResize: () => (held = true),
+      pendingHomepageResizes: () => pending.length,
+      flushHomepageResizes: () => {
+        held = false;
+        for (const invoke of pending.splice(0)) invoke();
+      },
+    });
+  });
+  await visit(page);
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
+  await page.evaluate(() => Reflect.get(window, 'deferHomepageResize')());
+  await page.setViewportSize({ width: 1280, height: 850 });
+  await expect
+    .poll(() => page.evaluate(() => Reflect.get(window, 'pendingHomepageResizes')()))
+    .toBeGreaterThan(0);
+  await page
+    .locator('.home-nav a[href="#work"]')
+    .evaluate((node) => (node as HTMLAnchorElement).click());
+  await page.clock.runFor(1000);
+  await at(page, -3);
+  await page.mouse.move(20, 650);
+  await page.mouse.wheel(0, 120);
+  // Deliver the queued native resize during the wheel glide, before it settles.
+  await page.clock.runFor(60);
+  await page.evaluate(() => Reflect.get(window, 'flushHomepageResizes')());
+  await page.clock.runFor(1000);
+  await at(page, -2);
+});
+
 test('touch drags tune horizontally while vertical swipes scroll the page', async ({
   page,
 }, info) => {
@@ -339,6 +411,9 @@ test('late tuner changes center card one and reset Projects after either complet
 test('the cylinder loops both ways with previous and next names, without resetting its motion at the seam', async ({
   page,
 }, info) => {
+  // Native WebKit needs more total time for this long gesture sequence; each
+  // assertion keeps its normal deadline.
+  if (info.project.name === 'webkit-desktop') test.setTimeout(90_000);
   await visit(page);
   await tuner(page).focus();
   const before = await curtain(page),
@@ -415,7 +490,9 @@ test('the cylinder loops both ways with previous and next names, without resetti
 
 test('scroll reentry from either side defaults to Projects and preserves its five-notch entrance', async ({
   page,
-}) => {
+}, info) => {
+  // Keep per-interaction deadlines while allowing the full native WebKit sequence.
+  if (info.project.name === 'webkit-desktop') test.setTimeout(90_000);
   await visit(page);
   await choose(page, 'articles');
   await page.mouse.move(20, 650);

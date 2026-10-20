@@ -16,10 +16,17 @@ export async function startOnFilm(
   film: 'robotic-arm' | 'tree' | 'waterfall' = 'robotic-arm',
 ) {
   await page.addInitScript((film) => {
-    if (!history.state?.homepageV2?.film)
-      history.replaceState(
-        { ...history.state, homepageV2: { ...history.state?.homepageV2, film } },
-        '',
-      );
+    const select = () => {
+      if (!history.state?.homepageV2?.film)
+        history.replaceState(
+          { ...history.state, homepageV2: { ...history.state?.homepageV2, film } },
+          '',
+        );
+    };
+    // Firefox can replace the initial history entry after document creation.
+    // Select after parsing, before the deferred application modules execute.
+    if (document.readyState === 'loading')
+      document.addEventListener('readystatechange', select, { once: true });
+    else select();
   }, film);
 }

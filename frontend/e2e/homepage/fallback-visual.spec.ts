@@ -11,7 +11,8 @@ for (const failure of ['no JavaScript', 'entry download failure'] as const) {
       await context.route('**/assets/home-*.js', (route) => route.abort());
     const page = await context.newPage();
     await page.goto('/');
-    await page.evaluate(() => document.fonts.ready);
+    // Poll from the runner: Firefox suppresses page promise callbacks when JS is disabled.
+    await expect.poll(() => page.evaluate(() => document.fonts.status)).toBe('loaded');
     const heading = page.locator('.hero-statement');
     await heading.scrollIntoViewIfNeeded();
     const clip = (await heading.boundingBox())!;

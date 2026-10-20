@@ -3,10 +3,9 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { hash, webpDimensions } from './delivery.mjs';
+import { sourceArguments, externalSource } from './source-input.mjs';
 
-const source = fileURLToPath(
-  new URL('../../../.local/media/home/loop-video/loop video.mp4', import.meta.url),
-);
+const source = await externalSource(sourceArguments(['source']).source);
 const destination = fileURLToPath(new URL('../../public/home-loops/', import.meta.url));
 const probe = (path) =>
   JSON.parse(

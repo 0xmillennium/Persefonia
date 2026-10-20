@@ -149,6 +149,7 @@ public class SecurityConfiguration {
             }
         }
 
+        http.addFilterBefore(new PublicRouteMissFilter(), AuthorizationFilter.class);
         return http.build();
     }
 }

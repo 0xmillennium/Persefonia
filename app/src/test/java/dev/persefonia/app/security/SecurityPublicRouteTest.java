@@ -42,6 +42,20 @@ class SecurityPublicRouteTest {
     private ViteAssetResolver viteAssetResolver;
 
     @Test
+    void safePublicMissesReturnNotFoundWithoutAnAuthenticationRedirect() throws Exception {
+        for (String path : List.of("/not-a-public-route", "/contact/", "/search/", "/en/contact",
+                "/tr/contact", "/de/projects", "/de/articles/slug", "/en/projects/")) {
+            for (String method : List.of("GET", "HEAD")) {
+                var response = httpClient.send(HttpRequest.newBuilder(uri(path)).header("Accept", "text/html")
+                        .method(method, HttpRequest.BodyPublishers.noBody()).build(), HttpResponse.BodyHandlers.ofString());
+                assertEquals(404, response.statusCode(), method + " " + path);
+                assertTrue(response.headers().firstValue("Location").isEmpty(), path);
+                if (method.equals("HEAD")) assertEquals("", response.body(), path);
+            }
+        }
+    }
+
+    @Test
     void explicitPublicAllowlistRemainsAvailable() throws Exception {
         HttpResponse<String> home = get("/");
 

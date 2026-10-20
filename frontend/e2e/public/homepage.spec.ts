@@ -31,7 +31,8 @@ function setSettings(sql: string): void {
 async function visit(page: Page): Promise<void> {
   const response = await page.goto('/', { waitUntil: 'networkidle' });
   expect(response?.status()).toBe(200);
-  await page.evaluate(() => document.fonts.ready);
+  // Firefox does not settle page promise callbacks with JavaScript disabled.
+  await expect.poll(() => page.evaluate(() => document.fonts.status)).toBe('loaded');
 }
 function contrast(foreground: string, background: string): number {
   const luminance = (color: string): number => {
@@ -173,12 +174,10 @@ test('SSR publications, metadata, public destinations, CSP and self-hosted asset
       ),
     ),
   ).toBe(true);
-  for (const name of ['hero', 'statements', 'capabilities', 'mark', 'gallery', 'location']) {
-    await scene(page, name);
-    await page.screenshot({ path: testInfo.outputPath(`${name}.png`) });
-  }
-  expect(errors).toEqual([]);
-  expect(bad).toEqual([]);
+  const scenes = ['hero', 'statements', 'capabilities', 'mark', 'gallery', 'location'];
+  for (const name of scenes) await scene(page, name);
+  // Qualify the application before diagnostic captures: Playwright's WebKit
+  // screenshot synchronization injects a stylesheet that this CSP blocks.
   expect(
     await page.evaluate(
       () =>
@@ -189,6 +188,12 @@ test('SSR publications, metadata, public destinations, CSP and self-hosted asset
         ).violations,
     ),
   ).toEqual([]);
+  for (const name of scenes) {
+    await scene(page, name);
+    await page.screenshot({ path: testInfo.outputPath(`${name}.png`) });
+  }
+  expect(errors).toEqual([]);
+  expect(bad).toEqual([]);
 });
 test('gallery covers use eligible variants and revoke independently of the publication', async ({
   page,
@@ -462,7 +467,10 @@ test('keyboard navigation, contrast and category input', async ({ page }) => {
 test('continuous resize and orientation preserve composition and all routes', async ({
   page,
 }, testInfo) => {
-  test.skip(testInfo.project.name !== 'desktop-1440');
+  test.skip(
+    testInfo.project.name !== 'desktop-1440',
+    'Continuous responsive sweep sampled on desktop',
+  );
   await visit(page);
   for (const [width, height] of [
     [320, 640],

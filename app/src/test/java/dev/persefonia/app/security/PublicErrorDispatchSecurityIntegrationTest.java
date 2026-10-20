@@ -57,6 +57,15 @@ class PublicErrorDispatchSecurityIntegrationTest {
     private int port;
 
     @Test
+    void configuredOidcDoesNotCaptureSafePublicMisses() throws Exception {
+        for (String path : java.util.List.of("/unknown", "/contact/", "/search/", "/tr/contact", "/de/projects")) {
+            var response = get(path);
+            assertThat(response.statusCode()).as(path).isEqualTo(404);
+            assertThat(response.headers().firstValue("Location")).isEmpty();
+        }
+    }
+
+    @Test
     void embeddedServletContainerUsesOnlyCookieSessionTracking() {
         assertThat(servletContext.getEffectiveSessionTrackingModes()).isEqualTo(Set.of(SessionTrackingMode.COOKIE));
     }

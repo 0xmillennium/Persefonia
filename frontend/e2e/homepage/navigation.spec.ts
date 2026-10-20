@@ -71,3 +71,38 @@ test('ordinary navigation paints styled source and destination covers before his
   await page.goForward({ waitUntil: 'networkidle' });
   await expect(page.locator('.navigation-cover')).toHaveCount(0);
 });
+
+for (const deliveredFrames of [0, 1]) {
+  test(`teardown invalidates navigation after ${deliveredFrames} cover frames`, async ({
+    page,
+  }) => {
+    await visit(page);
+    const source = page.url();
+    await page.evaluate((deliveredFrames) => {
+      const nativeFrame = window.requestAnimationFrame;
+      const pending: FrameRequestCallback[] = [];
+      window.requestAnimationFrame = (callback) => {
+        pending.push(callback);
+        return pending.length;
+      };
+      (document.querySelector('a[href="/search"]') as HTMLAnchorElement).click();
+      if (deliveredFrames) {
+        const first = pending.splice(0);
+        first.forEach((callback) => callback(performance.now()));
+      }
+      dispatchEvent(new PageTransitionEvent('pagehide', { persisted: false }));
+      window.requestAnimationFrame = nativeFrame;
+      // Cancellation can race a dequeued callback. Lifetime guards must hold even then.
+      pending.forEach((callback) => nativeFrame(callback));
+    }, deliveredFrames);
+    await expect(page.locator('.navigation-cover')).toHaveCount(0);
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        ),
+    );
+    expect(page.url()).toBe(source);
+    await expect(page.locator('[data-home-v2]')).not.toHaveAttribute('data-enhanced');
+  });
+}

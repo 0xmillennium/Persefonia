@@ -1,5 +1,6 @@
 package dev.persefonia.webpublic.tags;
 
+import dev.persefonia.webpublic.PublicDocument;
 import java.util.List;
 import java.util.Objects;
 
@@ -12,7 +13,7 @@ public record PublicTagPage(
         String canonicalUrl,
         boolean noindex,
         List<String> stylesheetPaths,
-        List<PublicTagContentItemView> items) {
+        List<PublicTagContentItemView> items) implements PublicDocument {
     public PublicTagPage {
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(description, "description");

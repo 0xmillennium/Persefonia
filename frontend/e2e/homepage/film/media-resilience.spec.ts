@@ -171,3 +171,35 @@ test('a hung loop retains its poster and explicitly retries native playback', as
     release();
   }
 });
+
+test('a healthy selected poster arriving after timeout recovers without retry or reopening startup', async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let requests = 0;
+  await page.route('**/home-posters/**/robotic-arm/opening.webp*', async (route) => {
+    requests++;
+    await gate;
+    await route.continue();
+  });
+  try {
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('[data-home-v2]')).toHaveAttribute(
+      'data-film-presentation',
+      'unavailable',
+      { timeout: 10000 },
+    );
+    await expect(page.locator('[data-home-loader]')).toBeHidden({ timeout: 15000 });
+    release();
+    await expect(page.locator('[data-home-v2]')).toHaveAttribute('data-startup-state', 'static');
+    await expect(page.locator('[data-home-loader]')).toBeHidden();
+    await expect(page.locator('img[data-film-poster="opening"]:visible')).toHaveCount(1);
+    expect(requests).toBe(1);
+  } finally {
+    release();
+  }
+});

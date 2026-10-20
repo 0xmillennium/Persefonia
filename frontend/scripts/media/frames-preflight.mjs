@@ -1,6 +1,6 @@
 import { readFile, readdir, stat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { output, films, sourceSequence } from './frames-source.mjs';
+import { preparedOutput, films, sourceSequence } from './frames-source.mjs';
 import { hash, verifyDelivery } from './delivery.mjs';
 import { preparation } from './contracts.mjs';
 
@@ -20,7 +20,7 @@ export async function sourceMetadata() {
   }
   return result;
 }
-export async function preflight(directory = `${output}media`) {
+export async function preflight(directory = `${preparedOutput()}media`) {
   const raw = await readFile(`${directory}/manifest.json`, 'utf8'),
     manifest = JSON.parse(raw);
   const { identity, entries, ...contract } = manifest;
@@ -63,6 +63,7 @@ export async function preflight(directory = `${output}media`) {
   return manifest;
 }
 export async function consumeMedia() {
+  const output = preparedOutput();
   const manifest = await preflight();
   const receipt = JSON.parse(
     await readFile(`${output}media/validation-${manifest.identity}.json`, 'utf8'),

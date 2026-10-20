@@ -1,5 +1,6 @@
 package dev.persefonia.webpublic.projects;
 
+import dev.persefonia.webpublic.PublicDocument;
 import dev.persefonia.profileportfolio.application.query.PublicProjectCardView;
 import java.util.List;
 import java.util.Objects;
@@ -12,7 +13,7 @@ public record PublicProjectListingPage(
         boolean noindex,
         PublicProjectPageCopy copy,
         List<String> stylesheetPaths,
-        List<PublicProjectCardView> projects) {
+        List<PublicProjectCardView> projects) implements PublicDocument {
     public PublicProjectListingPage {
         Objects.requireNonNull(title, "title");
         Objects.requireNonNull(htmlLanguage, "htmlLanguage");

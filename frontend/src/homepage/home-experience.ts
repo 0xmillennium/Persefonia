@@ -454,15 +454,17 @@ function mountHomepage(scope: DisposalScope): () => void {
       const anchor = (e.target as Element).closest<HTMLAnchorElement>('a[href^="#"]');
       if (!anchor) return;
       if (anchor.hash === '#work' || anchor.hash === '#writing') {
+        // Apply pending viewport changes before measuring the hash destination.
+        resized();
         gallery.select(anchor.hash === '#writing' ? 'articles' : 'projects');
         travel.resetEntry(gallery.count);
         measure();
         e.preventDefault();
-        scrolling.cancel();
         historyState.cancel();
         filmHandoff.skip();
         filmPacing.reset();
-        window.scrollTo({ top: travelFirst(), behavior: 'instant' });
+        // Match wheelPath's integer stops even in browsers that truncate scroll targets.
+        window.scrollTo({ top: Math.round(travelFirst()), behavior: 'instant' });
         // Make the destination available before transferring keyboard focus.
         cancelAnimationFrame(raf);
         update(performance.now());
