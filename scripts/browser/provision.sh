@@ -22,16 +22,25 @@ args=(install --no-shell)
 if [[ -n "${CI:-}" || -n "${PERSEFONIA_BROWSER_WITH_DEPS:-}" ]]; then
   args+=(--with-deps)
 fi
+media_mode=check
+if [[ "$OSTYPE" == linux* && ( -n "${CI:-}" || -n "${PERSEFONIA_BROWSER_WITH_DEPS:-}" ) ]]; then
+  media_mode=install
+fi
+media_reports=${PERSEFONIA_MEDIA_REPORT_DIR:-${RUNNER_TEMP:+$RUNNER_TEMP/persefonia-media-tools}}
+media_reports=${media_reports:-${PERSEFONIA_BROWSER_ARTIFACT_DIR:-$project_root/app/build/browser}/media-prerequisites}
+python3 "$project_root/scripts/ci/prepare-media-tools.py" --mode "$media_mode" --report-dir "$media_reports"
 cd "$project_root/frontend"
 # Direct installed CLI prevents npx from fetching a different Playwright version.
 node node_modules/playwright/cli.js "${args[@]}" "${engines[@]}"
 if [[ "$OSTYPE" == linux* && ( -n "${CI:-}" || -n "${PERSEFONIA_BROWSER_WITH_DEPS:-}" ) && " ${engines[*]} " == *" firefox "* ]]; then
-  # Playwright 1.57's Ubuntu 24.04 Firefox dependencies omit the system H.264
-  # decoder. Xvfb also needs xauth when supplying Firefox's software GL display.
-  packages=(apt-get install -y --no-install-recommends ffmpeg xauth)
+  # Xvfb needs xauth when supplying Firefox's software GL display. Media tools
+  # have already been prepared for every engine by the shared prerequisite owner.
+  packages=(apt-get install -y --no-install-recommends xauth)
   if (( EUID == 0 )); then
+    apt-get update
     "${packages[@]}"
   else
-    sudo "${packages[@]}"
+    sudo -n apt-get update
+    sudo -n "${packages[@]}"
   fi
 fi

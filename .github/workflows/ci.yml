@@ -156,6 +156,10 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Prepare media tools
+        id: media_tools
+        run: python3 scripts/ci/prepare-media-tools.py --mode install --report-dir "$RUNNER_TEMP/persefonia-media-tools"
+
       - name: Set up Temurin Java 25
         uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
         with:
@@ -219,7 +223,6 @@ jobs:
 
       - name: Record resolved producer environment
         run: |
-          command -v ffprobe ffmpeg
           node frontend/scripts/verification/environment.mjs app/build/ci/environment.json
 
       - name: Verify Java 21 compatibility
@@ -276,12 +279,50 @@ jobs:
             app/build/ci/source-sha.txt
           if-no-files-found: error
           retention-days: 14
+      - name: Finalize media prerequisite diagnostics
+        if: always()
+        env:
+          MEDIA_REPORT_ROOT: ${{ runner.temp }}/persefonia-media-tools
+          MEDIA_STEP_OUTCOME: ${{ steps.media_tools.outcome }}
+          MEDIA_JOB_STATUS: ${{ job.status }}
+          MEDIA_JOB: compare
+        run: |
+          python3 - <<'PYTHON'
+          import json, os, shutil
+          from pathlib import Path
+          target = Path('app/build/ci/media-prerequisites')
+          target.mkdir(parents=True, exist_ok=True)
+          summary = {'kind': 'media-prerequisites-diagnostics', 'job': os.environ['MEDIA_JOB'],
+                     'stepOutcome': os.environ.get('MEDIA_STEP_OUTCOME') or 'not-started',
+                     'jobStatus': os.environ['MEDIA_JOB_STATUS'], 'setupRecords': 'unavailable'}
+          status = target/'job-status.json'
+          status.write_text(json.dumps(summary, indent=2)+'\n')
+          source = Path(os.environ['MEDIA_REPORT_ROOT'])
+          try:
+              if source.is_dir() and not source.is_symlink():
+                  for invocation in sorted(source.glob('invocation-*')):
+                      if not invocation.is_dir() or invocation.is_symlink(): continue
+                      for item in invocation.iterdir():
+                          if item.is_symlink() or not item.is_file(): continue
+                          if item.name != 'setup.json' and item.suffix != '.log': continue
+                          destination = target/invocation.name/item.name
+                          destination.parent.mkdir(parents=True, exist_ok=True)
+                          shutil.copyfile(item, destination)
+                          if item.name == 'setup.json': summary['setupRecords'] = 'available'
+          except OSError as error:
+              summary['diagnosticError'] = str(error)
+              raise
+          finally:
+              status.write_text(json.dumps(summary, indent=2)+'\n')
+          PYTHON
+
       - name: Retain comparison diagnostics
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: persefonia-comparison-diagnostics-${{ github.sha }}
           path: |
+            app/build/ci/media-prerequisites/**
             app/build/ci/*.json*
             app/build/ci/*.log
             **/build/qualification/*.json
@@ -327,6 +368,10 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      - name: Prepare media tools
+        id: media_tools
+        run: python3 scripts/ci/prepare-media-tools.py --mode install --report-dir "$RUNNER_TEMP/persefonia-media-tools"
 
       - name: Set up Temurin Java 25
         uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
@@ -391,7 +436,6 @@ jobs:
 
       - name: Record resolved producer environment
         run: |
-          command -v ffprobe ffmpeg
           node frontend/scripts/verification/environment.mjs app/build/ci/environment.json
 
       - name: Verify Java 21 compatibility
@@ -428,12 +472,50 @@ jobs:
             app/build/ci/source-sha.txt
           if-no-files-found: error
           retention-days: 14
+      - name: Finalize media prerequisite diagnostics
+        if: always()
+        env:
+          MEDIA_REPORT_ROOT: ${{ runner.temp }}/persefonia-media-tools
+          MEDIA_STEP_OUTCOME: ${{ steps.media_tools.outcome }}
+          MEDIA_JOB_STATUS: ${{ job.status }}
+          MEDIA_JOB: build-jvm
+        run: |
+          python3 - <<'PYTHON'
+          import json, os, shutil
+          from pathlib import Path
+          target = Path('app/build/ci/media-prerequisites')
+          target.mkdir(parents=True, exist_ok=True)
+          summary = {'kind': 'media-prerequisites-diagnostics', 'job': os.environ['MEDIA_JOB'],
+                     'stepOutcome': os.environ.get('MEDIA_STEP_OUTCOME') or 'not-started',
+                     'jobStatus': os.environ['MEDIA_JOB_STATUS'], 'setupRecords': 'unavailable'}
+          status = target/'job-status.json'
+          status.write_text(json.dumps(summary, indent=2)+'\n')
+          source = Path(os.environ['MEDIA_REPORT_ROOT'])
+          try:
+              if source.is_dir() and not source.is_symlink():
+                  for invocation in sorted(source.glob('invocation-*')):
+                      if not invocation.is_dir() or invocation.is_symlink(): continue
+                      for item in invocation.iterdir():
+                          if item.is_symlink() or not item.is_file(): continue
+                          if item.name != 'setup.json' and item.suffix != '.log': continue
+                          destination = target/invocation.name/item.name
+                          destination.parent.mkdir(parents=True, exist_ok=True)
+                          shutil.copyfile(item, destination)
+                          if item.name == 'setup.json': summary['setupRecords'] = 'available'
+          except OSError as error:
+              summary['diagnosticError'] = str(error)
+              raise
+          finally:
+              status.write_text(json.dumps(summary, indent=2)+'\n')
+          PYTHON
+
       - name: Upload build diagnostics
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: persefonia-build-diagnostics-${{ github.sha }}
           path: |
+            app/build/ci/media-prerequisites/**
             **/build/reports/tests/**
             **/build/test-results/**
             **/build/qualification/**
@@ -457,6 +539,10 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Prepare media tools
+        id: media_tools
+        run: python3 scripts/ci/prepare-media-tools.py --mode install --report-dir "$RUNNER_TEMP/persefonia-media-tools"
+
       - name: Set up Temurin Java 25
         uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
         with:
@@ -468,12 +554,6 @@ jobs:
           node-version: "22"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - name: Require media validation prerequisites
-        run: |
-          command -v ffprobe ffmpeg
-          ffprobe -version
-          ffmpeg -version
-
       - name: Restore locked frontend dependencies
         run: python3 scripts/ci/measure.py npm-ci app/build/ci/timings.jsonl npm ci --prefix frontend
 
@@ -490,12 +570,50 @@ jobs:
             app/build/ci/frontend.json
           if-no-files-found: error
           retention-days: 14
+      - name: Finalize media prerequisite diagnostics
+        if: always()
+        env:
+          MEDIA_REPORT_ROOT: ${{ runner.temp }}/persefonia-media-tools
+          MEDIA_STEP_OUTCOME: ${{ steps.media_tools.outcome }}
+          MEDIA_JOB_STATUS: ${{ job.status }}
+          MEDIA_JOB: frontend
+        run: |
+          python3 - <<'PYTHON'
+          import json, os, shutil
+          from pathlib import Path
+          target = Path('app/build/ci/media-prerequisites')
+          target.mkdir(parents=True, exist_ok=True)
+          summary = {'kind': 'media-prerequisites-diagnostics', 'job': os.environ['MEDIA_JOB'],
+                     'stepOutcome': os.environ.get('MEDIA_STEP_OUTCOME') or 'not-started',
+                     'jobStatus': os.environ['MEDIA_JOB_STATUS'], 'setupRecords': 'unavailable'}
+          status = target/'job-status.json'
+          status.write_text(json.dumps(summary, indent=2)+'\n')
+          source = Path(os.environ['MEDIA_REPORT_ROOT'])
+          try:
+              if source.is_dir() and not source.is_symlink():
+                  for invocation in sorted(source.glob('invocation-*')):
+                      if not invocation.is_dir() or invocation.is_symlink(): continue
+                      for item in invocation.iterdir():
+                          if item.is_symlink() or not item.is_file(): continue
+                          if item.name != 'setup.json' and item.suffix != '.log': continue
+                          destination = target/invocation.name/item.name
+                          destination.parent.mkdir(parents=True, exist_ok=True)
+                          shutil.copyfile(item, destination)
+                          if item.name == 'setup.json': summary['setupRecords'] = 'available'
+          except OSError as error:
+              summary['diagnosticError'] = str(error)
+              raise
+          finally:
+              status.write_text(json.dumps(summary, indent=2)+'\n')
+          PYTHON
+
       - name: Retain frontend diagnostics
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: persefonia-frontend-diagnostics-${{ github.sha }}
           path: |
+            app/build/ci/media-prerequisites/**
             frontend/test-results/unit*.json
             frontend/test-results/segmented-identity/*summary.json
             app/build/ci/timings.jsonl
@@ -602,6 +720,10 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Prepare media tools
+        id: media_tools
+        run: python3 scripts/ci/prepare-media-tools.py --mode install --report-dir "$RUNNER_TEMP/persefonia-media-tools"
+
       - name: Set up Temurin Java 21
         uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
         with:
@@ -672,12 +794,50 @@ jobs:
         if: always()
         run: python3 scripts/ci/validate-traces.py frontend/test-results app/build/browser/trace-validation.json
 
+      - name: Finalize media prerequisite diagnostics
+        if: always()
+        env:
+          MEDIA_REPORT_ROOT: ${{ runner.temp }}/persefonia-media-tools
+          MEDIA_STEP_OUTCOME: ${{ steps.media_tools.outcome }}
+          MEDIA_JOB_STATUS: ${{ job.status }}
+          MEDIA_JOB: browser
+        run: |
+          python3 - <<'PYTHON'
+          import json, os, shutil
+          from pathlib import Path
+          target = Path('app/build/ci/media-prerequisites')
+          target.mkdir(parents=True, exist_ok=True)
+          summary = {'kind': 'media-prerequisites-diagnostics', 'job': os.environ['MEDIA_JOB'],
+                     'stepOutcome': os.environ.get('MEDIA_STEP_OUTCOME') or 'not-started',
+                     'jobStatus': os.environ['MEDIA_JOB_STATUS'], 'setupRecords': 'unavailable'}
+          status = target/'job-status.json'
+          status.write_text(json.dumps(summary, indent=2)+'\n')
+          source = Path(os.environ['MEDIA_REPORT_ROOT'])
+          try:
+              if source.is_dir() and not source.is_symlink():
+                  for invocation in sorted(source.glob('invocation-*')):
+                      if not invocation.is_dir() or invocation.is_symlink(): continue
+                      for item in invocation.iterdir():
+                          if item.is_symlink() or not item.is_file(): continue
+                          if item.name != 'setup.json' and item.suffix != '.log': continue
+                          destination = target/invocation.name/item.name
+                          destination.parent.mkdir(parents=True, exist_ok=True)
+                          shutil.copyfile(item, destination)
+                          if item.name == 'setup.json': summary['setupRecords'] = 'available'
+          except OSError as error:
+              summary['diagnosticError'] = str(error)
+              raise
+          finally:
+              status.write_text(json.dumps(summary, indent=2)+'\n')
+          PYTHON
+
       - name: Upload browser diagnostics
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: persefonia-browser-${{ matrix.name }}-${{ github.sha }}
           path: |
+            app/build/ci/media-prerequisites/**
             frontend/playwright-report/**
             frontend/test-results/**
             app/build/browser/**

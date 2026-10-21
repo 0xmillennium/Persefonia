@@ -369,8 +369,8 @@ class CiWorkflowContractTest {
         assertThat(workflow.step("frontend", "Execute complete frontend discovery and stress").get("run"))
                 .asString().contains("unit-run.mjs").doesNotContain("test:unit");
         assertThat(workflow.step("frontend", "Set up Temurin Java 25")).isNotEmpty();
-        assertThat(workflow.step("frontend", "Require media validation prerequisites").get("run"))
-                .asString().contains("ffprobe", "ffmpeg");
+        assertThat(workflow.step("frontend", "Prepare media tools").get("run"))
+                .asString().contains("prepare-media-tools.py", "--mode install");
         assertThat(WorkflowDocument.map(workflow.step("eligibility", "Evaluate inexpensive trusted master eligibility").get("env")))
                 .containsEntry("CI_QUALIFICATION_REUSE", "${{ vars.CI_QUALIFICATION_REUSE }}");
         assertThat(workflow.job("compare").get("if")).isEqualTo("needs.eligibility.outputs.eligible == 'true'");

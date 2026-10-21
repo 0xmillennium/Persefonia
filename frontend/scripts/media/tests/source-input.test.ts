@@ -1,5 +1,14 @@
 import { expect, it } from 'vitest';
-import { mkdtemp, writeFile, symlink, rm, access, readdir, readFile } from 'node:fs/promises';
+import {
+  mkdtemp,
+  writeFile,
+  symlink,
+  rm,
+  access,
+  readdir,
+  readFile,
+  chmod,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
@@ -74,4 +83,39 @@ it('reports missing encoding tools as a prerequisite failure, not invalid media'
   expect(() => requireMediaTools({ PATH: '/nonexistent-media-tool-path' })).toThrow(
     'Missing media prerequisite: ffprobe',
   );
+});
+
+it('checks each media executable independently with a PATH isolated from host tools', async () => {
+  const directory = await mkdtemp(`${tmpdir()}/media-tools-test-`);
+  const log = `${directory}/calls`;
+  try {
+    for (const missing of ['ffprobe', 'ffmpeg', 'both', 'neither']) {
+      await writeFile(log, '');
+      for (const tool of ['ffprobe', 'ffmpeg']) {
+        const path = `${directory}/${tool}`;
+        await rm(path, { force: true });
+        if (missing === tool || missing === 'both') continue;
+        await writeFile(
+          path,
+          `#!/bin/sh\nprintf '%s\\n' '${tool} -version' >> "$MEDIA_FIXTURE_LOG"\nprintf '%s\\n' '${tool} version fixture'\n`,
+        );
+        await chmod(path, 0o755);
+      }
+      const check = () => requireMediaTools({ PATH: directory, MEDIA_FIXTURE_LOG: log });
+      if (missing === 'neither') {
+        expect(check).not.toThrow();
+        expect(await readFile(log, 'utf8')).toBe('ffprobe -version\nffmpeg -version\n');
+      } else {
+        expect(check).toThrow(
+          `Missing media prerequisite: ${missing === 'both' ? 'ffprobe' : missing}`,
+        );
+      }
+    }
+    await writeFile(`${directory}/ffmpeg`, '#!/bin/sh\nexit 7\n');
+    expect(() => requireMediaTools({ PATH: directory })).toThrow(
+      'Missing media prerequisite: ffmpeg',
+    );
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });
