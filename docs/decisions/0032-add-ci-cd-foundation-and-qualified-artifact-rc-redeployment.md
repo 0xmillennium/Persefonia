@@ -6,7 +6,7 @@
 | Date | 2026-09-29 |
 | Scope | architecture / operations / security |
 | Supersedes | none |
-| Superseded by | none |
+| Superseded by | ADR 0040 |
 
 ## Context
 

@@ -1,5 +1,5 @@
 // DOM-fallback gesture coverage: film WebGL is disabled; this does not qualify GPU frame delivery.
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from '../../support/test';
 import { openHomepage } from '../../support/homepage';
 
 test.afterEach(({}, info) => {

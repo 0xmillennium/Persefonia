@@ -1,5 +1,5 @@
 import { openHomepage } from '../../support/homepage';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from '../../support/test';
 
 const root = (page: Page) => page.locator('[data-scene="gallery"]');
 async function enter(page: Page, category: string) {

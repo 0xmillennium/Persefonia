@@ -86,3 +86,6 @@ Use [TEMPLATE.md](TEMPLATE.md) for new decision records.
 - [ADR 0036: Version Homepage Film Delivery Assets With the Application](0036-version-homepage-film-delivery-assets-with-the-application.md) — superseded by ADR 0038; records the original versioned film/poster delivery and ignored local-source publication policy.
 - [ADR 0037: Bound Ignored Local Workspaces to Active Task Context](0037-bound-ignored-local-workspaces-to-active-task-context.md) — supersedes ADR 0034; bounds local context to TODO, concise tooling guidance and active tasks with explicit evidence-retention conditions.
 - [ADR 0038: Keep Original Media External and Publish Versioned Delivery Assets](0038-keep-original-media-external-and-publish-versioned-delivery-assets.md) — supersedes ADR 0036; keeps originals external and intermediates disposable while preserving qualified, self-hosted delivery and source-independent builds.
+
+- [ADR 0039: Separate Frontend and JVM CI Qualification](0039-separate-frontend-and-jvm-ci-qualification.md) — supersedes only ADR 0031 scheduling; preserves complete local checks and isolated native evidence.
+- [ADR 0040: Compare Master Builds Before Reusing PR Qualification](0040-compare-master-builds-before-reusing-pr-qualification.md) — narrowly supersedes ADRs 0022/0032 qualification/handoff statements; defaults to shadow and preserves immutable OCI delivery.

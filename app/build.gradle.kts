@@ -144,8 +144,14 @@ tasks.withType<Test>().configureEach {
     }
 }
 
+val jvmCheck by tasks.registering {
+    group = "verification"
+    description = "Runs application JVM, integration and migration checks in the producer workspace."
+    dependsOn(tasks.test, integrationTest, migrationTest)
+}
+
 tasks.check {
-    dependsOn(integrationTest, migrationTest)
+    dependsOn(jvmCheck)
 }
 
 val frontendDirectory = rootProject.layout.projectDirectory.dir("frontend")
@@ -196,8 +202,14 @@ val npmRunUnitTest by tasks.registering(Exec::class) {
     )
 }
 
-tasks.check {
+val frontendCheck by tasks.registering {
+    group = "verification"
+    description = "Runs independently reconciled full frontend unit and both 100-seed stress pipelines."
     dependsOn(npmRunUnitTest)
+}
+
+tasks.check {
+    dependsOn(frontendCheck)
 }
 
 val viteBuild by tasks.registering(Exec::class) {

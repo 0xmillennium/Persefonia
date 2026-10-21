@@ -3,7 +3,12 @@ import { mkdtemp, writeFile, symlink, rm, access, readdir, readFile } from 'node
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { sourceArguments, externalSource, withMediaWorkspace } from '../source-input.mjs';
+import {
+  sourceArguments,
+  externalSource,
+  withMediaWorkspace,
+  requireMediaTools,
+} from '../source-input.mjs';
 
 it('requires explicit original paths and rejects repository files through symlinks', async () => {
   expect(() => sourceArguments(['arm', 'tree'], ['--arm', '/original.mp4'])).toThrow('--tree');
@@ -56,9 +61,17 @@ it('rejects invalid original video and cleans its workspace before touching publ
       { env: { ...process.env, TMPDIR: directory }, encoding: 'utf8' },
     );
     expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('Invalid data found when processing input');
+    expect(result.stderr).not.toContain('Missing media prerequisite');
     expect((await readdir(directory)).sort()).toEqual(['invalid.mp4']);
     expect(await readFile(manifest)).toEqual(before);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
+});
+
+it('reports missing encoding tools as a prerequisite failure, not invalid media', () => {
+  expect(() => requireMediaTools({ PATH: '/nonexistent-media-tool-path' })).toThrow(
+    'Missing media prerequisite: ffprobe',
+  );
 });

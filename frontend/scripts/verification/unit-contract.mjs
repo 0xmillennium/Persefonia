@@ -40,6 +40,16 @@ export function validateUnitExecution(discovered, report, scalar, live) {
   const cases = report.testResults.flatMap((file) =>
     file.assertionResults.map((test) => ({ file: file.name, ...test })),
   );
+  const expected = discovered.map((test) => JSON.stringify([test.file, test.name])).sort();
+  const actual = cases
+    .map((test) => JSON.stringify([test.file, [...test.ancestorTitles, test.title].join(' > ')]))
+    .sort();
+  if (
+    expected.length !== actual.length ||
+    expected.some((id, index) => id !== actual[index]) ||
+    discovered.some((test) => typeof test.name !== 'string' || !test.name)
+  )
+    throw new Error('Incomplete or unexpected expanded unit identities');
   if (
     !cases.length ||
     cases.length !== report.numTotalTests ||
@@ -68,4 +78,36 @@ export function validateUnitExecution(discovered, report, scalar, live) {
   )
     throw new Error('Incomplete scalar/live stress signal');
   return cases;
+}
+
+export function validateUnitPhases(cases, phases) {
+  if (
+    !Array.isArray(phases) ||
+    phases.some(
+      (phase) =>
+        phase.state !== 'passed' || !Number.isFinite(phase.durationMs) || phase.durationMs < 0,
+    )
+  )
+    throw new Error('Incomplete or failed monotonic unit phases');
+  sameInventory(
+    [...new Set(cases.map((test) => test.file))],
+    phases.map((phase) => phase.file),
+  );
+}
+
+/** Compare evidence as JSON data, independent of producer key order and workspace root. */
+export function unitEvidenceInventory(rows) {
+  const normalize = (value) =>
+    typeof value === 'string'
+      ? value.replace(/^.*\/frontend\//, 'frontend/')
+      : Array.isArray(value)
+        ? value.map(normalize)
+        : value && typeof value === 'object'
+          ? Object.fromEntries(
+              Object.entries(value)
+                .sort(([a], [b]) => a.localeCompare(b))
+                .map(([key, item]) => [key, normalize(item)]),
+            )
+          : value;
+  return rows.map((row) => JSON.stringify(normalize(row))).sort();
 }

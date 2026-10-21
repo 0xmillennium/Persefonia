@@ -26,7 +26,7 @@ if [[ "$OSTYPE" == linux* && -z "${DISPLAY:-}" && "$browser_suite" != chromium &
   fi
   browser_display=(xvfb-run --auto-servernum)
 fi
-phase_started_ns=$(date +%s%N)
+phase_started_ns=$(python3 -c 'import time; print(time.monotonic_ns())')
 media_dir="$artifact_dir/media"
 mkdir -p "$media_dir/original"
 mkdir -p "$media_dir/variants"
@@ -38,11 +38,23 @@ postgres_image="${POSTGRES_IMAGE:-postgres:17.11-alpine@sha256:18cfe3ef5e6815560
 printf 'Browser PostgreSQL image: %s\n' "$postgres_image"
 app_pid=""
 cleanup() {
+  local status=$? cleanup_started_ns deadline cleanup_exit=0
+  trap - EXIT
+  cleanup_started_ns=$(python3 -c 'import time; print(time.monotonic_ns())')
   if [[ -n "$app_pid" ]]; then
-    kill "$app_pid" 2>/dev/null || true
+    kill -TERM "$app_pid" 2>/dev/null || true
+    deadline=$((SECONDS + 10))
+    while kill -0 "$app_pid" 2>/dev/null && (( SECONDS < deadline )); do sleep 1; done
+    if kill -0 "$app_pid" 2>/dev/null; then kill -KILL "$app_pid" 2>/dev/null || true; fi
     wait "$app_pid" 2>/dev/null || true
   fi
-  docker rm -f "$container_name" >/dev/null 2>&1 || true
+  if ! timeout 15s docker rm -f "$container_name" >/dev/null 2>&1; then
+    cleanup_exit=1
+    printf '%s\n' 'Disposable browser database cleanup failed' > "$artifact_dir/cleanup-error.txt"
+    if (( status == 0 )); then status=1; fi
+  fi
+  python3 "$project_root/scripts/ci/record-timing.py" "$PERSEFONIA_TIMINGS_FILE" cleanup "$cleanup_started_ns" "$cleanup_exit" || true
+  exit "$status"
 }
 trap cleanup EXIT
 
@@ -57,7 +69,7 @@ for _ in $(seq 1 60); do
 done
 docker exec "$container_name" pg_isready -h 127.0.0.1 -U persefonia_browser -d persefonia_browser
 python3 "$project_root/scripts/ci/record-timing.py" "$PERSEFONIA_TIMINGS_FILE" database "$phase_started_ns"
-phase_started_ns=$(date +%s%N)
+phase_started_ns=$(python3 -c 'import time; print(time.monotonic_ns())')
 port_mapping="$(docker port "$container_name" 5432/tcp)"
 db_port="${port_mapping##*:}"
 app_port="${PERSEFONIA_BROWSER_PORT:-18080}"
@@ -87,7 +99,7 @@ for _ in $(seq 1 90); do
 done
 curl --fail --silent "$PERSEFONIA_BROWSER_URL/robots.txt" > /dev/null
 python3 "$project_root/scripts/ci/record-timing.py" "$PERSEFONIA_TIMINGS_FILE" application "$phase_started_ns"
-phase_started_ns=$(date +%s%N)
+phase_started_ns=$(python3 -c 'import time; print(time.monotonic_ns())')
 docker exec -i "$container_name" psql --set ON_ERROR_STOP=1 -U persefonia_browser -d persefonia_browser \
   < "$project_root/frontend/e2e/fixtures/content.sql" > "$artifact_dir/fixture.log"
 if ! curl --fail --silent --show-error "$PERSEFONIA_BROWSER_URL/" > /dev/null; then

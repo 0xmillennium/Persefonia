@@ -45,7 +45,8 @@ class WorkflowSecurityPolicyTest {
                     var job = WorkflowDocument.map(entry.getValue());
                     assertNoJobLevelUses(path.getFileName().toString(), jobId, job);
                     assertThat(job).containsKeys("timeout-minutes", "permissions");
-                    assertThat(((Number) job.get("timeout-minutes")).intValue()).isBetween(1, 30);
+                    int maximum = path.getFileName().toString().equals("ci.yml") && jobId.equals("browser") ? 35 : 30;
+                    assertThat(((Number) job.get("timeout-minutes")).intValue()).isBetween(1, maximum);
                     var permissions = WorkflowDocument.map(job.get("permissions"));
                     for (var permission : permissions.entrySet()) {
                         String name = permission.getKey();
@@ -56,7 +57,10 @@ class WorkflowSecurityPolicyTest {
                             assertThat(workflow.root().get("name")).isEqualTo("Delivery");
                             assertThat(jobId).isIn("publish-candidate", "publish-source-alias");
                         } else if (level.equals("read")) {
-                            assertThat(name).isIn(READ_PERMISSIONS);
+                            if (name.equals("pull-requests")) {
+                                assertThat(path.getFileName().toString()).isEqualTo("ci.yml");
+                                assertThat(jobId).isEqualTo("eligibility");
+                            } else assertThat(name).isIn(READ_PERMISSIONS);
                         }
                     }
                     for (Object stepValue : workflow.steps(jobId)) {

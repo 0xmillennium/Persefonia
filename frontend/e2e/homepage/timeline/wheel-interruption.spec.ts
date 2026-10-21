@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../../support/test';
 
 test('wheel input ends a gallery drag without a later release changing its destination', async ({
   page,

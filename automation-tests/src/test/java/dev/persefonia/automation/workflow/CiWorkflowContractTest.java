@@ -43,7 +43,7 @@ class CiWorkflowContractTest {
         assertDigestPinnedServices(workflow);
         for (String mutable : List.of("postgres:17", "redis:latest", "redis@sha256:short")) {
             WorkflowDocument changed = openCi();
-            WorkflowDocument.map(WorkflowDocument.map(changed.job("verify").get("services")).get("redis"))
+            WorkflowDocument.map(WorkflowDocument.map(changed.job("build-jvm").get("services")).get("redis"))
                     .put("image", mutable);
             assertThatThrownBy(() -> assertDigestPinnedServices(changed)).as(mutable)
                     .isInstanceOf(AssertionError.class);
@@ -53,13 +53,15 @@ class CiWorkflowContractTest {
     @Test
     void browserQualificationUsesTheCiPostgresImage() throws IOException {
         String ciImage = (String) WorkflowDocument.map(
-                WorkflowDocument.map(workflow.job("verify").get("services")).get("postgres")).get("image");
+                WorkflowDocument.map(workflow.job("build-jvm").get("services")).get("postgres")).get("image");
         String script = Files.readString(Path.of("../scripts/browser/check.sh"));
         Matcher defaultImage = Pattern.compile("(?m)^postgres_image=\"\\$\\{POSTGRES_IMAGE:-([^}\\r\\n]+)}\"$")
                 .matcher(script);
         assertThat(defaultImage.find()).isTrue();
         assertThat(defaultImage.group(1)).matches("[^\\s@]+@sha256:[0-9a-f]{64}").isEqualTo(ciImage);
         assertThat(script).contains("docker run", "\"$postgres_image\"");
+        String server = Files.readString(Path.of("../app/src/integrationTest/java/dev/persefonia/app/testsupport/SharedPostgresTestServer.java"));
+        assertThat(server).contains(ciImage, "asCompatibleSubstituteFor(\"postgres\")", "getImageId()");
     }
 
     @Test
@@ -67,7 +69,7 @@ class CiWorkflowContractTest {
         Object localYaml = new Load(LoadSettings.builder().build())
                 .loadFromString(Files.readString(Path.of("../compose.yaml")));
         Map<String, Object> localServices = WorkflowDocument.map(WorkflowDocument.map(localYaml).get("services"));
-        Map<String, Object> ciServices = WorkflowDocument.map(workflow.job("verify").get("services"));
+        Map<String, Object> ciServices = WorkflowDocument.map(workflow.job("build-jvm").get("services"));
         for (String service : List.of("postgres", "redis")) {
             assertThat(WorkflowDocument.map(localServices.get(service)).get("image"))
                     .as(service).isEqualTo(WorkflowDocument.map(ciServices.get(service)).get("image"));
@@ -76,14 +78,14 @@ class CiWorkflowContractTest {
 
     @Test
     void verifyChecksTheLocalComposeContract() {
-        assertThat(workflow.step("verify", "Validate local Compose contract").get("run"))
+        assertThat(workflow.step("build-jvm", "Validate local Compose contract").get("run"))
                 .asString().contains("./scripts/ci/verify-local-compose.sh");
         try {
             Object localYaml = new Load(LoadSettings.builder().build())
                     .loadFromString(Files.readString(Path.of("../compose.yaml")));
             String appImage = (String) WorkflowDocument.map(
                     WorkflowDocument.map(WorkflowDocument.map(localYaml).get("services")).get("app")).get("image");
-            assertThat(workflow.step("verify", "Verify development toolchain platforms").get("run"))
+            assertThat(workflow.step("build-jvm", "Verify development toolchain platforms").get("run"))
                     .asString().contains("verify-image-platforms.sh", appImage, "supported-platforms.txt contains");
         } catch (IOException exception) {
             throw new IllegalStateException(exception);
@@ -117,7 +119,7 @@ class CiWorkflowContractTest {
     }
 
     private static void assertDigestPinnedServices(WorkflowDocument ci) {
-        Map<String, Object> services = WorkflowDocument.map(ci.job("verify").get("services"));
+        Map<String, Object> services = WorkflowDocument.map(ci.job("build-jvm").get("services"));
         assertThat(services).containsOnlyKeys("postgres", "redis");
         for (var service : services.entrySet()) {
             assertThat((String) WorkflowDocument.map(service.getValue()).get("image"))
@@ -128,17 +130,17 @@ class CiWorkflowContractTest {
 
     @Test
     void automationFailsBeforeApplicationInfrastructureStarts() {
-        assertThat(workflow.jobs()).containsOnlyKeys("automation", "verify", "browser", "browser-receipts", "gate");
+        assertThat(workflow.jobs()).containsOnlyKeys("automation", "eligibility", "compare", "build-jvm", "frontend", "verify", "browser", "browser-receipts", "gate");
         Map<String, Object> automation = workflow.job("automation");
-        Map<String, Object> verify = workflow.job("verify");
+        Map<String, Object> verify = workflow.job("build-jvm");
         assertThat(WorkflowDocument.map(automation.get("permissions")))
                 .containsExactlyInAnyOrderEntriesOf(Map.of("contents", "read"));
         assertThat(WorkflowDocument.map(verify.get("permissions")))
                 .containsExactlyInAnyOrderEntriesOf(Map.of("contents", "read"));
         assertThat(automation).doesNotContainKeys("services");
         assertThat(automation.get("needs")).isNull();
-        assertThat(verify.get("needs")).isEqualTo("automation");
-        assertThat(workflow.job("browser").get("needs")).isEqualTo("verify");
+        assertThat(WorkflowDocument.list(verify.get("needs"))).containsExactlyInAnyOrder("automation", "eligibility", "compare");
+        assertThat(workflow.job("browser").get("needs")).isEqualTo("build-jvm");
         assertThat(workflow.job("browser")).doesNotContainKeys("services", "environment");
         assertThat(WorkflowDocument.map(workflow.job("browser").get("permissions")))
                 .containsExactlyInAnyOrderEntriesOf(Map.of("contents", "read"));
@@ -152,8 +154,8 @@ class CiWorkflowContractTest {
                 .asString().contains("./scripts/ci/verify-automation-source.sh");
         assertThat(workflow.step("automation", "Verify automation contracts").get("run"))
                 .asString().contains("automationCheck");
-        assertThat(workflow.step("verify", "Build and test").get("run"))
-                .asString().contains("applicationCheck", ":app:bootJar");
+        assertThat(workflow.step("build-jvm", "Build and test").get("run"))
+                .asString().contains("applicationJvmCheck", ":app:bootJar");
     }
 
     @Test
@@ -186,19 +188,19 @@ class CiWorkflowContractTest {
     void verifyRequiresProductionFrontendQualification() {
         assertProductionFrontendQualification(workflow);
         WorkflowDocument missing = openCi();
-        WorkflowDocument.list(missing.job("verify").get("steps")).removeIf(step ->
+        WorkflowDocument.list(missing.job("build-jvm").get("steps")).removeIf(step ->
                 "Verify production frontend ownership and generated assets".equals(WorkflowDocument.map(step).get("name")));
         assertThatThrownBy(() -> assertProductionFrontendQualification(missing)).isInstanceOf(AssertionError.class);
     }
 
     private static void assertProductionFrontendQualification(WorkflowDocument ci) {
-        assertThat(ci.steps("verify").stream().map(WorkflowDocument::map)
+        assertThat(ci.steps("build-jvm").stream().map(WorkflowDocument::map)
                 .map(step -> (String) step.get("name")))
                 .containsSubsequence("Build and test", "Verify production frontend ownership and generated assets",
                         "Set up Temurin Java 21", "Verify Java 21 compatibility", "Upload browser qualification input");
-        assertThat(ci.step("verify", "Build and test").get("run"))
-                .isEqualTo("python3 scripts/ci/measure.py build-and-test app/build/ci/timings.jsonl ./gradlew --no-daemon --stacktrace clean applicationCheck :app:bootJar --profile");
-        assertThat(ci.step("verify", "Verify production frontend ownership and generated assets").get("run"))
+        assertThat(ci.step("build-jvm", "Build and test").get("run"))
+                .isEqualTo("python3 scripts/ci/measure.py build-and-test app/build/ci/timings.jsonl ./gradlew --no-daemon --stacktrace clean applicationJvmCheck :app:bootJar qualificationInputs --profile");
+        assertThat(ci.step("build-jvm", "Verify production frontend ownership and generated assets").get("run"))
                 .asString().contains("npm run check:boundaries", "npm run check:generated", "npm run format:check");
         assertBrowserQualification(ci);
     }
@@ -211,7 +213,7 @@ class CiWorkflowContractTest {
     }
 
     private static void assertBrowserQualification(WorkflowDocument ci) {
-        assertThat(ci.job("browser").get("needs")).isEqualTo("verify");
+        assertThat(ci.job("browser").get("needs")).isEqualTo("build-jvm");
         Map<String, Object> strategy = WorkflowDocument.map(ci.job("browser").get("strategy"));
         assertThat(strategy.get("fail-fast")).isEqualTo(false);
         var matrix = WorkflowDocument.list(WorkflowDocument.map(strategy.get("matrix")).get("include"));
@@ -234,7 +236,7 @@ class CiWorkflowContractTest {
                 .containsSubsequence("Set up Temurin Java 21", "Set up Node 22", "Download verified BootJar",
                         "Stage verified browser artifact", "Install browser matrix",
                         "Qualify production homepage and browser matrix");
-        var input = ci.step("verify", "Upload browser qualification input");
+        var input = ci.step("build-jvm", "Upload browser qualification input");
         assertThat(input).doesNotContainKey("if");
         assertThat(WorkflowDocument.map(input.get("with")))
                 .containsEntry("name", "persefonia-browser-input-${{ github.sha }}")
@@ -264,7 +266,7 @@ class CiWorkflowContractTest {
     void browserReceiptsRequireIndependentCompleteDiscoveryAndExactArtifactIdentity() {
         var receipts = workflow.job("browser-receipts");
         assertThat(receipts.get("if")).isEqualTo("always()");
-        assertThat(WorkflowDocument.list(receipts.get("needs"))).containsExactlyInAnyOrder("verify", "browser");
+        assertThat(WorkflowDocument.list(receipts.get("needs"))).containsExactlyInAnyOrder("eligibility", "compare", "build-jvm", "browser");
         assertThat(workflow.step("browser-receipts", "Reconcile independent discovery and execution").get("run"))
                 .asString().contains("npm ci --prefix frontend", "browser-join.mjs");
         var download = WorkflowDocument.map(workflow.step("browser-receipts", "Download browser receipts").get("with"));
@@ -273,37 +275,77 @@ class CiWorkflowContractTest {
         assertThat(WorkflowDocument.map(workflow.step("browser", "Upload browser verification receipts").get("with")))
                 .containsEntry("if-no-files-found", "error").containsEntry("retention-days", 14);
         assertThat(workflow.step("browser", "Upload browser verification receipts").get("if")).isEqualTo("always()");
-        assertThat(workflow.step("verify", "Verify BootJar").get("run")).asString().contains("source-sha.txt", "$GITHUB_SHA");
+        assertFinalizedTimingHandoff(workflow);
+        assertThat(workflow.step("build-jvm", "Verify BootJar").get("run")).asString().contains("source-sha.txt", "$GITHUB_SHA");
         assertThat(workflow.step("browser", "Stage verified browser artifact").get("run")).asString().contains("source-sha.txt", "$GITHUB_SHA");
     }
 
+
     @Test
-    void stableGateRequiresAllResultsAndHasNoRepositoryOrSecretAccess() {
-        Map<String, Object> gate = workflow.job("gate");
-        assertThat(WorkflowDocument.list(gate.get("needs"))).containsExactlyInAnyOrder("automation", "verify", "browser", "browser-receipts");
-        assertThat(gate.get("if")).isEqualTo("always()");
-        assertThat(WorkflowDocument.map(gate.get("permissions"))).isEmpty();
-        assertThat(gate).doesNotContainKeys("services", "environment");
-        assertThat(workflow.steps("gate")).hasSize(1);
-        Map<String, Object> step = WorkflowDocument.map(workflow.steps("gate").getFirst());
-        assertThat(step).doesNotContainKeys("uses", "secrets");
-        assertThat(WorkflowDocument.map(step.get("env"))).containsKeys("AUTOMATION_RESULT", "VERIFY_RESULT", "BROWSER_RESULT", "RECEIPTS_RESULT");
-        assertThat((String) step.get("run")).contains("$AUTOMATION_RESULT", "$VERIFY_RESULT", "$BROWSER_RESULT", "$RECEIPTS_RESULT", "success");
+    void browserTimingRetentionCannotBeDroppedFromSuccessfulReceiptArtifacts() throws IOException {
+        WorkflowDocument changed = WorkflowDocument.open("ci.yml");
+        WorkflowDocument.map(changed.step("browser", "Upload browser verification receipts").get("with"))
+                .put("path", "app/build/browser/verification/*-receipt.json");
+        assertThatThrownBy(() -> assertFinalizedTimingHandoff(changed)).isInstanceOf(AssertionError.class);
+    }
+
+    private static void assertFinalizedTimingHandoff(WorkflowDocument ci) {
+        var retention = ci.step("browser", "Retain finalized browser timings");
+        assertThat(retention.get("if")).isEqualTo("always()");
+        assertThat(WorkflowDocument.map(retention.get("env")))
+                .containsEntry("BROWSER_PARTITION", "${{ matrix.name }}");
+        assertThat(retention.get("run")).asString().contains("app/build/browser/timings.jsonl",
+                "${BROWSER_PARTITION}-setup-timings.jsonl", "${BROWSER_PARTITION}-npm-timings.jsonl");
+        assertThat(((String) WorkflowDocument.map(ci.step("browser", "Upload browser verification receipts")
+                .get("with")).get("path")).lines().toList())
+                .containsExactly("app/build/browser/verification/*-receipt.json",
+                        "app/build/browser/verification/*-timings.jsonl");
     }
 
     @Test
-    void gateRejectsMissingFailedCancelledAndSkippedMandatoryWork() throws Exception {
-        String script = (String) WorkflowDocument.map(workflow.steps("gate").getFirst()).get("run");
-        Map<String, String> passing = Map.of("AUTOMATION_RESULT", "success", "VERIFY_RESULT", "success",
-                "BROWSER_RESULT", "success", "RECEIPTS_RESULT", "success");
-        assertThat(CommandRunner.command("bash").args("-e", "-c", script).env(passing).run().status()).isZero();
-        for (String dependency : passing.keySet()) {
-            for (String result : List.of("", "failure", "cancelled", "skipped")) {
-                var values = new java.util.HashMap<>(passing);
-                values.put(dependency, result);
-                assertThat(CommandRunner.command("bash").args("-e", "-c", script).env(values).run().status())
-                        .as(dependency + "=" + result).isNotZero();
-            }
+    void stableVerifyAndGateAlwaysReachStrictIdentityBoundAdmission() {
+        assertThat(workflow.job("verify").get("name")).isEqualTo("Verify");
+        assertThat(workflow.job("gate").get("name")).isEqualTo("Gate");
+        for (String job : List.of("verify", "gate", "browser-receipts")) {
+            assertThat(workflow.job(job).get("if")).isEqualTo("always()");
+            assertThat(workflow.job(job)).doesNotContainKeys("services", "environment");
+            assertThat(WorkflowDocument.map(workflow.job(job).get("permissions")))
+                    .containsExactlyInAnyOrderEntriesOf(Map.of("contents", "read"));
         }
+        assertThat(WorkflowDocument.list(workflow.job("verify").get("needs")))
+                .containsExactlyInAnyOrder("automation", "eligibility", "compare", "build-jvm", "frontend");
+        assertThat(WorkflowDocument.list(workflow.job("gate").get("needs")))
+                .containsExactlyInAnyOrder("automation", "eligibility", "compare", "build-jvm", "frontend", "verify", "browser", "browser-receipts");
+        assertThat(workflow.step("verify", "Validate producer identities and non-browser admission").get("run"))
+                .isEqualTo("python3 scripts/ci/verification-summary.py verify");
+        assertThat(workflow.step("gate", "Require successful identity-bound qualification").get("run"))
+                .isEqualTo("python3 scripts/ci/verification-summary.py gate");
+        assertThat(WorkflowDocument.map(workflow.step("gate", "Require successful identity-bound qualification").get("env")))
+                .containsEntry("QUALIFICATION_NEEDS", "${{ toJSON(needs) }}");
+    }
+
+    @Test
+    void fullFrontendStressRunsIndependentlyAndReuseHasAnOperationalOffSwitch() throws IOException {
+        assertThat(WorkflowDocument.list(workflow.job("frontend").get("needs")))
+                .containsExactlyInAnyOrder("automation", "eligibility", "compare");
+        assertThat(workflow.job("frontend").get("if")).isEqualTo(workflow.job("build-jvm").get("if"));
+        assertThat(workflow.job("frontend").get("if")).asString()
+                .contains("!cancelled()", "needs.automation.result == 'success'", "needs.eligibility.result == 'success'",
+                        "needs.compare.result == 'skipped'", "needs.compare.result == 'success'", "needs.compare.outputs.reuse != 'true'");
+        assertThat(workflow.step("frontend", "Execute complete frontend discovery and stress").get("run"))
+                .asString().contains("unit-run.mjs").doesNotContain("test:unit");
+        assertThat(workflow.step("frontend", "Set up Temurin Java 25")).isNotEmpty();
+        assertThat(workflow.step("frontend", "Require media validation prerequisites").get("run"))
+                .asString().contains("ffprobe", "ffmpeg");
+        assertThat(WorkflowDocument.map(workflow.step("eligibility", "Evaluate inexpensive trusted master eligibility").get("env")))
+                .containsEntry("CI_QUALIFICATION_REUSE", "${{ vars.CI_QUALIFICATION_REUSE }}");
+        assertThat(workflow.job("compare").get("if")).isEqualTo("needs.eligibility.outputs.eligible == 'true'");
+        assertThat(workflow.step("compare", "Build preliminary production candidate").get("run"))
+                .asString().contains("clean :app:bootJar qualificationInputs").doesNotContain("applicationJvmCheck");
+        String root = Files.readString(Path.of("../build.gradle.kts"));
+        String app = Files.readString(Path.of("../app/build.gradle.kts"));
+        assertThat(root).contains("applicationJvmCheck", "applicationCheck", "frontendCheck", "automationCheck");
+        assertThat(app).contains("dependsOn(jvmCheck)", "dependsOn(frontendCheck)", "dependsOn(npmRunUnitTest)",
+                "dependsOn(tasks.test, integrationTest, migrationTest)");
     }
 }

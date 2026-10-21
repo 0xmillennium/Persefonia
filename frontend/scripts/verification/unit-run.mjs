@@ -1,8 +1,12 @@
 import { spawnSync, execFileSync } from 'node:child_process';
 import { rmSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { frontend, repository, writeJson, metadata } from './browser-runtime.mjs';
-import { validateUnitExecution, validateUnitAttempts } from './unit-contract.mjs';
+import { frontend, repository, writeJson, metadata, sourceContext } from './browser-runtime.mjs';
+import {
+  validateUnitExecution,
+  validateUnitAttempts,
+  validateUnitPhases,
+} from './unit-contract.mjs';
 
 if (process.argv.length !== 2 || process.env.IDENTITY_SEED)
   throw new Error('Mandatory unit verification cannot use filters or a single seed');
@@ -12,16 +16,22 @@ for (const file of [
   'unit-receipt.json',
   'unit-discovery.json',
   'unit-attempts.json',
+  'unit-phases.json',
   'segmented-identity/unit-stress-summary.json',
   'segmented-identity/live-stress-summary.json',
 ])
   rmSync(join(output, file), { force: true });
 const cli = join(frontend, 'node_modules/vitest/vitest.mjs');
+const context = sourceContext();
 const started = performance.now();
-const discovery = spawnSync(process.execPath, [cli, 'list', '--json', '--allowOnly=false'], {
-  cwd: frontend,
-  encoding: 'utf8',
-});
+const discovery = spawnSync(
+  process.execPath,
+  [cli, 'list', '--no-static-parse', '--json', '--allowOnly=false'],
+  {
+    cwd: frontend,
+    encoding: 'utf8',
+  },
+);
 if (discovery.status !== 0) throw new Error(`Unit discovery failed: ${discovery.stderr}`);
 const selected = JSON.parse(discovery.stdout);
 writeJson(join(output, 'unit-discovery.json'), selected);
@@ -41,7 +51,11 @@ const execution = spawnSync(
   {
     cwd: frontend,
     stdio: 'inherit',
-    env: { ...process.env, PERSEFONIA_UNIT_ATTEMPTS: join(output, 'unit-attempts.json') },
+    env: {
+      ...process.env,
+      PERSEFONIA_UNIT_ATTEMPTS: join(output, 'unit-attempts.json'),
+      PERSEFONIA_UNIT_PHASES: join(output, 'unit-phases.json'),
+    },
   },
 );
 if (execution.status !== 0) process.exit(execution.status ?? 1);
@@ -55,7 +69,12 @@ const cases = validateUnitExecution(
 );
 const attempts = read('unit-attempts.json');
 validateUnitAttempts(cases, attempts);
+const phases = read('unit-phases.json');
+validateUnitPhases(cases, phases);
+if (JSON.stringify(sourceContext()) !== JSON.stringify(context))
+  throw new Error('Source changed during frontend verification');
 writeJson(join(output, 'unit-receipt.json'), {
+  sourceContext: context,
   schema: 1,
   status: 'passed',
   sourceSha: execFileSync('git', ['rev-parse', 'HEAD'], {
@@ -74,4 +93,5 @@ writeJson(join(output, 'unit-receipt.json'), {
     duration,
   })),
   attempts,
+  phases,
 });

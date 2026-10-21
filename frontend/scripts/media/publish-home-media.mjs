@@ -1,11 +1,17 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { sourceArguments, externalSource, withMediaWorkspace } from './source-input.mjs';
+import {
+  sourceArguments,
+  externalSource,
+  withMediaWorkspace,
+  requireMediaTools,
+} from './source-input.mjs';
 import { sources } from './contracts.mjs';
 import { hash, runFfmpeg } from './delivery.mjs';
 
 const arguments_ = sourceArguments(['arm', 'tree']);
+requireMediaTools();
 const originals = {
   'robotic-arm': await externalSource(arguments_.arm),
   tree: await externalSource(arguments_.tree),

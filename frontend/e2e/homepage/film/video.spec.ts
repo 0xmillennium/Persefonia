@@ -1,5 +1,5 @@
 import { startOnFilm } from '../../support/homepage';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from '../../support/test';
 import { readFileSync } from 'node:fs';
 import { pixels } from '../../support/pixels';
 
@@ -156,7 +156,18 @@ test('unavailable videos use static posters without WebGL and retry at the curre
   blocked = false;
   await page.locator('[data-home-v2]').focus();
   // F retries the selected failed media and selects the next film as before.
+  const retried = page.waitForRequest((request) =>
+    /\/robotic-arm\.mp4\?retry=\d+/.test(request.url()),
+  );
   await page.keyboard.press('f');
+  await retried;
+  await expect
+    .poll(() =>
+      page
+        .locator('video[src*="robotic-arm.mp4?retry="]')
+        .evaluate((node) => (node as HTMLVideoElement).readyState),
+    )
+    .toBeGreaterThanOrEqual(2);
   await expect(page.locator('[data-film-status]')).toHaveText('Tree · 101 / 192');
   await expect(page.locator('[data-home-v2]')).toHaveAttribute('data-film-presentation', 'video');
   expect(await page.evaluate(() => scrollY)).toBe(y);
@@ -167,10 +178,20 @@ test('incoming video failure reveals its static poster without losing scroll pos
   await page.route('**/tree.mp4*', (route) => route.fulfill({ status: 503, body: 'unavailable' }));
   await visit(page);
   await frame(page, 80);
+  const before = await page.evaluate(() => ({
+    y: scrollY,
+    markTop: document.querySelector('[data-scene="mark"]')!.getBoundingClientRect().top,
+  }));
   await page.locator('[data-home-v2]').focus();
   await page.keyboard.press('f');
   await expect(page.locator('[data-home-v2]')).toHaveAttribute('data-film', 'tree');
   await expect(page.locator('[data-film-status]')).toContainText('Tree · static final poster');
+  expect(await page.evaluate(() => scrollY)).toBe(before.y);
+  expect(
+    await page.evaluate(
+      () => document.querySelector('[data-scene="mark"]')!.getBoundingClientRect().top,
+    ),
+  ).toBe(before.markTop);
 });
 
 test('complete video and poster failure releases the loader and leaves semantic navigation usable', async ({
@@ -202,4 +223,19 @@ test('late video failure settles to a poster and explicit retry preserves the cu
   await page.evaluate(() => scrollTo(0, 0));
   await expect(page.locator('img[data-film-poster="opening"]')).toBeVisible();
   await expect(page.locator('[data-film-status]')).toContainText('static opening poster');
+  const y = await page.evaluate(() => scrollY);
+  const retried = page.waitForRequest((request) =>
+    /\/robotic-arm\.mp4\?retry=\d+/.test(request.url()),
+  );
+  await page.locator('[data-home-v2]').focus();
+  await page.keyboard.press('f');
+  await retried;
+  const replacement = page.locator('video[src*="robotic-arm.mp4?retry="]');
+  await expect
+    .poll(() => replacement.evaluate((node) => (node as HTMLVideoElement).readyState))
+    .toBeGreaterThanOrEqual(2);
+  expect(await replacement.evaluate((node) => (node as HTMLVideoElement).currentTime)).toBeLessThan(
+    1 / 30,
+  );
+  expect(await page.evaluate(() => scrollY)).toBe(y);
 });

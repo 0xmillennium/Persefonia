@@ -1,5 +1,5 @@
 import { chooseCollection } from '../support/gallery';
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 import { visit, position } from '../support/scenes';
 
 test('reduced motion uses readable static sections on initial and live preference changes', async ({

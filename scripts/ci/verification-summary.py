@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compact index of native JUnit/Vitest evidence, bound to the producing job and source."""
+"""Native verification receipts and strict non-browser/final admission; one evidence owner."""
 import json
 import os
 from pathlib import Path
@@ -7,44 +7,199 @@ import platform
 import subprocess
 import sys
 import xml.etree.ElementTree as ET
+import qualification as q
 
-root = Path(__file__).resolve().parents[2]
-source_sha = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
-if os.environ.get("GITHUB_SHA", source_sha) != source_sha:
-    raise SystemExit("Verification source SHA mismatch")
-scope = sys.argv[1] if len(sys.argv) == 2 else "application"
-if scope not in {"application", "automation"}:
-    raise SystemExit("Unknown verification scope")
-runner = {"name": os.environ.get("RUNNER_NAME", "local"), "os": platform.system(),
-          "arch": platform.machine(), "python": platform.python_version(),
-          "activeJava": subprocess.run(["java", "-version"], check=True, capture_output=True, text=True).stderr.strip(),
-          "attempt": os.environ.get("GITHUB_RUN_ATTEMPT", "1")}
-cases = []
-for report in sorted(root.glob("*/build/test-results/*/TEST-*.xml")):
-    automation = report.parts[-5] == "automation-tests"
-    if automation != (scope == "automation"):
-        continue
-    for case in ET.parse(report).getroot().iter("testcase"):
-        status = "failed" if case.find("failure") is not None or case.find("error") is not None else "skipped" if case.find("skipped") is not None else "passed"
-        cases.append({"report": str(report.relative_to(root)), "id": case.attrib["classname"] + "#" + case.attrib["name"],
-                      "status": status, "seconds": float(case.attrib.get("time", "0"))})
-if not cases or any(case["status"] != "passed" for case in cases):
-    raise SystemExit("Missing, failed or skipped mandatory Java verification")
-if scope == "automation":
-    destination = root / "automation-tests/build/verification.json"
-    destination.write_text(json.dumps({"schema": 1, "status": "passed", "sourceSha": source_sha,
-        "job": os.environ.get("GITHUB_JOB", "local"), "run": os.environ.get("GITHUB_RUN_ID", "local"),
-        "runner": runner, "cases": cases}, separators=(",", ":")) + "\n")
-    print(f"Retained {len(cases)} automation cases")
-    raise SystemExit(0)
-unit = json.loads((root / "frontend/test-results/unit-receipt.json").read_text())
-if unit["status"] != "passed" or unit["sourceSha"] != source_sha:
-    raise SystemExit("Missing or mismatched unit receipt")
-checksum = (root / "app/build/ci/persefonia.jar.sha256").read_text().split()[0]
-receipt = {"schema": 1, "status": "passed", "sourceSha": source_sha, "artifactSha256": checksum,
-           "job": os.environ.get("GITHUB_JOB", "local"), "run": os.environ.get("GITHUB_RUN_ID", "local"),
-           "runner": runner,
-           "javaCases": cases, "frontendCases": len(unit["cases"]),
-           "timings": [json.loads(line) for line in (root / "app/build/ci/timings.jsonl").read_text().splitlines()]}
-(root / "app/build/ci/verification.json").write_text(json.dumps(receipt, separators=(",", ":")) + "\n")
-print(f"Retained {len(cases)} Java cases and {len(unit['cases'])} frontend cases")
+ROOT = q.ROOT
+OUTPUT = ROOT / 'app/build/ci'
+
+
+def native_java(automation=False):
+    cases = []
+    for report in sorted(ROOT.glob('*/build/test-results/*/TEST-*.xml')):
+        if (report.parts[-5] == 'automation-tests') != automation: continue
+        for case in ET.parse(report).getroot().iter('testcase'):
+            status = 'failed' if case.find('failure') is not None or case.find('error') is not None else 'skipped' if case.find('skipped') is not None else 'passed'
+            cases.append({'report': str(report.relative_to(ROOT)), 'id': case.attrib['classname']+'#'+case.attrib['name'],
+                          'status': status, 'seconds': float(case.attrib.get('time', '0'))})
+    validate_java(cases)
+    return cases
+
+
+def validate_java(cases):
+    q.require(isinstance(cases, list) and cases and all(c['status'] == 'passed' for c in cases),
+              'Missing, failed or skipped mandatory Java verification')
+    keys = [(c['report'], c['id']) for c in cases]
+    q.require(len(keys) == len(set(keys)), 'Duplicate Java evidence')
+
+
+def production(executed=False):
+    values = {}
+    for path in sorted(ROOT.glob('*/build/qualification/production.json')):
+        value = q.read(path)
+        q.require(value['schema'] == q.SCHEMA and isinstance(value['production'], list), 'Missing production bytes')
+        values[path.parts[-4]] = value
+    q.require('app' in values and values['app']['production'], 'Missing app production manifest')
+    if executed:
+        for report_dir in ROOT.glob('*/build/test-results/*'):
+            if report_dir.parts[-4] == 'automation-tests' or not list(report_dir.glob('TEST-*.xml')): continue
+            project = report_dir.parts[-4]
+            witness = q.read(ROOT/project/'build/qualification'/f'{report_dir.name}.json')
+            q.require(witness['testRuntime'] == values[project]['resolvedTestRuntimes'][report_dir.name]
+                      and witness['gradle'] == values[project]['gradle'] and witness['compilerToolchain'] == values[project]['compilerToolchain']
+                      and witness['testDependencies'] == values[project]['resolvedTestDependencies'][report_dir.name]
+                      and witness['sourceInputs'] == q.source_inputs() and witness['executed'] is True and witness['production'] == values[project]['production']
+                      and witness['compiler'] == values[project]['compiler'] and witness['java'] == values[project]['java'],
+                      'Final producer outputs differ from actual JVM test inputs')
+    return values
+
+
+def timings():
+    paths = [ROOT/'app/build/ci/timings.jsonl', ROOT/'build/ci/task-timings.jsonl']
+    return {str(path.relative_to(ROOT)): [q.load_json(line.encode()) for line in path.read_text().splitlines() if line]
+            for path in paths if path.exists()}
+
+
+def base(lane, source):
+    return {'schema': q.SCHEMA, 'status': 'passed', 'lane': lane, 'identity': source,
+            'runner': {'os': platform.system(), 'arch': platform.machine(),
+                       'imageOS': os.environ.get('ImageOS', 'local'),
+                       'imageVersion': os.environ.get('ImageVersion', 'local')}}
+
+
+def validate_unit(unit, source):
+    q.require(unit.get('schema') == 1 and unit.get('status') == 'passed' and unit.get('sourceSha') == source['sourceSha'], 'Invalid unit source receipt')
+    q.validate_identity(unit.get('sourceContext'), source)
+    runner = unit['runner']
+    q.require(str(runner['run']) == source['run'] and str(runner['attempt']) == source['attempt'], 'Wrong unit attempt')
+    q.require(unit['cases'] and all(c['status'] == 'passed' for c in unit['cases']), 'Incomplete frontend cases')
+    q.require(unit['attempts'], 'Missing first-attempt unit evidence')
+
+
+def validate_nonbrowser(directory, source, checksum):
+    directory = Path(directory)
+    jvm = q.receipt(q.read(directory/'jvm.json'), 'jvm', source, checksum)
+    frontend = q.receipt(q.read(directory/'frontend.json'), 'frontend', source)
+    validate_java(jvm['javaCases'])
+    q.validate_production(jvm['production'], source['inputs'], strict_environment=False)
+    validate_unit(frontend['unit'], source)
+    q.require(jvm['production'] and jvm['java21']['passed'] is True and jvm['java21']['version'].startswith('openjdk version "21'), 'Missing production/runtime evidence')
+    return jvm, frontend
+
+
+def validate_browser(value, source, checksum):
+    q.require(value.get('schema') == 1 and value.get('status') == 'passed' and value.get('sourceContext') == source and
+              value.get('identity') == {'sourceSha': source['sourceSha'], 'artifactSha256': checksum}
+              and str(value.get('runner', {}).get('run')) == source['run']
+              and str(value.get('runner', {}).get('attempt')) == source['attempt']
+              and value.get('partitions') == 8 and value.get('selected', 0) > 0
+              and len(value.get('receipts', [])) == 8, 'Invalid browser acceptance')
+    return value
+
+
+def aggregate(source):
+    jobs = q.load_json(os.environ['VERIFICATION_NEEDS'].encode())
+    q.require(set(jobs) == {'automation', 'eligibility', 'compare', 'build-jvm', 'frontend'}, 'Incomplete Verify dependencies')
+    q.require(jobs['automation']['result'] == 'success' and jobs['eligibility']['result'] == 'success', 'Automation/eligibility failed')
+    policy_mode = q.admission_policy(jobs)
+    checksum = q.candidate(OUTPUT)
+    result = {**base('verify', source), 'reusePolicyMode': policy_mode}
+    decision_path = OUTPUT/'equivalence.json'
+    decision = q.read(decision_path) if jobs['compare']['result'] == 'success' else None
+    if jobs['compare']['result'] == 'success':
+        q.require(decision and decision.get('schema') == q.SCHEMA and decision.get('kind') == 'master-equivalence'
+                  and decision.get('mode') == policy_mode and decision.get('eligible') is True
+                  and isinstance(decision.get('equivalent'), bool), 'Missing or inconsistent comparison decision')
+        q.validate_identity(decision['master'], source)
+        if decision['equivalent'] is True: q.validate_equivalence(decision, source, decision['candidate'])
+    reused = bool(decision and policy_mode == 'enforce' and decision.get('equivalent') is True)
+    if decision:
+        expected_flag = 'true' if reused else 'false'
+        q.require(jobs['compare'].get('outputs', {}).get('reuse') == expected_flag, 'Claimed branch differs from trusted decision')
+    if reused:
+        q.validate_equivalence(decision, source, checksum)
+        q.require(jobs['build-jvm']['result'] == 'skipped' and jobs['frontend']['result'] == 'skipped', 'Unexpected reuse scheduling')
+        result.update(mode='reused', equivalence=decision)
+    else:
+        q.require(jobs['compare']['result'] in {'success', 'skipped'}, 'Master comparison build/runtime failure')
+        q.require(jobs['build-jvm']['result'] == 'success' and jobs['frontend']['result'] == 'success', 'Required producer failed/cancelled/skipped')
+        jvm, frontend = validate_nonbrowser(OUTPUT, source, checksum)
+        result.update(mode='executed', producers={'jvm': q.digest(jvm), 'frontend': q.digest(frontend)})
+        if decision:
+            result['reuseEvaluation'] = {'decision': q.digest(decision), 'equivalent': decision['equivalent'],
+                'finalCandidateMatches': decision.get('candidate') == checksum,
+                'finalProducerMatches': decision.get('production') == q.digest(jvm['production'])
+                    and decision.get('buildEnvironment') == q.digest(jvm['environment'])
+                    and decision.get('freshJava21') == jvm['java21']}
+    result['candidate'] = checksum
+    q.write(OUTPUT/'verification.json', result)
+
+
+def gate(source):
+    verify = q.receipt(q.read(OUTPUT/'verification.json'), 'verify', source)
+    checksum = q.candidate(OUTPUT)
+    q.require(verify['candidate'] == checksum, 'Gate candidate mismatch')
+    jobs = q.load_json(os.environ['QUALIFICATION_NEEDS'].encode())
+    q.require(set(jobs) == {'automation', 'eligibility', 'compare', 'build-jvm', 'frontend', 'verify', 'browser', 'browser-receipts'}
+              and jobs['eligibility']['result'] == 'success' and jobs['compare']['result'] in {'success', 'skipped'},
+              'Incomplete/failed eligibility or comparison dependency')
+    results = {key: jobs[key]['result'] for key in ['automation', 'build-jvm', 'frontend', 'verify', 'browser', 'browser-receipts']}
+    q.require(q.admission_policy(jobs) == verify.get('reusePolicyMode'), 'Gate qualification policy differs from Verify')
+    decision = verify.get('equivalence')
+    q.job_results(verify['mode'], results, decision, source, checksum)
+    if verify['mode'] == 'reused':
+        q.require(jobs['compare']['result'] == 'success', 'Missing trusted master comparison job')
+    else:
+        jvm, frontend = validate_nonbrowser(OUTPUT, source, checksum)
+        q.require(verify['producers'] == {'jvm': q.digest(jvm), 'frontend': q.digest(frontend)}, 'Forged producer references')
+    automation = q.receipt(q.read(OUTPUT/'automation.json'), 'automation', source)
+    validate_java(automation['javaCases'])
+    browser = q.read(OUTPUT/'browser-acceptance.json')
+    if verify['mode'] == 'executed':
+        validate_browser(browser, source, checksum)
+        subprocess.run(['node', 'frontend/scripts/verification/browser-admit.mjs', str(OUTPUT/'browser-acceptance.json'),
+                        source['sourceSha'], checksum], cwd=ROOT, check=True)
+    else:
+        q.require(browser.get('mode') == 'reused' and browser.get('equivalence') == q.digest(decision)
+                  and browser.get('identity') == source, 'Invalid reused browser admission')
+    result = base('qualification', source)
+    result.update(mode=verify['mode'], reusePolicyMode=verify['reusePolicyMode'], candidate=checksum, verification=verify,
+                  browser=browser, automation=q.digest(automation))
+    q.write(OUTPUT/'qualification.json', result)
+
+
+def main():
+    scope = sys.argv[1] if len(sys.argv) == 2 else 'application'
+    source = q.identity()
+    OUTPUT.mkdir(parents=True, exist_ok=True)
+    if scope == 'automation':
+        result = base('automation', source)
+        result['javaCases'] = native_java(True)
+        q.write(ROOT/'automation-tests/build/verification.json', result)
+    elif scope in {'jvm', 'application'}:
+        checksum = q.candidate(OUTPUT)
+        result = base('jvm', source)
+        result.update(candidate=checksum, javaCases=native_java(), production=production(True),
+                      environment=q.read(OUTPUT/'environment.json'), java21=q.read(OUTPUT/'java21.json'), timings=timings())
+        q.write(OUTPUT/'jvm.json', result)
+        if scope == 'application':
+            unit = q.read(ROOT/'frontend/test-results/unit-receipt.json'); validate_unit(unit, source)
+            q.write(OUTPUT/'verification.json', {**result, 'frontendCases': len(unit['cases'])})
+    elif scope == 'frontend':
+        unit = q.read(ROOT/'frontend/test-results/unit-receipt.json'); validate_unit(unit, source)
+        native = {key: q.read(ROOT/'frontend/test-results'/name) for key, name in {
+            'discovery': 'unit-discovery.json', 'report': 'unit.json', 'attempts': 'unit-attempts.json', 'phases': 'unit-phases.json',
+            'scalar': 'segmented-identity/unit-stress-summary.json', 'live': 'segmented-identity/live-stress-summary.json'}.items()}
+        q.write(OUTPUT/'frontend.json', {**base('frontend', source), 'unit': unit, 'native': native})
+        subprocess.run(['node', 'frontend/scripts/verification/unit-validate.mjs', str(OUTPUT/'frontend.json')], cwd=ROOT, check=True)
+    elif scope == 'production':
+        q.write(OUTPUT/'production.json', {'schema': q.SCHEMA, 'identity': source,
+            'candidate': q.candidate(OUTPUT), 'production': production(),
+            'environment': q.read(OUTPUT/'environment.json'), 'java21': q.read(OUTPUT/'java21.json'), 'timings': timings()})
+    elif scope == 'verify': aggregate(source)
+    elif scope == 'gate': gate(source)
+    else: raise ValueError('Unknown verification scope')
+
+
+if __name__ == '__main__':
+    try: main()
+    except (ValueError, KeyError, OSError, ET.ParseError) as error: raise SystemExit(str(error)) from error

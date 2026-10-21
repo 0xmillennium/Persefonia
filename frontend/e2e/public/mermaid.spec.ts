@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 import { readFileSync } from 'node:fs';
 import { openHomepage } from '../support/homepage';
 

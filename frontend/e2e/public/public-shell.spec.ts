@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 
 test('direct public visits retain a shared SSR shell without downloading the navigation animation', async ({
   page,
@@ -53,7 +53,7 @@ test('SSR shell and reading content reflow at narrow widths and enlarged text wi
   await context.close();
 });
 
-test('only a fresh matching navigation marker loads and dismisses the optional cover', async ({
+test('a fresh matching navigation marker loads and dismisses the optional cover', async ({
   page,
 }) => {
   await page.goto('/search');
@@ -71,4 +71,18 @@ test('only a fresh matching navigation marker loads and dismisses the optional c
   expect(
     await page.evaluate(() => sessionStorage.getItem('persefonia-navigation-cover')),
   ).toBeNull();
+});
+
+// marker.test.ts owns wrong-url/history/expired/future/malformed decisions. This native
+// counterexample proves the shell wires rejection to lazy-loading and consumes the marker.
+test('a mismatched navigation marker is consumed without loading the cover', async ({ page }) => {
+  await page.goto('/search');
+  await page.evaluate(() => sessionStorage.setItem('persefonia-navigation-cover',
+    JSON.stringify({ url: new URL('/en/projects', location.href).href, time: Date.now() })));
+  const requests: string[] = [];
+  page.on('request', request => requests.push(request.url()));
+  await page.goto('/contact', { waitUntil: 'networkidle' });
+  await expect(page.locator('.public-header')).toBeVisible();
+  expect(requests.filter(url => /\/cover-[^/]+\.js/.test(url))).toEqual([]);
+  expect(await page.evaluate(() => sessionStorage.getItem('persefonia-navigation-cover'))).toBeNull();
 });

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 import { difference } from '../support/pixels';
 
 for (const failure of ['no JavaScript', 'entry download failure'] as const) {
