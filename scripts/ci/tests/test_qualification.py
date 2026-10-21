@@ -2,13 +2,149 @@
 import copy
 import io
 import json
+import os
 from pathlib import Path
+import subprocess
 import sys
+import tempfile
 import unittest
+from unittest.mock import patch
 import zipfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import qualification as q
+
+
+class GitIdentityFixture:
+    """Small SHA-1 graph; all Git writes and event files stay in owned temp storage."""
+    def __init__(self):
+        self.temporary = tempfile.TemporaryDirectory(dir=os.environ.get('RUNNER_TEMP'))
+        self.directory = Path(self.temporary.name)
+        self.env = {'PATH': os.environ['PATH'], 'HOME': str(self.directory), 'LC_ALL': 'C',
+            'GIT_CONFIG_NOSYSTEM': '1', 'GIT_CONFIG_GLOBAL': os.devnull,
+            'GIT_CONFIG_COUNT': '3', 'GIT_CONFIG_KEY_0': 'core.hooksPath',
+            'GIT_CONFIG_VALUE_0': os.devnull, 'GIT_CONFIG_KEY_1': 'commit.gpgsign',
+            'GIT_CONFIG_VALUE_1': 'false', 'GIT_CONFIG_KEY_2': 'tag.gpgsign',
+            'GIT_CONFIG_VALUE_2': 'false', 'GIT_TERMINAL_PROMPT': '0',
+            'GIT_AUTHOR_NAME': 'CI Fixture', 'GIT_AUTHOR_EMAIL': 'ci-fixture@example.invalid',
+            'GIT_COMMITTER_NAME': 'CI Fixture', 'GIT_COMMITTER_EMAIL': 'ci-fixture@example.invalid',
+            'GIT_AUTHOR_DATE': '2026-10-20T10:00:00Z', 'GIT_COMMITTER_DATE': '2026-10-20T10:00:00Z'}
+        self.origin = self.directory/'origin'
+        self.git(self.directory, 'init', '--object-format=sha1', '--template=',
+                 '--initial-branch=fixture', str(self.origin))
+        source = self.origin/'frontend/src/product.ts'
+        source.parent.mkdir(parents=True)
+        self.graph = {}
+        for name, content in [('root', 'root'), ('normal', 'base'), ('head', 'head')]:
+            source.write_text(content+'\n')
+            self.git(self.origin, 'add', 'frontend/src/product.ts')
+            self.git(self.origin, 'commit', '-m', name)
+            sha = self.git(self.origin, 'rev-parse', 'HEAD')
+            tree = self.git(self.origin, 'rev-parse', 'HEAD^{tree}')
+            parents = [] if name == 'root' else [self.graph['root' if name == 'normal' else 'normal']['sha']]
+            self.graph[name] = {'sha': sha, 'tree': tree, 'parents': parents}
+        base, head = self.graph['normal']['sha'], self.graph['head']['sha']
+        tree = self.graph['head']['tree']
+        for name, parents in [('pr-merge', [base, head]), ('squash', [base])]:
+            arguments = [argument for parent in parents for argument in ('-p', parent)]
+            # A convincing message header must never become part of the parent list.
+            sha = self.git(self.origin, 'commit-tree', tree, *arguments,
+                           input=b'message\n\nparent '+b'f'*40+b'\nnon-UTF8: \xff\n')
+            self.graph[name] = {'sha': sha, 'tree': tree, 'parents': parents}
+        for name, node in self.graph.items():
+            self.git(self.origin, 'update-ref', 'refs/heads/'+name, node['sha'])
+        self.copies = {}
+
+    def close(self):
+        self.temporary.cleanup()
+
+    def git(self, directory, *arguments, input=None):
+        return subprocess.run(['git', *arguments], cwd=directory, env=self.env, input=input,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, timeout=10).stdout.decode('ascii').strip()
+
+    def clone(self, name, shallow):
+        key = (name, shallow)
+        if key not in self.copies:
+            directory = self.directory/(name+('-shallow' if shallow else '-full'))
+            depth = ['--depth=1'] if shallow else []
+            self.git(self.directory, 'clone', '--no-tags', '--single-branch', '--branch', name,
+                     *depth, self.origin.as_uri(), str(directory))
+            self.copies[key] = directory
+        return self.copies[key]
+
+    def identity(self, name, shallow, source_only=False):
+        node = self.graph[name]
+        context = {'GITHUB_SHA': node['sha'], 'GITHUB_RUN_ATTEMPT': '1'}
+        if name == 'pr-merge':
+            event = self.directory/'pull-request.json'
+            event.write_text(json.dumps({'pull_request': {'number': 1,
+                'base': {'sha': self.graph['normal']['sha'], 'repo': {'id': q.REPOSITORY_ID}},
+                'head': {'sha': self.graph['head']['sha'], 'repo': {'id': q.REPOSITORY_ID}}}}))
+            context.update(GITHUB_EVENT_PATH=str(event), GITHUB_EVENT_NAME='pull_request',
+                           GITHUB_REF='refs/pull/1/merge', GITHUB_RUN_ID='200')
+        else:
+            context.update(GITHUB_EVENT_NAME='push', GITHUB_REF='refs/heads/master', GITHUB_RUN_ID='300')
+        with patch.object(q, 'ROOT', self.clone(name, shallow)), \
+                patch.dict(os.environ, {**self.env, **context}, clear=True):
+            return q.identity(source_only=source_only)
+
+
+class SourceParentContracts(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.fixture = GitIdentityFixture()
+        cls.addClassCleanup(cls.fixture.close)
+
+    def test_full_and_depth_one_identities_retain_actual_commit_graph(self):
+        for name in ['root', 'normal', 'pr-merge', 'squash']:
+            node = self.fixture.graph[name]
+            for shallow in (False, True):
+                directory = self.fixture.clone(name, shallow)
+                if shallow and node['parents']:
+                    self.assertEqual(self.fixture.git(directory, 'rev-parse', '--is-shallow-repository'), 'true')
+                    for parent in node['parents']:
+                        with self.assertRaises(subprocess.CalledProcessError):
+                            self.fixture.git(directory, 'cat-file', '-e', parent)
+                elif not shallow:
+                    self.assertEqual(self.fixture.git(directory, 'rev-parse', '--is-shallow-repository'), 'false')
+                for source_only in (False, True):
+                    with self.subTest(case=name, shallow=shallow, source_only=source_only):
+                        actual = self.fixture.identity(name, shallow, source_only)
+                        self.assertEqual(actual['sourceSha'], node['sha'])
+                        self.assertEqual(actual['tree'], node['tree'])
+                        self.assertEqual(actual['parents'], node['parents'])
+                        self.assertFalse(actual['dirty'])
+        self.assertEqual(self.fixture.graph['pr-merge']['tree'], self.fixture.graph['squash']['tree'])
+
+    def test_parent_headers_ignore_signatures_and_arbitrary_message_bytes(self):
+        sha = 'a'*40
+        raw = (b'tree '+b'b'*40+b'\nparent '+b'c'*40+b'\ngpgsig signature\n parent '+b'd'*40+
+               b'\n continuation\nparent '+b'e'*40+b'\nencoding ISO-8859-1\n\nparent '+b'f'*40+b'\n\xff')
+        with patch.object(q.subprocess, 'check_output', return_value=raw) as read:
+            self.assertEqual(q.commit_parents(sha), ['c'*40, 'e'*40])
+        read.assert_called_once_with(['git', '--no-replace-objects', 'cat-file', 'commit', sha], cwd=q.ROOT)
+
+    def test_malformed_parent_or_missing_header_separator_fails_closed(self):
+        for parent in [b'', b'a'*39, b'a'*41, b'A'*40, b'g'*40, b'\xff'*40, b'a'*40+b' extra']:
+            with self.subTest(parent=parent), \
+                    patch.object(q.subprocess, 'check_output', return_value=b'tree '+b'b'*40+b'\nparent '+parent+b'\n\nmessage'):
+                with self.assertRaises(ValueError): q.commit_parents('a'*40)
+        for raw in [b'', b'tree '+b'b'*40+b'\nparent '+b'c'*40, b'\n\nmessage',
+                    b'tree invalid\n\nmessage', b'tree '+b'b'*40+b'\nparent\n\nmessage',
+                    b'tree '+b'b'*40+b'\nparent\t'+b'c'*40+b'\n\nmessage']:
+            with self.subTest(raw=raw), patch.object(q.subprocess, 'check_output', return_value=raw):
+                with self.assertRaises(ValueError): q.commit_parents('a'*40)
+
+    def test_failed_commit_read_is_not_a_root_commit(self):
+        with patch.object(q.subprocess, 'check_output', side_effect=subprocess.CalledProcessError(128, 'git')):
+            with self.assertRaises(subprocess.CalledProcessError): q.commit_parents('a'*40)
+
+    def test_identity_rejects_a_non_sha1_source_before_reading_the_object(self):
+        for sha in ['a'*64, 'HEAD', 'a'*39, 'A'*40]:
+            with self.subTest(sha=sha), patch.dict(os.environ, {}, clear=True), \
+                    patch.object(q, 'git', return_value=sha) as git:
+                with self.assertRaisesRegex(ValueError, 'Malformed source SHA'): q.identity()
+                git.assert_called_once_with('rev-parse', 'HEAD')
 
 
 class QualificationContracts(unittest.TestCase):
@@ -196,18 +332,22 @@ class NativeReuseContracts(unittest.TestCase):
 class EligibilityFlowContracts(unittest.TestCase):
     setUp = NativeReuseContracts.setUp
     def test_complete_controlled_squash_accepts_and_policy_ambiguity_fork_misses(self):
-        import tempfile
-        from unittest.mock import patch
+        fixture = GitIdentityFixture()
+        self.addCleanup(fixture.close)
+        self.master = fixture.identity('squash', shallow=True)
+        self.pr = fixture.identity('pr-merge', shallow=True)
+        base_sha, head_sha = fixture.graph['normal']['sha'], fixture.graph['head']['sha']
+        self.run['head_sha'] = head_sha
         master_run = {**self.run, 'id': 300, 'event': 'push', 'head_branch': 'master',
                       'head_sha': self.master['sourceSha'], 'created_at': self.now}
         pr = {'number': 1, 'merged': True, 'merge_commit_sha': self.master['sourceSha'],
               'base': {'ref': 'master', 'repo': {'id': q.REPOSITORY_ID}},
-              'head': {'sha': '1'*40, 'repo': {'id': q.REPOSITORY_ID, 'fork': False}}}
+              'head': {'sha': head_sha, 'repo': {'id': q.REPOSITORY_ID, 'fork': False}}}
         metadata = {'id': 1, 'name': 'persefonia-qualification-'+self.pr['sourceSha'],
             'expired': False, 'size_in_bytes': 100, 'digest': 'sha256:'+'a'*64,
             'created_at': self.run['created_at'], 'expires_at': '2099-01-01T00:00:00Z',
             'workflow_run': {'id': 200, 'repository_id': q.REPOSITORY_ID,
-                'head_repository_id': q.REPOSITORY_ID, 'head_sha': '1'*40}}
+                'head_repository_id': q.REPOSITORY_ID, 'head_sha': head_sha}}
         candidate = {**metadata, 'id': 2, 'name': 'persefonia-browser-input-'+self.pr['sourceSha']}
         names = ['Automation', 'Reuse eligibility', 'Comparison build', 'Build + JVM', 'Frontend verification',
                  'Verify', 'Browser receipts', 'Gate'] + [f'Browsers ({p})' for p in q.PARTITIONS]
@@ -218,7 +358,7 @@ class EligibilityFlowContracts(unittest.TestCase):
         responses = {
             'actions/runs/300': master_run, 'commits/'+self.master['sourceSha']+'/pulls?per_page=100': [{'number': 1}],
             'pulls/1': pr,
-            f'actions/workflows/{q.WORKFLOW_ID}/runs?event=pull_request&head_sha={"1"*40}&per_page=100': {'total_count': 1, 'workflow_runs': [{'id': 200}]},
+            f'actions/workflows/{q.WORKFLOW_ID}/runs?event=pull_request&head_sha={head_sha}&per_page=100': {'total_count': 1, 'workflow_runs': [{'id': 200}]},
             'actions/runs/200': self.run,
             'actions/runs/200/artifacts?per_page=100': {'total_count': 2, 'artifacts': [metadata, candidate]},
             'actions/runs/200/attempts/1/jobs?per_page=100': jobs,
@@ -226,11 +366,11 @@ class EligibilityFlowContracts(unittest.TestCase):
         for source in [self.pr, self.master]:
             responses['git/commits/'+source['sourceSha']] = {'sha': source['sourceSha'],
                 'parents': [{'sha': parent} for parent in source['parents']], 'tree': {'sha': source['tree']}}
-            responses[f'compare/{"b"*40}...{source["sourceSha"]}?per_page=100'] = {
+            responses[f'compare/{base_sha}...{source["sourceSha"]}?per_page=100'] = {
                 'status': 'ahead', 'total_commits': 1,
                 'files': [{'filename': 'frontend/src/product.ts', 'status': 'modified'}]}
-        responses['git/commits/'+ 'b'*40] = {'sha': 'b'*40, 'tree': {'sha': '9'*40}}
-        for revision in ['9'*40, self.master['tree']]:
+        responses['git/commits/'+base_sha] = {'sha': base_sha, 'tree': {'sha': fixture.graph['normal']['tree']}}
+        for revision in [fixture.graph['normal']['tree'], self.master['tree']]:
             responses['git/trees/'+revision+'?recursive=1'] = {'truncated': False,
                 'tree': [{'path': 'frontend/src/product.ts', 'mode': '100644'}]}
         record = {'schema': 2, 'status': 'passed', 'lane': 'qualification', 'mode': 'executed', 'identity': self.pr}
@@ -259,22 +399,44 @@ class EligibilityFlowContracts(unittest.TestCase):
             'frontend.json': frontend, 'browser-acceptance.json': browser, 'automation.json': automation}
         class API:
             def __init__(self, values): self.values = values
-            def get(self, path): return self.values[path]
-            def artifact(self, *args): return {name: json.dumps(value).encode() for name,value in evidence.items()}
-            def checkout(inner, job): return self.pr['sourceSha']
-        with tempfile.TemporaryDirectory() as temp, patch.object(self.reuse, 'OUTPUT', Path(temp)):
+            def get(self, path):
+                if path not in self.values: raise AssertionError('Unexpected API path: '+path)
+                return self.values[path]
+            def artifact(inner, artifact, run, source_sha):
+                self.assertEqual(artifact, metadata)
+                self.assertEqual(run, self.run)
+                self.assertIsNone(source_sha)
+                return {name: json.dumps(value).encode() for name,value in evidence.items()}
+            def checkout(inner, job):
+                self.assertEqual(job, next(job for job in jobs['jobs'] if job['name'] == 'Build + JVM'))
+                return self.pr['sourceSha']
+        with patch.object(self.reuse, 'OUTPUT', fixture.directory/'output'):
             result = self.reuse.eligible(API(responses), self.master, 'shadow')
             self.assertTrue(result['eligible']); self.assertEqual(result['pr'], self.pr)
+            root = fixture.identity('root', shallow=True)
+            root_responses = {
+                'actions/runs/300': {**master_run, 'head_sha': root['sourceSha']},
+                'commits/'+root['sourceSha']+'/pulls?per_page=100': [{'number': 1}],
+                'pulls/1': {**pr, 'merge_commit_sha': root['sourceSha']}}
+            with self.assertRaisesRegex(ValueError, 'Unsupported master merge history'):
+                self.reuse.eligible(API(root_responses), root, 'shadow')
             # Uploaded eligibility contains only explicitly selected provenance, no actor/commit/URLs.
             self.assertEqual(set(result['prRun']), set(self.reuse.compact_run(self.run)))
             self.assertEqual(len(result['artifacts']), 2)
-            for mutation in ['fork', 'ambiguous', 'wrong-tree', 'protected', 'unknown', 'rerun', 'expired', 'missing-candidate']:
+            for mutation in ['fork', 'ambiguous', 'pr-tree', 'final-tree', 'pr-parent-order', 'pr-parent-identity', 'master-parent', 'protected', 'unknown', 'rerun', 'expired', 'missing-candidate']:
                 bad = copy.deepcopy(responses)
                 if mutation == 'fork': bad['pulls/1']['head']['repo']['fork'] = True
                 elif mutation == 'ambiguous': bad['commits/'+self.master['sourceSha']+'/pulls?per_page=100'].append({'number': 2})
-                elif mutation == 'wrong-tree': bad['git/commits/'+self.pr['sourceSha']]['tree']['sha'] = '0'*40
+                elif mutation in {'pr-tree', 'final-tree'}:
+                    sha = self.pr['sourceSha'] if mutation == 'pr-tree' else self.master['sourceSha']
+                    bad['git/commits/'+sha]['tree']['sha'] = '0'*40
+                elif mutation == 'pr-parent-order':
+                    bad['git/commits/'+self.pr['sourceSha']]['parents'].reverse()
+                elif mutation in {'pr-parent-identity', 'master-parent'}:
+                    sha = self.pr['sourceSha'] if mutation == 'pr-parent-identity' else self.master['sourceSha']
+                    bad['git/commits/'+sha]['parents'][0]['sha'] = '0'*40
                 elif mutation in {'protected', 'unknown'}:
-                    bad[f'compare/{"b"*40}...{self.pr["sourceSha"]}?per_page=100']['files'][0]['filename'] = '.github/new.yml' if mutation == 'protected' else 'new-executable.py'
+                    bad[f'compare/{base_sha}...{self.pr["sourceSha"]}?per_page=100']['files'][0]['filename'] = '.github/new.yml' if mutation == 'protected' else 'new-executable.py'
                 elif mutation == 'expired': bad['actions/runs/200/artifacts?per_page=100']['artifacts'][1]['expired'] = True
                 elif mutation == 'missing-candidate':
                     bad['actions/runs/200/artifacts?per_page=100'] = {'total_count': 1, 'artifacts': [metadata]}

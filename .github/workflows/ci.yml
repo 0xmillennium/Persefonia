@@ -553,6 +553,7 @@ jobs:
 
   browser:
     name: Browsers (${{ matrix.name }})
+    if: ${{ !cancelled() && needs.build-jvm.result == 'success' }}
     needs: build-jvm
     runs-on: ubuntu-24.04
     timeout-minutes: 35

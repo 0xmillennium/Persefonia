@@ -159,6 +159,40 @@ class CiWorkflowContractTest {
     }
 
     @Test
+    void browserSchedulingRequiresAnUncancelledSuccessfulProducerEvenAfterSkippedComparison() {
+        // PR/off/ineligible (comparison skipped) and shadow/comparison misses run browsers
+        // after Build + JVM succeeds. Failure, producer cancellation, workflow cancellation,
+        // and a skipped producer on valid enforced reuse must not start the matrix.
+        // This protects production YAML; hosted scheduling is a separate pilot observation.
+        assertBrowserScheduling(workflow);
+        WorkflowDocument missing = openCi();
+        missing.job("browser").remove("if");
+        assertThatThrownBy(() -> assertBrowserScheduling(missing)).isInstanceOf(AssertionError.class);
+        for (String condition : List.of("needs.build-jvm.result == 'success'", "${{ !cancelled() }}", "always()")) {
+            WorkflowDocument changed = openCi();
+            changed.job("browser").put("if", condition);
+            assertThatThrownBy(() -> assertBrowserScheduling(changed)).as(condition).isInstanceOf(AssertionError.class);
+        }
+        for (List<String> dependencies : List.of(List.of("build-jvm", "verify"), List.of("build-jvm", "frontend"))) {
+            WorkflowDocument changed = openCi();
+            changed.job("browser").put("needs", dependencies);
+            assertThatThrownBy(() -> assertBrowserScheduling(changed)).as(dependencies.toString())
+                    .isInstanceOf(AssertionError.class);
+        }
+    }
+
+    private static void assertBrowserScheduling(WorkflowDocument ci) {
+        assertThat(ci.job("browser").get("needs")).isEqualTo("build-jvm");
+        Object condition = ci.job("browser").get("if");
+        assertThat(condition).isInstanceOf(String.class);
+        String expression = ((String) condition).strip();
+        if (expression.startsWith("${{") && expression.endsWith("}}")) {
+            expression = expression.substring(3, expression.length() - 2).strip();
+        }
+        assertThat(expression).matches("!cancelled\\(\\)\\s*&&\\s*needs\\.build-jvm\\.result\\s*==\\s*'success'");
+    }
+
+    @Test
     void browserMatrixRequiresTheVerifiedArtifactAndAllQualificationSteps() {
         assertBrowserQualification(workflow);
         for (String name : List.of("Download verified BootJar", "Stage verified browser artifact",
@@ -213,7 +247,7 @@ class CiWorkflowContractTest {
     }
 
     private static void assertBrowserQualification(WorkflowDocument ci) {
-        assertThat(ci.job("browser").get("needs")).isEqualTo("build-jvm");
+        assertBrowserScheduling(ci);
         Map<String, Object> strategy = WorkflowDocument.map(ci.job("browser").get("strategy"));
         assertThat(strategy.get("fail-fast")).isEqualTo(false);
         var matrix = WorkflowDocument.list(WorkflowDocument.map(strategy.get("matrix")).get("include"));

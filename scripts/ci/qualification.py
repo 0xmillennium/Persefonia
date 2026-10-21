@@ -67,6 +67,24 @@ def git(*args):
     return subprocess.check_output(['git', *args], cwd=ROOT, text=True).strip()
 
 
+def commit_parents(source_sha):
+    require(SHA.fullmatch(source_sha), 'Malformed source SHA')
+    raw = subprocess.check_output(['git', '--no-replace-objects', 'cat-file', 'commit', source_sha], cwd=ROOT)
+    headers, separator, _ = raw.partition(b'\n\n')
+    lines = headers.split(b'\n')
+    require(separator and lines[0].startswith(b'tree ') and
+            SHA.fullmatch(lines[0][5:].decode('ascii')), 'Malformed commit headers')
+    parents = []
+    for line in lines[1:]:
+        # Continuations (including signatures) and message bytes are not headers.
+        if line.startswith((b' ', b'\t')): continue
+        if line == b'parent' or line.startswith((b'parent ', b'parent\t')):
+            parent = line[7:].decode('ascii')
+            require(line.startswith(b'parent ') and SHA.fullmatch(parent), 'Malformed commit parent')
+            parents.append(parent)
+    return parents
+
+
 def reuse_mode(value):
     mode = 'shadow' if value is None or value == '' else value
     require(mode in ('off', 'shadow', 'enforce'), 'Unknown CI_QUALIFICATION_REUSE mode')
@@ -132,13 +150,14 @@ def identity(source_only=False):
             os.environ.get('GITHUB_REPOSITORY_ID', str(REPOSITORY_ID)) == str(REPOSITORY_ID),
             'Untrusted execution repository')
     sha = git('rev-parse', 'HEAD')
+    require(SHA.fullmatch(sha), 'Malformed source SHA')
     require(os.environ.get('GITHUB_SHA', sha) == sha, 'Checkout SHA mismatch')
     event = read(os.environ['GITHUB_EVENT_PATH']) if os.environ.get('GITHUB_EVENT_PATH') else {}
     pr = event.get('pull_request', {})
     return {'schema': SCHEMA, 'repository': REPOSITORY, 'repositoryId': REPOSITORY_ID,
-            'workflowId': WORKFLOW_ID, 'sourceSha': sha, 'tree': git('rev-parse', 'HEAD^{tree}'),
+            'workflowId': WORKFLOW_ID, 'sourceSha': sha, 'tree': git('rev-parse', f'{sha}^{{tree}}'),
             'inputs': source_inputs(not source_only), 'dirty': bool(git('status', '--porcelain', '--untracked-files=no') if source_only else git('status', '--porcelain')),
-            'parents': git('show', '-s', '--format=%P', 'HEAD').split(), 'policy': policy(not source_only),
+            'parents': commit_parents(sha), 'policy': policy(not source_only),
             'run': os.environ.get('GITHUB_RUN_ID', 'local'),
             'attempt': os.environ.get('GITHUB_RUN_ATTEMPT', '1'),
             'event': os.environ.get('GITHUB_EVENT_NAME', 'local'),
