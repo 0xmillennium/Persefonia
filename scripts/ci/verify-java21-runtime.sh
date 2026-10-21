@@ -94,3 +94,12 @@ if ! kill -0 "$java_pid" 2>/dev/null; then
   exit 1
 fi
 echo "Public /robots.txt smoke verified."
+java -version 2> "$(dirname "$bootjar")/java21-version.txt"
+python3 - "$(dirname "$bootjar")" <<'PYTHON'
+import json
+from pathlib import Path
+import sys
+path = Path(sys.argv[1])
+(path / 'java21.json').write_text(json.dumps({'passed': True,
+    'version': (path / 'java21-version.txt').read_text().strip()}) + chr(10))
+PYTHON

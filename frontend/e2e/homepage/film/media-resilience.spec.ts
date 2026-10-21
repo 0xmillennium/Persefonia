@@ -1,5 +1,5 @@
 import { startOnFilm } from '../../support/homepage';
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../../support/test';
 import { visit, presented, position, selectFilm } from '../../support/scenes';
 
 test.beforeEach(async ({ page }) => startOnFilm(page));

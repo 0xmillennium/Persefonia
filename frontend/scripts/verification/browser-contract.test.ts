@@ -6,6 +6,7 @@ import {
   validateOutcomes,
   validateReceipt,
   joinReceipts,
+  validateAcceptance,
   partitions,
 } from './browser-contract.mjs';
 
@@ -159,4 +160,36 @@ it('keeps each project/file atomic even when the union of selected IDs is comple
   f.inventory.chromium[0]!.file = 'shared.spec.ts';
   f.inventory.chromium[1]!.file = 'shared.spec.ts';
   expect(() => joinReceipts(f.inventory, f.receipts, identity)).toThrow('File split');
+});
+
+it('admission rejects forged, duplicate, omitted and mixed-attempt receipts using the source-join contract', () => {
+  const fixtureData = fixture();
+  const runner = { run: 'controlled-fixture', attempt: '1' };
+  const sourceContext = { sourceSha: identity.sourceSha, policy: 'fixture-policy' };
+  const acceptance = {
+    schema: 1,
+    status: 'passed',
+    identity,
+    inventory: fixtureData.inventory,
+    receipts: fixtureData.receipts.map((receipt) => ({
+      ...receipt,
+      runner: { ...runner },
+      sourceContext: { ...sourceContext },
+    })),
+    runner,
+    sourceContext,
+    selected: partitions.length,
+    partitions: partitions.length,
+  };
+  expect(validateAcceptance(acceptance, identity).partitions).toBe(8);
+  for (const variant of ['duplicate', 'omitted', 'count', 'attempt', 'policy', 'candidate']) {
+    const changed = structuredClone(acceptance);
+    if (variant === 'duplicate') changed.receipts[1] = changed.receipts[0]!;
+    else if (variant === 'omitted') changed.receipts.pop();
+    else if (variant === 'count') changed.selected++;
+    else if (variant === 'attempt') changed.receipts[0]!.runner.attempt = '2';
+    else if (variant === 'policy') changed.receipts[0]!.sourceContext.policy = 'forged';
+    else changed.receipts[0]!.identity.artifactSha256 = 'c'.repeat(64);
+    expect(() => validateAcceptance(changed, identity), variant).toThrow();
+  }
 });

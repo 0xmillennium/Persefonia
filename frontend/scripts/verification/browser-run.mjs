@@ -1,3 +1,4 @@
+import { environment } from './environment.mjs';
 import { readFileSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import {
@@ -13,6 +14,7 @@ import {
   repository,
   identity,
   metadata,
+  sourceContext,
   writeJson,
   playwright,
 } from './browser-runtime.mjs';
@@ -45,7 +47,11 @@ const receipt = {
 };
 try {
   receipt.identity = identity(true);
+  receipt.sourceContext = sourceContext();
   receipt.runner = metadata();
+  receipt.environment = environment([
+    suite === 'chromium' ? 'chromium' : project.startsWith('firefox') ? 'firefox' : 'webkit',
+  ]);
   const selection = [...(project === '*' ? [] : [`--project=${project}`]), `--shard=${shard}`];
   const discovery = playwright(suite, selection, discoveryPath, true);
   receipt.timings.discovery = discovery;
@@ -75,6 +81,8 @@ try {
   if (execution.exitCode !== 0 || report.stats.unexpected || report.stats.flaky)
     throw new Error('Browser process failed');
   receipt.timings.reconciliationMs = performance.now() - started;
+  if (JSON.stringify(sourceContext()) !== JSON.stringify(receipt.sourceContext))
+    throw new Error('Source changed during browser verification');
   receipt.status = 'passed';
 } catch (error) {
   receipt.errors.push(String(error));

@@ -32,6 +32,9 @@ export function identity(running = false) {
 export function metadata() {
   const version = (tool, args) =>
     execFileSync(tool, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  const java = spawnSync('java', ['-version'], { encoding: 'utf8' });
+  if (java.status !== 0 || typeof java.stderr !== 'string')
+    throw new Error('Java metadata prerequisite unavailable');
   return {
     job: process.env.GITHUB_JOB ?? 'local',
     run: process.env.GITHUB_RUN_ID ?? 'local',
@@ -44,7 +47,7 @@ export function metadata() {
     playwright: JSON.parse(
       readFileSync(join(frontend, 'node_modules/@playwright/test/package.json'), 'utf8'),
     ).version,
-    java: spawnSync('java', ['-version'], { encoding: 'utf8' }).stderr.trim(),
+    java: java.stderr.trim(),
     dirty: !!execFileSync('git', ['status', '--porcelain'], {
       cwd: repository,
       encoding: 'utf8',
@@ -70,10 +73,12 @@ export function playwright(suite, selection, destination, discover = false) {
       '--workers=1',
       '--retries=0',
       ...selection,
-      ...(discover ? ['--list', '--reporter=json'] : []),
+      ...(discover ? ['--list', '--reporter=json'] : ['--global-timeout=1500000']),
     ],
     {
       cwd: frontend,
+      timeout: discover ? 120_000 : 1_560_000,
+      killSignal: 'SIGTERM',
       stdio: discover ? ['ignore', 'pipe', 'pipe'] : 'inherit',
       encoding: 'utf8',
       env: {
@@ -90,4 +95,14 @@ export function playwright(suite, selection, destination, discover = false) {
     signal: result.signal,
     durationMs: performance.now() - started,
   };
+}
+
+export function sourceContext() {
+  return JSON.parse(
+    execFileSync('python3', ['-B', join(repository, 'scripts/ci/qualification.py')], {
+      cwd: repository,
+      encoding: 'utf8',
+      maxBuffer: 1024 * 1024,
+    }),
+  );
 }

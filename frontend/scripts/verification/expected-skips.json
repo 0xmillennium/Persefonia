@@ -330,9 +330,9 @@
   },
   {
     "file": "public/homepage.spec.ts",
-    "title": "continuous resize and orientation preserve composition and all routes",
+    "title": "sampled viewport sizes preserve homepage structure and hero visibility",
     "projects": ["tablet-834", "mobile-390", "firefox-desktop", "webkit-desktop"],
-    "reason": "Continuous responsive sweep sampled on desktop",
+    "reason": "Finite homepage viewport sweep sampled on desktop",
     "optional": false
   },
   {

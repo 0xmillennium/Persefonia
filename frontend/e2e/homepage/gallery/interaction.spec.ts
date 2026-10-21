@@ -1,5 +1,5 @@
 import { chooseCollection } from '../../support/gallery';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from '../../support/test';
 import { settleScroll } from '../../support/scroll';
 
 async function visit(page: Page) {

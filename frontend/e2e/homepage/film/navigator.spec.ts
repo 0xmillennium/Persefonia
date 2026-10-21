@@ -1,5 +1,5 @@
 import { startOnFilm } from '../../support/homepage';
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../../support/test';
 import { visit, position, selectFilm } from '../../support/scenes';
 import { HOLD } from '../../../src/homepage/film/hold/state';
 import { difference, pixels } from '../../support/pixels';

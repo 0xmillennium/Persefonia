@@ -221,3 +221,29 @@ export function joinReceipts(
     selected: receipts.reduce((n, r) => n + r.selected.length, 0),
   };
 }
+
+/** Gate validates the complete native receipt set through the same owner as the source join. */
+export function validateAcceptance(value, expectedIdentity) {
+  requireThat(
+    value?.schema === 1 &&
+      value.status === 'passed' &&
+      value.inventory &&
+      Array.isArray(value.receipts) &&
+      value.runner &&
+      value.sourceContext,
+    'Malformed browser acceptance',
+  );
+  for (const receipt of value.receipts)
+    requireThat(
+      receipt.runner?.run === value.runner.run &&
+        receipt.runner?.attempt === value.runner.attempt &&
+        digest(receipt.sourceContext) === digest(value.sourceContext),
+      'Mixed browser source/run/attempt',
+    );
+  const result = joinReceipts(value.inventory, value.receipts, expectedIdentity);
+  requireThat(
+    result.selected === value.selected && result.partitions === value.partitions,
+    'Forged browser acceptance counts',
+  );
+  return result;
+}

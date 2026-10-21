@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 import { visit, position } from '../support/scenes';
 import { settleScroll } from '../support/scroll';
 

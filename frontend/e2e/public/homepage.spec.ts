@@ -3,7 +3,7 @@ import { homepageReady } from '../support/homepage';
 import { settlePresentation } from '../support/scenes';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from '../support/test';
 const databaseContainer = process.env.PERSEFONIA_BROWSER_DB_CONTAINER;
 const chapters = ['identity', 'work', 'writing', 'contact'];
 let fixtureDirty = true;
@@ -464,12 +464,12 @@ test('keyboard navigation, contrast and category input', async ({ page }) => {
   await page.keyboard.press('Enter');
   await expect(page).toHaveURL(new URL(destination!, process.env.PERSEFONIA_BROWSER_URL!).href);
 });
-test('continuous resize and orientation preserve composition and all routes', async ({
+test('sampled viewport sizes preserve homepage structure and hero visibility', async ({
   page,
 }, testInfo) => {
   test.skip(
     testInfo.project.name !== 'desktop-1440',
-    'Continuous responsive sweep sampled on desktop',
+    'Finite homepage viewport sweep sampled on desktop',
   );
   await visit(page);
   for (const [width, height] of [

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 import { visit, position, settlePresentation } from '../support/scenes';
 
 test('compact identity activation reaches the authored M and resets accessibly', async ({

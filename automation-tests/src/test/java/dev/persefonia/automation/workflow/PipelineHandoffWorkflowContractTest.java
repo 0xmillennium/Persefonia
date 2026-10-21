@@ -16,7 +16,7 @@ class PipelineHandoffWorkflowContractTest {
         assertBootJarHandoff(ci, delivery);
 
         WorkflowDocument changed = WorkflowDocument.open("ci.yml");
-        WorkflowDocument.map(changed.step("verify", "Upload verified BootJar").get("with"))
+        WorkflowDocument.map(changed.step("build-jvm", "Upload verified BootJar").get("with"))
                 .put("name", "persefonia-bootjar-latest");
         assertThatThrownBy(() -> assertBootJarHandoff(changed, delivery)).isInstanceOf(AssertionError.class);
     }
@@ -33,16 +33,43 @@ class PipelineHandoffWorkflowContractTest {
         assertThatThrownBy(() -> assertDeliveryHandoff(changed, deploy)).isInstanceOf(AssertionError.class);
     }
 
+    @Test
+    void equivalentMasterCandidateUsesTheSameHandoffOnlyAfterTrustedComparison() throws IOException {
+        WorkflowDocument ci = WorkflowDocument.open("ci.yml");
+        assertThat(ci.job("compare").get("if")).isEqualTo("needs.eligibility.outputs.eligible == 'true'");
+        assertThat(WorkflowDocument.list(ci.job("compare").get("needs")))
+                .containsExactlyInAnyOrder("automation", "eligibility");
+        for (var names : Map.of("Upload equivalent master BootJar", "Upload verified BootJar",
+                "Upload equivalent master browser input", "Upload browser qualification input").entrySet()) {
+            var compared = ci.step("compare", names.getKey());
+            var executed = ci.step("build-jvm", names.getValue());
+            assertThat(compared.get("if")).isEqualTo("steps.compare.outputs.reuse == 'true'");
+            assertThat(WorkflowDocument.map(compared.get("with")))
+                    .isEqualTo(WorkflowDocument.map(executed.get("with")));
+        }
+        WorkflowDocument delivery = WorkflowDocument.open("delivery.yml");
+        var download = WorkflowDocument.map(delivery.step("publish-candidate", "Download master qualification record").get("with"));
+        assertThat(download).containsEntry("name", "persefonia-qualification-${{ github.event.workflow_run.head_sha }}")
+                .containsEntry("run-id", "${{ github.event.workflow_run.id }}")
+                .containsEntry("repository", "${{ github.repository }}");
+        assertThat(delivery.step("publish-candidate", "Validate trusted master qualification").get("run"))
+                .asString().contains("scripts/ci/delivery-admission.py");
+        var names = delivery.steps("publish-candidate").stream().map(WorkflowDocument::map)
+                .map(step -> (String) step.get("name")).toList();
+        assertThat(names).containsSubsequence("Download verified BootJar", "Download master qualification record",
+                "Validate trusted master qualification", "Verify and stage CI BootJar", "Log in to GitHub Container Registry");
+    }
+
     private static void assertBootJarHandoff(WorkflowDocument ci, WorkflowDocument delivery) {
-        Map<String, Object> producer = ci.step("verify", "Upload verified BootJar");
+        Map<String, Object> producer = ci.step("build-jvm", "Upload verified BootJar");
         assertThat((String) producer.get("uses")).startsWith("actions/upload-artifact@");
         assertThat(producer.get("if")).isEqualTo("github.event_name == 'push' && github.ref == 'refs/heads/master'");
         Map<String, Object> upload = WorkflowDocument.map(producer.get("with"));
         assertThat(upload).containsEntry("name", "persefonia-bootjar-${{ github.sha }}")
                 .containsEntry("if-no-files-found", "error");
         assertThat(((String) upload.get("path")).lines().toList())
-                .containsExactly("app/build/ci/persefonia.jar", "app/build/ci/persefonia.jar.sha256");
-        assertThat(ci.step("verify", "Verify BootJar").get("run"))
+                .containsExactly("app/build/ci/persefonia.jar", "app/build/ci/persefonia.jar.sha256", "app/build/ci/source-sha.txt");
+        assertThat(ci.step("build-jvm", "Verify BootJar").get("run"))
                 .isEqualTo("""
                         ./scripts/ci/verify-bootjar.sh app/build/libs/persefonia.jar app/build/ci
                         printf '%s\\n' "$GITHUB_SHA" > app/build/ci/source-sha.txt

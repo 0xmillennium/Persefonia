@@ -1,5 +1,5 @@
 import { openHomepage } from '../../support/homepage';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from '../../support/test';
 
 test.afterEach(({}, info) => {
   if (info.status !== info.expectedStatus)

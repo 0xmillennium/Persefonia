@@ -14,68 +14,61 @@ class BrowserProvisionContractTest {
     @TempDir Path temporary;
 
     @Test
-    void oneOwnerInstallsOnlyTheSelectedLockedEnginesAndCiSystemDependencies() throws Exception {
+    void oneOwnerChecksMediaBeforeEverySelectedEngineAndKeepsInstallationOptIn() throws Exception {
         Path bin = Files.createDirectory(temporary.resolve("bin"));
         Path log = temporary.resolve("arguments");
         Path packagesLog = Path.of(log + ".packages");
-        Path node = bin.resolve("node");
-        Files.writeString(node, "#!/usr/bin/env bash\nprintf '%s\\n' \"$@\" > \"$PROVISION_LOG\"\n");
-        assertThat(node.toFile().setExecutable(true)).isTrue();
-        Path apt = bin.resolve("apt-get");
-        Files.writeString(apt, "#!/usr/bin/env bash\nprintf '%s\\n' \"$@\" > \"$PROVISION_LOG.packages\"\n");
-        assertThat(apt.toFile().setExecutable(true)).isTrue();
-        Path sudo = bin.resolve("sudo");
-        Files.writeString(sudo, "#!/usr/bin/env bash\nexec \"$@\"\n");
-        assertThat(sudo.toFile().setExecutable(true)).isTrue();
+        Map<String, String> commands = Map.of(
+                "node", "printf '%s\\n' \"$@\" > \"$PROVISION_LOG\"\n"
+                        + "printf 'browser-download\\n' >> \"$PROVISION_LOG.order\"\n",
+                "python3", "[[ $1 == */scripts/ci/prepare-media-tools.py ]] || exit 21\n"
+                        + "printf '%s\\n' \"$@\" > \"$PROVISION_LOG.media\"\n"
+                        + "printf 'media-check\\n' >> \"$PROVISION_LOG.order\"\n",
+                "apt-get", "printf '%s\\n' \"$*\" >> \"$PROVISION_LOG.packages\"\n",
+                "sudo", "[[ $1 == -n ]] || exit 22\nshift\nexec \"$@\"\n");
+        for (var command : commands.entrySet()) {
+            Path executable = bin.resolve(command.getKey());
+            Files.writeString(executable, "#!/usr/bin/env bash\nset -euo pipefail\n" + command.getValue());
+            assertThat(executable.toFile().setExecutable(true)).isTrue();
+        }
         Path script = Path.of("../scripts/browser/provision.sh").toAbsolutePath();
-        for (String suite : List.of("chromium", "cross", "all")) {
-            Files.deleteIfExists(packagesLog);
-            var command = CommandRunner.command("bash").args(script.toString(), suite).pathPrepend(bin)
-                    .env("PROVISION_LOG", log.toString()).env("CI", "true");
-            command.run().requireSuccess();
-            var arguments = Files.readAllLines(log);
-            assertThat(arguments).startsWith("node_modules/playwright/cli.js", "install", "--no-shell", "--with-deps");
-            assertThat(arguments.subList(4, arguments.size())).containsExactlyElementsOf(switch (suite) {
-                case "chromium" -> List.of("chromium");
-                case "cross" -> List.of("firefox", "webkit");
-                default -> List.of("chromium", "firefox", "webkit");
-            });
-            assertFirefoxPackages(packagesLog, !suite.equals("chromium"));
+        record Selection(String suite, String project, List<String> engines) {}
+        for (String optIn : List.of("local", "CI", "PERSEFONIA_BROWSER_WITH_DEPS")) {
+            for (var selection : List.of(
+                    new Selection("chromium", "*", List.of("chromium")),
+                    new Selection("cross", "firefox-desktop", List.of("firefox")),
+                    new Selection("cross", "webkit-desktop", List.of("webkit")),
+                    new Selection("all", "*", List.of("chromium", "firefox", "webkit")))) {
+                Files.deleteIfExists(packagesLog);
+                Files.deleteIfExists(Path.of(log + ".order"));
+                var command = CommandRunner.command("bash").args(script.toString(), selection.suite(), selection.project())
+                        .pathPrepend(bin).env("PROVISION_LOG", log.toString())
+                        .env("PERSEFONIA_MEDIA_REPORT_DIR", temporary.resolve("media-reports").toString());
+                if (!optIn.equals("local")) command.env(optIn, "1");
+                command.run().requireSuccess();
+                var arguments = Files.readAllLines(log);
+                var prefix = new java.util.ArrayList<>(List.of("node_modules/playwright/cli.js", "install", "--no-shell"));
+                if (!optIn.equals("local")) prefix.add("--with-deps");
+                prefix.addAll(selection.engines());
+                assertThat(arguments).containsExactlyElementsOf(prefix);
+                boolean install = !optIn.equals("local") && System.getProperty("os.name").equals("Linux");
+                assertThat(Files.readAllLines(Path.of(log + ".media"))).containsExactly(
+                        script.getParent().getParent().resolve("ci/prepare-media-tools.py").normalize().toString(),
+                        "--mode", install ? "install" : "check", "--report-dir", temporary.resolve("media-reports").toString());
+                assertThat(Files.readAllLines(Path.of(log + ".order"))).containsExactly("media-check", "browser-download");
+                boolean firefoxPackages = install && selection.engines().contains("firefox");
+                assertThat(Files.exists(packagesLog)).isEqualTo(firefoxPackages);
+                if (firefoxPackages) assertThat(Files.readAllLines(packagesLog))
+                        .containsExactly("update", "install -y --no-install-recommends xauth");
+            }
         }
-        for (String engine : List.of("firefox", "webkit")) {
-            Files.deleteIfExists(packagesLog);
-            CommandRunner.command("bash").args(script.toString(), "cross", engine + "-desktop").pathPrepend(bin)
-                    .env("PROVISION_LOG", log.toString()).env("CI", "true").run().requireSuccess();
-            assertThat(Files.readAllLines(log)).containsExactly(
-                    "node_modules/playwright/cli.js", "install", "--no-shell", "--with-deps", engine);
-            assertFirefoxPackages(packagesLog, engine.equals("firefox"));
+        for (List<String> bad : List.of(List.of("cross", "unknown"), List.of("unknown"))) {
+            assertThat(CommandRunner.command("bash").args(script.toString()).args(bad).pathPrepend(bin)
+                    .env("PROVISION_LOG", log.toString()).run().status()).isNotZero();
         }
-        assertThat(CommandRunner.command("bash").args(script.toString(), "cross", "unknown").pathPrepend(bin)
-                .env("PROVISION_LOG", log.toString()).run().status()).isNotZero();
-        CommandRunner.command("bash").args(script.toString(), "chromium").pathPrepend(bin)
-                .env("PROVISION_LOG", log.toString()).run().requireSuccess();
-        assertThat(Files.readAllLines(log)).doesNotContain("--with-deps");
-        Files.deleteIfExists(packagesLog);
-        CommandRunner.command("bash").args(script.toString(), "cross", "firefox-desktop").pathPrepend(bin)
-                .env("PROVISION_LOG", log.toString()).run().requireSuccess();
-        assertFirefoxPackages(packagesLog, false);
-        CommandRunner.command("bash").args(script.toString(), "cross", "firefox-desktop").pathPrepend(bin)
-                .env("PROVISION_LOG", log.toString()).env("PERSEFONIA_BROWSER_WITH_DEPS", "1")
-                .run().requireSuccess();
-        assertThat(Files.readAllLines(log)).contains("--with-deps");
-        assertFirefoxPackages(packagesLog, true);
-        assertThat(CommandRunner.command("bash").args(script.toString(), "unknown").pathPrepend(bin)
-                .env("PROVISION_LOG", log.toString()).run().status()).isNotZero();
         String wrapper = Files.readString(Path.of("../scripts/browser/check.sh"));
         assertThat(wrapper).contains("scripts/browser/provision.sh").doesNotContain("npx playwright install");
         assertThat(wrapper.indexOf("scripts/browser/provision.sh")).isLessThan(wrapper.indexOf("docker run"));
-    }
-
-    private void assertFirefoxPackages(Path log, boolean firefox) throws Exception {
-        boolean expected = firefox && System.getProperty("os.name").equals("Linux");
-        assertThat(Files.exists(log)).isEqualTo(expected);
-        if (expected) assertThat(Files.readAllLines(log)).containsExactly(
-                "install", "-y", "--no-install-recommends", "ffmpeg", "xauth");
     }
 
     @Test
@@ -90,7 +83,7 @@ class BrowserProvisionContractTest {
                 "java", "exec sleep 60\n",
                 "curl", "exit 0\n",
                 "apt-get", "exit 0\n",
-                "sudo", "exec \"$@\"\n",
+                "sudo", "[[ $1 == -n ]] || exit 22\nshift\nexec \"$@\"\n",
                 "xvfb-run", "[[ $1 == --auto-servernum ]] || exit 2\nshift\nexport DISPLAY=:99\nexec \"$@\"\n");
         for (var command : commands.entrySet()) {
             Path executable = bin.resolve(command.getKey());

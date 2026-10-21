@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 import { visit } from '../support/scenes';
 
 const root = '[data-home-v2]';

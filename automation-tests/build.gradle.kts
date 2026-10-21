@@ -15,3 +15,10 @@ tasks.test {
     outputs.upToDateWhen { false }
     outputs.cacheIf { false }
 }
+
+val pythonContracts by tasks.registering(Exec::class) {
+    workingDir(rootProject.layout.projectDirectory)
+    commandLine("python3", "-B", "-m", "unittest", "discover", "-s", "scripts/ci/tests", "-v")
+}
+
+tasks.check { dependsOn(pythonContracts) }

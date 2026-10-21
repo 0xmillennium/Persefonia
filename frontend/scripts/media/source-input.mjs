@@ -2,6 +2,7 @@ import { realpath, stat, mkdtemp, rm } from 'node:fs/promises';
 import { resolve, relative, isAbsolute, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
+import { spawnSync } from 'node:child_process';
 import { parseArgs } from 'node:util';
 
 const repository = fileURLToPath(new URL('../../../', import.meta.url));
@@ -41,5 +42,12 @@ export async function withMediaWorkspace(action) {
     return await action(directory);
   } finally {
     await rm(directory, { recursive: true, force: true });
+  }
+}
+
+export function requireMediaTools(environment = process.env) {
+  for (const tool of ['ffprobe', 'ffmpeg']) {
+    const result = spawnSync(tool, ['-version'], { env: environment, encoding: 'utf8' });
+    if (result.error || result.status !== 0) throw new Error(`Missing media prerequisite: ${tool}`);
   }
 }

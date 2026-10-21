@@ -1,7 +1,7 @@
 import { startOnFilm } from '../../support/homepage';
 import { settleScroll } from '../../support/scroll';
 import { chooseCollection } from '../../support/gallery';
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../../support/test';
 import { visit, position, selectFilm } from '../../support/scenes';
 import { difference } from '../../support/pixels';
 

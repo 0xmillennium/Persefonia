@@ -6,7 +6,7 @@
 | Date | 2026-09-28 |
 | Scope | architecture / testing / operations |
 | Supersedes | none |
-| Superseded by | none |
+| Superseded by | ADR 0039 |
 
 ## Context
 

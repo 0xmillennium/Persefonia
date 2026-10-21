@@ -6,13 +6,16 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.testcontainers.postgresql.PostgreSQLContainer;
+import org.testcontainers.utility.DockerImageName;
 
 /** Sole PostgreSQL process owner for each DB-backed app test JVM. */
 public final class SharedPostgresTestServer {
     private static final String USERNAME = "persefonia";
     private static final String PASSWORD = "persefonia_dev";
     private static final AtomicInteger DATABASE_SEQUENCE = new AtomicInteger();
-    private static final PostgreSQLContainer SERVER = new PostgreSQLContainer("postgres:17-alpine")
+    private static final PostgreSQLContainer SERVER = new PostgreSQLContainer(DockerImageName.parse(
+                    "postgres:17.11-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73")
+                    .asCompatibleSubstituteFor("postgres"))
             .withDatabaseName("postgres")
             .withUsername(USERNAME)
             .withPassword(PASSWORD);
@@ -28,7 +31,11 @@ public final class SharedPostgresTestServer {
     }
 
     private static synchronized void startServer() {
-        if (!SERVER.isRunning()) SERVER.start();
+        if (!SERVER.isRunning()) {
+            SERVER.start();
+            System.out.println("Test PostgreSQL image: " + SERVER.getDockerImageName()
+                    + " (resolved " + SERVER.getContainerInfo().getImageId() + ")");
+        }
     }
 
     private static String jdbcUrl(String database) {

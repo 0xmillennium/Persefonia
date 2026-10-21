@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 
 test('responsive covers do not undersize the wider unenhanced reading layout', async ({
   browser,

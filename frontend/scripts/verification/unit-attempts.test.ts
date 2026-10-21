@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { expect, it } from 'vitest';
-import { validateUnitAttempts } from './unit-contract.mjs';
+import { validateUnitAttempts, validateUnitPhases } from './unit-contract.mjs';
 
 it('observes and rejects a native successful retry that JSON alone could accept', () => {
   const directory = mkdtempSync(join(tmpdir(), 'persefonia-unit-attempts-'));
@@ -28,7 +28,11 @@ it('observes and rejects a native successful retry that JSON alone could accept'
       [resolve('node_modules/vitest/vitest.mjs'), 'run', '--config', config],
       {
         encoding: 'utf8',
-        env: { ...process.env, PERSEFONIA_UNIT_ATTEMPTS: attempts },
+        env: {
+          ...process.env,
+          PERSEFONIA_UNIT_ATTEMPTS: attempts,
+          PERSEFONIA_UNIT_PHASES: `${attempts}.phases.json`,
+        },
         timeout: 30_000,
       },
     );
@@ -39,6 +43,12 @@ it('observes and rejects a native successful retry that JSON alone could accept'
       file.assertionResults.map((test) => ({ file: file.name, ...test })),
     );
     expect(json.success).toBe(true);
+    const phases = JSON.parse(readFileSync(`${attempts}.phases.json`, 'utf8'));
+    expect(() => validateUnitPhases(cases, phases)).not.toThrow();
+    expect(phases[0].durationMs).toBeGreaterThan(0);
+    expect(() => validateUnitPhases(cases, [])).toThrow();
+    expect(() => validateUnitPhases(cases, [...phases, phases[0]])).toThrow();
+    expect(() => validateUnitPhases(cases, [{ ...phases[0], state: 'failed' }])).toThrow();
     const retried = diagnostics.find((test: { retryCount: number }) => test.retryCount === 1);
     expect(retried).toBeDefined();
     expect(() => validateUnitAttempts(cases, diagnostics)).toThrow('first attempt');

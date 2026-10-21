@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 import { openHomepage } from '../support/homepage';
 
 test('destruction releases the active controllers and restores usable semantic content', async ({

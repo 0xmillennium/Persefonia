@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 import { visit, position } from '../support/scenes';
 
 test('globe retains real geography and exposes keyboard controls without triggering film hold', async ({
