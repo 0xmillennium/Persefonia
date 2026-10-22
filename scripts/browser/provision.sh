@@ -6,7 +6,7 @@ set -euo pipefail
 project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 suite="${1:-all}"
 case "$suite" in
-  chromium) engines=(chromium) ;;
+  chromium|admin) engines=(chromium) ;;
   cross)
     case "${2:-*}" in
       firefox-desktop) engines=(firefox) ;;
@@ -15,7 +15,7 @@ case "$suite" in
       *) printf 'Unknown cross-browser project: %s\n' "$2" >&2; exit 2 ;;
     esac
     ;;
-  all) engines=(chromium firefox webkit) ;;
+  all|native) engines=(chromium firefox webkit) ;;
   *) printf 'Unknown browser suite: %s\n' "$suite" >&2; exit 2 ;;
 esac
 args=(install --no-shell)
@@ -24,7 +24,7 @@ if [[ -n "${CI:-}" || -n "${PERSEFONIA_BROWSER_WITH_DEPS:-}" ]]; then
 fi
 media_mode=check
 if [[ "$OSTYPE" == linux* && ( -n "${CI:-}" || -n "${PERSEFONIA_BROWSER_WITH_DEPS:-}" ) ]]; then
-  media_mode=install
+  if [[ "${PERSEFONIA_MEDIA_TOOLS_READY:-}" != 1 ]]; then media_mode=install; fi
 fi
 media_reports=${PERSEFONIA_MEDIA_REPORT_DIR:-${RUNNER_TEMP:+$RUNNER_TEMP/persefonia-media-tools}}
 media_reports=${media_reports:-${PERSEFONIA_BROWSER_ARTIFACT_DIR:-$project_root/app/build/browser}/media-prerequisites}

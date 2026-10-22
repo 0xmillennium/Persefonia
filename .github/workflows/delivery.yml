@@ -54,6 +54,7 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
           persist-credentials: false
+          fetch-depth: 2
 
       - name: Assert checked out source
         env:
@@ -189,6 +190,7 @@ jobs:
         with:
           ref: ${{ needs.publish-candidate.outputs.source_sha }}
           persist-credentials: false
+          fetch-depth: 2
 
       - name: Assert checked out source
         env:
@@ -261,6 +263,7 @@ jobs:
         with:
           ref: ${{ needs.publish-candidate.outputs.source_sha }}
           persist-credentials: false
+          fetch-depth: 2
 
       - name: Assert checked out source
         env:
@@ -324,6 +327,7 @@ jobs:
         with:
           ref: ${{ needs.publish-candidate.outputs.source_sha }}
           persist-credentials: false
+          fetch-depth: 2
 
       - name: Assert checked out source
         env:

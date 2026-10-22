@@ -2,27 +2,34 @@ import { environment } from './environment.mjs';
 import { readFileSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import {
-  partitions,
   partitionKey,
   reportTests,
   sameInventory,
   validateOutcomes,
   digest,
+  skipRules,
 } from './browser-contract.mjs';
 import {
-  frontend,
   repository,
   identity,
   metadata,
   sourceContext,
   writeJson,
   playwright,
+  riskPlan,
 } from './browser-runtime.mjs';
+import {
+  policyHash,
+  nativeProfiles,
+  requiredPartitions,
+  validateNativeSelection,
+} from './selection-policy.mjs';
 
-// Mandatory qualification accepts only the matrix's project/shard identity, never grep/file filters.
+// Mandatory qualification accepts only the source policy's profile/context identity.
 const [suite, flag, project, ...extra] = process.argv.slice(2);
 const shard = process.env.PERSEFONIA_BROWSER_SHARD ?? '1/1';
-const partition = partitions.find(
+const plan = riskPlan();
+const partition = requiredPartitions(nativeProfiles(plan)).find(
   (p) => p.suite === suite && p.project === project && p.shard === shard,
 );
 if (flag !== '--project' || extra.length || !partition)
@@ -36,7 +43,9 @@ const discoveryPath = join(output, `${key}-discovery.json`),
 const receiptPath = join(output, `${key}-receipt.json`);
 for (const path of [discoveryPath, resultsPath, receiptPath]) rmSync(path, { force: true });
 const receipt = {
-  schema: 1,
+  schema: 2,
+  policy: policyHash,
+  selectionPlan: plan,
   partition,
   status: 'failed',
   exitCode: 1,
@@ -50,13 +59,18 @@ try {
   receipt.sourceContext = sourceContext();
   receipt.runner = metadata();
   receipt.environment = environment([
-    suite === 'chromium' ? 'chromium' : project.startsWith('firefox') ? 'firefox' : 'webkit',
+    project.startsWith('firefox')
+      ? 'firefox'
+      : project.startsWith('webkit')
+        ? 'webkit'
+        : 'chromium',
   ]);
   const selection = [...(project === '*' ? [] : [`--project=${project}`]), `--shard=${shard}`];
   const discovery = playwright(suite, selection, discoveryPath, true);
   receipt.timings.discovery = discovery;
   if (discovery.exitCode !== 0) throw new Error('Discovery failed');
   const planned = reportTests(JSON.parse(readFileSync(discoveryPath, 'utf8')));
+  if (['ordinary', 'admin'].includes(suite)) validateNativeSelection(planned, suite, project);
   receipt.selected = planned.map((r) => r.id);
   receipt.selectionHash = digest([...receipt.selected].sort());
   const execution = playwright(suite, selection, resultsPath);
@@ -77,7 +91,7 @@ try {
     receipt.selected,
     receipt.outcomes.map((r) => r.id),
   );
-  receipt.counts = validateOutcomes(receipt.outcomes);
+  receipt.counts = validateOutcomes(receipt.outcomes, skipRules(suite));
   if (execution.exitCode !== 0 || report.stats.unexpected || report.stats.flaky)
     throw new Error('Browser process failed');
   receipt.timings.reconciliationMs = performance.now() - started;

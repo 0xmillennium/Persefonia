@@ -1,0 +1,345 @@
+[
+  {
+    "file": "homepage/device-recovery.spec.ts",
+    "title": "touch gallery centers its first card after one viewport and reverses",
+    "projects": ["desktop-1440", "tablet-834", "firefox-desktop", "webkit-desktop"],
+    "reason": "Touch pacing",
+    "optional": false
+  },
+  {
+    "file": "homepage/fallback-visual.spec.ts",
+    "title": "base homepage remains readable at narrow width with enlarged text",
+    "projects": ["tablet-834", "mobile-390", "firefox-desktop", "webkit-desktop"],
+    "reason": "One representative layout per run",
+    "optional": false
+  },
+  {
+    "file": "homepage/film/gpu-delivery.spec.ts",
+    "title": "the navigator uploads a replacement source even when the logical film pose is unchanged",
+    "projects": ["tablet-834", "mobile-390", "firefox-desktop", "webkit-desktop"],
+    "reason": "Same texture cache for every composition",
+    "optional": false
+  },
+  {
+    "file": "homepage/film/loop.spec.ts",
+    "title": "desktop waterfall has four capsules aligned at their centers and preserves the fixed film during expansion",
+    "projects": ["tablet-834", "mobile-390", "firefox-desktop", "webkit-desktop"],
+    "reason": "Four-window desktop composition",
+    "optional": false
+  },
+  {
+    "file": "homepage/film/loop.spec.ts",
+    "title": "waterfall joins the hold cycle, loops independently of scrolling, and pauses behind the gallery",
+    "projects": ["tablet-834"],
+    "reason": "Desktop and phone delivery tiers",
+    "optional": false
+  },
+  {
+    "file": "homepage/film/loop.spec.ts",
+    "title": "liquid effect uploads new waterfall frames and native playback survives context loss",
+    "projects": ["tablet-834"],
+    "reason": "Same renderer with both viewport compositions",
+    "optional": false
+  },
+  {
+    "file": "homepage/film/loop.spec.ts",
+    "title": "loop failures retain a poster and retry, menu, hidden-page and reduced-motion states stop playback",
+    "projects": ["desktop-1440"],
+    "reason": "Phone and tablet menu lifecycle",
+    "optional": false
+  },
+  {
+    "file": "homepage/film/loop.spec.ts",
+    "title": "a refused play promise retains a still image and retries through the existing background gesture",
+    "projects": ["tablet-834", "mobile-390", "firefox-desktop", "webkit-desktop"],
+    "reason": "Playback policy is independent of viewport size",
+    "optional": false
+  },
+  {
+    "file": "homepage/film/loop.spec.ts",
+    "title": "a menu interruption while play is pending resumes without treating cancellation as denial",
+    "projects": ["desktop-1440", "mobile-390", "firefox-desktop", "webkit-desktop"],
+    "reason": "Compact menu with a delayed native play promise",
+    "optional": false
+  },
+  {
+    "file": "homepage/film/media-resilience.spec.ts",
+    "title": "a hung native film recovers through a static poster within the readiness deadline",
+    "projects": ["tablet-834"],
+    "reason": "Desktop and portrait readiness",
+    "optional": false
+  },
+  {
+    "file": "homepage/film/media-resilience.spec.ts",
+    "title": "resolution changes retain the last native presentation until a new pose is ready",
+    "projects": ["tablet-834", "mobile-390"],
+    "reason": "Live landscape/portrait resize",
+    "optional": false
+  },
+  {
+    "file": "homepage/film/media-resilience.spec.ts",
+    "title": "reduced motion skips GPU and physics; static presentations contain no empty cinematic spacer",
+    "projects": ["tablet-834", "mobile-390"],
+    "reason": "Capability policy independent of viewport",
+    "optional": false
+  },
+  {
+    "file": "homepage/film/media-resilience.spec.ts",
+    "title": "a hung loop retains its poster and explicitly retries native playback",
+    "projects": ["tablet-834", "mobile-390"],
+    "reason": "Shared loop readiness policy",
+    "optional": false
+  },
+  {
+    "file": "homepage/film/motion.spec.ts",
+    "title": "film wheel steps advance four frames and preserve the last pose at the authored gallery handoff",
+    "projects": ["tablet-834"],
+    "reason": "Desktop and portrait playback geometry",
+    "optional": false
+  },
+  {
+    "file": "homepage/film/motion.spec.ts",
+    "title": "presented media-time probes cover cold, warm and reverse wheel travel",
+    "projects": ["tablet-834"],
+    "reason": "Desktop and portrait decoder paths",
+    "optional": false
+  },
+  {
+    "file": "homepage/film/navigator.spec.ts",
+    "title": "navigator paints and then releases the photo outside the opening doorway",
+    "projects": ["tablet-834", "mobile-390", "firefox-desktop", "webkit-desktop"],
+    "reason": "Fine-pointer photo composition at the desktop review size",
+    "optional": false
+  },
+  {
+    "file": "homepage/film/navigator.spec.ts",
+    "title": "hold opens the photo to the current frame and restores it after cancel or switch",
+    "projects": ["tablet-834"],
+    "reason": "Desktop and native touch exercise the same composition",
+    "optional": false
+  },
+  {
+    "file": "homepage/film/touch-hold.spec.ts",
+    "title": "settled hold tolerates finger drift and changes the film only once until release",
+    "projects": ["desktop-1440", "tablet-834", "firefox-desktop", "webkit-desktop"],
+    "reason": "Native touch input at phone size",
+    "optional": false
+  },
+  {
+    "file": "homepage/film/touch-hold.spec.ts",
+    "title": "film long-press suppresses selection and its menu while links retain their native menu",
+    "projects": ["desktop-1440", "tablet-834", "firefox-desktop", "webkit-desktop"],
+    "reason": "Native touch input at phone size",
+    "optional": false
+  },
+  {
+    "file": "homepage/film/touch-hold.spec.ts",
+    "title": "quick swipes retain native scrolling and do not complete a film hold",
+    "projects": ["desktop-1440", "tablet-834", "firefox-desktop", "webkit-desktop"],
+    "reason": "Native touch input at phone size",
+    "optional": false
+  },
+  {
+    "file": "homepage/film/touch-hold.spec.ts",
+    "title": "release and browser cancellation stop an unfinished hold",
+    "projects": ["desktop-1440", "tablet-834", "firefox-desktop", "webkit-desktop"],
+    "reason": "Native touch input at phone size",
+    "optional": false
+  },
+  {
+    "file": "homepage/film/video.spec.ts",
+    "title": "paused native films seek both ways, retain exact end poses and sleep at rest",
+    "projects": ["tablet-834"],
+    "reason": "Desktop and portrait video tiers",
+    "optional": false
+  },
+  {
+    "file": "homepage/gallery/directory.spec.ts",
+    "title": "the tuner and its choices fit intermediate widths and short viewports",
+    "projects": ["tablet-834", "mobile-390", "firefox-desktop", "webkit-desktop"],
+    "reason": "Explicitly sweeps desktop, tablet, mobile, and short viewports",
+    "optional": false
+  },
+  {
+    "file": "homepage/gallery/directory.spec.ts",
+    "title": "touch drags tune horizontally while vertical swipes scroll the page",
+    "projects": ["desktop-1440", "tablet-834", "firefox-desktop", "webkit-desktop"],
+    "reason": "Native touch gesture arbitration",
+    "optional": false
+  },
+  {
+    "file": "homepage/gallery/directory.spec.ts",
+    "title": "late tuner changes center card one and reset Projects after either completed exit without moving the footer",
+    "projects": ["tablet-834", "mobile-390", "firefox-desktop", "webkit-desktop"],
+    "reason": "Shared measured tail geometry",
+    "optional": false
+  },
+  {
+    "file": "homepage/gallery/interaction.spec.ts",
+    "title": "touch gallery preserves native vertical scrolling",
+    "projects": ["desktop-1440", "tablet-834", "firefox-desktop", "webkit-desktop"],
+    "reason": "Native touch gesture",
+    "optional": false
+  },
+  {
+    "file": "homepage/gallery/interaction.spec.ts",
+    "title": "hold hint follows eligibility, disappears over links and during a press, and stays off in the gallery",
+    "projects": ["mobile-390"],
+    "reason": "Fine-pointer discoverability",
+    "optional": false
+  },
+  {
+    "file": "homepage/gallery/interaction.spec.ts",
+    "title": "a fast gallery flick coasts to a bounded card and announces only after settling",
+    "projects": ["mobile-390"],
+    "reason": "Controlled fine-pointer release velocity",
+    "optional": false
+  },
+  {
+    "file": "homepage/gallery/scene.spec.ts",
+    "title": "wheel reversal returns from the gallery through the film boundary to the top",
+    "projects": ["tablet-834"],
+    "reason": "Desktop and portrait native wheel boundary",
+    "optional": false
+  },
+  {
+    "file": "homepage/gallery/scene.spec.ts",
+    "title": "gallery arrives on staggered dark columns above the retained film",
+    "projects": ["tablet-834"],
+    "reason": "Desktop and portrait exercise twelve and six columns.",
+    "optional": false
+  },
+  {
+    "file": "homepage/globe.spec.ts",
+    "title": "pointer focus stays quiet and keyboard focus follows the visible globe",
+    "projects": ["mobile-390"],
+    "reason": "Mouse-to-keyboard modality; touch is covered separately",
+    "optional": false
+  },
+  {
+    "file": "homepage/globe.spec.ts",
+    "title": "touch rotates both globe axes while swipes outside the sphere scroll the page",
+    "projects": ["desktop-1440", "tablet-834", "firefox-desktop", "webkit-desktop"],
+    "reason": "Real touch dispatch on the phone composition",
+    "optional": false
+  },
+  {
+    "file": "homepage/globe.spec.ts",
+    "title": "graphics interruption retains location content and restoration and teardown release focus styling",
+    "projects": ["desktop-1440", "tablet-834", "mobile-390", "firefox-desktop", "webkit-desktop"],
+    "reason": "Context-loss extension unavailable in this browser",
+    "optional": true
+  },
+  {
+    "file": "homepage/hero.spec.ts",
+    "title": "desktop tree panes retain their frame and dividers through navigator rendering and scroll reversal",
+    "projects": ["tablet-834", "mobile-390", "firefox-desktop", "webkit-desktop"],
+    "reason": "Six-pane desktop tree composition",
+    "optional": false
+  },
+  {
+    "file": "homepage/hero.spec.ts",
+    "title": "mobile tree has equal centered windows above and below the writing in native and navigator presentation",
+    "projects": ["desktop-1440", "tablet-834", "firefox-desktop", "webkit-desktop"],
+    "reason": "Paired portrait phone composition",
+    "optional": false
+  },
+  {
+    "file": "homepage/identity.spec.ts",
+    "title": "physical identity responds to pointer contact and restores on scene exit",
+    "projects": ["mobile-390"],
+    "reason": "Mouse-contact case; touch interaction is covered by mobile input checks.",
+    "optional": false
+  },
+  {
+    "file": "homepage/mobile.spec.ts",
+    "title": "mobile menu contains focus, restores navigation, and closes on a desktop resize",
+    "projects": ["desktop-1440"],
+    "reason": "Compact navigation at tablet and phone widths",
+    "optional": false
+  },
+  {
+    "file": "homepage/mobile.spec.ts",
+    "title": "drawer links select the semantic gallery section without trapping focus",
+    "projects": ["desktop-1440"],
+    "reason": "Drawer navigation",
+    "optional": false
+  },
+  {
+    "file": "homepage/mobile.spec.ts",
+    "title": "finger contact moves logo pieces and vertical swipes retain native scrolling",
+    "projects": ["desktop-1440", "tablet-834", "firefox-desktop", "webkit-desktop"],
+    "reason": "Native emulated touch events",
+    "optional": false
+  },
+  {
+    "file": "homepage/mobile.spec.ts",
+    "title": "phone-width mouse effects survive input changes and remain visible inside the menu",
+    "projects": ["tablet-834", "mobile-390", "firefox-desktop", "webkit-desktop"],
+    "reason": "Fine pointer at phone width with a simulated device change",
+    "optional": false
+  },
+  {
+    "file": "homepage/mobile.spec.ts",
+    "title": "portrait and landscape writing stays centered, ordered and inside the viewport",
+    "projects": ["tablet-834", "mobile-390", "firefox-desktop", "webkit-desktop"],
+    "reason": "One responsive sweep avoids repeating the same geometry",
+    "optional": false
+  },
+  {
+    "file": "homepage/performance.spec.ts",
+    "title": "healthy startup keeps optional renderers lazy and the resting page stops scheduling animation frames",
+    "projects": ["tablet-834"],
+    "reason": "Desktop and portrait resource policy",
+    "optional": false
+  },
+  {
+    "file": "homepage/responsive-covers.spec.ts",
+    "title": "responsive covers do not undersize the wider unenhanced reading layout",
+    "projects": ["tablet-834", "mobile-390", "firefox-desktop", "webkit-desktop"],
+    "reason": "One controlled DPR-1 reading layout",
+    "optional": false
+  },
+  {
+    "file": "homepage/writing.spec.ts",
+    "title": "later writing uses upward row exits while the film stays at its original scale",
+    "projects": ["tablet-834"],
+    "reason": "Desktop and portrait exercise the two compositions.",
+    "optional": false
+  },
+  {
+    "file": "public/homepage.spec.ts",
+    "title": "gallery covers use eligible variants and revoke independently of the publication",
+    "projects": ["tablet-834", "mobile-390"],
+    "reason": "Viewport-invariant media revocation SSR contract",
+    "optional": false
+  },
+  {
+    "file": "public/homepage.spec.ts",
+    "title": "configured Turkish content and routes remain localized alongside locked identity copy",
+    "projects": ["tablet-834", "mobile-390"],
+    "reason": "Viewport-invariant localization SSR contract",
+    "optional": false
+  },
+  {
+    "file": "public/homepage.spec.ts",
+    "title": "standard theme covers projects, content TOC, and CV in both system preferences",
+    "projects": ["tablet-834", "mobile-390"],
+    "reason": "Viewport-invariant theme stylesheet and token contract",
+    "optional": false
+  },
+  {
+    "file": "public/homepage.spec.ts",
+    "title": "sampled viewport sizes preserve homepage structure and hero visibility",
+    "projects": ["tablet-834", "mobile-390", "firefox-desktop", "webkit-desktop"],
+    "reason": "Finite homepage viewport sweep sampled on desktop",
+    "optional": false
+  },
+  {
+    "file": "public/public-shell.spec.ts",
+    "title": "SSR shell and reading content reflow at narrow widths and enlarged text without JavaScript",
+    "projects": ["tablet-834", "mobile-390"],
+    "reason": "Layout contract sampled once per supported engine",
+    "optional": false
+  }
+]

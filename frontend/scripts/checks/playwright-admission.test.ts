@@ -6,7 +6,11 @@ import { expect, it } from 'vitest';
 import { reportTests, sameInventory, validateOutcomes } from '../verification/browser-contract.mjs';
 
 // Exercise the installed runner and inherited configurations, without starting an application.
-it.each(['playwright.config.ts', 'playwright.cross-browser.config.ts'])(
+it.each([
+  'playwright.config.ts',
+  'playwright.cross-browser.config.ts',
+  'playwright.native.config.ts',
+])(
   '%s rejects both focus forms in CI and preserves ordinary execution and skips',
   (config) => {
     const directory = mkdtempSync(join(tmpdir(), 'persefonia-admission-'));

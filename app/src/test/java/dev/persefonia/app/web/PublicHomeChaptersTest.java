@@ -1,6 +1,7 @@
 package dev.persefonia.app.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -46,8 +47,12 @@ class PublicHomeChaptersTest {
                 .andReturn().getResponse().getContentAsString();
 
         for (String id : List.of("identity", "work", "writing", "contact")) {
-            assertThat(html).contains("id=\"" + id + "\"");
+            String attribute = "id=\"" + id + "\"";
+            assertThat(html).containsOnlyOnce(attribute);
+            assertThatThrownBy(() -> assertThat(html + "<section " + attribute + "></section>")
+                    .containsOnlyOnce(attribute)).isInstanceOf(AssertionError.class);
         }
+        assertThat(java.util.regex.Pattern.compile("<h1(?:\\s|>)").matcher(html).results().count()).isEqualTo(1);
         assertThat(html).contains("<h1 id=\"identity-title\" class=\"home-masthead\">0xmillennium");
         assertThat(html).contains("href=\"#work\"", "href=\"#writing\"", "href=\"/contact\"");
         assertThat(html).contains("href=\"/en/articles/real-article\"");

@@ -196,7 +196,7 @@ class CiWorkflowContractTest {
     void browserMatrixRequiresTheVerifiedArtifactAndAllQualificationSteps() {
         assertBrowserQualification(workflow);
         for (String name : List.of("Download verified BootJar", "Stage verified browser artifact",
-                "Install browser matrix", "Qualify production homepage and browser matrix")) {
+                "Install locked native dependencies", "Qualify shared native lifecycle")) {
             WorkflowDocument missing = openCi();
             WorkflowDocument.list(missing.job("browser").get("steps")).removeIf(step ->
                     name.equals(WorkflowDocument.map(step).get("name")));
@@ -204,18 +204,20 @@ class CiWorkflowContractTest {
         }
         WorkflowDocument reordered = openCi();
         List<Object> steps = WorkflowDocument.list(reordered.job("browser").get("steps"));
-        int browserIndex = stepIndex(steps, "Qualify production homepage and browser matrix");
+        int browserIndex = stepIndex(steps, "Qualify shared native lifecycle");
         Collections.swap(steps, browserIndex, browserIndex - 1);
         assertThatThrownBy(() -> assertBrowserQualification(reordered)).isInstanceOf(AssertionError.class);
         WorkflowDocument bypassed = openCi();
-        bypassed.step("browser", "Qualify production homepage and browser matrix")
+        bypassed.step("browser", "Qualify shared native lifecycle")
                 .put("run", "cd frontend && npm run test:browser");
         assertThatThrownBy(() -> assertBrowserQualification(bypassed)).isInstanceOf(AssertionError.class);
-        WorkflowDocument missingViewport = openCi();
-        WorkflowDocument.list(WorkflowDocument.map(WorkflowDocument.map(
-                missingViewport.job("browser").get("strategy")).get("matrix")).get("include"))
-                .removeIf(value -> "mobile-390".equals(WorkflowDocument.map(value).get("project")));
-        assertThatThrownBy(() -> assertBrowserQualification(missingViewport)).isInstanceOf(AssertionError.class);
+        WorkflowDocument narrowed = openCi();
+        WorkflowDocument.map(narrowed.step("browser", "Qualify shared native lifecycle").get("env"))
+                .put("PERSEFONIA_BROWSER_SUITE", "chromium");
+        assertThatThrownBy(() -> assertBrowserQualification(narrowed)).isInstanceOf(AssertionError.class);
+        WorkflowDocument matrix = openCi();
+        matrix.job("browser").put("strategy", Map.of("matrix", Map.of("project", List.of("desktop-1440"))));
+        assertThatThrownBy(() -> assertBrowserQualification(matrix)).isInstanceOf(AssertionError.class);
     }
 
     @Test
@@ -233,7 +235,7 @@ class CiWorkflowContractTest {
                 .containsSubsequence("Build and test", "Verify production frontend ownership and generated assets",
                         "Set up Temurin Java 21", "Verify Java 21 compatibility", "Upload browser qualification input");
         assertThat(ci.step("build-jvm", "Build and test").get("run"))
-                .isEqualTo("python3 scripts/ci/measure.py build-and-test app/build/ci/timings.jsonl ./gradlew --no-daemon --stacktrace clean applicationJvmCheck :app:bootJar qualificationInputs --profile");
+                .isEqualTo("python3 scripts/ci/measure.py build-and-test app/build/ci/timings.jsonl ./gradlew --no-daemon --stacktrace applicationJvmCheck :app:bootJar qualificationInputs --profile");
         assertThat(ci.step("build-jvm", "Verify production frontend ownership and generated assets").get("run"))
                 .asString().contains("npm run check:boundaries", "npm run check:generated", "npm run format:check");
         assertBrowserQualification(ci);
@@ -248,28 +250,13 @@ class CiWorkflowContractTest {
 
     private static void assertBrowserQualification(WorkflowDocument ci) {
         assertBrowserScheduling(ci);
-        Map<String, Object> strategy = WorkflowDocument.map(ci.job("browser").get("strategy"));
-        assertThat(strategy.get("fail-fast")).isEqualTo(false);
-        var matrix = WorkflowDocument.list(WorkflowDocument.map(strategy.get("matrix")).get("include"));
-        var expected = new java.util.ArrayList<Map<String, Object>>();
-        for (var group : List.of(
-                Map.of("name", "desktop", "suite", "chromium", "project", "desktop-1440"),
-                Map.of("name", "tablet", "suite", "chromium", "project", "tablet-834"),
-                Map.of("name", "mobile", "suite", "chromium", "project", "mobile-390"))) {
-            for (int shard = 1; shard <= 2; shard++) {
-                expected.add(Map.of("name", group.get("name") + "-" + shard + "of2", "suite", group.get("suite"),
-                        "project", group.get("project"), "shard", shard + "/2"));
-            }
-        }
-        expected.add(Map.of("name", "firefox-1of1", "suite", "cross", "project", "firefox-desktop", "shard", "1/1"));
-        expected.add(Map.of("name", "webkit-1of1", "suite", "cross", "project", "webkit-desktop", "shard", "1/1"));
-        assertThat(matrix.stream().map(WorkflowDocument::map).toList()).containsExactlyInAnyOrderElementsOf(expected);
-        assertThat(strategy.get("max-parallel")).isEqualTo(8);
+        assertThat(ci.job("browser")).doesNotContainKey("strategy");
+        assertThat(ci.job("browser").get("name")).isEqualTo("Native browsers");
         assertThat(ci.steps("browser").stream().map(WorkflowDocument::map)
                 .map(step -> (String) step.get("name")))
                 .containsSubsequence("Set up Temurin Java 21", "Set up Node 22", "Download verified BootJar",
-                        "Stage verified browser artifact", "Install browser matrix",
-                        "Qualify production homepage and browser matrix");
+                        "Stage verified browser artifact", "Install locked native dependencies",
+                        "Qualify shared native lifecycle");
         var input = ci.step("build-jvm", "Upload browser qualification input");
         assertThat(input).doesNotContainKey("if");
         assertThat(WorkflowDocument.map(input.get("with")))
@@ -285,15 +272,14 @@ class CiWorkflowContractTest {
                 "cp app/build/ci/persefonia.jar app/build/libs/persefonia.jar",
                 "BOOT-INF/classes/static/assets/.vite/manifest.json");
         assertThat(stage.indexOf("sha256sum --check")).isLessThan(stage.indexOf("cp app/build/ci"));
-        assertThat(ci.step("browser", "Install browser matrix").get("run"))
+        assertThat(ci.step("browser", "Install locked native dependencies").get("run"))
                 .asString().contains("npm ci --prefix frontend", "scripts/ci/measure.py").doesNotContain("playwright install");
-        var qualification = ci.step("browser", "Qualify production homepage and browser matrix");
+        var qualification = ci.step("browser", "Qualify shared native lifecycle");
         assertThat(qualification.get("run")).asString()
-                .contains("bash scripts/browser/check.sh --project \"$BROWSER_PROJECT\"");
+                .contains("bash scripts/browser/check.sh").doesNotContain("--project", "--grep", "--shard");
         assertThat(WorkflowDocument.map(qualification.get("env")))
-                .containsEntry("PERSEFONIA_BROWSER_SUITE", "${{ matrix.suite }}")
-                .containsEntry("PERSEFONIA_BROWSER_SHARD", "${{ matrix.shard }}")
-                .containsEntry("BROWSER_PROJECT", "${{ matrix.project }}");
+                .containsEntry("PERSEFONIA_BROWSER_SUITE", "native")
+                .doesNotContainKeys("PERSEFONIA_BROWSER_SHARD", "BROWSER_PROJECT");
     }
 
     @Test
@@ -327,7 +313,7 @@ class CiWorkflowContractTest {
         var retention = ci.step("browser", "Retain finalized browser timings");
         assertThat(retention.get("if")).isEqualTo("always()");
         assertThat(WorkflowDocument.map(retention.get("env")))
-                .containsEntry("BROWSER_PARTITION", "${{ matrix.name }}");
+                .containsEntry("BROWSER_PARTITION", "native");
         assertThat(retention.get("run")).asString().contains("app/build/browser/timings.jsonl",
                 "${BROWSER_PARTITION}-setup-timings.jsonl", "${BROWSER_PARTITION}-npm-timings.jsonl");
         assertThat(((String) WorkflowDocument.map(ci.step("browser", "Upload browser verification receipts")
@@ -366,7 +352,7 @@ class CiWorkflowContractTest {
         assertThat(workflow.job("frontend").get("if")).asString()
                 .contains("!cancelled()", "needs.automation.result == 'success'", "needs.eligibility.result == 'success'",
                         "needs.compare.result == 'skipped'", "needs.compare.result == 'success'", "needs.compare.outputs.reuse != 'true'");
-        assertThat(workflow.step("frontend", "Execute complete frontend discovery and stress").get("run"))
+        assertThat(workflow.step("frontend", "Execute ordinary frontend and risk-required physics").get("run"))
                 .asString().contains("unit-run.mjs").doesNotContain("test:unit");
         assertThat(workflow.step("frontend", "Set up Temurin Java 25")).isNotEmpty();
         assertThat(workflow.step("frontend", "Prepare media tools").get("run"))
@@ -382,4 +368,47 @@ class CiWorkflowContractTest {
         assertThat(app).contains("dependsOn(jvmCheck)", "dependsOn(frontendCheck)", "dependsOn(npmRunUnitTest)",
                 "dependsOn(tasks.test, integrationTest, migrationTest)");
     }
+
+    @Test
+    void adminNativeRetainsTheOwnJvmWorkspaceAndCannotBeReplacedByPublicSmoke() {
+        assertAdminNative(workflow);
+        for (String name : List.of("Select required admin native owner", "Export own-workspace admin test runtime",
+                "Qualify isolated required admin native forms", "Upload isolated admin native receipt")) {
+            var changed = openCi();
+            WorkflowDocument.list(changed.job("build-jvm").get("steps")).removeIf(step ->
+                    name.equals(WorkflowDocument.map(step).get("name")));
+            assertThatThrownBy(() -> assertAdminNative(changed)).isInstanceOfAny(AssertionError.class, IllegalArgumentException.class);
+        }
+        var changed = openCi();
+        changed.step("build-jvm", "Qualify isolated required admin native forms").put("run", "npm run test:browser");
+        assertThatThrownBy(() -> assertAdminNative(changed)).isInstanceOf(AssertionError.class);
+        var nested = openCi();
+        WorkflowDocument.map(nested.step("build-jvm", "Upload isolated admin native receipt").get("with"))
+                .put("path", "app/build/browser/verification/admin-*-receipt.json\napp/build/admin-browser/timings.jsonl");
+        assertThatThrownBy(() -> assertAdminNative(nested)).isInstanceOf(AssertionError.class);
+    }
+
+    private static void assertAdminNative(WorkflowDocument ci) {
+        assertThat(ci.step("build-jvm", "Select required admin native owner").get("run"))
+                .isEqualTo("python3 -B scripts/ci/admin-preview.py required");
+        var runtime = ci.step("build-jvm", "Export own-workspace admin test runtime");
+        assertThat(runtime.get("if")).isEqualTo("steps.admin_risk.outputs.admin_required == 'true'");
+        assertThat(runtime.get("run")).asString().contains(":app:writeAdminPreviewClasspath")
+                .doesNotContain("clean", "testClasses", "--rerun-tasks");
+        var nativeStep = ci.step("build-jvm", "Qualify isolated required admin native forms");
+        assertThat(nativeStep.get("if")).isEqualTo("steps.admin_risk.outputs.admin_required == 'true'");
+        assertThat(nativeStep.get("run")).isEqualTo("bash scripts/browser/check.sh");
+        assertThat(WorkflowDocument.map(nativeStep.get("env")))
+                .containsEntry("PERSEFONIA_BROWSER_SUITE", "admin").containsEntry("PERSEFONIA_BROWSER_PORT", "18081");
+        var upload = WorkflowDocument.map(ci.step("build-jvm", "Upload isolated admin native receipt").get("with"));
+        assertThat(upload).containsEntry("name", "persefonia-browser-receipt-admin-${{ github.sha }}")
+                .containsEntry("if-no-files-found", "error");
+        assertThat(upload.get("path")).asString()
+                .contains("app/build/browser/verification/admin-*-receipt.json",
+                        "app/build/browser/verification/admin-setup-timings.jsonl")
+                .doesNotContain("app/build/admin-browser");
+        assertThat(ci.step("build-jvm", "Retain finalized admin timings").get("if")).asString()
+                .contains("always()", "steps.admin_risk.outputs.admin_required == 'true'");
+    }
+
 }

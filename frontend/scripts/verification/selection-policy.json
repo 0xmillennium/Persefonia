@@ -1,0 +1,425 @@
+{
+  "schema": 1,
+  "version": "ordinary-native-v1",
+  "receiptSchema": 2,
+  "ordinaryPhysicsSeeds": [1, 2, 26, 27, 30, 45, 58, 74, 99, 100],
+  "expectedSkips": [],
+  "native": [
+    {
+      "name": "desktop",
+      "project": "desktop-1440",
+      "engine": "chromium",
+      "context": "desktop",
+      "cases": [
+        {
+          "file": "native/bootstrap.spec.ts",
+          "title": "the checked artifact boots production assets and exposes unique semantic chapters"
+        },
+        {
+          "file": "homepage/fallback-visual.spec.ts",
+          "title": "base hero writing actually paints with no JavaScript"
+        },
+        {
+          "file": "homepage/fallback-visual.spec.ts",
+          "title": "base hero writing actually paints with entry download failure"
+        },
+        {
+          "file": "public/public-shell.spec.ts",
+          "title": "SSR shell and reading content reflow at narrow widths and enlarged text without JavaScript"
+        },
+        {
+          "file": "public/mermaid.spec.ts",
+          "title": "the isolated diagram bundle renders flowcharts and sequence diagrams"
+        },
+        {
+          "file": "homepage/writing.spec.ts",
+          "title": "second statement restores word goo and staggered clipped exits with finite entrance"
+        },
+        {
+          "file": "homepage/writing.spec.ts",
+          "title": "first writing restores character pull, clipping and reversible high-travel exits"
+        },
+        {
+          "file": "homepage/writing-compositions.spec.ts",
+          "title": "stopped entrances complete all rows and interrupted exits retain ownership through reverse and resume"
+        },
+        {
+          "file": "homepage/film/video.spec.ts",
+          "title": "paused native films seek both ways, retain exact end poses and sleep at rest"
+        },
+        {
+          "file": "homepage/finalization.spec.ts",
+          "title": "cold work and clicked navigation share category, focus, URL and history"
+        },
+        {
+          "file": "homepage/gallery/scene.spec.ts",
+          "title": "gallery departure removes hidden keyboard targets and transfers focus visibly"
+        },
+        {
+          "file": "public/contact-form.spec.ts",
+          "title": "synthetic admin authentication is absent from the production application artifact"
+        },
+        {
+          "file": "public/public-shell.spec.ts",
+          "title": "a fresh matching navigation marker loads and dismisses the optional cover"
+        },
+        {
+          "file": "public/public-shell.spec.ts",
+          "title": "a mismatched navigation marker is consumed without loading the cover"
+        },
+        {
+          "file": "homepage/fallback-visual.spec.ts",
+          "title": "base homepage remains readable at narrow width with enlarged text"
+        },
+        {
+          "file": "homepage/finalization.spec.ts",
+          "title": "globe alternatives keep their targets clear of footer links at narrow and short sizes"
+        },
+        {
+          "file": "homepage/film/gpu-delivery.spec.ts",
+          "title": "the navigator uploads a replacement source even when the logical film pose is unchanged"
+        },
+        {
+          "file": "homepage/film/media-resilience.spec.ts",
+          "title": "a hung native film recovers through a static poster within the readiness deadline"
+        },
+        {
+          "file": "homepage/film/media-resilience.spec.ts",
+          "title": "a hung loop retains its poster and explicitly retries native playback"
+        },
+        {
+          "file": "homepage/film/motion.spec.ts",
+          "title": "presented media-time probes cover cold, warm and reverse wheel travel"
+        },
+        {
+          "file": "homepage/gallery/scene.spec.ts",
+          "title": "wheel reversal returns from the gallery through the film boundary to the top"
+        },
+        {
+          "file": "homepage/timeline/wheel-roundtrip.spec.ts",
+          "title": "rapid direction changes preserve pending notch counts through the writing handoff"
+        },
+        {
+          "file": "homepage/lifecycle.spec.ts",
+          "title": "destruction releases the active controllers and restores usable semantic content"
+        },
+        {
+          "file": "homepage/performance.spec.ts",
+          "title": "healthy startup keeps optional renderers lazy and the resting page stops scheduling animation frames"
+        },
+        {
+          "file": "homepage/identity.spec.ts",
+          "title": "logo entrance completes with stopped input, preserves stagger and gives authored exits priority"
+        },
+        {
+          "file": "homepage/film/media-resilience.spec.ts",
+          "title": "reduced motion skips GPU and physics; static presentations contain no empty cinematic spacer"
+        },
+        {
+          "file": "homepage/identity.spec.ts",
+          "title": "physical identity responds to pointer contact and restores on scene exit"
+        }
+      ]
+    },
+    {
+      "name": "mobile",
+      "project": "mobile-390",
+      "engine": "chromium",
+      "context": "touch",
+      "cases": [
+        {
+          "file": "homepage/film/touch-hold.spec.ts",
+          "title": "settled hold tolerates finger drift and changes the film only once until release"
+        },
+        {
+          "file": "homepage/film/touch-hold.spec.ts",
+          "title": "quick swipes retain native scrolling and do not complete a film hold"
+        },
+        {
+          "file": "homepage/film/touch-hold.spec.ts",
+          "title": "release and browser cancellation stop an unfinished hold"
+        },
+        {
+          "file": "homepage/gallery/directory.spec.ts",
+          "title": "touch drags tune horizontally while vertical swipes scroll the page"
+        }
+      ]
+    },
+    {
+      "name": "firefox",
+      "project": "firefox-desktop",
+      "engine": "firefox",
+      "context": "desktop",
+      "cases": [
+        {
+          "file": "native/bootstrap.spec.ts",
+          "title": "the checked artifact boots production assets and exposes unique semantic chapters"
+        },
+        {
+          "file": "homepage/fallback-visual.spec.ts",
+          "title": "base hero writing actually paints with no JavaScript"
+        },
+        {
+          "file": "homepage/fallback-visual.spec.ts",
+          "title": "base hero writing actually paints with entry download failure"
+        },
+        {
+          "file": "public/public-shell.spec.ts",
+          "title": "SSR shell and reading content reflow at narrow widths and enlarged text without JavaScript"
+        },
+        {
+          "file": "public/mermaid.spec.ts",
+          "title": "the isolated diagram bundle renders flowcharts and sequence diagrams"
+        },
+        {
+          "file": "homepage/writing.spec.ts",
+          "title": "second statement restores word goo and staggered clipped exits with finite entrance"
+        },
+        {
+          "file": "homepage/writing.spec.ts",
+          "title": "first writing restores character pull, clipping and reversible high-travel exits"
+        },
+        {
+          "file": "homepage/writing-compositions.spec.ts",
+          "title": "stopped entrances complete all rows and interrupted exits retain ownership through reverse and resume"
+        },
+        {
+          "file": "homepage/film/video.spec.ts",
+          "title": "paused native films seek both ways, retain exact end poses and sleep at rest"
+        },
+        {
+          "file": "homepage/finalization.spec.ts",
+          "title": "cold work and clicked navigation share category, focus, URL and history"
+        },
+        {
+          "file": "homepage/gallery/scene.spec.ts",
+          "title": "gallery departure removes hidden keyboard targets and transfers focus visibly"
+        },
+        {
+          "file": "homepage/identity.spec.ts",
+          "title": "logo entrance completes with stopped input, preserves stagger and gives authored exits priority"
+        },
+        {
+          "file": "homepage/film/media-resilience.spec.ts",
+          "title": "reduced motion skips GPU and physics; static presentations contain no empty cinematic spacer"
+        }
+      ]
+    },
+    {
+      "name": "webkit",
+      "project": "webkit-desktop",
+      "engine": "webkit",
+      "context": "desktop",
+      "cases": [
+        {
+          "file": "native/bootstrap.spec.ts",
+          "title": "the checked artifact boots production assets and exposes unique semantic chapters"
+        },
+        {
+          "file": "homepage/fallback-visual.spec.ts",
+          "title": "base hero writing actually paints with no JavaScript"
+        },
+        {
+          "file": "homepage/fallback-visual.spec.ts",
+          "title": "base hero writing actually paints with entry download failure"
+        },
+        {
+          "file": "public/public-shell.spec.ts",
+          "title": "SSR shell and reading content reflow at narrow widths and enlarged text without JavaScript"
+        },
+        {
+          "file": "public/mermaid.spec.ts",
+          "title": "the isolated diagram bundle renders flowcharts and sequence diagrams"
+        },
+        {
+          "file": "homepage/writing.spec.ts",
+          "title": "second statement restores word goo and staggered clipped exits with finite entrance"
+        },
+        {
+          "file": "homepage/writing.spec.ts",
+          "title": "first writing restores character pull, clipping and reversible high-travel exits"
+        },
+        {
+          "file": "homepage/writing-compositions.spec.ts",
+          "title": "stopped entrances complete all rows and interrupted exits retain ownership through reverse and resume"
+        },
+        {
+          "file": "homepage/film/video.spec.ts",
+          "title": "paused native films seek both ways, retain exact end poses and sleep at rest"
+        },
+        {
+          "file": "homepage/finalization.spec.ts",
+          "title": "cold work and clicked navigation share category, focus, URL and history"
+        },
+        {
+          "file": "homepage/gallery/scene.spec.ts",
+          "title": "gallery departure removes hidden keyboard targets and transfers focus visibly"
+        },
+        {
+          "file": "homepage/identity.spec.ts",
+          "title": "logo entrance completes with stopped input, preserves stagger and gives authored exits priority"
+        },
+        {
+          "file": "homepage/film/media-resilience.spec.ts",
+          "title": "reduced motion skips GPU and physics; static presentations contain no empty cinematic spacer"
+        }
+      ]
+    }
+  ],
+  "deep": {
+    "physics-scalar": {
+      "kind": "unit",
+      "files": ["src/identity/physics/tests/stress.test.ts"]
+    },
+    "physics-live": {
+      "kind": "unit",
+      "files": ["src/identity/physics/tests/live-stress.test.ts"]
+    },
+    "media": {
+      "kind": "native",
+      "projects": ["desktop-1440", "firefox-desktop", "webkit-desktop"],
+      "files": [
+        "homepage/film/*.spec.ts",
+        "homepage/loading.spec.ts",
+        "homepage/device-recovery.spec.ts",
+        "homepage/globe.spec.ts",
+        "homepage/identity.spec.ts"
+      ],
+      "excludeOrdinary": true
+    },
+    "journeys": {
+      "kind": "native",
+      "projects": ["desktop-1440"],
+      "files": [
+        "homepage/timeline/*.spec.ts",
+        "homepage/gallery/*.spec.ts",
+        "homepage/writing*.spec.ts",
+        "homepage/finalization.spec.ts",
+        "homepage/performance.spec.ts"
+      ],
+      "excludeOrdinary": true
+    },
+    "content-variants": {
+      "kind": "isolated-native",
+      "files": ["public/homepage.spec.ts"],
+      "reason": "Mutates DB; forbidden in shared immutable ordinary fixture"
+    },
+    "admin": {
+      "kind": "native-admin",
+      "projects": ["admin-desktop"],
+      "owner": "JVM producer workspace; test-classpath-only preview"
+    }
+  },
+  "riskRules": [
+    {
+      "owner": "media-pipeline",
+      "patterns": [
+        "frontend/scripts/media/**",
+        "scripts/ci/prepare-media-tools.py",
+        "scripts/ci/media-toolchain*",
+        "frontend/src/types/home-media.d.ts"
+      ],
+      "require": ["media"]
+    },
+    {
+      "owner": "admin-preview",
+      "patterns": [
+        "scripts/ci/admin-preview.py",
+        "scripts/ci/tests/test_admin_preview.py",
+        "frontend/playwright.admin.required.config.ts",
+        "frontend/scripts/verification/admin-contract.test.ts"
+      ],
+      "require": ["admin"]
+    },
+    {
+      "owner": "policy",
+      "patterns": [
+        ".github/**",
+        "scripts/**",
+        "frontend/scripts/**",
+        "frontend/*config*",
+        "frontend/package*.json",
+        "*.gradle.kts",
+        "gradle/**",
+        "gradle.properties",
+        "gradlew*",
+        "automation-tests/**",
+        "docs/**",
+        "AGENTS.md",
+        ".gitignore",
+        ".gitattributes",
+        ".editorconfig",
+        "Dockerfile*",
+        "compose*.yml",
+        "compose*.yaml",
+        ".dockerignore"
+      ],
+      "require": []
+    },
+    {
+      "owner": "physics",
+      "patterns": ["frontend/src/identity/**"],
+      "require": ["physics-scalar", "physics-live"]
+    },
+    {
+      "owner": "media",
+      "patterns": [
+        "frontend/src/homepage/film/**",
+        "frontend/src/homepage/globe/**",
+        "frontend/public/**",
+        "frontend/e2e/fixtures/media/**"
+      ],
+      "require": ["media"]
+    },
+    {
+      "owner": "admin",
+      "patterns": [
+        "web-admin/**",
+        "app/src/main/jte/admin/**",
+        "app/src/main/resources/templates/admin/**",
+        "app/src/test/java/dev/persefonia/app/webadmin/**",
+        "frontend/admin-e2e/**",
+        "frontend/src/admin/**",
+        "frontend/src/styles/admin.css",
+        "frontend/src/shared/focus.ts",
+        "app/src/main/java/dev/persefonia/app/security/admin/**",
+        "app/src/main/java/dev/persefonia/app/webadmin/**"
+      ],
+      "require": ["admin"]
+    },
+    {
+      "owner": "frontend-mechanics",
+      "patterns": ["frontend/src/**", "frontend/e2e/**"],
+      "require": []
+    },
+    {
+      "owner": "jvm",
+      "patterns": ["*/src/**", "*/build.gradle.kts"],
+      "require": []
+    },
+    {
+      "owner": "build",
+      "patterns": ["settings.gradle.kts", "config/**", "containers/**", "deploy/**", "release/**"],
+      "require": []
+    }
+  ],
+  "classifiedChanges": [],
+  "adminNative": [
+    {
+      "name": "preview",
+      "project": "admin-desktop",
+      "engine": "chromium",
+      "context": "admin",
+      "cases": [
+        {
+          "file": "required-native.spec.ts",
+          "title": "isolated real admin validation preserves private responses and summary focus"
+        },
+        {
+          "file": "required-native.spec.ts",
+          "title": "isolated real admin submission requires OWNER and CSRF"
+        }
+      ]
+    }
+  ]
+}

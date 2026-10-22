@@ -1,78 +1,106 @@
 import { expect, it } from 'vitest';
 import {
   digest,
-  sameInventory,
-  reportTests,
-  validateOutcomes,
-  validateReceipt,
   joinReceipts,
   validateAcceptance,
+  validateOutcomes,
+  reportTests,
+  sameInventory,
   partitions,
 } from './browser-contract.mjs';
-
+import { policyHash, selectionPolicy } from './selection-policy.mjs';
 const identity = { sourceSha: 'a'.repeat(40), artifactSha256: 'b'.repeat(64) };
-const row = (id: string, project = 'desktop-1440') => ({
-  id,
-  project,
-  file: `${id}.spec.ts`,
-  title: id,
-  expectedStatus: 'passed',
-  status: 'expected',
-  annotations: [] as { type: string; description: string }[],
-  results: [{ status: 'passed', duration: 1, retry: 0 }],
-});
 function fixture() {
-  const receipts = partitions.map((partition, index) => {
-    const outcomes = [
-      row(String(index), partition.project === '*' ? 'firefox-desktop' : partition.project),
-    ];
-    const selected = outcomes.map((r) => r.id);
-    return {
-      schema: 1,
-      identity: { ...identity },
-      partition: { ...partition },
-      status: 'passed',
-      exitCode: 0,
-      errors: [],
-      outcomes,
-      selected,
-      selectionHash: digest([...selected].sort()),
-    };
-  });
-  const inventory = {
-    chromium: receipts
-      .filter((r) => r.partition.suite === 'chromium')
-      .flatMap((r) => structuredClone(r.outcomes)),
-    cross: receipts
-      .filter((r) => r.partition.suite === 'cross')
-      .flatMap((r) => structuredClone(r.outcomes)),
+  const runner = { run: '100', attempt: '1' };
+  const sourceContext = {
+    sourceSha: identity.sourceSha,
+    tree: 'c'.repeat(40),
+    policy: 'd'.repeat(64),
   };
-  return { receipts, inventory };
+  const receipts = partitions.map(
+    (partition: { project: string; suite: string; name: string; shard: string }) => {
+      const source = selectionPolicy.native.find(
+        (p: { project: string }) => p.project === partition.project,
+      )!;
+      const outcomes = source.cases.map((c: { file: string; title: string }, index: number) => ({
+        ...c,
+        id: `${partition.project}:${index}`,
+        project: partition.project,
+        expectedStatus: 'passed',
+        status: 'expected',
+        annotations: [] as { type: string; description: string }[],
+        results: [{ status: 'passed', retry: 0, duration: 1 }],
+      }));
+      const selected = outcomes.map((r: { id: string }) => r.id);
+      return {
+        environment: {
+          browsers: { [source.engine]: { sha256: 'e'.repeat(64) } },
+          ffmpeg: 'qualified ffmpeg',
+          ffprobe: 'qualified ffprobe',
+        },
+        identity: { ...identity },
+        schema: 2,
+        policy: policyHash,
+        partition: { ...partition },
+        status: 'passed',
+        exitCode: 0,
+        errors: [],
+        runner: { ...runner },
+        sourceContext: { ...sourceContext },
+        outcomes,
+        selected,
+        selectionHash: digest([...selected].sort()),
+      };
+    },
+  );
+  return {
+    schema: 2,
+    policy: policyHash,
+    profiles: ['ordinary'],
+    status: 'passed',
+    identity,
+    runner,
+    sourceContext,
+    receipts,
+    inventory: {
+      ordinary: receipts.flatMap((r: { outcomes: unknown[] }) => structuredClone(r.outcomes)),
+    },
+    partitions: receipts.length,
+    selected: receipts.reduce((n: number, r: { selected: unknown[] }) => n + r.selected.length, 0),
+  };
 }
-it('joins complete independent discovery and first-attempt execution without fixed test counts', () => {
+it('admits exact independent policy/discovery/outcomes for four native context identities', () => {
   const f = fixture();
-  expect(joinReceipts(f.inventory, f.receipts, identity).selected).toBe(partitions.length);
-  f.receipts[0]!.outcomes.push(row('new'));
-  f.receipts[0]!.selected.push('new');
-  f.receipts[0]!.selectionHash = digest([...f.receipts[0]!.selected].sort());
-  f.inventory.chromium.push(row('new'));
-  expect(joinReceipts(f.inventory, f.receipts, identity).selected).toBe(partitions.length + 1);
+  expect(validateAcceptance(f, identity)).toMatchObject({ partitions: 4, selected: f.selected });
 });
 it.each([
   'missing',
+  'extra',
   'duplicate',
   'failed',
   'cancelled',
-  'skipped-job',
+  'exit',
   'empty',
-  'corrupt',
-  'sha',
+  'old-schema',
+  'policy',
+  'source',
   'artifact',
   'omitted-test',
-  'retries',
-  'unexpected-skip',
+  'retry',
+  'flaky',
+  'skip',
   'fingerprint',
-  'forged-skip-identity',
+  'forged-title',
+  'wrong-engine',
+  'wrong-shard',
+  'run',
+  'attempt',
+  'tree',
+  'count',
+  'profile',
+  'discovery',
+  'unsupported-engine',
+  'missing-decoder',
 ])('rejects %s qualification', (mode) => {
   const f = fixture(),
     r = f.receipts[0]!;
@@ -80,8 +108,11 @@ it.each([
     case 'missing':
       f.receipts.pop();
       break;
-    case 'duplicate':
+    case 'extra':
       f.receipts.push(structuredClone(r));
+      break;
+    case 'duplicate':
+      f.receipts[1] = structuredClone(r);
       break;
     case 'failed':
       r.status = 'failed';
@@ -89,107 +120,102 @@ it.each([
     case 'cancelled':
       r.outcomes[0]!.results[0]!.status = 'interrupted';
       break;
-    case 'skipped-job':
+    case 'exit':
       r.exitCode = 1;
       break;
     case 'empty':
-      r.selected = [];
       r.outcomes = [];
+      r.selected = [];
       break;
-    case 'corrupt':
-      r.schema = 99;
+    case 'old-schema':
+      r.schema = 1;
       break;
-    case 'sha':
-      r.identity.sourceSha = 'c'.repeat(40);
+    case 'policy':
+      r.policy = 'old-policy';
+      break;
+    case 'source':
+      r.sourceContext.sourceSha = 'c'.repeat(40);
       break;
     case 'artifact':
-      r.identity.artifactSha256 = 'd'.repeat(64);
+      r.identity = { ...identity, artifactSha256: 'd'.repeat(64) };
       break;
     case 'omitted-test':
-      f.inventory.chromium.push(row('missing'));
+      r.selected.pop();
       break;
-    case 'retries':
-      r.outcomes[0]!.results.push({ status: 'passed', duration: 1, retry: 1 });
+    case 'retry':
+      r.outcomes[0]!.results.push({ status: 'passed', retry: 1, duration: 1 });
       break;
-    case 'unexpected-skip':
+    case 'flaky':
+      r.outcomes[0]!.status = 'flaky';
+      break;
+    case 'skip':
       r.outcomes[0]!.results[0]!.status = 'skipped';
-      r.outcomes[0]!.status = 'skipped';
       break;
     case 'fingerprint':
-      r.selectionHash = 'corrupt';
+      r.selectionHash = 'forged';
       break;
-    case 'forged-skip-identity':
-      r.outcomes[0]!.title = 'another test';
+    case 'forged-title':
+      r.outcomes[0]!.title = 'another case';
+      break;
+    case 'wrong-engine':
+      r.partition.project = 'webkit-desktop';
+      break;
+    case 'wrong-shard':
+      r.partition.shard = '1/2';
+      break;
+    case 'run':
+      r.runner.run = '99';
+      break;
+    case 'attempt':
+      r.runner.attempt = '2';
+      break;
+    case 'tree':
+      r.sourceContext.tree = 'e'.repeat(40);
+      break;
+    case 'count':
+      f.selected++;
+      break;
+    case 'profile':
+      f.profiles.push('media');
+      break;
+    case 'unsupported-engine':
+      r.environment.browsers = {};
+      break;
+    case 'missing-decoder':
+      r.environment.ffprobe = '';
+      break;
+    case 'discovery':
+      f.inventory.ordinary.pop();
       break;
   }
-  expect(() => joinReceipts(f.inventory, f.receipts, identity)).toThrow();
+  expect(() => validateAcceptance(f, identity), mode).toThrow();
 });
-it('accepts only explicit skip predicates and reasons while allowing a capability-dependent skip', () => {
-  const skip = row('skipped');
-  skip.status = 'skipped';
-  skip.expectedStatus = 'skipped';
-  skip.results[0]!.status = 'skipped';
-  skip.annotations.push({ type: 'skip', description: 'Native touch' });
-  const policy = [
-    {
-      file: skip.file,
-      title: skip.title,
-      projects: [skip.project],
-      reason: 'Native touch',
-      optional: false,
-    },
-  ];
-  expect(validateOutcomes([row('passed'), skip], policy)).toMatchObject({ passed: 1, skipped: 1 });
-  expect(() => validateOutcomes([skip], policy)).toThrow('No tests executed');
-  skip.annotations[0]!.description = 'different';
-  expect(() => validateOutcomes([row('passed'), skip], policy)).toThrow('Unexpected skip');
-  expect(() => sameInventory(['one'], ['one', 'one'])).toThrow('Duplicate');
-  expect(() => validateReceipt({}, identity)).toThrow();
+it('rejects self-consistent omitted case or renamed title even when submitted discovery agrees', () => {
+  for (const mode of ['omit', 'rename']) {
+    const f = fixture(),
+      r = f.receipts[0]!;
+    if (mode === 'omit') r.outcomes.pop();
+    else r.outcomes[0]!.title = 'forged';
+    r.selected = r.outcomes.map((row: { id: string }) => row.id);
+    r.selectionHash = digest([...r.selected].sort());
+    f.inventory.ordinary = f.receipts.flatMap((r: { outcomes: unknown[] }) =>
+      structuredClone(r.outcomes),
+    );
+    f.selected = f.receipts.reduce(
+      (n: number, r: { selected: unknown[] }) => n + r.selected.length,
+      0,
+    );
+    expect(() => validateAcceptance(f, identity)).toThrow();
+  }
 });
-it('rejects corrupt and focused native reports before treating discovery as execution', () => {
+it('keeps discovery, empty, duplicate and first-attempt validation independent', () => {
+  expect(() => sameInventory([], [])).toThrow();
+  expect(() => sameInventory(['one'], ['one', 'one'])).toThrow();
   expect(() => reportTests({ config: { forbidOnly: false } })).toThrow('Focused');
   expect(() => reportTests({ config: { forbidOnly: true, fullyParallel: true } })).toThrow(
     'scheduling',
   );
-});
-
-it('keeps each project/file atomic even when the union of selected IDs is complete', () => {
   const f = fixture();
-  f.receipts[0]!.outcomes[0]!.file = 'shared.spec.ts';
-  f.receipts[1]!.outcomes[0]!.file = 'shared.spec.ts';
-  f.inventory.chromium[0]!.file = 'shared.spec.ts';
-  f.inventory.chromium[1]!.file = 'shared.spec.ts';
-  expect(() => joinReceipts(f.inventory, f.receipts, identity)).toThrow('File split');
-});
-
-it('admission rejects forged, duplicate, omitted and mixed-attempt receipts using the source-join contract', () => {
-  const fixtureData = fixture();
-  const runner = { run: 'controlled-fixture', attempt: '1' };
-  const sourceContext = { sourceSha: identity.sourceSha, policy: 'fixture-policy' };
-  const acceptance = {
-    schema: 1,
-    status: 'passed',
-    identity,
-    inventory: fixtureData.inventory,
-    receipts: fixtureData.receipts.map((receipt) => ({
-      ...receipt,
-      runner: { ...runner },
-      sourceContext: { ...sourceContext },
-    })),
-    runner,
-    sourceContext,
-    selected: partitions.length,
-    partitions: partitions.length,
-  };
-  expect(validateAcceptance(acceptance, identity).partitions).toBe(8);
-  for (const variant of ['duplicate', 'omitted', 'count', 'attempt', 'policy', 'candidate']) {
-    const changed = structuredClone(acceptance);
-    if (variant === 'duplicate') changed.receipts[1] = changed.receipts[0]!;
-    else if (variant === 'omitted') changed.receipts.pop();
-    else if (variant === 'count') changed.selected++;
-    else if (variant === 'attempt') changed.receipts[0]!.runner.attempt = '2';
-    else if (variant === 'policy') changed.receipts[0]!.sourceContext.policy = 'forged';
-    else changed.receipts[0]!.identity.artifactSha256 = 'c'.repeat(64);
-    expect(() => validateAcceptance(changed, identity), variant).toThrow();
-  }
+  expect(joinReceipts(f.inventory, f.receipts, identity).partitions).toBe(4);
+  expect(validateOutcomes(f.receipts[0]!.outcomes).skipped).toBe(0);
 });

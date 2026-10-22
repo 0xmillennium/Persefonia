@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { frontend } from './browser-runtime.mjs';
+import { frontend, riskPlan } from './browser-runtime.mjs';
 import {
   validateUnitAttempts,
   validateUnitExecution,
@@ -9,8 +9,19 @@ import {
   unitEvidenceInventory,
 } from './unit-contract.mjs';
 
+import { policyHash } from './selection-policy.mjs';
 const receipt = JSON.parse(readFileSync(process.argv[2], 'utf8'));
 const native = receipt.native;
+const plan = riskPlan();
+const physicsProfile = plan.required.some((p) => p.startsWith('physics-')) ? 'deep' : 'ordinary';
+if (
+  receipt.unit.profile !== 'ordinary' ||
+  receipt.unit.schema !== 2 ||
+  receipt.unit.policy !== policyHash ||
+  receipt.unit.physicsProfile !== physicsProfile
+)
+  throw new Error('Wrong frontend policy/profile');
+process.env.PERSEFONIA_PHYSICS_PROFILE = physicsProfile;
 const discovered = JSON.parse(
   execFileSync(
     process.execPath,
@@ -29,7 +40,13 @@ if (
   JSON.stringify(unitEvidenceInventory(native.discovery))
 )
   throw new Error('Frontend evidence differs from independent source discovery');
-const cases = validateUnitExecution(native.discovery, native.report, native.scalar, native.live);
+const cases = validateUnitExecution(
+  native.discovery,
+  native.report,
+  native.scalar,
+  native.live,
+  physicsProfile,
+);
 validateUnitAttempts(cases, native.attempts);
 validateUnitPhases(cases, native.phases);
 const summaries = cases.map(({ file, fullName, status, duration }) => ({

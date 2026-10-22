@@ -63,18 +63,26 @@ public final class AdminBrowserPreview {
                         chain.doFilter(request, response);
                         return;
                     }
+                    response.setHeader("Cache-Control", "no-store");
                     if (!request.getMethod().equals("POST")
                             || !"synthetic".equals(request.getHeader("X-Persefonia-Preview"))
                             || !request.getRemoteAddr().equals("127.0.0.1")) {
                         response.setStatus(404);
                         return;
                     }
+                    var namespace = request.getHeader("X-Persefonia-Preview-Case");
+                    if (namespace == null) namespace = "legacy";
+                    if (!namespace.matches("[a-z0-9-]{1,32}")) {
+                        response.setStatus(404);
+                        return;
+                    }
                     var role = "editor".equals(request.getParameter("role")) ? AdminRole.EDITOR : AdminRole.OWNER;
-                    var subject = OidcSubject.of("synthetic-browser-" + role.name().toLowerCase(java.util.Locale.ROOT));
+                    var caseNamespace = namespace;
+                    var subject = OidcSubject.of("synthetic-browser-" + role.name().toLowerCase(java.util.Locale.ROOT) + "-" + caseNamespace);
                     var now = Instant.now();
                     var account = accounts.findByOidcSubject(subject).orElseGet(() -> accounts.save(AdminAccount.create(
                             AdminAccountId.newId(), subject,
-                            EmailAddress.of(role.name().toLowerCase(java.util.Locale.ROOT) + "@preview.invalid"),
+                            EmailAddress.of(role.name().toLowerCase(java.util.Locale.ROOT) + "+" + caseNamespace + "@preview.invalid"),
                             DisplayName.of("Synthetic preview " + role.name()), Set.of(role), now)));
                     var delegate = new DefaultOidcUser(Set.of(), new OidcIdToken("synthetic-preview-token",
                             now, now.plusSeconds(3600), Map.of("sub", subject.value())), "sub");

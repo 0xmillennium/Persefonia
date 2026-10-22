@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Native verification receipts and strict non-browser/final admission; one evidence owner."""
 import json
+import hashlib
 import os
 from pathlib import Path
 import platform
@@ -8,6 +9,7 @@ import subprocess
 import sys
 import xml.etree.ElementTree as ET
 import qualification as q
+import selection as selection
 
 ROOT = q.ROOT
 OUTPUT = ROOT / 'app/build/ci'
@@ -67,12 +69,24 @@ def base(lane, source):
 
 
 def validate_unit(unit, source):
-    q.require(unit.get('schema') == 1 and unit.get('status') == 'passed' and unit.get('sourceSha') == source['sourceSha'], 'Invalid unit source receipt')
+    q.require(unit.get('schema') == 2 and unit.get('policy') == selection.POLICY_HASH and unit.get('profile') == 'ordinary' and unit.get('status') == 'passed' and unit.get('sourceSha') == source['sourceSha'], 'Invalid unit source receipt')
     q.validate_identity(unit.get('sourceContext'), source)
+    expected_plan = selection.plan(source)
+    q.require(unit.get('selectionPlan') == expected_plan, 'Wrong frontend change-risk plan')
+    expected_physics = 'deep' if any(p.startswith('physics-') for p in expected_plan['required']) else 'ordinary'
+    q.require(unit.get('physicsProfile') == expected_physics,
+              'Missing mandatory physics risk qualification')
     runner = unit['runner']
     q.require(str(runner['run']) == source['run'] and str(runner['attempt']) == source['attempt'], 'Wrong unit attempt')
     q.require(unit['cases'] and all(c['status'] == 'passed' for c in unit['cases']), 'Incomplete frontend cases')
     q.require(unit['attempts'], 'Missing first-attempt unit evidence')
+    seeds = range(1, 101) if expected_physics == 'deep' else selection.POLICY['ordinaryPhysicsSeeds']
+    for file, title in [('stress.test.ts', 'seed {} converges without invariant failures'),
+                        ('live-stress.test.ts', 'live seed {}: coalesced fast strokes preserve invariants and recover')]:
+        actual = [case.get('fullName') for case in unit['cases']
+                  if case.get('file', '').replace('\\', '/').endswith('/identity/physics/tests/'+file)]
+        q.require(sorted(actual) == sorted(title.format(seed) for seed in seeds),
+                  'Missing/duplicate/extra required scalar/live physics corpus')
 
 
 def validate_nonbrowser(directory, source, checksum):
@@ -87,12 +101,79 @@ def validate_nonbrowser(directory, source, checksum):
 
 
 def validate_browser(value, source, checksum):
-    q.require(value.get('schema') == 1 and value.get('status') == 'passed' and value.get('sourceContext') == source and
-              value.get('identity') == {'sourceSha': source['sourceSha'], 'artifactSha256': checksum}
+    plan = selection.plan(source)
+    profiles = [p for p in plan['required'] if p == 'ordinary' or selection.POLICY['deep'][p]['kind'] in {'native', 'native-admin'}]
+    q.require(value.get('schema') == 2 and value.get('policy') == selection.POLICY_HASH
+              and value.get('status') == 'passed' and value.get('sourceContext') == source
+              and value.get('selectionPlan') == plan and value.get('profiles') == profiles
+              and value.get('identity') == {'sourceSha': source['sourceSha'], 'artifactSha256': checksum}
               and str(value.get('runner', {}).get('run')) == source['run']
-              and str(value.get('runner', {}).get('attempt')) == source['attempt']
-              and value.get('partitions') == 8 and value.get('selected', 0) > 0
-              and len(value.get('receipts', [])) == 8, 'Invalid browser acceptance')
+              and str(value.get('runner', {}).get('attempt')) == source['attempt'], 'Invalid browser acceptance')
+    expected = {}
+    for profile in profiles:
+        for project in (selection.POLICY['adminNative'] if profile == 'admin' else selection.POLICY['native']):
+            if profile != 'ordinary' and project['project'] not in selection.POLICY['deep'][profile]['projects']: continue
+            key = profile+'-'+project['name']+'-1of1'
+            expected[key] = (profile, project)
+    receipts = value.get('receipts', [])
+    q.require(isinstance(receipts, list) and value.get('partitions') == len(receipts) == len(expected), 'Incomplete native receipts')
+    observed = set()
+    all_ids = {}
+    for receipt in receipts:
+        partition = receipt['partition']
+        key = partition['name']+'-'+partition['shard'].replace('/', 'of')
+        q.require(key in expected and key not in observed, 'Missing/extra/duplicate native engine/context')
+        observed.add(key)
+        profile, project = expected[key]
+        q.require(partition == {'name': profile+'-'+project['name'], 'suite': profile, 'project': project['project'], 'shard': '1/1'}
+                  and receipt.get('schema') == 2 and receipt.get('policy') == selection.POLICY_HASH
+                  and receipt.get('status') == 'passed' and receipt.get('exitCode') == 0 and receipt.get('errors') == []
+                  and receipt.get('identity') == value['identity'] and receipt.get('sourceContext') == source
+                  and receipt.get('selectionPlan') == plan
+                  and receipt.get('runner', {}).get('run') == source['run']
+                  and receipt.get('runner', {}).get('attempt') == source['attempt'], 'Wrong native profile/source/run/attempt/candidate')
+        if profile == 'admin':
+            q.require(receipt.get('runner', {}).get('job') == 'build-jvm', 'Admin preview must execute in its own JVM producer workspace')
+        environment = receipt.get('environment', {})
+        engine = project['engine']
+        q.require(set(environment.get('browsers', {})) == {engine}
+                  and q.HASH.fullmatch(environment['browsers'][engine].get('sha256', ''))
+                  and all(isinstance(environment.get(tool), str) and environment[tool] for tool in ['ffmpeg', 'ffprobe']),
+                  'Missing required native engine/decoder prerequisite')
+        outcomes = receipt.get('outcomes', [])
+        ids = [r['id'] for r in outcomes]
+        q.require(ids and len(ids) == len(set(ids)) and sorted(ids) == sorted(receipt.get('selected', [])), 'Missing/duplicate native cases')
+        fingerprint = hashlib.sha256(json.dumps(sorted(ids), separators=(',', ':'), ensure_ascii=False).encode()).hexdigest()
+        q.require(receipt.get('selectionHash') == fingerprint, 'Corrupt native selection')
+        if profile in {'ordinary', 'admin'}:
+            wanted = {(c['file'], c['title']) for c in project['cases']}
+            q.require(len(outcomes) == len(wanted) and {(r['file'], r['title']) for r in outcomes} == wanted,
+                      'Ordinary native cases differ from source policy')
+        for row in outcomes:
+            q.require(row['project'] == project['project'] and len(row.get('results', [])) == 1, 'Wrong context or repeated native attempt')
+            result = row['results'][0]
+            q.require(result.get('retry') == 0 and isinstance(result.get('duration'), (int, float)) and result['duration'] >= 0,
+                      'Invalid native first attempt')
+            if profile in {'ordinary', 'admin'}:
+                q.require(result.get('status') == 'passed' and row.get('status') == 'expected' and row.get('expectedStatus') == 'passed',
+                          'Failed/skipped/cancelled/unsupported ordinary native contract')
+            else:
+                # Deep skips remain exact source predicates; Node also checks annotations and discovery.
+                if result.get('status') == 'skipped':
+                    rules = q.read(ROOT/'frontend/scripts/verification/deep-expected-skips.json')
+                    q.require(any(rule['file'] == row['file'] and rule['title'] == row['title'] and row['project'] in rule['projects']
+                        and {'type': 'skip', 'description': rule['reason']} in row['annotations'] for rule in rules), 'Unexpected deep skip')
+                else: q.require(result.get('status') == 'passed' and row.get('status') == 'expected' and row.get('expectedStatus') == 'passed', 'Failed deep native contract')
+        all_ids.setdefault(profile, []).extend(ids)
+    inventory = value.get('inventory', {})
+    q.require(set(inventory) == set(profiles), 'Wrong independent discovery profile')
+    for profile, ids in all_ids.items():
+        rows = inventory[profile]
+        q.require(len(ids) == len(set(ids)) and sorted(ids) == sorted(r['id'] for r in rows), 'Discovery/receipt case mismatch')
+        actual = {(r['id'], r['file'], r['title'], r['project']) for r in rows}
+        executed = {(r['id'], r['file'], r['title'], r['project']) for receipt in receipts if receipt['partition']['suite'] == profile for r in receipt['outcomes']}
+        q.require(actual == executed, 'Forged discovery identity')
+    q.require(value.get('selected') == sum(len(ids) for ids in all_ids.values()), 'Forged native counts')
     return value
 
 

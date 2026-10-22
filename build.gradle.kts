@@ -22,12 +22,19 @@ abstract class ProductionSnapshot @Inject constructor(private val processes: Exe
         fun metadata(value: org.gradle.jvm.toolchain.JavaInstallationMetadata) = mapOf(
             "languageVersion" to value.languageVersion.toString(), "vendor" to value.vendor,
             "runtimeVersion" to value.javaRuntimeVersion, "jvmVersion" to value.jvmVersion)
-        fun runtime(task: Test) = metadata(task.javaLauncher.get().metadata) + mapOf(
-            "maxParallelForks" to task.maxParallelForks.toString(),
-            "maxHeapSize" to (task.maxHeapSize ?: "default"),
-            "customJvmArguments" to task.jvmArgs.isNotEmpty().toString(),
-            "assertions" to task.enableAssertions.toString(),
-            "hasFilters" to (task.filter.includePatterns.isNotEmpty() || task.filter.excludePatterns.isNotEmpty()).toString())
+        fun runtime(task: Test): Map<String, String> {
+            // Pinned Gradle 9.2 separates --tests from TestFilter.includePatterns.
+            // Unknown implementations fail closed instead of certifying a partial selection.
+            val commandLine = task.filter as? org.gradle.api.internal.tasks.testing.filter.DefaultTestFilter
+            return metadata(task.javaLauncher.get().metadata) + mapOf(
+                "maxParallelForks" to task.maxParallelForks.toString(),
+                "maxHeapSize" to (task.maxHeapSize ?: "default"),
+                "customJvmArguments" to task.jvmArgs.isNotEmpty().toString(),
+                "assertions" to task.enableAssertions.toString(),
+                "hasFilters" to (task.includes.isNotEmpty() || task.excludes.isNotEmpty() ||
+                    task.filter.includePatterns.isNotEmpty() || task.filter.excludePatterns.isNotEmpty() ||
+                    commandLine == null || commandLine.commandLineIncludePatterns.isNotEmpty()).toString())
+        }
     }
 
     override fun execute(task: Task) {
@@ -166,7 +173,15 @@ subprojects {
                 doLast(action)
             }
             tasks.withType<Test>().configureEach {
-                outputs.upToDateWhen { false }
+                // Architecture/template tests read source beyond their compiled classpath.
+                inputs.files(rootProject.fileTree(".") {
+                    include("**/src/**", "docs/decisions/**", ".github/**", "scripts/**",
+                        "*.gradle.kts", "*/build.gradle.kts", "frontend/*config*", "frontend/package*.json")
+                    exclude("**/build/**", "**/node_modules/**", ".local/**", ".git/**")
+                })
+                // CI always executes actual tests; real DB suites retain fresh local execution.
+                val allowLocalUpToDate = !providers.environmentVariable("CI").isPresent && name == "test"
+                outputs.upToDateWhen { allowLocalUpToDate }
                 outputs.cacheIf { false }
                 val action = objects.newInstance(ProductionSnapshot::class.java).apply {
                     rootDirectory = repositoryDirectory

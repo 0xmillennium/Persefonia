@@ -1,6 +1,7 @@
 package dev.persefonia.app.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
@@ -67,6 +68,18 @@ class PublicDocumentLanguageTest {
         var response = mvc.perform(get(path).header("Accept-Language", preference)).andReturn().getResponse();
         assertThat(response.getStatus()).as(path).isEqualTo(status);
         assertThat(response.getHeader("Content-Language")).as(path).isEqualTo(language);
-        assertThat(response.getContentAsString()).as(path).contains("lang=\"" + language + "\"");
+        String html = response.getContentAsString();
+        assertDocument(html, language, status);
+        for (String attribute : java.util.List.of("translate=\"no\"", "<meta name=\"google\"", "<meta name=\"googlebot\"")) {
+            assertThatThrownBy(() -> assertDocument(html.replace(attribute, "removed-by-negative-control"), language, status))
+                    .as(path + " " + attribute).isInstanceOf(AssertionError.class);
+        }
+    }
+
+    private static void assertDocument(String html, String language, int status) {
+        assertThat(html).contains("lang=\"" + language + "\"", "translate=\"no\"",
+                "<meta name=\"google\" content=\"notranslate\"",
+                "<meta name=\"googlebot\" content=\"notranslate\"");
+        if (status >= 400) assertThat(html).contains("noindex");
     }
 }

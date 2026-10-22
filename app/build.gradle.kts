@@ -157,6 +157,11 @@ tasks.check {
 val frontendDirectory = rootProject.layout.projectDirectory.dir("frontend")
 val generatedViteDirectory = layout.buildDirectory.dir("generated/vite")
 
+val dependencyInputs = providers.exec {
+    workingDir(frontendDirectory)
+    commandLine("node", "scripts/verification/dependency-inputs.mjs")
+}.standardOutput.asText.map { it.trim() }
+
 val npmCi by tasks.registering(Exec::class) {
     workingDir(frontendDirectory)
     commandLine("npm", "ci")
@@ -166,9 +171,12 @@ val npmCi by tasks.registering(Exec::class) {
     )
     inputs.property("nodePlatform", System.getProperty("os.name") + "-" + System.getProperty("os.arch"))
     outputs.dir(frontendDirectory.dir("node_modules"))
-    // Effective npm configuration, lifecycle scripts and native packages are not a reusable
-    // output contract. Reinstall deterministically rather than fingerprinting node_modules.
-    outputs.upToDateWhen { false }
+    inputs.file(frontendDirectory.file("scripts/verification/dependency-inputs.mjs"))
+    inputs.property("effectiveDependencyInputs", dependencyInputs)
+    // Gradle fingerprints the actual installed outputs, including the hidden package lock.
+    // A bare node_modules directory or a separate success stamp cannot satisfy this task.
+    val allowLocalDependencyReuse = !providers.environmentVariable("CI").isPresent
+    outputs.upToDateWhen { allowLocalDependencyReuse }
 }
 
 val npmRunTypecheck by tasks.registering(Exec::class) {
@@ -192,7 +200,7 @@ val npmRunUnitTest by tasks.registering(Exec::class) {
     description = "Runs all frontend unit tests, including deterministic physics stress pipelines."
     dependsOn(npmCi)
     workingDir(frontendDirectory)
-    commandLine("node", "scripts/verification/unit-run.mjs")
+    commandLine("node", "scripts/verification/unit-run.mjs", "--comprehensive")
     inputs.dir(frontendDirectory.dir("src"))
     inputs.dir(frontendDirectory.dir("scripts"))
     inputs.dir(frontendDirectory.dir("e2e"))
@@ -228,9 +236,12 @@ val viteBuild by tasks.registering(Exec::class) {
         include("tsconfig*.json", ".npmrc")
     })
     outputs.dir(generatedViteDirectory)
-    // Always revalidate media and regenerate from the freshly installed toolchain. Exec
-    // outputs are not placed in a build cache; mandatory checks never reuse a success stamp.
-    outputs.upToDateWhen { false }
+    inputs.property("effectiveDependencyInputs", dependencyInputs)
+    inputs.files(rootProject.layout.projectDirectory.asFileTree.matching {
+        include("package.json", "package-lock.json", ".npmrc")
+    })
+    // Output fingerprints detect missing/changed generated assets. Test freshness is separate.
+    outputs.cacheIf { false }
 }
 
 tasks.processResources {
@@ -239,6 +250,7 @@ tasks.processResources {
 }
 
 tasks.register<Exec>("browserCheck") {
+    description = "Runs explicit comprehensive local browser diagnostics (expensive); CI uses the native artifact lifecycle."
     dependsOn(tasks.named("bootJar"), npmCi)
     workingDir(rootProject.layout.projectDirectory)
     commandLine("bash", "scripts/browser/check.sh")
@@ -270,4 +282,19 @@ tasks.named<BootRun>("bootRun") {
 
 tasks.named("jar") {
     enabled = false
+}
+
+// Data only, consumed in this producer workspace after its full JVM tests. No compile/install dependencies.
+val adminPreviewRuntime = sourceSets.test.get().runtimeClasspath + files(precompiledJteDirectory)
+val adminPreviewClasspathFile = layout.buildDirectory.file("admin-preview/classpath.json")
+tasks.register("writeAdminPreviewClasspath") {
+    group = "verification"
+    description = "Exports the already-built own-workspace test runtime for the guarded native admin preview."
+    doLast {
+        val destination = adminPreviewClasspathFile.get().asFile
+        destination.parentFile.mkdirs()
+        destination.writeText(groovy.json.JsonOutput.toJson(mapOf(
+            "schema" to 1, "classpath" to adminPreviewRuntime.files.map { it.absolutePath }
+        )) + "\n")
+    }
 }

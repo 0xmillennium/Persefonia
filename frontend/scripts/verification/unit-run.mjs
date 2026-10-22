@@ -1,14 +1,35 @@
 import { spawnSync, execFileSync } from 'node:child_process';
 import { rmSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { frontend, repository, writeJson, metadata, sourceContext } from './browser-runtime.mjs';
+import {
+  frontend,
+  repository,
+  writeJson,
+  metadata,
+  sourceContext,
+  riskPlan,
+} from './browser-runtime.mjs';
 import {
   validateUnitExecution,
   validateUnitAttempts,
   validateUnitPhases,
 } from './unit-contract.mjs';
 
-if (process.argv.length !== 2 || process.env.IDENTITY_SEED)
+import { policyHash } from './selection-policy.mjs';
+const comprehensive = process.argv.slice(2).join(' ') === '--comprehensive';
+const plan = comprehensive
+  ? {
+      schema: 1,
+      policy: policyHash,
+      required: ['ordinary', 'physics-live', 'physics-scalar'],
+      manual: true,
+    }
+  : riskPlan();
+const physicsProfile =
+  comprehensive || plan.required.some((p) => p.startsWith('physics-')) ? 'deep' : 'ordinary';
+process.env.PERSEFONIA_PHYSICS_PROFILE = physicsProfile;
+
+if ((!comprehensive && process.argv.length !== 2) || process.env.IDENTITY_SEED)
   throw new Error('Mandatory unit verification cannot use filters or a single seed');
 const output = join(frontend, 'test-results');
 for (const file of [
@@ -66,6 +87,7 @@ const cases = validateUnitExecution(
   read('unit.json'),
   read('segmented-identity/unit-stress-summary.json'),
   read('segmented-identity/live-stress-summary.json'),
+  physicsProfile,
 );
 const attempts = read('unit-attempts.json');
 validateUnitAttempts(cases, attempts);
@@ -75,7 +97,11 @@ if (JSON.stringify(sourceContext()) !== JSON.stringify(context))
   throw new Error('Source changed during frontend verification');
 writeJson(join(output, 'unit-receipt.json'), {
   sourceContext: context,
-  schema: 1,
+  schema: 2,
+  policy: policyHash,
+  selectionPlan: plan,
+  physicsProfile,
+  profile: comprehensive ? 'comprehensive' : 'ordinary',
   status: 'passed',
   sourceSha: execFileSync('git', ['rev-parse', 'HEAD'], {
     cwd: repository,

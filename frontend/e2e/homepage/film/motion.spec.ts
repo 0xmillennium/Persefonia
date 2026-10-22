@@ -1,6 +1,6 @@
 import { startOnFilm } from '../../support/homepage';
 import { expect, test } from '../../support/test';
-import { visit, position, selectFilm, presented, settlePresentation } from '../../support/scenes';
+import { visit, position, selectFilm, presented } from '../../support/scenes';
 
 test.beforeEach(async ({ page }) => startOnFilm(page));
 
@@ -180,24 +180,8 @@ test('film wheel glides through intermediate positions and yields to native inpu
   expect(await page.evaluate(() => scrollY)).toBe(0);
 });
 
-test('all canonical scene states reverse without one-shot progression', async ({
-  page,
-}, testInfo) => {
-  await visit(page);
-  for (const name of ['statements', 'capabilities', 'mark', 'gallery']) {
-    await position(page, name, 0.35);
-    await settlePresentation(page);
-    const face = page.locator(`[data-scene="${name}"] .scene-face`);
-    const first = await face.getAttribute('style');
-    await position(page, name, 0.7);
-    await settlePresentation(page);
-    await position(page, name, 0.35);
-    await settlePresentation(page);
-    expect(await face.getAttribute('style')).toBe(first);
-    await page.screenshot({ path: testInfo.outputPath(`${name}-reversible.png`) });
-  }
-});
-
+// Scene-face phase/style reversibility is owned by homepage/presentation.test.ts.
+// Ordinary native writing paint, gallery reversal/focus and decoded-frame probes remain required.
 test('presented media-time probes cover cold, warm and reverse wheel travel', async ({
   page,
 }, info) => {

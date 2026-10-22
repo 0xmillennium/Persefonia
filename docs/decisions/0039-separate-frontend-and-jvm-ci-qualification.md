@@ -6,7 +6,7 @@
 | Date | 2026-10-21 |
 | Scope | architecture / testing / operations |
 | Supersedes | ADR 0031 |
-| Superseded by | none |
+| Superseded by | ADR 0041 (selection and browser partition topology only) |
 
 ## Context
 

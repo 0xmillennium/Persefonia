@@ -67,7 +67,7 @@ export function playwright(suite, selection, destination, discover = false) {
       join(frontend, 'node_modules/@playwright/test/cli.js'),
       'test',
       '--config',
-      suite === 'cross' ? 'playwright.cross-browser.config.ts' : 'playwright.config.ts',
+      suite === 'admin' ? 'playwright.admin.required.config.ts' : 'playwright.native.config.ts',
       '--forbid-only',
       '--fail-on-flaky-tests',
       '--workers=1',
@@ -84,6 +84,11 @@ export function playwright(suite, selection, destination, discover = false) {
       env: {
         ...process.env,
         CI: 'true',
+        PERSEFONIA_NATIVE_PROFILE: suite,
+        PERSEFONIA_ADMIN_PREVIEW_URL:
+          process.env.PERSEFONIA_ADMIN_PREVIEW_URL ?? 'http://127.0.0.1:18081',
+        PERSEFONIA_NATIVE_PROJECT:
+          selection.find((s) => s.startsWith('--project='))?.slice('--project='.length) ?? 'all',
         PLAYWRIGHT_JSON_OUTPUT_NAME: destination,
         PERSEFONIA_VERIFICATION_REPORT: destination,
       },
@@ -104,5 +109,32 @@ export function sourceContext() {
       encoding: 'utf8',
       maxBuffer: 1024 * 1024,
     }),
+  );
+}
+
+export function riskPlan() {
+  return JSON.parse(
+    execFileSync('python3', ['-B', join(repository, 'scripts/ci/selection.py')], {
+      cwd: repository,
+      encoding: 'utf8',
+      maxBuffer: 2 * 1024 * 1024,
+    }),
+  );
+}
+
+/** Bounded unique-key JSON parsing is shared with artifact admission, without executing data. */
+export function readEvidence(path) {
+  return JSON.parse(
+    execFileSync(
+      'python3',
+      [
+        '-B',
+        '-c',
+        'import sys,json; sys.path.insert(0,sys.argv[1]); import qualification as q; print(json.dumps(q.read(sys.argv[2])))',
+        join(repository, 'scripts/ci'),
+        resolve(path),
+      ],
+      { cwd: repository, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 },
+    ),
   );
 }

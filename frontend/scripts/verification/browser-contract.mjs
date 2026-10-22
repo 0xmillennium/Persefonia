@@ -1,22 +1,25 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
-const skipPolicy = JSON.parse(
+const skipMirror = JSON.parse(
   readFileSync(new URL('./expected-skips.json', import.meta.url), 'utf8'),
 );
-export const groups = [
-  { name: 'desktop', suite: 'chromium', project: 'desktop-1440', shards: 2 },
-  { name: 'tablet', suite: 'chromium', project: 'tablet-834', shards: 2 },
-  { name: 'mobile', suite: 'chromium', project: 'mobile-390', shards: 2 },
-  { name: 'firefox', suite: 'cross', project: 'firefox-desktop', shards: 1 },
-  { name: 'webkit', suite: 'cross', project: 'webkit-desktop', shards: 1 },
-];
-export const partitions = groups.flatMap(({ shards, ...group }) =>
-  Array.from({ length: shards }, (_, index) => ({
-    ...group,
-    shard: `${index + 1}/${shards}`,
-  })),
+import {
+  policyHash,
+  selectionPolicy,
+  requiredPartitions,
+  validateNativeSelection,
+} from './selection-policy.mjs';
+const skipPolicy = selectionPolicy.expectedSkips;
+if (JSON.stringify(skipPolicy) !== JSON.stringify(skipMirror))
+  throw new Error('Ordinary skip mirror differs from source policy');
+const deepSkipPolicy = JSON.parse(
+  readFileSync(new URL('./deep-expected-skips.json', import.meta.url), 'utf8'),
 );
+export const partitions = requiredPartitions();
+export const groups = partitions.map((p) => ({ ...p, shards: 1 }));
+export const skipRules = (suite) =>
+  ['ordinary', 'admin'].includes(suite) ? skipPolicy : deepSkipPolicy;
 export const partitionKey = (partition) =>
   `${partition.name}-${partition.shard.replace('/', 'of')}`;
 export const digest = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -132,7 +135,10 @@ export function validateOutcomes(rows, policy = skipPolicy) {
 
 export function validateReceipt(receipt, expectedIdentity, policy = skipPolicy) {
   requireThat(
-    receipt?.schema === 1 && receipt.status === 'passed' && receipt.exitCode === 0,
+    receipt?.schema === 2 &&
+      receipt.policy === policyHash &&
+      receipt.status === 'passed' &&
+      receipt.exitCode === 0,
     'Missing, corrupt or failed receipt',
   );
   requireThat(
@@ -144,6 +150,25 @@ export function validateReceipt(receipt, expectedIdentity, policy = skipPolicy) 
     /^[a-f0-9]{40}$/.test(receipt.identity.sourceSha) &&
       /^[a-f0-9]{64}$/.test(receipt.identity.artifactSha256),
     'Invalid artifact identity',
+  );
+  if (receipt.partition?.suite === 'admin')
+    requireThat(
+      receipt.runner?.job === 'build-jvm',
+      'Admin native must execute in its own JVM workspace',
+    );
+  const engine = receipt.partition?.project?.startsWith('firefox')
+    ? 'firefox'
+    : receipt.partition?.project?.startsWith('webkit')
+      ? 'webkit'
+      : 'chromium';
+  requireThat(
+    Object.keys(receipt.environment?.browsers ?? {}).join(',') === engine &&
+      /^[a-f0-9]{64}$/.test(receipt.environment.browsers[engine]?.sha256) &&
+      typeof receipt.environment.ffmpeg === 'string' &&
+      receipt.environment.ffmpeg.length > 0 &&
+      typeof receipt.environment.ffprobe === 'string' &&
+      receipt.environment.ffprobe.length > 0,
+    'Missing required engine/decoder prerequisite',
   );
   requireThat(
     Array.isArray(receipt.selected) && Array.isArray(receipt.outcomes),
@@ -176,7 +201,11 @@ export function joinReceipts(
     receipts.map((r) => partitionKey(r.partition)),
   );
   for (const receipt of receipts) {
-    validateReceipt(receipt, identity, policy);
+    validateReceipt(
+      receipt,
+      identity,
+      policy === skipPolicy ? skipRules(receipt.partition.suite) : policy,
+    );
     const expected = required.find((p) => partitionKey(p) === partitionKey(receipt.partition));
     requireThat(
       expected &&
@@ -189,7 +218,8 @@ export function joinReceipts(
       'Wrong viewport partition',
     );
   }
-  for (const suite of ['chromium', 'cross']) {
+  sameInventory([...new Set(required.map((p) => p.suite))], Object.keys(inventory));
+  for (const suite of [...new Set(required.map((p) => p.suite))]) {
     const matching = receipts.filter((r) => r.partition.suite === suite);
     sameInventory(
       inventory[suite].map((r) => r.id),
@@ -225,7 +255,8 @@ export function joinReceipts(
 /** Gate validates the complete native receipt set through the same owner as the source join. */
 export function validateAcceptance(value, expectedIdentity) {
   requireThat(
-    value?.schema === 1 &&
+    value?.schema === 2 &&
+      value.policy === policyHash &&
       value.status === 'passed' &&
       value.inventory &&
       Array.isArray(value.receipts) &&
@@ -240,7 +271,20 @@ export function validateAcceptance(value, expectedIdentity) {
         digest(receipt.sourceContext) === digest(value.sourceContext),
       'Mixed browser source/run/attempt',
     );
-  const result = joinReceipts(value.inventory, value.receipts, expectedIdentity);
+  requireThat(
+    Array.isArray(value.profiles) &&
+      value.profiles[0] === 'ordinary' &&
+      new Set(value.profiles).size === value.profiles.length,
+    'Invalid native profiles',
+  );
+  const required = requiredPartitions(value.profiles);
+  const result = joinReceipts(value.inventory, value.receipts, expectedIdentity, required);
+  for (const part of required.filter((p) => ['ordinary', 'admin'].includes(p.suite)))
+    validateNativeSelection(
+      value.inventory[part.suite].filter((r) => r.project === part.project),
+      part.suite,
+      part.project,
+    );
   requireThat(
     result.selected === value.selected && result.partitions === value.partitions,
     'Forged browser acceptance counts',

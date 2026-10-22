@@ -1,6 +1,8 @@
 import { expect, it } from 'vitest';
 import base from '../../playwright.config';
 import cross from '../../playwright.cross-browser.config';
+import native from '../../playwright.native.config';
+import policy from './selection-policy.json';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -9,6 +11,7 @@ import { spawnSync } from 'node:child_process';
 it.each([
   ['playwright.config.ts', 3],
   ['playwright.cross-browser.config.ts', 2],
+  ['playwright.native.config.ts', 4],
 ] as const)(
   '%s resolves the actual engine and channel for every project',
   (config, count) => {
@@ -19,6 +22,7 @@ it.each([
         inherited,
         `import base from ${JSON.stringify(resolve(config))};
 export default { ...base, testDir: ${JSON.stringify(directory)}, testMatch: '**/*.spec.ts',
+projects: base.projects.map((p) => ({...p, testMatch: '**/*.spec.ts', grep: /.*/})),
 reporter: 'json', outputDir: ${JSON.stringify(join(directory, 'output'))} };`,
       );
       writeFileSync(
@@ -87,4 +91,17 @@ it('retains unfiltered Chromium discovery and every mandatory viewport and engin
       '**/homepage/film/hold-repress.spec.ts',
     ]),
   );
+});
+
+it('ordinary native selection has exact engine/context ownership, no retries and no mutable content suite', () => {
+  expect(native.projects?.map((p) => p.name)).toEqual(policy.native.map((p) => p.project));
+  expect(native.workers).toBe(1);
+  expect(native.retries).toBe(0);
+  expect(native.fullyParallel).not.toBe(true);
+  for (const [i, project] of (native.projects ?? []).entries()) {
+    expect(project.use?.browserName).toBe(policy.native[i]!.engine);
+    expect(project.use?.hasTouch ?? false).toBe(policy.native[i]!.context === 'touch');
+    expect(project.testMatch).not.toContain('**/public/homepage.spec.ts');
+    expect(project.grep).toBeInstanceOf(RegExp);
+  }
 });

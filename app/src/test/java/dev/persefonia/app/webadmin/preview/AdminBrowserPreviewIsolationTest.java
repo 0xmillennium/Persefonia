@@ -38,4 +38,25 @@ class AdminBrowserPreviewIsolationTest {
                     .as(violation).isInstanceOf(IllegalStateException.class);
         }
     }
+
+    @Test
+    void malformedCaseNamespaceCannotReachAccountsOrCreateASession() throws Exception {
+        var environment = new MockEnvironment()
+                .withProperty("server.address", "127.0.0.1")
+                .withProperty("persefonia.preview.disposable", "true")
+                .withProperty("spring.datasource.url", "jdbc:postgresql://127.0.0.1:12345/persefonia_browser");
+        var accounts = mock(AdminAccountRepository.class);
+        var contexts = mock(SecurityContextRepository.class);
+        var filter = new AdminBrowserPreview.PreviewConfiguration()
+                .syntheticPreviewSession(environment, accounts, contexts).getFilter();
+        var request = new org.springframework.mock.web.MockHttpServletRequest("POST", "/__admin_preview/session");
+        request.setRemoteAddr("127.0.0.1");
+        request.addHeader("X-Persefonia-Preview", "synthetic");
+        request.addHeader("X-Persefonia-Preview-Case", "../foreign-account");
+        var response = new org.springframework.mock.web.MockHttpServletResponse();
+        filter.doFilter(request, response, mock(jakarta.servlet.FilterChain.class));
+        assertThat(response.getStatus()).isEqualTo(404);
+        org.mockito.Mockito.verifyNoInteractions(accounts, contexts);
+    }
+
 }

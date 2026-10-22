@@ -19,8 +19,8 @@ WORKFLOW_ID = 351133355
 SCHEMA = 2
 SHA = re.compile(r'[0-9a-f]{40}')
 HASH = re.compile(r'[0-9a-f]{64}')
-PARTITIONS = ['desktop-1of2', 'desktop-2of2', 'tablet-1of2', 'tablet-2of2',
-              'mobile-1of2', 'mobile-2of2', 'firefox-1of1', 'webkit-1of1']
+CI_JOBS = ['Automation', 'Reuse eligibility', 'Comparison build', 'Build + JVM', 'Frontend verification',
+           'Verify', 'Browser receipts', 'Gate', 'Native browsers']
 
 
 def require(condition, message):

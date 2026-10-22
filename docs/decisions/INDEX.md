@@ -87,5 +87,7 @@ Use [TEMPLATE.md](TEMPLATE.md) for new decision records.
 - [ADR 0037: Bound Ignored Local Workspaces to Active Task Context](0037-bound-ignored-local-workspaces-to-active-task-context.md) — supersedes ADR 0034; bounds local context to TODO, concise tooling guidance and active tasks with explicit evidence-retention conditions.
 - [ADR 0038: Keep Original Media External and Publish Versioned Delivery Assets](0038-keep-original-media-external-and-publish-versioned-delivery-assets.md) — supersedes ADR 0036; keeps originals external and intermediates disposable while preserving qualified, self-hosted delivery and source-independent builds.
 
-- [ADR 0039: Separate Frontend and JVM CI Qualification](0039-separate-frontend-and-jvm-ci-qualification.md) — supersedes only ADR 0031 scheduling; preserves complete local checks and isolated native evidence.
+- [ADR 0039: Separate Frontend and JVM CI Qualification](0039-separate-frontend-and-jvm-ci-qualification.md) — supersedes only ADR 0031 scheduling; preserves complete local checks and isolated native evidence; selection/topology narrowly superseded by ADR 0041.
 - [ADR 0040: Compare Master Builds Before Reusing PR Qualification](0040-compare-master-builds-before-reusing-pr-qualification.md) — narrowly supersedes ADRs 0022/0032 qualification/handoff statements; defaults to shadow and preserves immutable OCI delivery.
+
+- [ADR 0041: Use Risk-Owned Test Profiles and a Shared Native Lifecycle](0041-use-risk-owned-test-profiles-and-a-shared-native-lifecycle.md) — narrows ADR 0039 selection/topology; preserves first-attempt provenance, fail-closed admission and ADR 0040 shadow reuse.
