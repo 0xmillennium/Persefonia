@@ -4,16 +4,19 @@
 @param java.util.List<String> adminStylesheetPaths = java.util.List.of()
 @template.admin.components.pageShell("Edit series | Persefonia Admin", page.chrome().admin(), page.chrome().navigation(), page.chrome().logoutForm(), false, adminStylesheetPaths = adminStylesheetPaths, content = @`
     <main id="admin-content" tabindex="-1">
-        <div id="series" tabindex="-1"></div>
-        <h1>${page.heading()}</h1>
+        <h1 id="series" tabindex="-1" aria-describedby="${page.globalErrors().isEmpty() ? null : "series-errors"}">${page.heading()}</h1>
         <p><a href="/admin/series">Back to series</a></p>
         @if(page.successMessage() != null)
             <p role="status">${page.successMessage()}</p>
         @endif
         @if(page.hasErrors())
-            @for(var error : page.globalErrors())
-                <p role="alert">${error}</p>
-            @endfor
+            @if(!page.globalErrors().isEmpty())
+                <section id="series-errors" role="alert" tabindex="-1" autofocus aria-label="Series errors">
+                    @for(var error : page.globalErrors())
+                        <p><a href="#series">${error}</a></p>
+                    @endfor
+                </section>
+            @endif
             @template.admin.components.fieldErrors(page.fieldErrors())
         @endif
         <p>Status: <strong>${page.series().status().name()}</strong></p>

@@ -114,35 +114,42 @@
             @if(page.tagAssignmentSuccessMessage() != null)
                 <p role="status">${page.tagAssignmentSuccessMessage()}</p>
             @endif
-            @for(var error : page.tagAssignmentErrors())
-                <p role="alert">${error}</p>
-            @endfor
             <form method="post" action="/admin/content/${page.tagAssignment().contentId().value().toString()}/tags">
                 @template.admin.components.csrfField(page.chrome().logoutForm())
-                @if(page.tagAssignment().assignableTags().isEmpty() && page.tagAssignment().assignedTags().stream().noneMatch(tag -> tag.archived()))
-                    <p>No assignable tags are available.</p>
-                @else
-                    @for(var tag : page.tagAssignment().assignableTags())
-                        <label>
-                            <input type="checkbox"
-                                   name="tagId"
-                                   value="${tag.id().value().toString()}"
-                                   checked="${page.selectedTagIds().contains(tag.id().value().toString())}" id="tagId" aria-invalid="${FieldErrors.has(page.fieldErrors(), "tagId") ? "true" : null}" aria-describedby="${FieldErrors.has(page.fieldErrors(), "tagId") ? "error-tagId" : null}">
-                            ${tag.name()}
-                        </label>
-                    @endfor
-                    @for(var tag : page.tagAssignment().assignedTags())
-                        @if(tag.archived())
+                <fieldset id="tagId" tabindex="-1" aria-invalid="${page.hasTagAssignmentErrors() ? "true" : null}" aria-describedby="${page.hasTagAssignmentErrors() ? "content-tag-errors" : null}">
+                    <legend>Tags</legend>
+                    @if(page.hasTagAssignmentErrors())
+                        <div id="content-tag-errors" role="alert">
+                            @for(var error : page.tagAssignmentErrors())
+                                <p>${error}</p>
+                            @endfor
+                        </div>
+                    @endif
+                    @if(page.tagAssignment().assignableTags().isEmpty() && page.tagAssignment().assignedTags().stream().noneMatch(tag -> tag.archived()))
+                        <p>No assignable tags are available.</p>
+                    @else
+                        @for(var tag : page.tagAssignment().assignableTags())
                             <label>
                                 <input type="checkbox"
                                        name="tagId"
                                        value="${tag.id().value().toString()}"
-                                       checked="${page.selectedTagIds().contains(tag.id().value().toString())}" id="tagId" aria-invalid="${FieldErrors.has(page.fieldErrors(), "tagId") ? "true" : null}" aria-describedby="${FieldErrors.has(page.fieldErrors(), "tagId") ? "error-tagId" : null}">
-                                ${tag.name()} <strong>ARCHIVED</strong>
+                                       checked="${page.selectedTagIds().contains(tag.id().value().toString())}" id="content-tag-${tag.id().value().toString()}">
+                                ${tag.name()}
                             </label>
-                        @endif
-                    @endfor
-                @endif
+                        @endfor
+                        @for(var tag : page.tagAssignment().assignedTags())
+                            @if(tag.archived())
+                                <label>
+                                    <input type="checkbox"
+                                           name="tagId"
+                                           value="${tag.id().value().toString()}"
+                                           checked="${page.selectedTagIds().contains(tag.id().value().toString())}" id="content-tag-${tag.id().value().toString()}">
+                                    ${tag.name()} <strong>ARCHIVED</strong>
+                                </label>
+                            @endif
+                        @endfor
+                    @endif
+                </fieldset>
                 <button type="submit">Save tags</button>
             </form>
         </section>

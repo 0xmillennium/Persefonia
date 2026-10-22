@@ -7,12 +7,16 @@
         <h1>${page.heading()}</h1>
         <p><a href="/admin/series">Back to series</a></p>
         @if(page.hasErrors())
-            @for(var error : page.globalErrors())
-                <p role="alert">${error}</p>
-            @endfor
+            @if(!page.globalErrors().isEmpty())
+                <section id="series-errors" role="alert" tabindex="-1" autofocus aria-label="Series errors">
+                    @for(var error : page.globalErrors())
+                        <p><a href="#series">${error}</a></p>
+                    @endfor
+                </section>
+            @endif
             @template.admin.components.fieldErrors(page.fieldErrors())
         @endif
-        <form method="post" action="${page.action()}">
+        <form id="series" tabindex="-1" aria-label="Create series" aria-describedby="${page.globalErrors().isEmpty() ? null : "series-errors"}" method="post" action="${page.action()}">
             @template.admin.components.csrfField(page.chrome().logoutForm())
             <label for="language">Language</label>
             <select id="language" name="language" aria-invalid="${FieldErrors.has(page.fieldErrors(), "language") ? "true" : null}" aria-describedby="${FieldErrors.has(page.fieldErrors(), "language") ? "error-language" : null}">

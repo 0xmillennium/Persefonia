@@ -1,5 +1,133 @@
 import { test, expect } from '../e2e/support/test';
 import { randomUUID } from 'node:crypto';
+import type { Page } from '@playwright/test';
+
+async function assertDocumentReferences(page: Page) {
+  expect(
+    await page.evaluate(() => {
+      const ids = [...document.querySelectorAll('[id]')].map((node) => node.id);
+      return ids.filter((id, index) => ids.indexOf(id) !== index);
+    }),
+  ).toEqual([]);
+  for (const element of await page.locator('[aria-describedby]').all()) {
+    for (const id of (await element.getAttribute('aria-describedby'))!.split(/\s+/)) {
+      await expect(page.locator(`[id="${id}"]`)).toHaveCount(1);
+    }
+  }
+  for (const link of await page.locator('.field-errors a[href^="#"]').all()) {
+    const field = page.locator((await link.getAttribute('href'))!);
+    await expect(field).toHaveCount(1);
+    await link.click();
+    await expect(field).toBeFocused();
+  }
+}
+
+test('populated content tags retain distinct labels, archived selection and native submission', async ({
+  page,
+}, info) => {
+  const identity = randomUUID().slice(0, 8);
+  const tags: { name: string; id: string; edit: string }[] = [];
+  for (const suffix of ['first', 'second', 'archived']) {
+    const name = `Synthetic ${identity} ${suffix}`;
+    await page.goto('/admin/tags/new');
+    await page.locator('#name').fill(name);
+    await page.locator('#slug').fill(`synthetic-${identity}-${suffix}`);
+    await page.getByRole('button', { name: 'Create tag', exact: true }).click();
+    await expect(page).toHaveURL(/\/admin\/tags\/.+\/edit/);
+    tags.push({ name, id: new URL(page.url()).pathname.split('/')[3]!, edit: page.url() });
+  }
+  await page.goto('/admin/content/new');
+  await page.locator('#type').selectOption('ARTICLE');
+  await page.locator('#language').selectOption('EN');
+  await page.locator('#visibility').selectOption('PRIVATE');
+  await page.getByRole('button', { name: 'Create draft', exact: true }).click();
+  await expect(page).toHaveURL(/\/admin\/content\/.+\/edit/);
+  const edit = page.url();
+  for (const tag of [tags[0]!, tags[2]!]) {
+    await page.getByLabel(tag.name, { exact: true }).check();
+  }
+  await page.getByRole('button', { name: 'Save tags', exact: true }).click();
+  await expect(page).toHaveURL(/tagsSaved/);
+  await page.goto(tags[2]!.edit);
+  await page.getByRole('button', { name: 'Archive', exact: true }).click();
+  await page.goto(edit);
+  await assertDocumentReferences(page);
+  const group = page.getByRole('group', { name: 'Tags', exact: true });
+  await expect(group).toHaveCount(1);
+  const first = page.getByLabel(tags[0]!.name, { exact: true });
+  const second = page.getByLabel(tags[1]!.name, { exact: true });
+  const archived = page.getByLabel(`${tags[2]!.name} ARCHIVED`, { exact: true });
+  await expect(first).toBeChecked();
+  await expect(second).not.toBeChecked();
+  await expect(archived).toBeChecked();
+  for (const [control, tag] of [
+    [first, tags[0]!],
+    [second, tags[1]!],
+    [archived, tags[2]!],
+  ] as const) {
+    await expect(control).toHaveValue(tag.id);
+  }
+  await page.getByText(tags[1]!.name, { exact: true }).click();
+  await expect(second).toBeChecked();
+  await expect(first).toBeChecked();
+  await expect(archived).toBeChecked();
+  await page.getByRole('button', { name: 'Save tags', exact: true }).click();
+  await expect(page.getByLabel(tags[1]!.name, { exact: true })).toBeChecked();
+  await expect(page.getByLabel(`${tags[2]!.name} ARCHIVED`, { exact: true })).toBeChecked();
+  await assertDocumentReferences(page);
+  if (process.env.PERSEFONIA_ADMIN_EVIDENCE_DIR) {
+    await page.getByRole('group', { name: 'Tags', exact: true }).screenshot({
+      path: `${process.env.PERSEFONIA_ADMIN_EVIDENCE_DIR}/${info.project.name}-content-tags.png`,
+    });
+  }
+});
+
+test('series validation links focus the correct language, title and slug controls', async ({
+  page,
+}, info) => {
+  for (const [language, title, slug, field] of [
+    ['INVALID', 'Synthetic series', 'synthetic-series', 'language'],
+    ['EN', ' ', 'synthetic-series', 'title'],
+    ['EN', 'Synthetic series', 'bad slug', 'slug'],
+  ]) {
+    await page.goto('/admin/series/new');
+    await page.locator('#title').fill(title!);
+    await page.locator('#slug').fill(slug!);
+    if (language === 'INVALID') {
+      // Submit a real tampered form through native navigation, keeping its OWNER session and CSRF.
+      await page.locator('#language').evaluate((select) => {
+        select.appendChild(new Option('Invalid synthetic language', 'INVALID', true, true));
+      });
+    }
+    await page.getByRole('button', { name: 'Create series', exact: true }).click();
+    const control = page.locator(`#${field}`);
+    await expect(page.locator('.field-errors')).toBeFocused();
+    await expect(page.locator(`.field-errors a[href="#${field}"]`)).toHaveCount(1);
+    await expect(control).toHaveAttribute('aria-invalid', 'true');
+    await expect(control).toHaveAttribute('aria-describedby', `error-${field}`);
+    await assertDocumentReferences(page);
+    await expect(control).toBeFocused();
+    if (process.env.PERSEFONIA_ADMIN_EVIDENCE_DIR && field === 'language') {
+      await page.screenshot({
+        path: `${process.env.PERSEFONIA_ADMIN_EVIDENCE_DIR}/${info.project.name}-series-language.png`,
+      });
+    }
+  }
+});
+
+test('adjacent content and tag validation summaries keep unique focusable destinations', async ({
+  page,
+}) => {
+  for (const [path, button] of [
+    ['/admin/content/new', 'Create draft'],
+    ['/admin/tags/new', 'Create tag'],
+  ]) {
+    await page.goto(path!);
+    await page.getByRole('button', { name: button!, exact: true }).click();
+    await expect(page.locator('.field-errors')).toBeVisible();
+    await assertDocumentReferences(page);
+  }
+});
 
 test.beforeEach(async ({ context }) => {
   const session = await context.request.post('/__admin_preview/session', {

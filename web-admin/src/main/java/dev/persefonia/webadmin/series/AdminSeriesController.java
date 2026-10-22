@@ -16,6 +16,9 @@ import dev.persefonia.contentpublishing.domain.content.ContentId;
 import dev.persefonia.contentpublishing.domain.content.ContentLanguage;
 import dev.persefonia.contentpublishing.domain.model.series.SeriesEntryId;
 import dev.persefonia.contentpublishing.domain.model.series.SeriesId;
+import dev.persefonia.contentpublishing.domain.model.series.SeriesTitle;
+import dev.persefonia.contentpublishing.domain.model.series.SeriesSlug;
+import dev.persefonia.contentpublishing.domain.model.series.SeriesDescription;
 import dev.persefonia.contentpublishing.domain.model.series.SeriesValidationException;
 import dev.persefonia.webadmin.content.ContentAdminActorResolver;
 import java.time.Instant;
@@ -84,10 +87,19 @@ public final class AdminSeriesController {
             CsrfToken csrfToken,
             @ModelAttribute AdminSeriesForm form,
             Model model) {
+        ContentLanguage language;
+        try {
+            language = ContentLanguage.valueOf(form.getLanguage());
+        } catch (IllegalArgumentException exception) {
+            model.addAttribute("page", createFormPage(
+                    chrome.create(authentication, csrfToken), form,
+                    List.of(new AdminSeriesFieldError("language", "Choose a valid language.")), List.of()));
+            return "admin/series/new";
+        }
         try {
             var result = commands.create(new CreateSeriesCommand(
                     actors.resolve(authentication),
-                    ContentLanguage.valueOf(form.getLanguage()),
+                    language,
                     form.getTitle(),
                     form.getSlug(),
                     form.getDescription(),
@@ -97,8 +109,9 @@ public final class AdminSeriesController {
             model.addAttribute("page", createFormPage(
                     chrome.create(authentication, csrfToken), form, commandError(exception), List.of()));
         } catch (IllegalArgumentException | SeriesValidationException exception) {
+            var errors = validationError(form);
             model.addAttribute("page", createFormPage(
-                    chrome.create(authentication, csrfToken), form, validationError(form), List.of()));
+                    chrome.create(authentication, csrfToken), form, errors, globalValidationError(errors)));
         }
         return "admin/series/new";
     }
@@ -145,8 +158,9 @@ public final class AdminSeriesController {
                     chrome.create(authentication, csrfToken), form, series, commandError(exception), List.of(), null));
         } catch (IllegalArgumentException | SeriesValidationException exception) {
             SeriesEditView series = series(authentication, seriesId);
+            var errors = validationError(form);
             model.addAttribute("page", editFormPage(
-                    chrome.create(authentication, csrfToken), form, series, validationError(form), List.of(), null));
+                    chrome.create(authentication, csrfToken), form, series, errors, globalValidationError(errors), null));
         }
         return "admin/series/edit";
     }
@@ -278,13 +292,28 @@ public final class AdminSeriesController {
     }
 
     private static List<AdminSeriesFieldError> validationError(AdminSeriesForm form) {
-        if (form.getTitle().isBlank()) {
-            return List.of(new AdminSeriesFieldError("title", "This field is required."));
+        try {
+            SeriesTitle.of(form.getTitle());
+        } catch (SeriesValidationException exception) {
+            return List.of(new AdminSeriesFieldError("title",
+                    form.getTitle().isBlank() ? "This field is required." : "Use a title of at most 120 characters."));
         }
-        if (form.getSlug().isBlank()) {
-            return List.of(new AdminSeriesFieldError("slug", "This field is required."));
+        try {
+            SeriesSlug.of(form.getSlug());
+        } catch (SeriesValidationException exception) {
+            return List.of(new AdminSeriesFieldError("slug",
+                    form.getSlug().isBlank() ? "This field is required." : "Use a lowercase slug with hyphens between words."));
         }
-        return List.of(new AdminSeriesFieldError("series", "Provide a valid language, title, slug, and description."));
+        try {
+            SeriesDescription.optional(form.getDescription());
+        } catch (SeriesValidationException exception) {
+            return List.of(new AdminSeriesFieldError("description", "Use a description of at most 500 characters."));
+        }
+        return List.of();
+    }
+
+    private static List<String> globalValidationError(List<AdminSeriesFieldError> errors) {
+        return errors.isEmpty() ? List.of("The series could not be saved. Review the form and try again.") : List.of();
     }
 
     private static String redirectError(String seriesId, SeriesCommandRejectedException exception) {
