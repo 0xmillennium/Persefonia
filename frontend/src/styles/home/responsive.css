@@ -187,7 +187,7 @@
   }
 
   [data-home-v2][data-enhanced='true'][data-reduced='false'] .location-face {
-    padding: 128px 24px 100px;
+    padding: 128px 24px 114px;
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr);
     gap: 32px;

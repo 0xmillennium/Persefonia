@@ -6,7 +6,7 @@
 }
 
 [data-home-v2][data-enhanced='true'][data-reduced='false'] .gallery-writing-slot {
-  overflow: visible;
+  overflow: clip;
 }
 
 .tuner-reveal-slot {

@@ -74,11 +74,23 @@ test('explicit background pause survives page suspension and resumes only on req
 }) => {
   await startOnFilm(page, 'waterfall');
   await openHomepage(page);
-  const button = page.getByRole('button', { name: 'Pause background motion', exact: true });
-  await expect(button).toBeVisible();
-  await button.click();
-  const resume = page.getByRole('button', { name: 'Resume background motion', exact: true });
-  await expect(resume).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('[data-background-motion],.globe-controls')).toHaveCount(0);
+  const stage = page.locator('[data-home-v2]');
+  const size = page.viewportSize()!;
+  // A short tap on the existing background changes motion, without changing film or scrolling.
+  const y = await page.evaluate(() => scrollY);
+  await page.mouse.click(size.width * 0.9, size.height * 0.65);
+  await expect
+    .poll(() => page.locator('[data-loop-video]').evaluate((v: HTMLVideoElement) => v.paused))
+    .toBe(true);
+  expect(await page.evaluate(() => scrollY)).toBe(y);
+  await stage.focus();
+  await page.keyboard.press('p');
+  await expect
+    .poll(() => page.locator('[data-loop-video]').evaluate((v: HTMLVideoElement) => v.paused))
+    .toBe(false);
+  await stage.focus();
+  await page.keyboard.press('p');
   await expect
     .poll(() => page.locator('[data-loop-video]').evaluate((v: HTMLVideoElement) => v.paused))
     .toBe(true);
@@ -86,13 +98,12 @@ test('explicit background pause survives page suspension and resumes only on req
     dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }));
     dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
   });
-  await expect(resume).toBeVisible();
   await page.waitForTimeout(250);
   expect(await page.locator('[data-loop-video]').evaluate((v: HTMLVideoElement) => v.paused)).toBe(
     true,
   );
-  await resume.press('Enter');
-  await expect(button).toHaveAttribute('aria-pressed', 'false');
+  await stage.focus();
+  await page.keyboard.press('p');
   await expect
     .poll(() => page.locator('[data-loop-video]').evaluate((v: HTMLVideoElement) => v.paused))
     .toBe(false);
@@ -182,6 +193,9 @@ test('foreign wrapped, split and replaced Unicode text survives resize and re-en
     await page.evaluate(() => scrollTo(0, 150));
     await expect(page.locator('.hero-writing-text').first()).toBeVisible();
     await expect(page.locator('.hero-writing-text').first()).toHaveText(content);
+    await expect(
+      page.getByRole('heading', { name: `${content} engineered`, exact: true }),
+    ).toHaveCount(1);
     await expect(page.locator('.hero-writing-visual').first()).toBeHidden();
     expect(errors).toEqual([]);
     await page.evaluate(() => scrollTo(0, 0));
@@ -201,15 +215,47 @@ test('globe alternatives keep their targets clear of footer links at narrow and 
     await page.setViewportSize(size);
     await page.goto('/#contact');
     await expect(page.locator('[data-home-loader]')).toBeHidden();
-    const controls = (await page.locator('.globe-controls').boundingBox())!;
+    await expect(page.locator('.globe-controls,[data-background-motion]')).toHaveCount(0);
+    const globe = (await page.locator('.location-globe').boundingBox())!;
     const strip = (await page.locator('.location-strip').boundingBox())!;
-    expect(controls.y + controls.height, JSON.stringify(size)).toBeLessThanOrEqual(strip.y - 8);
-    for (const button of await page.locator('.globe-controls button').all()) {
-      const bounds = (await button.boundingBox())!;
-      expect(bounds.width).toBeGreaterThanOrEqual(44);
-      expect(bounds.height).toBeGreaterThanOrEqual(44);
-      expect(bounds.x).toBeGreaterThanOrEqual(0);
-      expect(bounds.x + bounds.width).toBeLessThanOrEqual(size.width);
-    }
+    // The interactive target is the visible sphere, not transparent canvas corners.
+    const radius = Math.min(globe.width, globe.height) * 0.42;
+    expect(globe.y + globe.height / 2 + radius + 8, JSON.stringify(size)).toBeLessThanOrEqual(
+      strip.y,
+    );
+    expect(globe.x).toBeGreaterThanOrEqual(0);
+    expect(globe.x + globe.width).toBeLessThanOrEqual(size.width);
   }
+});
+
+test('late font metrics rebuild decorative glyphs without replaying completed writing', async ({
+  page,
+}) => {
+  await startOnFilm(page, 'tree');
+  await openHomepage(page);
+  await page
+    .locator('[data-scene="statements"]')
+    .evaluate((n) => scrollTo(0, Math.ceil(n.getBoundingClientRect().top + scrollY + 75)));
+  await expect
+    .poll(() =>
+      page
+        .locator('.statement-word')
+        .evaluateAll((ns) => ns.every((n) => (n as HTMLElement).style.filter === '')),
+    )
+    .toBe(true);
+  await page
+    .locator('.hero-writing-text')
+    .first()
+    .evaluate((n) => {
+      n.style.fontSize = '64px';
+      document.fonts.dispatchEvent(new Event('loadingdone'));
+    });
+  await expect(page.locator('.hero-writing-visual').first()).toHaveCSS('font-size', '64px');
+  await expect
+    .poll(() =>
+      page
+        .locator('.statement-word')
+        .evaluateAll((ns) => ns.every((n) => (n as HTMLElement).style.filter === '')),
+    )
+    .toBe(true);
 });

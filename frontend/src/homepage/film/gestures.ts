@@ -25,10 +25,11 @@ export function filmGestures(
   clock: HoldClock,
   state: () => FilmGestureState,
   callbacks: {
+    toggleMotion?(): void;
     invalidate(): void;
     request(): void;
     changed(): void;
-    retry(modality: 'pointer' | 'keyboard'): void;
+    retry(modality: 'pointer' | 'keyboard'): boolean | void;
     prefetch(from: Background): void;
     motion(sample: MotionSample): void;
   },
@@ -43,7 +44,9 @@ export function filmGestures(
     const origin = state().origin;
     return { x: x - (origin?.x ?? 0), y: y - (origin?.y ?? 0) };
   };
+  let tap: { id: number; x: number; y: number; time: number } | null = null;
   const release = () => {
+    tap = null;
     callbacks.invalidate();
     clock.beforeEvent(hold, performance.now());
     hold.release();
@@ -69,9 +72,12 @@ export function filmGestures(
       )
         return;
       clock.beforeEvent(hold, performance.now());
-      callbacks.retry('pointer');
+      const recovering = callbacks.retry('pointer');
       if (hold.press(point(e.clientX, e.clientY), e.pointerType as Modality)) {
         gesture = e.pointerId;
+        tap = recovering
+          ? null
+          : { id: e.pointerId, x: e.clientX, y: e.clientY, time: e.timeStamp };
         // Capture keeps ownership stable when the visual layers change;
         // it does not prevent a quick native pan from canceling the pointer.
         root.setPointerCapture(e.pointerId);
@@ -149,6 +155,7 @@ export function filmGestures(
         document.documentElement.dataset.menuOpen === 'true'
       )
         return;
+      if (tap && Math.hypot(e.clientX - tap.x, e.clientY - tap.y) > 5) tap = null;
       if (e.pointerId === gesture) {
         clock.beforeEvent(hold, performance.now());
         hold.move(point(e.clientX, e.clientY));
@@ -203,7 +210,11 @@ export function filmGestures(
     window.addEventListener(
       type,
       (e) => {
-        if (e.pointerId === gesture) release();
+        if (e.pointerId === gesture) {
+          if (type === 'pointerup' && tap?.id === e.pointerId && e.timeStamp - tap.time < 300)
+            callbacks.toggleMotion?.();
+          release();
+        }
       },
       options,
     );

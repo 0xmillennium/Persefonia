@@ -69,11 +69,9 @@ test('five notches grow the curtain and bring the first card from the left to ce
     const state = await snapshot(page);
     states.push(state);
     expect(state.heading.map((row) => row.text)).toEqual(['Building systems', 'worth explaining']);
-    expect(
-      state.heading.every((row) => row.opacity >= 0.72 && row.slotOverflow === 'visible'),
-    ).toBe(true);
+    expect(state.heading.every((row) => row.slotOverflow === 'clip')).toBe(true);
     if (notch <= 4) {
-      expect(state.writing).toEqual(['translateY(8%)', 'translateY(8%)', 'translateY(100%)']);
+      expect(state.writing).toEqual(Array(3).fill('translateY(100%)'));
       expect(state.tunerHidden).toBe(true);
       expect(state.tunerInert).toBe(true);
     } else {
@@ -115,10 +113,11 @@ test('five notches grow the curtain and bring the first card from the left to ce
   await page.waitForTimeout(250);
   const halfway = await snapshot(page);
   expect(halfway.bands.every((y) => y === 0)).toBe(true);
+  // Reverse departure stays coupled to the original slit trajectory.
   expect(
-    halfway.writing.every((value, i) => {
+    halfway.writing.every((value) => {
       const y = parseFloat(value.slice('translateY('.length));
-      return y > 0 && y < (i < 2 ? 8 : 100);
+      return y > 0 && y < 100;
     }),
   ).toBe(true);
   expect(halfway.tunerHidden).toBe(false);
@@ -171,17 +170,17 @@ test('the gallery writing and tuner leave through their gates and retrace the fo
   await settle(page);
   const halfway = await snapshot(page);
   expect(
-    halfway.writing.every((value, i) => {
+    halfway.writing.every((value) => {
       const y = parseFloat(value.slice('translateY('.length));
-      return y < 0 && y > (i < 2 ? -10 : -100);
+      return y < 0 && y > -100;
     }),
   ).toBe(true);
   await page.screenshot({ path: info.outputPath('footer-exit-in-progress.png'), scale: 'css' });
   await page.evaluate((y) => scrollTo(0, y), footer);
   await settle(page);
   const after = await snapshot(page);
-  expect(after.writing).toEqual(['translateY(-10%)', 'translateY(-10%)', 'translateY(-100%)']);
-  expect(after.heading.every((row) => row.opacity === 0)).toBe(true);
+  expect(after.writing).toEqual(Array(3).fill('translateY(-100%)'));
+  expect(after.heading.every((row) => row.slotOverflow === 'clip')).toBe(true);
   expect(after.tunerHidden).toBe(true);
   expect(after.tunerInert).toBe(true);
   await page.evaluate((y) => scrollTo(0, y), halfwayY);

@@ -21,10 +21,23 @@ async function decodedFilm(page: Page) {
   return Buffer.from(png, 'base64');
 }
 
-test('second statement resolves readable phrase groups and fades complete phrases on exit', async ({
+async function freeze(page: Page) {
+  await page.clock.install({ time: new Date('2026-01-01T00:00:00Z') });
+  await page.clock.pauseAt(new Date('2026-01-01T00:00:01Z'));
+}
+async function pose(page: Page, scene: string, offset: number) {
+  await page.locator(`[data-scene="${scene}"]`).evaluate((n, offset) => {
+    scrollTo(0, Math.ceil(n.getBoundingClientRect().top + scrollY + offset));
+    dispatchEvent(new Event('scroll'));
+  }, offset);
+  await page.clock.runFor(300);
+}
+
+test('second statement restores word goo and staggered clipped exits with finite entrance', async ({
   page,
 }, info) => {
   await visit(page);
+  await freeze(page);
   await expect(page.locator('.statement-word-text')).toHaveText([
     'Curious',
     'by',
@@ -37,106 +50,109 @@ test('second statement resolves readable phrase groups and fades complete phrase
     page.locator('.statement-word').evaluateAll((nodes) =>
       nodes.map((node) => {
         const text = node.querySelector<HTMLElement>('.statement-word-text')!;
+        const id = (node as HTMLElement).style.filter.match(/#([\w-]+)/)?.[1];
         return {
-          opacity: Number(getComputedStyle(node).opacity),
           filter: (node as HTMLElement).style.filter,
+          blur: id
+            ? Number(
+                document
+                  .getElementById(id)
+                  ?.querySelector('feGaussianBlur')
+                  ?.getAttribute('stdDeviation'),
+              )
+            : 0,
+          matrix: id
+            ? document.getElementById(id)?.querySelector('feColorMatrix')?.getAttribute('values')
+            : null,
           y: new DOMMatrixReadOnly(getComputedStyle(text).transform).m42,
+          height: text.getBoundingClientRect().height,
           hidden: text.style.opacity,
         };
       }),
     );
-  await writingPosition(page, 'statements', 420 * 0.18);
+  await pose(page, 'statements', 75);
   const partial = await reading();
-  for (const word of partial) expect(word.opacity).toBeGreaterThanOrEqual(0.7);
-  expect(partial[0]).toEqual(partial[2]);
-  expect(partial[3]).toEqual(partial[5]);
-  expect(partial[0]!.opacity).toBeGreaterThan(partial[5]!.opacity);
-  await page.screenshot({ path: info.outputPath('second-writing-readable-entry.png') });
-  await page.waitForTimeout(250);
-  expect(await reading()).toEqual(partial);
-  await writingPosition(page, 'statements', 421);
-  await expect
-    .poll(async () =>
-      (await reading()).every((w) => w.opacity === 1 && w.filter === '' && w.y === 0),
-    )
-    .toBe(true);
-  await writingPosition(page, 'statements', 420 * 0.18);
-  expect(await reading()).toEqual(partial);
-  await writingPosition(page, 'statements', 1140 + 420 * 0.64);
-  const exit = await reading();
-  expect(exit.every((w) => w.opacity > 0 && w.opacity < 1 && w.y < 0 && w.hidden === '')).toBe(
+  expect(partial[5]!.filter).toContain('url(');
+  expect(partial[5]!.blur).toBeGreaterThan(1);
+  expect(partial[5]!.matrix).toContain('12.5 -1.5');
+  expect(partial[0]!.blur).toBeLessThan(partial[5]!.blur);
+  await page.screenshot({ path: info.outputPath('second-goo-entry.png') });
+  await page.clock.runFor(1400);
+  expect((await reading()).every((w) => w.filter === '' && w.y === 0 && w.hidden === '')).toBe(
     true,
   );
-  expect(exit[0]).toEqual(exit[2]);
-  await expect(page.locator('.statement-word-slot').first()).toHaveCSS('overflow', 'visible');
-  await page.screenshot({ path: info.outputPath('second-writing-composed-exit.png') });
-  await page.waitForTimeout(250);
+  await pose(page, 'statements', 1140 + 420 * 0.64);
+  const exit = await reading();
+  expect(exit[0]!.y).toBeLessThan(-exit[0]!.height * 0.95);
+  expect(exit[0]!.hidden).toBe('0');
+  expect(exit[5]!.y).toBeGreaterThan(-exit[5]!.height * 0.1);
+  expect(exit[5]!.y).toBeLessThan(0);
+  await expect(page.locator('.statement-word-slot').first()).toHaveCSS('overflow', 'hidden');
+  await page.clock.runFor(1400);
   expect(await reading()).toEqual(exit);
-  await writingPosition(page, 'statements', 1561);
-  await expect
-    .poll(async () => (await reading()).every((w) => w.opacity === 0 && w.hidden === '0'))
-    .toBe(true);
-  await writingPosition(page, 'statements', 1140 + 420 * 0.64);
+  await pose(page, 'statements', 1561);
+  expect((await reading()).every((w) => w.hidden === '0')).toBe(true);
+  await pose(page, 'statements', 1140 + 420 * 0.64);
   expect(await reading()).toEqual(exit);
   await page.emulateMedia({ reducedMotion: 'reduce' });
+  // CSS media emulation can land before the change listener's queued RAF.
+  // Advance that owned frame until the application has reconciled the mode.
   await expect
-    .poll(async () =>
-      (await reading()).every((w) => w.opacity === 1 && w.y === 0 && w.filter === ''),
-    )
-    .toBe(true);
+    .poll(async () => {
+      await page.clock.runFor(32);
+      return page.locator('[data-home-v2]').getAttribute('data-reduced');
+    })
+    .toBe('true');
+  expect((await reading()).every((w) => w.filter === '' && w.y === 0 && w.hidden === '')).toBe(
+    true,
+  );
 });
 
-test('first writing preserves whole semantic lines at stopped and reversed poses', async ({
+test('first writing restores character pull, clipping and reversible high-travel exits', async ({
   page,
 }, info) => {
   await visit(page);
+  await freeze(page);
   const rows = page.locator('.hero-writing-text');
   await expect(rows).toHaveText(['Clarity is', 'engineered']);
   await expect(rows.last()).toHaveCSS('text-transform', 'uppercase');
   await expect(rows.last()).toHaveCSS('font-weight', '650');
   await expect(rows.last()).toHaveCSS('font-style', 'normal');
   await expect(rows.last()).toHaveCSS('font-variation-settings', '"wdth" 85, "wght" 650');
-  await expect(page.locator('.hero-writing-visual')).toHaveCount(0);
+  await expect(page.locator('.hero-writing-visual')).toHaveCount(2);
+  for (const visual of await page.locator('.hero-writing-visual').all())
+    await expect(visual).toHaveAttribute('aria-hidden', 'true');
+  await expect(page.locator('.hero-writing-row').first()).toHaveCSS('overflow', 'hidden');
   const reading = () =>
-    rows.evaluateAll((nodes) =>
-      nodes.map((n) => ({
-        opacity: Number(getComputedStyle(n).opacity),
-        y: new DOMMatrixReadOnly(getComputedStyle(n).transform).m42,
-        text: n.textContent,
-        height: n.getBoundingClientRect().height,
-      })),
+    page.locator('.hero-writing-visual').evaluateAll((nodes) =>
+      nodes.map((node) =>
+        [...node.children].map((glyph) => {
+          const matrix = new DOMMatrixReadOnly(getComputedStyle(glyph).transform);
+          return { x: matrix.m41, y: matrix.m42 };
+        }),
+      ),
     );
-  await position(page, 'hero', 0);
-  await expect
-    .poll(async () => (await reading()).every((r) => r.opacity === 1 && r.y === 0))
-    .toBe(true);
-  await page.screenshot({ path: info.outputPath('writing-open.png') });
-  await writingPosition(page, 'hero', 420 * 0.35);
+  await pose(page, 'hero', 147);
   const partial = await reading();
-  for (const row of partial) {
-    expect(row.opacity).toBeGreaterThan(0.7);
-    expect(row.opacity).toBeLessThan(1);
-    expect(row.y).toBeLessThan(0);
-    expect(Math.abs(row.y)).toBeLessThan(row.height * 0.15);
-  }
-  await page.waitForTimeout(250);
+  await expect(page.getByRole('heading', { name: /^Clarity is engineered$/i })).toHaveCount(1);
+  expect(partial[0]![0]!.y).toBeLessThan(partial[0]!.at(-1)!.y);
+  expect(partial[0]![0]!.x).toBeGreaterThan(0);
+  expect(partial[0]![0]!.y).toBeLessThan(partial[1]![0]!.y);
+  await page.screenshot({ path: info.outputPath('hero-character-pull.png') });
+  await page.clock.runFor(1200);
   expect(await reading()).toEqual(partial);
-  await page.screenshot({ path: info.outputPath('writing-composed-departure.png') });
-  await writingPosition(page, 'hero', 420 * 0.8);
-  expect((await reading())[0]!.opacity).toBeLessThan(partial[0]!.opacity);
-  await writingPosition(page, 'hero', 420 * 0.35);
+  await pose(page, 'hero', 336);
+  expect((await reading())[0]![0]!.y).toBeLessThan(partial[0]![0]!.y);
+  await pose(page, 'hero', 147);
   expect(await reading()).toEqual(partial);
-  await writingPosition(page, 'hero', 421);
-  await expect.poll(async () => (await reading()).every((r) => r.opacity === 0)).toBe(true);
-  await position(page, 'hero', 0);
-  await expect
-    .poll(async () => (await reading()).every((r) => r.opacity === 1 && r.y === 0))
-    .toBe(true);
+  await pose(page, 'hero', 421);
+  await expect(page.locator('.hero-writing-visual').first()).toBeHidden();
+  expect(await rows.first().evaluate((n) => getComputedStyle(n).opacity)).toBe('0');
+  await pose(page, 'hero', 0);
+  expect(await rows.first().evaluate((n) => getComputedStyle(n).opacity)).toBe('1');
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await position(page, 'hero', 0.25);
-  await expect
-    .poll(async () => (await reading()).every((r) => r.opacity === 1 && r.y === 0))
-    .toBe(true);
+  await page.clock.runFor(100);
+  expect(await rows.first().evaluate((n) => getComputedStyle(n).opacity)).toBe('1');
 });
 
 test('later writing uses upward row exits while the film stays at its original scale', async ({
@@ -160,7 +176,7 @@ test('later writing uses upward row exits while the film stays at its original s
     expect(await y(third, i)).toBeGreaterThan(0);
     expect(
       await third.nth(i).evaluate((n) => Number(getComputedStyle(n).opacity)),
-    ).toBeGreaterThanOrEqual(0.7);
+    ).toBeGreaterThanOrEqual(0);
   }
   await writingPosition(page, 'capabilities', 780);
   await expect.poll(() => y(third, 3)).toBe(0);

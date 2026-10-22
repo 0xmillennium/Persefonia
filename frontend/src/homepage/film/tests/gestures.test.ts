@@ -79,7 +79,11 @@ it.each([0, 220, 450])(
   'touch motion after %dms cancels a candidate without claiming native pan',
   (delay) => {
     let now = 0;
-    const windowTarget = Object.assign(new EventTarget(), { setTimeout, clearTimeout });
+    const windowTarget = Object.assign(new EventTarget(), {
+      setTimeout,
+      clearTimeout,
+      closest: () => null,
+    });
     const root = Object.assign(new EventTarget(), {
       closest: () => null,
       setPointerCapture() {},
@@ -129,6 +133,85 @@ it.each([0, 220, 450])(
       touches: [{ identifier: 1, clientX: 103, clientY: 570 }],
     });
     expect(move.defaultPrevented).toBe(false);
+    expect(hold.pressed).toBe(false);
+    expect(hold.cycles).toBe(0);
+    gestures.dispose();
+  },
+);
+it.each([
+  { duration: 100, movement: 0, end: 'pointerup', toggles: 1, recovering: false },
+  { duration: 500, movement: 0, end: 'pointerup', toggles: 0, recovering: false },
+  { duration: 100, movement: 20, end: 'pointerup', toggles: 0, recovering: false },
+  { duration: 100, movement: 0, end: 'pointercancel', toggles: 0, recovering: false },
+  { duration: 100, movement: 0, end: 'pointerup', toggles: 0, recovering: true },
+])(
+  'background tap arbitration: $duration ms, $movement px, $end, recovery=$recovering',
+  ({ duration, movement, end, toggles, recovering }) => {
+    let now = 0,
+      actual = 0;
+    const windowTarget = Object.assign(new EventTarget(), {
+      setTimeout,
+      clearTimeout,
+      closest: () => null,
+    });
+    const root = Object.assign(new EventTarget(), {
+      closest: () => null,
+      setPointerCapture() {},
+      hasPointerCapture: () => false,
+      releasePointerCapture() {},
+    });
+    vi.stubGlobal('window', windowTarget);
+    vi.stubGlobal('document', { documentElement: { dataset: {} } });
+    vi.stubGlobal('performance', { now: () => now });
+    const hold = new Hold();
+    const gestures = filmGestures(
+      root as unknown as HTMLElement,
+      hold,
+      new HoldClock(),
+      () => ({
+        enabled: true,
+        suspended: false,
+        disposed: false,
+        first: false,
+        reduced: false,
+        visible: true,
+        covered: false,
+        width: 390,
+        height: 850,
+        film: 'waterfall',
+        prefetchedFrom: null,
+      }),
+      {
+        toggleMotion() {
+          actual++;
+        },
+        invalidate() {},
+        request() {},
+        changed() {},
+        retry() {
+          return recovering;
+        },
+        prefetch() {},
+        motion() {},
+      },
+    );
+    const fire = (target: EventTarget, type: string, x: number) => {
+      const event = Object.assign(new Event(type), {
+        pointerId: 1,
+        pointerType: 'touch',
+        clientX: x,
+        clientY: 600,
+        button: 0,
+        isPrimary: true,
+      });
+      Object.defineProperty(event, 'timeStamp', { value: now });
+      target.dispatchEvent(event);
+    };
+    fire(root, 'pointerdown', 100);
+    now = duration;
+    fire(windowTarget, 'pointermove', 100 + movement);
+    fire(windowTarget, end, 100 + movement);
+    expect(actual).toBe(toggles);
     expect(hold.pressed).toBe(false);
     expect(hold.cycles).toBe(0);
     gestures.dispose();

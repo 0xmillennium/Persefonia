@@ -1,3 +1,4 @@
+import { slitPosition } from '../../shared/motion/reveal';
 import { windowProgress } from '../contracts/progress';
 import { CURTAIN_START, GALLERY_HANDOFF } from '../contracts/choreography';
 
@@ -75,13 +76,9 @@ export function laterWriting(root: HTMLElement) {
         line.style.removeProperty('opacity');
         return;
       }
-      const emphasis = easeOut(
-        windowProgress(entry, stagger * i * 0.4, stagger * i * 0.4 + duration),
-      );
-      const y = (1 - easeOut(entry)) * 8 - easeIn(exit) * 10;
+      const y = slitPosition(windowProgress(entry, stagger * i, stagger * i + duration), exit);
       line.style.transform = `translateY(${y}%)`;
-      line.style.opacity =
-        entry === 1 && exit === 0 ? '' : String((0.72 + emphasis * 0.28) * (1 - easeIn(exit)));
+      line.style.opacity = Math.abs(y) > 95 ? '0' : '';
     });
   }
   return {

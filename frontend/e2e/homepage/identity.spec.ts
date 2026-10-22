@@ -19,10 +19,12 @@ test('compact identity activation reaches the authored M and resets accessibly',
   await expect.poll(() => mark.evaluate((node) => Number(getComputedStyle(node).opacity))).toBe(0);
 });
 
-test('logo entrance retraces each piece when scrolling backward and stops with the scroll', async ({
+test('logo entrance completes with stopped input, preserves stagger and gives authored exits priority', async ({
   page,
 }, info) => {
   await visit(page);
+  await page.clock.install({ time: new Date('2026-01-01T00:00:00Z') });
+  await page.clock.pauseAt(new Date('2026-01-01T00:00:01Z'));
   const slots = page.locator('[data-identity-slot]');
   const state = () =>
     slots.evaluateAll((nodes) =>
@@ -31,7 +33,7 @@ test('logo entrance retraces each piece when scrolling backward and stops with t
         clipped: slot.hasAttribute('clip-path'),
       })),
     );
-  const at = async (p: number) => {
+  const move = async (p: number) => {
     await page.locator('[data-scene="mark"]').evaluate((node, p) => {
       const gap = Number.parseFloat(
         document
@@ -40,65 +42,80 @@ test('logo entrance retraces each piece when scrolling backward and stops with t
       );
       const y = node.getBoundingClientRect().top + scrollY - gap + gap * p;
       scrollTo(0, p === 0 ? Math.floor(y) : Math.ceil(y));
+      dispatchEvent(new Event('scroll'));
     }, p);
-    await settlePresentation(page);
+    await page.clock.runFor(300);
   };
-  await at(0);
-  const closed = await state();
-  expect(closed.every((piece) => piece.clipped && piece.y > 0)).toBe(true);
-  await at(0.45);
-  await expect
-    .poll(async () => (await state()).some((piece, i) => piece.y > 0 && piece.y < closed[i]!.y))
-    .toBe(true);
-  const partial = await state();
-  const relative = partial.map((piece, i) => piece.y / closed[i]!.y);
-  expect(Math.max(...relative) - Math.min(...relative)).toBeGreaterThan(0.1);
-  await page.waitForTimeout(250);
-  expect(await state()).toEqual(partial);
-  expect(
-    await page
+  const formed = () =>
+    state().then((pieces) => pieces.every((piece) => piece.y === 0 && !piece.clipped));
+  const noRunningAnimation = () =>
+    page
       .locator('[data-physical-identity] svg')
       .evaluate((node) =>
         node
           .getAnimations({ subtree: true })
-          .some((animation) => animation.playState === 'running'),
-      ),
-  ).toBe(false);
+          .every((animation) => animation.playState !== 'running'),
+      );
+  await move(0);
+  const closed = await state();
+  expect(closed).toHaveLength(8);
+  expect(closed.every((piece) => piece.clipped && piece.y > 0)).toBe(true);
+  await move(0.2);
+  const partial = await state();
+  expect(partial.some((piece, i) => piece.y > 0 && piece.y < closed[i]!.y)).toBe(true);
+  const relative = partial.map((piece, i) => piece.y / closed[i]!.y);
+  expect(Math.max(...relative) - Math.min(...relative)).toBeGreaterThan(0.1);
+  expect(await noRunningAnimation()).toBe(true);
   await page.screenshot({ path: info.outputPath('logo-entry-partial.png') });
-  await at(1);
-  await expect
-    .poll(async () => (await state()).every((piece) => piece.y === 0 && !piece.clipped))
-    .toBe(true);
-  await at(0.45);
-  await expect.poll(state).toEqual(partial);
-  await page.screenshot({ path: info.outputPath('logo-entry-reversed.png') });
-  await at(0.2);
-  const earlier = await state();
-  expect(earlier.every((piece, i) => piece.y >= partial[i]!.y)).toBe(true);
-  expect(earlier.some((piece, i) => piece.y > partial[i]!.y)).toBe(true);
-  await at(0.45);
-  await expect.poll(state).toEqual(partial);
-  await at(0);
-  await expect.poll(state).toEqual(closed);
-  await at(0.45);
-  await expect.poll(state).toEqual(partial);
+  await page.clock.runFor(300);
+  const advancing = await state();
+  expect(advancing.every((piece, i) => piece.y <= partial[i]!.y)).toBe(true);
+  expect(advancing.some((piece, i) => piece.y < partial[i]!.y)).toBe(true);
+  await page.clock.runFor(1800);
+  expect(await formed()).toBe(true);
+  await move(0.1);
+  expect(await formed()).toBe(true);
+  await move(0);
+  expect(await state()).toEqual(closed);
+  await move(0.2);
+  expect((await state()).some((piece) => piece.y > 0)).toBe(true);
+  const exitAt = async (offset: number) => {
+    await page.locator('[data-scene="mark"]').evaluate((node, offset) => {
+      scrollTo(0, Math.ceil(node.getBoundingClientRect().top + scrollY + offset));
+      dispatchEvent(new Event('scroll'));
+    }, offset);
+    await page.clock.runFor(300);
+  };
+  await exitAt(1450);
+  const exit = await state();
+  expect(exit.every((piece) => piece.clipped && piece.y > 0)).toBe(true);
+  const travel = exit.map((piece, i) => piece.y / closed[i]!.y);
+  expect(Math.max(...travel) - Math.min(...travel)).toBeLessThan(0.00001);
+  await page.clock.runFor(1800);
+  expect(await state()).toEqual(exit);
+  await exitAt(1250);
+  expect((await state()).every((piece, i) => piece.y < exit[i]!.y)).toBe(true);
+  await exitAt(1450);
+  expect(await state()).toEqual(exit);
+  await page.screenshot({ path: info.outputPath('logo-exit-reversed.png') });
+  await move(0.2);
+  expect(await formed()).toBe(true);
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await expect
-    .poll(async () => (await state()).every((piece) => piece.y === 0 && !piece.clipped))
-    .toBe(true);
+  await page.clock.runFor(100);
+  expect(await formed()).toBe(true);
   expect(
     await page
       .locator('[data-physical-identity] svg')
       .evaluate((node) => node.getAnimations({ subtree: true }).length),
   ).toBe(0);
   await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.clock.runFor(100);
   await expect(page.locator('[data-home-v2]')).toHaveAttribute('data-reduced', 'false');
-  await at(0.45);
-  // Re-measuring after a mode change can vary native matrices below a thousandth
-  // of a pixel; clip state and ordinary forward/backward retracing remain exact.
-  await expect
-    .poll(state)
-    .toEqual(partial.map((piece) => ({ ...piece, y: expect.closeTo(piece.y, 3) })));
+  await move(0);
+  expect(await state()).toEqual(closed);
+  await move(0.2);
+  await page.clock.runFor(1800);
+  expect(await formed()).toBe(true);
 });
 
 test('physical identity responds to pointer contact and restores on scene exit', async ({

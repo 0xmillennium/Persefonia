@@ -25,17 +25,17 @@ export function mountFooter(root: HTMLElement) {
     node.inert = !available;
   };
   return {
-    update(phase: number, reduced: boolean) {
+    update(phase: number, reduced: boolean, writingPhase = phase) {
       for (const row of rows) {
-        const p = reduced ? 1 : footerRowProgress(phase, row.index, row.detail);
+        const p = reduced ? 1 : footerRowProgress(writingPhase, row.index, row.detail);
         if (reduced) {
           row.rise.style.removeProperty('transform');
           row.rise.style.removeProperty('opacity');
         } else {
-          row.rise.style.transform = `translateY(${Math.pow(1 - p, 5) * 8}%)`;
-          row.rise.style.opacity = String(0.72 + p * 0.28);
+          row.rise.style.transform = `translateY(${Math.pow(1 - p, 5) * 100}%)`;
+          row.rise.style.opacity = p === 0 ? '0' : '1';
         }
-        availability(row.node, reduced || phase >= 0);
+        availability(row.node, p === 1);
       }
       const opacity = windowProgress(phase, 0.5, 1);
       const stripOpacity = windowProgress(phase, -0.05, 0.15);

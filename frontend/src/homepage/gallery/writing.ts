@@ -24,9 +24,8 @@ export function galleryWriting(root: HTMLElement) {
         return;
       }
       lines.forEach((line, i) => {
-        const emphasis = windowProgress(entry, i * 0.12, 0.76 + i * 0.12);
-        line.style.transform = `translateY(${(1 - entry) * 8 - exit * 10}%)`;
-        line.style.opacity = String((0.72 + 0.28 * emphasis) * (1 - exit));
+        line.style.transform = `translateY(${slitPosition(windowProgress(entry, i * 0.12, 0.76 + i * 0.12), exit)}%)`;
+        line.style.removeProperty('opacity');
       });
       const y = slitPosition(windowProgress(entry, 0.24, 1), exit);
       button.style.transform = `translateY(${y}%)`;

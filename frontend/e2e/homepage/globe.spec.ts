@@ -2,23 +2,27 @@ import { expect, test } from '../support/test';
 import { visit, position } from '../support/scenes';
 import { difference } from '../support/pixels';
 
-test('visible globe controls rotate, pause and reset without dragging', async ({ page }) => {
+test('globe surface pauses persistently and turns without dragging or button chrome', async ({
+  page,
+}) => {
   await visit(page);
   await position(page, 'location', 0.6);
   await expect(page.locator('.location-system')).toHaveAttribute('data-ready', 'true');
-  const pause = page.getByRole('button', { name: 'Pause rotation', exact: true });
-  await expect(pause).toBeVisible();
-  await pause.click();
-  await expect(page.getByRole('button', { name: 'Resume rotation', exact: true })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
-  const before = await page.locator('#globe').screenshot();
-  await page.getByRole('button', { name: 'Rotate left', exact: true }).click();
-  expect(difference(before, await page.locator('#globe').screenshot()).changed).toBeGreaterThan(0);
-  await page.getByRole('button', { name: 'Rotate right', exact: true }).press('Enter');
-  await page.getByRole('button', { name: 'Reset view', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Reset view', exact: true })).toBeFocused();
+  await expect(page.locator('.globe-controls,[data-background-motion]')).toHaveCount(0);
+  const globe = page.locator('#globe');
+  const box = (await globe.boundingBox())!;
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  const before = await globe.screenshot();
+  await page.waitForTimeout(250);
+  expect(difference(before, await globe.screenshot()).changed).toBe(0);
+  await page.mouse.click(box.x + box.width * 0.25, box.y + box.height / 2);
+  expect(difference(before, await globe.screenshot()).changed).toBeGreaterThan(0);
+  const turned = await globe.screenshot();
+  await page.waitForTimeout(250);
+  expect(difference(turned, await globe.screenshot()).changed).toBe(0);
+  await globe.focus();
+  await page.keyboard.press('Home');
+  await expect(page.locator('#location-panel')).toHaveAttribute('data-open', 'true');
   await expect(page.locator('[data-hold-countdown]')).toBeHidden();
 });
 

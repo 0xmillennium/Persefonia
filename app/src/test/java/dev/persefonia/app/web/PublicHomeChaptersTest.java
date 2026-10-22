@@ -56,9 +56,10 @@ class PublicHomeChaptersTest {
         assertThat(html).doesNotContain("id=\"architecture\"", "id=\"about\"",
                 "href=\"#about\"", "href=\"#architecture\"", "class=\"film-controls\"",
                 "data-film-switch", "data-film-retry", "id=\"find-location\"");
-        assertThat(html).contains("role=\"group\" aria-label=\"Globe controls\"",
-                "id=\"tilt-up\" aria-label=\"Tilt up\"", "id=\"pause\" aria-pressed=\"false\"",
-                "id=\"reset-view\"", "Pause rotation", "Reset view");
+        assertThat(html).doesNotContain("globe-controls", "data-background-motion",
+                "id=\"rotate-left\"", "id=\"rotate-right\"", "id=\"tilt-up\"",
+                "id=\"tilt-down\"", "id=\"pause\"", "id=\"reset-view\"");
+        assertThat(html).contains("Tap the globe edges", "Space to pause or resume rotation");
         assertThat(html).contains("class=\"home-cinema__image\" aria-hidden=\"true\"");
         assertThat(html).doesNotContain("[Published article title]", "[Published research title]", "ref. pending");
     }

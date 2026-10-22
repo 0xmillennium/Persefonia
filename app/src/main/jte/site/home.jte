@@ -139,7 +139,7 @@
         <section class="home-scene home-contact" id="contact" data-scene="location" aria-labelledby="contact-title" tabindex="-1"><div class="scene-face location-face">
             <div class="location-links"><h2 id="contact-title" class="sr-only">${page.copy().contactTitle()}</h2><nav aria-label="Explore"><a href="/${page.htmlLanguage()}/projects">${page.copy().projects()}</a><a href="/search">${page.copy().writing()}</a><a href="/contact">${page.copy().contact()}</a></nav><p>Istanbul, Türkiye</p><a class="contact-entry" href="/contact">${page.copy().getInTouch()} ↗</a></div>
             <div class="location-system" lang="en">    <div class="location-globe" data-input-owner>
-      <canvas role="img" id="globe" aria-label="Interactive Earth. Use arrow keys to rotate and tilt." aria-describedby="globe-instructions" tabindex="-1"></canvas>
+      <canvas role="img" id="globe" aria-label="Interactive Earth. Tap edges to turn or tilt, center to pause. Arrow keys rotate and tilt." aria-describedby="globe-instructions" tabindex="-1"></canvas>
       <span id="marker" aria-hidden="true" hidden>
         <span class="marker-core"></span>
         <span class="marker-signal">
@@ -158,21 +158,12 @@
       </div>
       <p id="fallback">Istanbul, Türkiye · 41.0082° N, 28.9784° E<br>The interactive globe requires JavaScript and WebGL 2.</p>
     </div>
-    <p id="globe-instructions" class="sr-only">Drag to turn and tilt. On touch screens, drag the globe to turn and tilt; swipe outside the globe to scroll. When the globe is focused, use arrow keys to turn and tilt, Space to pause or resume rotation, and Home to find Istanbul.</p>
-    <div class="controls globe-controls" role="group" aria-label="Globe controls">
-      <button type="button" id="rotate-left" aria-label="Rotate left" disabled>←</button>
-      <button type="button" id="rotate-right" aria-label="Rotate right" disabled>→</button>
-      <button type="button" id="tilt-up" aria-label="Tilt up" disabled>↑</button>
-      <button type="button" id="tilt-down" aria-label="Tilt down" disabled>↓</button>
-      <button type="button" id="pause" aria-pressed="false" disabled>Pause rotation</button>
-      <button type="button" id="reset-view" disabled>Reset view</button>
-    </div>
+    <p id="globe-instructions" class="sr-only">Tap the globe edges to turn or tilt, or its center to pause or resume rotation. Drag to turn and tilt. On touch screens, drag the globe to turn and tilt; swipe outside the globe to scroll. When the globe is focused, use arrow keys to turn and tilt, Space to pause or resume rotation, and Home to find Istanbul.</p>
 </div>
             <div class="location-strip"><span>${page.ownerAlias()} / Persefonia</span><a href="/search">${page.copy().searchPublished()}</a>@for(var link : navigationLinks)<a lang="en" href="${link.url()}">${link.label()}</a>@endfor<a href="#identity">${page.copy().backToTop()} ↑</a></div>
         </div></section>
         <div class="home-staircase" aria-hidden="true" data-scene-wipe><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
         <span data-film-status lang="en" hidden></span>
-        <button class="background-motion" type="button" data-background-motion lang="en" aria-pressed="false" hidden>Pause background motion</button>
         <output class="sr-only" data-film-notice lang="en" role="status" aria-live="polite"></output>
         <output data-hold-countdown class="hold-countdown" lang="en" aria-live="polite" hidden></output>
     </main>

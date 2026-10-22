@@ -89,23 +89,11 @@ async function assertStructure(page: Page, language: string) {
   );
 }
 async function assertGlobeControls(page: Page, unavailable = false): Promise<void> {
-  const controls = page.locator('.location-system .globe-controls');
-  await expect(controls).toHaveCount(1);
-  await expect(controls).toHaveAttribute('role', 'group');
-  await expect(controls).toHaveAttribute('aria-label', 'Globe controls');
-  await expect(controls.locator('button')).toHaveCount(6);
-  for (const name of [
-    'Rotate left',
-    'Rotate right',
-    'Tilt up',
-    'Tilt down',
-    'Pause rotation',
-    'Reset view',
-  ]) {
-    const button = controls.getByRole('button', { name, exact: true, includeHidden: true });
-    await expect(button).toHaveCount(1);
-    if (unavailable) await expect(button).toBeDisabled();
-  }
+  await expect(page.locator('.globe-controls,[data-background-motion]')).toHaveCount(0);
+  const canvas = page.locator('#globe');
+  await expect(canvas).toHaveAttribute('aria-describedby', 'globe-instructions');
+  await expect(page.locator('#globe-instructions')).toContainText('Tap the globe edges');
+  if (unavailable) await expect(canvas).toHaveAttribute('tabindex', '-1');
 }
 async function scene(page: Page, name: string, p = name === 'gallery' ? 0.55 : 0.3) {
   await page

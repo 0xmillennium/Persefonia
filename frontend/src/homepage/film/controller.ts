@@ -96,7 +96,6 @@ export function mountFilm({ root, ready, selectionChanged, mediaChanged }: FilmO
   let loopDelivery = loopTier(width, height);
   const loop = new ResponsiveLoop(environment, loopDelivery, () => wake());
   const posterPose = () => (expansion < 1 ? ('opening' as const) : ('final' as const));
-  const motionControl = root.querySelector<HTMLButtonElement>('[data-background-motion]');
   let userPaused = false;
   const presentation = new FilmPresentation(root, canvas, video, loop, () => wake());
   const syncLoop = (effects = false) => {
@@ -106,24 +105,27 @@ export function mountFilm({ root, ready, selectionChanged, mediaChanged }: FilmO
       selected && filmVisible && !covered && !suspended && !menu && !reduced.matches && !userPaused,
       effects && selected,
     );
-    if (motionControl) {
-      motionControl.hidden = !selected || !filmVisible || covered || menu;
-      motionControl.disabled = reduced.matches;
-      motionControl.setAttribute('aria-pressed', String(userPaused || reduced.matches));
-      const label = reduced.matches
-        ? 'Background motion off (reduced motion)'
-        : userPaused
-          ? 'Resume background motion'
-          : 'Pause background motion';
-      if (motionControl.textContent !== label) motionControl.textContent = label;
-    }
   };
-  motionControl?.addEventListener(
-    'click',
-    () => {
-      userPaused = !userPaused;
-      syncLoop();
-      wake();
+  const toggleMotion = () => {
+    if (!isLoopBackground(transport.film) || !filmVisible || covered || suspended) return;
+    userPaused = !userPaused;
+    syncLoop();
+    wake();
+  };
+  root.addEventListener(
+    'keydown',
+    (event) => {
+      if (
+        event.target === root &&
+        event.key.toLowerCase() === 'p' &&
+        !event.repeat &&
+        !event.ctrlKey &&
+        !event.metaKey &&
+        !event.altKey
+      ) {
+        event.preventDefault();
+        toggleMotion();
+      }
     },
     options,
   );
@@ -179,7 +181,7 @@ export function mountFilm({ root, ready, selectionChanged, mediaChanged }: FilmO
       (reduced.matches
         ? 'Press F while the main content is focused to change the static film image.'
         : 'Hold the background to change film, or press F while the main content is focused.') +
-      ' Repeat to retry if a film is unavailable.';
+      ' Tap the background or press P to pause or resume background motion. Repeat F or hold to retry if a film is unavailable.';
     if (instructions.textContent !== instruction) instructions.textContent = instruction;
     const elapsed = previous ? (now - previous) / 1000 : 0;
     previous = now;
@@ -273,10 +275,15 @@ export function mountFilm({ root, ready, selectionChanged, mediaChanged }: FilmO
     {
       request,
       changed: wake,
+      toggleMotion,
       invalidate() {
         presentation.invalidate();
       },
       retry(modality) {
+        const recoveringLoop =
+          modality === 'pointer' &&
+          isLoopBackground(transport.film) &&
+          (loop.failed || loop.blocked);
         if (video.hasError) {
           video.retry();
           hold.retry();
@@ -285,6 +292,7 @@ export function mountFilm({ root, ready, selectionChanged, mediaChanged }: FilmO
           isLoopBackground(modality === 'pointer' ? transport.film : nextBackground(transport.film))
         )
           loop.retry();
+        return recoveringLoop;
       },
       prefetch(from) {
         prefetchedFrom = from;
@@ -333,7 +341,7 @@ export function mountFilm({ root, ready, selectionChanged, mediaChanged }: FilmO
   );
   initialize();
   instructions.hidden = false;
-  root.setAttribute('aria-keyshortcuts', 'F');
+  root.setAttribute('aria-keyshortcuts', 'F P');
   root.setAttribute('aria-describedby', 'film-instructions');
   return {
     get frameInterval() {
