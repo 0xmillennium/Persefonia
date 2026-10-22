@@ -55,6 +55,8 @@ function mountHomepage(scope: DisposalScope): () => void {
   });
   const touch = matchMedia('(pointer: coarse)');
   scope.add(() => historyState.dispose());
+  let pendingDestination = historyState.historyVisit ? '' : location.hash;
+  let handledHash = location.hash;
   const pacing = writingPacing();
   scope.add(() => {
     lifetime.abort();
@@ -268,13 +270,17 @@ function mountHomepage(scope: DisposalScope): () => void {
     if (!preserveGlide) scrolling.cancel();
     measurements.measure();
     film?.resize();
-    writing.measure();
     perspective.measure();
     measurements.resizeSurface();
     schedule();
     restorePosition();
   }
   function restorePosition() {
+    if (readiness.complete && pendingDestination && !historyState.restoring) {
+      const hash = pendingDestination;
+      pendingDestination = '';
+      return navigate(hash);
+    }
     historyState.restore(readiness.complete, (y) => {
       filmPacing.reset();
       filmHandoff.skip();
@@ -282,6 +288,7 @@ function mountHomepage(scope: DisposalScope): () => void {
       scrollTo({ top: y, behavior: 'instant' });
       schedule();
     });
+    return false;
   }
   const readiness = homepageReadiness(root, loading, historyState.historyVisit, reduced, measure);
   scope.add(() => readiness.dispose());
@@ -304,6 +311,7 @@ function mountHomepage(scope: DisposalScope): () => void {
   function update(now: number) {
     raf = 0;
     if (disposed || suspended) return;
+    if (restorePosition()) return;
     // Keep the derived presentation flag consistent with the current query.
     // Scene wakeups and BFCache restoration reconcile it as well as change
     // notifications; stale derived state must not control measured measurements.geometry.
@@ -448,27 +456,83 @@ function mountHomepage(scope: DisposalScope): () => void {
     },
     options,
   );
+  function navigate(hash: string, push = false) {
+    if (!['#work', '#writing', '#contact'].includes(hash)) return false;
+    if (!readiness.complete) {
+      pendingDestination = hash;
+      return false;
+    }
+    historyState.cancel();
+    scrolling.cancel();
+    filmHandoff.skip();
+    filmPacing.reset();
+    if (push && location.hash !== hash) {
+      save(true);
+      history.pushState(history.state, '', hash);
+    }
+    handledHash = hash;
+    if (hash !== '#contact') {
+      gallery.select(hash === '#writing' ? 'articles' : 'projects');
+      travel.resetEntry(gallery.count);
+    }
+    viewport.refresh();
+    measure();
+    const target = root.querySelector<HTMLElement>(hash)!;
+    const top = reduced.matches
+      ? target.getBoundingClientRect().top + scrollY
+      : hash === '#contact'
+        ? locationRegion.top + Math.min(viewport.height, locationRegion.height - viewport.height)
+        : travelFirst() + galleryStep() * 3;
+    scrollTo({ top: Math.round(top), behavior: 'instant' });
+    cancelAnimationFrame(raf);
+    update(performance.now());
+    target.focus({ preventScroll: true });
+    save(true);
+    return true;
+  }
+  window.addEventListener(
+    'hashchange',
+    () => {
+      if (location.hash === handledHash) return;
+      pendingDestination = location.hash;
+      schedule();
+    },
+    options,
+  );
+  window.addEventListener(
+    'popstate',
+    () => {
+      handledHash = location.hash;
+      pendingDestination = '';
+      const category = history.state?.homepageV2?.category;
+      if (typeof category === 'string') gallery.select(category);
+      historyState.pageshow(true);
+      if (historyState.restoring) restorePosition();
+      else {
+        pendingDestination = location.hash;
+        schedule();
+      }
+    },
+    options,
+  );
   document.addEventListener(
     'click',
     (e) => {
       const anchor = (e.target as Element).closest<HTMLAnchorElement>('a[href^="#"]');
-      if (!anchor) return;
-      if (anchor.hash === '#work' || anchor.hash === '#writing') {
-        // Apply pending viewport changes before measuring the hash destination.
-        resized();
-        gallery.select(anchor.hash === '#writing' ? 'articles' : 'projects');
-        travel.resetEntry(gallery.count);
-        measure();
+      if (
+        !anchor ||
+        e.defaultPrevented ||
+        e.button !== 0 ||
+        e.ctrlKey ||
+        e.metaKey ||
+        e.shiftKey ||
+        e.altKey ||
+        anchor.target === '_blank' ||
+        anchor.hasAttribute('download')
+      )
+        return;
+      if (navigate(anchor.hash, true)) {
         e.preventDefault();
-        historyState.cancel();
-        filmHandoff.skip();
-        filmPacing.reset();
-        // Match wheelPath's integer stops even in browsers that truncate scroll targets.
-        window.scrollTo({ top: Math.round(travelFirst()), behavior: 'instant' });
-        // Make the destination available before transferring keyboard focus.
-        cancelAnimationFrame(raf);
-        update(performance.now());
-        root.querySelector<HTMLElement>(anchor.hash)?.focus({ preventScroll: true });
       }
     },
     options,

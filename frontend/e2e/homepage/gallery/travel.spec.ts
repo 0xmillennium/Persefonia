@@ -1,3 +1,4 @@
+import { scrollToGalleryPreroll } from '../../support/gallery';
 import { openHomepage } from '../../support/homepage';
 import { expect, test, type Page } from '../../support/test';
 
@@ -9,6 +10,8 @@ async function enter(page: Page, category: string) {
   await expect
     .poll(() => page.locator('.gallery-face').evaluate((node) => (node as HTMLElement).inert))
     .toBe(false);
+  await at(page, 0);
+  await scrollToGalleryPreroll(page);
   await at(page, -3);
   if (category !== 'projects') {
     await notch(page, 1, 3);

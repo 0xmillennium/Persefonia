@@ -1,7 +1,8 @@
 @import dev.persefonia.webadmin.media.AdminMediaListPage
 @param AdminMediaListPage page
-@template.admin.components.pageShell("Media | Persefonia Admin", page.chrome().admin(), page.chrome().navigation(), page.chrome().logoutForm(), false, content = @`
-    <main>
+@param java.util.List<String> adminStylesheetPaths = java.util.List.of()
+@template.admin.components.pageShell("Media | Persefonia Admin", page.chrome().admin(), page.chrome().navigation(), page.chrome().logoutForm(), false, adminStylesheetPaths = adminStylesheetPaths, content = @`
+    <main id="admin-content" tabindex="-1">
         <h1>Media</h1>
         <p><a href="/admin/media/new">Upload media</a></p>
         @if(page.flashMessage() != null)
@@ -10,7 +11,7 @@
         @if(page.assets().isEmpty())
             <p>No media assets yet.</p>
         @else
-            <table>
+            <div class="admin-table-scroll" role="region" aria-label="Scrollable table" tabindex="0"><table>
                 <thead>
                     <tr>
                         <th>Filename</th>
@@ -39,7 +40,7 @@
                     </tr>
                 @endfor
                 </tbody>
-            </table>
+            </table></div>
         @endif
     </main>
 `)

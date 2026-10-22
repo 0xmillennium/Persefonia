@@ -108,6 +108,32 @@ export class GlobeController {
         this.preferences();
       };
       pause?.addEventListener('click', toggleRotation, options);
+      for (const [id, yaw] of [
+        ['rotate-left', -0.16],
+        ['rotate-right', 0.16],
+      ] as const) {
+        this.controlsRoot.querySelector<HTMLButtonElement>(`#${id}`)?.addEventListener(
+          'click',
+          () => {
+            this.entrance.finish();
+            this.input.cancel();
+            this.orientation.drag(yaw, 0);
+            this.invalidate();
+          },
+          options,
+        );
+      }
+      this.controlsRoot.querySelector<HTMLButtonElement>('#reset-view')?.addEventListener(
+        'click',
+        () => {
+          this.entrance.finish();
+          this.input.cancel();
+          this.orientation.reset();
+          this.location.clear();
+          this.invalidate();
+        },
+        options,
+      );
       for (const [id, amount] of [
         ['tilt-up', -0.12],
         ['tilt-down', 0.12],

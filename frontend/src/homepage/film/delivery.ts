@@ -13,6 +13,7 @@ export function filmTier(width: number, height: number, current?: FilmTier): Fil
 }
 
 export function loopTier(width: number, height: number, current?: LoopTier): LoopTier {
+  if (width <= 700 && height > width) return 1280;
   const [left, , right] = filmCoverBox(width, height);
   return right - left > (current === 1920 ? 1320 : 1440) ? 1920 : 1280;
 }

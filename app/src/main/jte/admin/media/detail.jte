@@ -1,8 +1,10 @@
+@import dev.persefonia.webadmin.FieldErrors
 @import dev.persefonia.medialibrary.domain.asset.AssetKind
 @import dev.persefonia.webadmin.media.AdminMediaDetailPage
 @param AdminMediaDetailPage page
-@template.admin.components.pageShell("Media detail | Persefonia Admin", page.chrome().admin(), page.chrome().navigation(), page.chrome().logoutForm(), false, content = @`
-    <main>
+@param java.util.List<String> adminStylesheetPaths = java.util.List.of()
+@template.admin.components.pageShell("Media detail | Persefonia Admin", page.chrome().admin(), page.chrome().navigation(), page.chrome().logoutForm(), false, adminStylesheetPaths = adminStylesheetPaths, content = @`
+    <main id="admin-content" tabindex="-1">
         <h1>${page.asset().summary().originalFilename()}</h1>
         <p><a href="/admin/media">Back to media</a></p>
         @if(page.flashMessage() != null)
@@ -12,9 +14,7 @@
             @for(var error : page.globalErrors())
                 <p role="alert">${error}</p>
             @endfor
-            @for(var error : page.fieldErrors())
-                <p role="alert">${error.field()}: ${error.message()}</p>
-            @endfor
+            @template.admin.components.fieldErrors(page.fieldErrors())
         @endif
 
         <section>
@@ -41,15 +41,15 @@
             <form method="post" action="/admin/media/${page.asset().summary().assetId().value().toString()}">
                 @template.admin.components.csrfField(page.chrome().logoutForm())
                 <label for="visibility">Visibility</label>
-                <select id="visibility" name="visibility">
+                <select id="visibility" name="visibility" aria-invalid="${FieldErrors.has(page.fieldErrors(), "visibility") ? "true" : null}" aria-describedby="${FieldErrors.has(page.fieldErrors(), "visibility") ? "error-visibility" : null}">
                     <option value="PRIVATE" selected="${"PRIVATE".equals(page.form().getVisibility())}">Private</option>
                     <option value="PUBLIC" selected="${"PUBLIC".equals(page.form().getVisibility())}">Public</option>
                 </select>
                 @if(page.asset().summary().kind() == AssetKind.IMAGE)
                     <label for="altText">Alt text</label>
-                    <input id="altText" name="altText" maxlength="500" value="${page.form().getAltText()}">
+                    <input id="altText" name="altText" maxlength="500" value="${page.form().getAltText()}" aria-invalid="${FieldErrors.has(page.fieldErrors(), "altText") ? "true" : null}" aria-describedby="${FieldErrors.has(page.fieldErrors(), "altText") ? "error-altText" : null}">
                     <label for="decorative">
-                        <input id="decorative" name="decorative" type="checkbox" checked="${page.form().isDecorative()}">
+                        <input id="decorative" name="decorative" type="checkbox" checked="${page.form().isDecorative()}" aria-invalid="${FieldErrors.has(page.fieldErrors(), "decorative") ? "true" : null}" aria-describedby="${FieldErrors.has(page.fieldErrors(), "decorative") ? "error-decorative" : null}">
                         Decorative image
                     </label>
                 @endif
@@ -62,7 +62,7 @@
             @if(page.asset().variants().isEmpty())
                 <p>No variants.</p>
             @else
-                <table>
+                <div class="admin-table-scroll" role="region" aria-label="Scrollable table" tabindex="0"><table>
                     <thead><tr><th>Name</th><th>Dimensions</th><th>Type</th><th>Size</th><th>Checksum</th><th>Public route</th></tr></thead>
                     <tbody>
                     @for(var variant : page.asset().variants())
@@ -80,7 +80,7 @@
                         </tr>
                     @endfor
                     </tbody>
-                </table>
+                </table></div>
             @endif
         </section>
 
@@ -89,7 +89,7 @@
             @if(page.asset().validationResults().isEmpty())
                 <p>No validation results.</p>
             @else
-                <table>
+                <div class="admin-table-scroll" role="region" aria-label="Scrollable table" tabindex="0"><table>
                     <thead><tr><th>Rule</th><th>Status</th><th>Message</th><th>Checked</th></tr></thead>
                     <tbody>
                     @for(var result : page.asset().validationResults())
@@ -105,7 +105,7 @@
                         </tr>
                     @endfor
                     </tbody>
-                </table>
+                </table></div>
             @endif
         </section>
     </main>

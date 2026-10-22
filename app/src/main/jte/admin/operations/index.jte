@@ -1,7 +1,8 @@
 @import dev.persefonia.webadmin.operations.AdminOperationsPage
 @param AdminOperationsPage page
-@template.admin.components.pageShell("Operations | Persefonia Admin", page.chrome().admin(), page.chrome().navigation(), page.chrome().logoutForm(), false, content = @`
-    <main>
+@param java.util.List<String> adminStylesheetPaths = java.util.List.of()
+@template.admin.components.pageShell("Operations | Persefonia Admin", page.chrome().admin(), page.chrome().navigation(), page.chrome().logoutForm(), false, adminStylesheetPaths = adminStylesheetPaths, content = @`
+    <main id="admin-content" tabindex="-1">
         <h1>Operations</h1>
 
         <section>
@@ -63,7 +64,7 @@
             @if(page.batches().items().isEmpty())
                 <p>No cache invalidation batches found.</p>
             @else
-                <table>
+                <div class="admin-table-scroll" role="region" aria-label="Scrollable table" tabindex="0"><table>
                     <thead><tr><th>Requested</th><th>Status</th><th>Attention</th><th>Targets</th><th>Attempts</th><th>Latest provider</th><th>Latest result</th><th>Failure reason</th><th>Details</th></tr></thead>
                     <tbody>
                     @for(var batch : page.batches().items())
@@ -80,7 +81,7 @@
                         </tr>
                     @endfor
                     </tbody>
-                </table>
+                </table></div>
             @endif
             <nav aria-label="Cache invalidation pages">
                 @if(page.hasPreviousPage())<a rel="prev" href="${page.previousUrl()}">Previous</a>@endif

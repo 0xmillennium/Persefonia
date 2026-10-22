@@ -1,15 +1,30 @@
 import { startOnFilm } from '../support/homepage';
-import { expect, test } from '../support/test';
+import { expect, test, type Page } from '../support/test';
 import { visit, position, writingPosition, presented } from '../support/scenes';
 import { difference } from '../support/pixels';
 
 test.beforeEach(async ({ page }) => startOnFilm(page));
 
-test('second statement resolves from word blobs and exits through individual slits', async ({
+async function decodedFilm(page: Page) {
+  const png = await page.evaluate(() => {
+    const film = document.querySelector<HTMLElement>('[data-home-v2]')!.dataset.film;
+    const video = [...document.querySelectorAll<HTMLVideoElement>('video.film-presentation')].find(
+      (v) => v.currentSrc.includes(`/${film}.mp4`) && v.readyState >= 2 && !v.seeking,
+    );
+    if (!video) throw new Error('The selected film has no decoded native frame');
+    const canvas = document.createElement('canvas');
+    canvas.width = 160;
+    canvas.height = 90;
+    canvas.getContext('2d')!.drawImage(video, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL('image/png').split(',')[1]!;
+  });
+  return Buffer.from(png, 'base64');
+}
+
+test('second statement resolves readable phrase groups and fades complete phrases on exit', async ({
   page,
 }, info) => {
   await visit(page);
-  await expect(page.locator('[data-home-loader]')).toBeHidden();
   await expect(page.locator('.statement-word-text')).toHaveText([
     'Curious',
     'by',
@@ -21,151 +36,106 @@ test('second statement resolves from word blobs and exits through individual sli
   const reading = () =>
     page.locator('.statement-word').evaluateAll((nodes) =>
       nodes.map((node) => {
-        const filter = (node as HTMLElement).style.filter;
-        const id = filter.match(/#([\w-]+)/)?.[1];
+        const text = node.querySelector<HTMLElement>('.statement-word-text')!;
         return {
-          filter,
-          opacity: (node as HTMLElement).style.opacity,
-          blur: id
-            ? Number(
-                document
-                  .getElementById(id)
-                  ?.querySelector('feGaussianBlur')
-                  ?.getAttribute('stdDeviation'),
-              )
-            : 0,
-          transform: (node.querySelector('.statement-word-text') as HTMLElement).style.transform,
-          hidden: (node.querySelector('.statement-word-text') as HTMLElement).style.opacity,
+          opacity: Number(getComputedStyle(node).opacity),
+          filter: (node as HTMLElement).style.filter,
+          y: new DOMMatrixReadOnly(getComputedStyle(text).transform).m42,
+          hidden: text.style.opacity,
         };
       }),
     );
-  await writingPosition(page, 'statements', -1);
-  await expect
-    .poll(async () =>
-      (await reading()).every(
-        (word) => word.filter.startsWith('url(') && word.opacity === '0.3' && word.blur > 0,
-      ),
-    )
-    .toBe(true);
-  await writingPosition(page, 'statements', 0);
-  await expect(page.locator('.statement-face')).toBeVisible();
   await writingPosition(page, 'statements', 420 * 0.18);
-  await expect
-    .poll(async () => {
-      const words = await reading();
-      return words[0]!.blur < words[5]!.blur * 0.5;
-    })
-    .toBe(true);
-  const first = await reading();
-  await page.screenshot({ path: info.outputPath('second-writing-entry.png') });
+  const partial = await reading();
+  for (const word of partial) expect(word.opacity).toBeGreaterThanOrEqual(0.7);
+  expect(partial[0]).toEqual(partial[2]);
+  expect(partial[3]).toEqual(partial[5]);
+  expect(partial[0]!.opacity).toBeGreaterThan(partial[5]!.opacity);
+  await page.screenshot({ path: info.outputPath('second-writing-readable-entry.png') });
   await page.waitForTimeout(250);
-  expect(await reading()).toEqual(first);
+  expect(await reading()).toEqual(partial);
   await writingPosition(page, 'statements', 421);
   await expect
     .poll(async () =>
-      (await reading()).every(
-        (word) => word.filter === '' && word.opacity === '' && word.transform === '',
-      ),
+      (await reading()).every((w) => w.opacity === 1 && w.filter === '' && w.y === 0),
     )
     .toBe(true);
   await writingPosition(page, 'statements', 420 * 0.18);
-  await expect.poll(reading).toEqual(first);
+  expect(await reading()).toEqual(partial);
   await writingPosition(page, 'statements', 1140 + 420 * 0.64);
-  await expect
-    .poll(async () => {
-      const words = await reading();
-      return words[0]!.hidden === '0' && words[5]!.hidden !== '0';
-    })
-    .toBe(true);
   const exit = await reading();
-  await expect(page.locator('.statement-word-slot').first()).toHaveCSS('overflow', 'hidden');
-  await expect(page.locator('.statement-copy')).toHaveCSS('transform', 'none');
-  await page.screenshot({ path: info.outputPath('second-writing-exit.png') });
+  expect(exit.every((w) => w.opacity > 0 && w.opacity < 1 && w.y < 0 && w.hidden === '')).toBe(
+    true,
+  );
+  expect(exit[0]).toEqual(exit[2]);
+  await expect(page.locator('.statement-word-slot').first()).toHaveCSS('overflow', 'visible');
+  await page.screenshot({ path: info.outputPath('second-writing-composed-exit.png') });
   await page.waitForTimeout(250);
   expect(await reading()).toEqual(exit);
   await writingPosition(page, 'statements', 1561);
-  await expect(page.locator('.statement-bottom')).toHaveCount(0);
   await expect
-    .poll(async () =>
-      (await reading()).every(
-        (word) => word.hidden === '0' && word.transform === 'translateY(-100%)',
-      ),
-    )
+    .poll(async () => (await reading()).every((w) => w.opacity === 0 && w.hidden === '0'))
     .toBe(true);
   await writingPosition(page, 'statements', 1140 + 420 * 0.64);
-  await expect.poll(reading).toEqual(exit);
+  expect(await reading()).toEqual(exit);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await expect
     .poll(async () =>
-      (await reading()).every(
-        (word) =>
-          word.filter === '' && word.opacity === '' && word.hidden === '' && word.transform === '',
-      ),
+      (await reading()).every((w) => w.opacity === 1 && w.y === 0 && w.filter === ''),
     )
     .toBe(true);
 });
 
-test('first writing enters and exits through per-row slits from left to right', async ({
+test('first writing preserves whole semantic lines at stopped and reversed poses', async ({
   page,
 }, info) => {
   await visit(page);
-  await expect(page.locator('[data-home-loader]')).toBeHidden();
-  await expect(page.locator('.hero-writing-text')).toHaveText(['Clarity is', 'engineered']);
-  await expect(page.locator('.hero-writing-text').first()).toHaveCSS('text-transform', 'none');
-  await expect(page.locator('.hero-writing-text').last()).toHaveCSS('text-transform', 'uppercase');
-  for (const selector of ['.hero-writing-text', '.hero-writing-visual']) {
-    await expect(page.locator(selector).last()).toHaveCSS('font-weight', '650');
-    await expect(page.locator(selector).last()).toHaveCSS('font-style', 'normal');
-    await expect(page.locator(selector).last()).toHaveCSS(
-      'font-variation-settings',
-      '"wdth" 85, "wght" 650',
-    );
-  }
-  await expect(page.locator('.hero-writing-visual').last()).toHaveCSS(
-    'text-transform',
-    'uppercase',
-  );
+  const rows = page.locator('.hero-writing-text');
+  await expect(rows).toHaveText(['Clarity is', 'engineered']);
+  await expect(rows.last()).toHaveCSS('text-transform', 'uppercase');
+  await expect(rows.last()).toHaveCSS('font-weight', '650');
+  await expect(rows.last()).toHaveCSS('font-style', 'normal');
+  await expect(rows.last()).toHaveCSS('font-variation-settings', '"wdth" 85, "wght" 650');
+  await expect(page.locator('.hero-writing-visual')).toHaveCount(0);
   const reading = () =>
-    page.locator('.hero-writing-row').evaluateAll((nodes) =>
-      nodes.map((node) => ({
-        opacity: (node.querySelector('.hero-writing-text') as HTMLElement).style.opacity,
-        hidden: (node.querySelector('.hero-writing-visual') as HTMLElement).hidden,
-        transforms: [...node.querySelectorAll<HTMLElement>('.hero-writing-visual>span')].map(
-          (glyph) => glyph.style.transform,
-        ),
+    rows.evaluateAll((nodes) =>
+      nodes.map((n) => ({
+        opacity: Number(getComputedStyle(n).opacity),
+        y: new DOMMatrixReadOnly(getComputedStyle(n).transform).m42,
+        text: n.textContent,
+        height: n.getBoundingClientRect().height,
       })),
     );
   await position(page, 'hero', 0);
   await expect
-    .poll(async () => (await reading()).every((row) => row.hidden && row.opacity === ''))
+    .poll(async () => (await reading()).every((r) => r.opacity === 1 && r.y === 0))
     .toBe(true);
   await page.screenshot({ path: info.outputPath('writing-open.png') });
   await writingPosition(page, 'hero', 420 * 0.35);
-  await expect.poll(async () => (await reading()).every((row) => !row.hidden)).toBe(true);
   const partial = await reading();
-  const vertical = (value: string) => Number(value.match(/,\s*(-?[\d.]+)px/)![1]);
-  expect(vertical(partial[0]!.transforms[0]!)).toBeLessThan(
-    vertical(partial[0]!.transforms.at(-1)!),
-  );
-  expect(vertical(partial[0]!.transforms[0]!)).toBeLessThan(vertical(partial[1]!.transforms[0]!));
-  await page.screenshot({ path: info.outputPath('writing-pulled.png') });
+  for (const row of partial) {
+    expect(row.opacity).toBeGreaterThan(0.7);
+    expect(row.opacity).toBeLessThan(1);
+    expect(row.y).toBeLessThan(0);
+    expect(Math.abs(row.y)).toBeLessThan(row.height * 0.15);
+  }
+  await page.waitForTimeout(250);
   expect(await reading()).toEqual(partial);
+  await page.screenshot({ path: info.outputPath('writing-composed-departure.png') });
   await writingPosition(page, 'hero', 420 * 0.8);
-  await page.screenshot({ path: info.outputPath('writing-closing.png') });
+  expect((await reading())[0]!.opacity).toBeLessThan(partial[0]!.opacity);
   await writingPosition(page, 'hero', 420 * 0.35);
-  await expect.poll(reading).toEqual(partial);
+  expect(await reading()).toEqual(partial);
   await writingPosition(page, 'hero', 421);
-  await expect
-    .poll(async () => (await reading()).every((row) => row.hidden && row.opacity === '0'))
-    .toBe(true);
+  await expect.poll(async () => (await reading()).every((r) => r.opacity === 0)).toBe(true);
   await position(page, 'hero', 0);
   await expect
-    .poll(async () => (await reading()).every((row) => row.hidden && row.opacity === ''))
+    .poll(async () => (await reading()).every((r) => r.opacity === 1 && r.y === 0))
     .toBe(true);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await position(page, 'hero', 0.25);
   await expect
-    .poll(async () => (await reading()).every((row) => row.hidden && row.opacity === ''))
+    .poll(async () => (await reading()).every((r) => r.opacity === 1 && r.y === 0))
     .toBe(true);
 });
 
@@ -186,15 +156,20 @@ test('later writing uses upward row exits while the film stays at its original s
       .evaluate((node) => new DOMMatrixReadOnly(getComputedStyle(node).transform).m42);
   await writingPosition(page, 'capabilities', 420 * 0.1);
   await expect.poll(() => y(third)).toBeGreaterThan(0);
-  expect(await y(third, 3)).toBeGreaterThan(await y(third));
+  for (let i = 0; i < 4; i++) {
+    expect(await y(third, i)).toBeGreaterThan(0);
+    expect(
+      await third.nth(i).evaluate((n) => Number(getComputedStyle(n).opacity)),
+    ).toBeGreaterThanOrEqual(0.7);
+  }
   await writingPosition(page, 'capabilities', 780);
   await expect.poll(() => y(third, 3)).toBe(0);
   await presented(page);
   const thirdFrame = await page.locator('[data-film-status]').textContent();
   expect(thirdFrame).not.toContain('192 / 192');
   const bounds = await page.locator('[data-film-canvas]').boundingBox();
-  const clip = { x: page.viewportSize()!.width - 80, y: 130, width: 60, height: 60 };
-  const filmBefore = await page.screenshot({ clip });
+  // Inspect the complete decoded subject; a small sky crop can legitimately stay identical.
+  const filmBefore = await decodedFilm(page);
   await writingPosition(page, 'capabilities', 1140 + 420 * 0.6);
   await expect.poll(() => y(third)).toBeLessThan(0);
   await writingPosition(page, 'mark', 420 * 0.2);
@@ -210,7 +185,7 @@ test('later writing uses upward row exits while the film stays at its original s
     .toBe(0);
   await presented(page);
   expect(await page.locator('[data-film-canvas]').boundingBox()).toEqual(bounds);
-  expect(difference(filmBefore, await page.screenshot({ clip })).changed).toBeGreaterThan(0);
+  expect(difference(filmBefore, await decodedFilm(page)).changed).toBeGreaterThan(0);
   expect(await page.locator('[data-film-status]').textContent()).not.toBe(thirdFrame);
   await page.screenshot({ path: info.outputPath('fourth-writing.png') });
   await writingPosition(page, 'mark', 1140 + 420 * 0.8);

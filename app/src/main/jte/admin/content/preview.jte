@@ -1,7 +1,8 @@
 @import dev.persefonia.webadmin.content.AdminContentPreviewPage
 @param AdminContentPreviewPage page
-@template.admin.components.pageShell(page.heading() + " | Persefonia Admin", page.chrome().admin(), page.chrome().navigation(), page.chrome().logoutForm(), false, content = @`
-<main>
+@param java.util.List<String> adminStylesheetPaths = java.util.List.of()
+@template.admin.components.pageShell(page.heading() + " | Persefonia Admin", page.chrome().admin(), page.chrome().navigation(), page.chrome().logoutForm(), false, adminStylesheetPaths = adminStylesheetPaths, content = @`
+<main id="admin-content" tabindex="-1">
     <h1>${page.heading()}</h1>
     <p><a href="${page.editLink()}">Back to edit</a></p>
     @for(var error : page.globalErrors())

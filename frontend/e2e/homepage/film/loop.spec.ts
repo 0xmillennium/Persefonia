@@ -181,7 +181,7 @@ test('waterfall joins the hold cycle, loops independently of scrolling, and paus
     loop: true,
     muted: true,
     inline: true,
-    width: 1920,
+    width: info.project.use.isMobile ? 1280 : 1920,
     duration: 8,
   });
   const bounds = await video.boundingBox();

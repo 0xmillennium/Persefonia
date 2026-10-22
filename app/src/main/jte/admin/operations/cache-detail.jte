@@ -1,8 +1,9 @@
 @import dev.persefonia.webadmin.operations.AdminOperationsDetailPage
 @import dev.persefonia.platformoperations.application.operations.CacheRecoveryAction
 @param AdminOperationsDetailPage page
-@template.admin.components.pageShell("Cache invalidation | Persefonia Admin", page.chrome().admin(), page.chrome().navigation(), page.chrome().logoutForm(), false, content = @`
-    <main>
+@param java.util.List<String> adminStylesheetPaths = java.util.List.of()
+@template.admin.components.pageShell("Cache invalidation | Persefonia Admin", page.chrome().admin(), page.chrome().navigation(), page.chrome().logoutForm(), false, adminStylesheetPaths = adminStylesheetPaths, content = @`
+    <main id="admin-content" tabindex="-1">
         <h1>Cache invalidation batch</h1>
         <p><a href="/admin/operations">Back to operations</a> · <a href="${page.auditUrl()}">Related audit history</a></p>
 
@@ -57,14 +58,14 @@
 
         <section>
             <h2>Targets</h2>
-            <table>
+            <div class="admin-table-scroll" role="region" aria-label="Scrollable table" tabindex="0"><table>
                 <thead><tr><th>Type</th><th>Target</th><th>Status</th></tr></thead>
                 <tbody>
                 @for(var target : page.batch().targets())
                     <tr><td>${target.type().name()}</td><td>${target.value().value()}</td><td>${target.status().name()}</td></tr>
                 @endfor
                 </tbody>
-            </table>
+            </table></div>
         </section>
 
         <section>
@@ -72,7 +73,7 @@
             @if(page.batch().attempts().isEmpty())
                 <p>No provider attempt has a durable result.</p>
             @else
-                <table>
+                <div class="admin-table-scroll" role="region" aria-label="Scrollable table" tabindex="0"><table>
                     <thead><tr><th>Attempt</th><th>Provider</th><th>Attempted</th><th>Result</th><th>Failure reason</th></tr></thead>
                     <tbody>
                     @for(var attempt : page.batch().attempts())
@@ -85,7 +86,7 @@
                         </tr>
                     @endfor
                     </tbody>
-                </table>
+                </table></div>
             @endif
         </section>
     </main>

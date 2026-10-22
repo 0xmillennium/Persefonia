@@ -201,3 +201,20 @@ it('retries a persistently idle request once while renewed progress postpones re
   films.dispose();
   expect(vi.getTimerCount()).toBe(0);
 });
+
+it.each(['canplay', 'canplaythrough'])(
+  'notifies readiness when %s follows an already settled paused seek',
+  (event) => {
+    const changed = vi.fn();
+    const films = new SeekFilm(parent, 960, changed);
+    films.request('tree', 134);
+    videos[0]!.settle(134);
+    changed.mockClear();
+    videos[0]!.readyState = 4;
+    videos[0]!.dispatchEvent(new Event(event));
+    expect(changed).toHaveBeenCalledOnce();
+    expect(films.get('tree', 134)).toBe(videos[0]);
+    films.dispose();
+    expect(vi.getTimerCount()).toBe(0);
+  },
+);

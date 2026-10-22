@@ -1,7 +1,8 @@
 @import dev.persefonia.webadmin.analytics.AdminAnalyticsPage
 @param AdminAnalyticsPage page
-@template.admin.components.pageShell("Analytics | Persefonia Admin", page.chrome().admin(), page.chrome().navigation(), page.chrome().logoutForm(), false, content = @`
-    <main>
+@param java.util.List<String> adminStylesheetPaths = java.util.List.of()
+@template.admin.components.pageShell("Analytics | Persefonia Admin", page.chrome().admin(), page.chrome().navigation(), page.chrome().logoutForm(), false, adminStylesheetPaths = adminStylesheetPaths, content = @`
+    <main id="admin-content" tabindex="-1">
         <h1>Analytics</h1>
         <p>Privacy-safe aggregate activity. Totals are counted per metric and surface only; no visitor, path, or search details are recorded.</p>
 
@@ -19,7 +20,7 @@
                 <dd>${Long.toString(page.summary().totalAllTimeCount())}</dd>
             </dl>
 
-            <table>
+            <div class="admin-table-scroll" role="region" aria-label="Scrollable table" tabindex="0"><table>
                 <thead>
                     <tr>
                         <th>Metric</th>
@@ -42,7 +43,7 @@
                     </tr>
                 @endfor
                 </tbody>
-            </table>
+            </table></div>
         @endif
 
         <p>Reporting windows end on ${page.summary().range().today().toString()}.</p>

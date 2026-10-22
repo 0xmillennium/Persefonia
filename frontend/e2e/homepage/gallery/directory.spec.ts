@@ -1,3 +1,4 @@
+import { scrollToGalleryPreroll } from '../../support/gallery';
 import { openHomepage } from '../../support/homepage';
 import { expect, test, type Page } from '../../support/test';
 
@@ -13,6 +14,8 @@ async function visit(page: Page) {
   await page
     .locator('.home-nav a[href="#work"]')
     .evaluate((node) => (node as HTMLAnchorElement).click());
+  await at(page, 0);
+  await scrollToGalleryPreroll(page);
   await at(page, -3);
   await page.mouse.move(20, 650);
   for (let i = 0; i < 3; i++) await page.mouse.wheel(0, 120);
@@ -228,6 +231,8 @@ test('the tuner and its choices fit intermediate widths and short viewports', as
     await page
       .locator('.home-nav a[href="#work"]')
       .evaluate((node) => (node as HTMLAnchorElement).click());
+    await at(page, 0);
+    await scrollToGalleryPreroll(page);
     await at(page, -3);
     await page.mouse.move(20, Math.min(650, height! - 20));
     for (let i = 0; i < 3; i++) {
@@ -314,14 +319,14 @@ test('gallery hash navigation keeps its first wheel step when viewport resize de
     .locator('.home-nav a[href="#work"]')
     .evaluate((node) => (node as HTMLAnchorElement).click());
   await page.clock.runFor(1000);
-  await at(page, -3);
+  await at(page, 0);
   await page.mouse.move(20, 650);
   await page.mouse.wheel(0, 120);
   // Deliver the queued native resize during the wheel glide, before it settles.
   await page.clock.runFor(60);
   await page.evaluate(() => Reflect.get(window, 'flushHomepageResizes')());
   await page.clock.runFor(1000);
-  await at(page, -2);
+  await at(page, 1);
 });
 
 test('touch drags tune horizontally while vertical swipes scroll the page', async ({

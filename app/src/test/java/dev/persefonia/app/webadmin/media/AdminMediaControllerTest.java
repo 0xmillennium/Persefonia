@@ -120,7 +120,8 @@ class AdminMediaControllerTest {
 
         mockMvc.perform(multipart("/admin/media").file(jpeg()).with(owner()).with(csrf()))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("file: Choose a JPEG, PNG, or PDF file.")))
+                .andExpect(content().string(containsString("<li id=\"error-file\"><a href=\"#file\">Choose a JPEG, PNG, or PDF file.</a></li>")))
+                .andExpect(content().string(containsString("aria-describedby=\"error-file\"")))
                 .andExpect(content().string(containsString("enctype=\"multipart/form-data\"")));
     }
 
@@ -184,7 +185,8 @@ class AdminMediaControllerTest {
                         .param("visibility", "VISIBLE")
                         .param("altText", "Useful image"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("visibility: Choose PRIVATE or PUBLIC.")))
+                .andExpect(content().string(containsString("<li id=\"error-visibility\"><a href=\"#visibility\">Choose PRIVATE or PUBLIC.</a></li>")))
+                .andExpect(content().string(containsString("aria-describedby=\"error-visibility\"")))
                 .andExpect(content().string(containsString("hero.png")));
 
         assertThat(gateway.updateMutationCount()).isZero();
@@ -199,7 +201,8 @@ class AdminMediaControllerTest {
                         .with(owner()).with(csrf())
                         .param("visibility", "PUBLIC"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("visibility: public image must have alt text or be decorative")));
+                .andExpect(content().string(containsString("<li id=\"error-visibility\"><a href=\"#visibility\">public image must have alt text or be decorative</a></li>")))
+                .andExpect(content().string(containsString("aria-describedby=\"error-visibility\"")));
     }
 
     private static org.springframework.test.web.servlet.request.RequestPostProcessor owner() {

@@ -65,6 +65,18 @@
   padding: 8px 14px;
 }
 
+.home-body .background-motion {
+  position: fixed;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  right: var(--gutter);
+  z-index: 12;
+  max-width: calc(100% - var(--gutter) * 2);
+  background: #080e11ed;
+  color: var(--ink);
+  font-size: 0.75rem;
+  border-color: var(--muted);
+}
+
 .home-body a:focus-visible,
 .home-body button:focus-visible,
 .home-body input:focus-visible,

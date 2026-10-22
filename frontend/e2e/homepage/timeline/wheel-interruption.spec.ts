@@ -1,3 +1,4 @@
+import { scrollToGalleryPreroll } from '../../support/gallery';
 import { expect, test } from '../../support/test';
 
 test('wheel input ends a gallery drag without a later release changing its destination', async ({
@@ -12,6 +13,8 @@ test('wheel input ends a gallery drag without a later release changing its desti
   const gallery = page.locator('[data-scene="gallery"]');
   const index = () =>
     gallery.evaluate((node) => Number((node as HTMLElement).dataset.galleryIndex));
+  await expect.poll(index).toBe(0);
+  await scrollToGalleryPreroll(page);
   await expect.poll(index).toBe(-3);
   await expect
     .poll(() => page.locator('.gallery-face').evaluate((node) => (node as HTMLElement).inert))

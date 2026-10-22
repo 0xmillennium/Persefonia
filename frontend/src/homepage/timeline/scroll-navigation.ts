@@ -53,7 +53,7 @@ export function scrollNavigation(options: {
       const { readingEnd, footer, first, step, count } = path;
       const stops = wheelPath(
         readingEnd,
-        [path.cue, ...Array.from({ length: count ? count + 6 : 0 }, (_, i) => first + i * step)],
+        [path.cue, ...Array.from({ length: Math.max(1, count) + 6 }, (_, i) => first + i * step)],
         footer,
         path.bottom,
         path.filmStep,

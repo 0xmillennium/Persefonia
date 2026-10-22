@@ -57,7 +57,7 @@ class PublicContentTranslationRenderingTest extends PublicContentMvcTestSupport 
                         .andExpect(status().isOk())
                         .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
                                 .string("Content-Language", code))
-                        .andExpect(content().string(containsString("<html lang=\"" + code + "\">")));
+                        .andExpect(content().string(containsString("<html translate=\"no\" lang=\"" + code + "\">")));
             }
         }
     }

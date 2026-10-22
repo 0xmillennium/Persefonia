@@ -1,4 +1,5 @@
 @import './public-shell.css';
+@import './admin.css';
 
 :root {
   color-scheme: light;

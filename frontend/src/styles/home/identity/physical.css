@@ -13,7 +13,7 @@
 
 .brand-statement > span {
   display: block;
-  overflow: hidden;
+  overflow: visible;
   line-height: 1.08;
   padding-bottom: 0.15em;
   margin-bottom: -0.15em;

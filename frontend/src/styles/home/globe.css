@@ -222,3 +222,27 @@
 .location-system[data-ready='true'] .globe-touch-surface {
   pointer-events: auto;
 }
+
+.globe-controls {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 4rem;
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px;
+}
+
+.home-body .globe-controls button {
+  min-width: 44px;
+  background: var(--paper);
+  font-size: 0.7rem;
+  padding-inline: 10px;
+}
+
+.globe-controls button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}

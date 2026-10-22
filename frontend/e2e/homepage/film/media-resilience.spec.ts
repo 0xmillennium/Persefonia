@@ -94,10 +94,17 @@ test('resolution changes retain the last native presentation until a new pose is
     await expect
       .poll(() => loop.evaluate((node) => (node as HTMLVideoElement).videoWidth))
       .toBe(1280);
-    await page.setViewportSize({ width: 390, height: 850 });
-    await expect
-      .poll(() => loop.evaluate((node) => (node as HTMLVideoElement).videoWidth))
-      .toBe(1920);
+    for (const [width, height, expected] of [
+      [390, 850, 1280],
+      [1440, 900, 1920],
+      [390, 850, 1280],
+    ]) {
+      await page.setViewportSize({ width: width!, height: height! });
+      await expect
+        .poll(() => loop.evaluate((node) => (node as HTMLVideoElement).videoWidth))
+        .toBe(expected);
+      await expect(loop).toHaveAttribute('src', new RegExp(`/${expected}/waterfall\\.mp4$`));
+    }
     await expect(page.locator('video[data-loop-video]')).toHaveCount(1);
     await expect.poll(() => loop.evaluate((node) => (node as HTMLVideoElement).paused)).toBe(false);
   } finally {

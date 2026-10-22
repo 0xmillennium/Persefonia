@@ -18,3 +18,21 @@ export async function chooseCollection(page: Page, category: string): Promise<vo
     )
     .toBe(0);
 }
+
+/** Set up wheel entrance tests independently of semantic links' first reading stop. */
+export async function scrollToGalleryPreroll(page: Page): Promise<void> {
+  await page.locator('[data-scene="gallery"]').evaluate((node) => {
+    const bounds = node.getBoundingClientRect();
+    const entry =
+      parseFloat((node as HTMLElement).style.getPropertyValue('--gallery-entry-distance')) || 0;
+    const count = Math.max(
+      1,
+      node.querySelectorAll('.gallery-category:not([hidden]) .gallery-card').length,
+    );
+    const range = bounds.height - entry;
+    scrollTo({
+      top: Math.round(bounds.top + scrollY + entry + range * (0.12 + 0.7 / (count + 7))),
+      behavior: 'instant',
+    });
+  });
+}

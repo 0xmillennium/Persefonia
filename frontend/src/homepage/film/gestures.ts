@@ -14,6 +14,7 @@ export interface FilmGestureState {
   covered: boolean;
   width: number;
   height: number;
+  origin?: { x: number; y: number };
   film: Background;
   prefetchedFrom: Background | null;
 }
@@ -36,10 +37,12 @@ export function filmGestures(
     options = { signal: abort.signal };
   const pointer = new PointerObserver();
   let gesture: number | null = null,
-    touchStartedAt = 0,
     touchIdentifier: number | null = null,
     prefetchTimer = 0;
-  const touchSettled = (time: number) => hold.modality === 'touch' && time - touchStartedAt >= 200;
+  const point = (x: number, y: number) => {
+    const origin = state().origin;
+    return { x: x - (origin?.x ?? 0), y: y - (origin?.y ?? 0) };
+  };
   const release = () => {
     callbacks.invalidate();
     clock.beforeEvent(hold, performance.now());
@@ -59,7 +62,7 @@ export function filmGestures(
           e.button,
           e.isPrimary,
           excluded,
-          { x: e.clientX, y: e.clientY },
+          point(e.clientX, e.clientY),
           state().width,
           state().height,
         )
@@ -67,9 +70,8 @@ export function filmGestures(
         return;
       clock.beforeEvent(hold, performance.now());
       callbacks.retry('pointer');
-      if (hold.press({ x: e.clientX, y: e.clientY }, e.pointerType as Modality)) {
+      if (hold.press(point(e.clientX, e.clientY), e.pointerType as Modality)) {
         gesture = e.pointerId;
-        if (e.pointerType === 'touch') touchStartedAt = e.timeStamp;
         // Capture keeps ownership stable when the visual layers change;
         // it does not prevent a quick native pan from canceling the pointer.
         root.setPointerCapture(e.pointerId);
@@ -99,9 +101,16 @@ export function filmGestures(
         release();
         return;
       }
-      // This must be a non-passive TouchEvent listener: preventing a pointer
-      // event (or changing touch-action after contact) cannot stop native pan.
-      if (touchSettled(e.timeStamp) && e.cancelable) e.preventDefault();
+      clock.beforeEvent(hold, performance.now());
+      const touch = e.touches[0]!;
+      hold.move(point(touch.clientX, touch.clientY));
+      if (!hold.pressed) {
+        release();
+        return;
+      }
+      // A candidate never claims a pan, even after hesitation. Only a completed
+      // deliberate hold owns subsequent motion while its film prepares.
+      if (hold.progress === 1 && e.cancelable) e.preventDefault();
     },
     { ...options, passive: false },
   );
@@ -142,7 +151,7 @@ export function filmGestures(
         return;
       if (e.pointerId === gesture) {
         clock.beforeEvent(hold, performance.now());
-        if (!touchSettled(e.timeStamp)) hold.move({ x: e.clientX, y: e.clientY });
+        hold.move(point(e.clientX, e.clientY));
         if (!hold.pressed) release();
         callbacks.changed();
       }
@@ -182,7 +191,8 @@ export function filmGestures(
       }
       const samples = e.getCoalescedEvents?.();
       for (const sample of samples?.length ? samples : [e]) {
-        const motion = pointer.observe(sample.clientX, sample.clientY, sample.timeStamp);
+        const local = point(sample.clientX, sample.clientY);
+        const motion = pointer.observe(local.x, local.y, sample.timeStamp);
         if (motion) callbacks.motion(motion);
       }
       callbacks.changed();

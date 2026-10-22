@@ -39,6 +39,20 @@ class AdminProjectTemplateSmokeTest {
     }
 
     @Test
+    void validationErrorsIdentifyAndDescribeTheirFieldsInTheStyledAdminShell() throws Exception {
+        var response = mockMvc.perform(post("/admin/projects")
+                        .with(authentication(AdminAuthenticationTestSupport.authentication(AdminRole.OWNER)))
+                        .with(csrf()).param("status", "invalid").param("visibility", "PRIVATE"))
+                .andExpect(status().isOk()).andReturn().getResponse();
+        var document = org.jsoup.Jsoup.parse(response.getContentAsString());
+        org.assertj.core.api.Assertions.assertThat(document.select("head link[rel=stylesheet]")).isNotEmpty();
+        org.assertj.core.api.Assertions.assertThat(document.getElementById("status").attr("aria-invalid")).isEqualTo("true");
+        org.assertj.core.api.Assertions.assertThat(document.getElementById("status").attr("aria-describedby")).isEqualTo("error-status");
+        org.assertj.core.api.Assertions.assertThat(document.select("#error-status a[href='#status']")).isNotEmpty();
+        org.assertj.core.api.Assertions.assertThat(document.getElementById("visibility").hasAttr("aria-invalid")).isFalse();
+    }
+
+    @Test
     void projectTemplatesRenderAllowedAdminFormsAndDoNotExposeOutOfScopeRoutesOrAssets() throws Exception {
         var owner = authentication(AdminAuthenticationTestSupport.authentication(AdminRole.OWNER));
 

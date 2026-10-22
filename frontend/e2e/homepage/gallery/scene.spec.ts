@@ -128,7 +128,16 @@ test('gallery departure removes hidden keyboard targets and transfers focus visi
   expect(outgoing.scaleX).toBe(1);
   expect(outgoing.scaleY).toBe(1);
   expect(outgoing.opacity).toBe('1');
-  await expect(page.locator('.location-links nav .footer-rise').first()).toHaveCSS('opacity', '0');
+  expect(
+    await page
+      .locator('.location-links nav .footer-rise')
+      .evaluateAll((nodes) =>
+        nodes.every(
+          (node) =>
+            Number(getComputedStyle(node).opacity) >= 0.72 && node.textContent!.trim().length > 0,
+        ),
+      ),
+  ).toBe(true);
   await position(page, 'location', 0.075);
   await expect
     .poll(async () => {

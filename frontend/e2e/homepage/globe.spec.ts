@@ -1,5 +1,26 @@
 import { expect, test } from '../support/test';
 import { visit, position } from '../support/scenes';
+import { difference } from '../support/pixels';
+
+test('visible globe controls rotate, pause and reset without dragging', async ({ page }) => {
+  await visit(page);
+  await position(page, 'location', 0.6);
+  await expect(page.locator('.location-system')).toHaveAttribute('data-ready', 'true');
+  const pause = page.getByRole('button', { name: 'Pause rotation', exact: true });
+  await expect(pause).toBeVisible();
+  await pause.click();
+  await expect(page.getByRole('button', { name: 'Resume rotation', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  const before = await page.locator('#globe').screenshot();
+  await page.getByRole('button', { name: 'Rotate left', exact: true }).click();
+  expect(difference(before, await page.locator('#globe').screenshot()).changed).toBeGreaterThan(0);
+  await page.getByRole('button', { name: 'Rotate right', exact: true }).press('Enter');
+  await page.getByRole('button', { name: 'Reset view', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Reset view', exact: true })).toBeFocused();
+  await expect(page.locator('[data-hold-countdown]')).toBeHidden();
+});
 
 test('globe retains real geography and exposes keyboard controls without triggering film hold', async ({
   page,

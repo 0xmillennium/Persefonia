@@ -1,3 +1,4 @@
+import { scrollToGalleryPreroll } from '../../support/gallery';
 import { settleScroll } from '../../support/scroll';
 import { expect, test, type Page } from '../../support/test';
 
@@ -25,6 +26,11 @@ async function snapshot(page: Page) {
       bands: [...wipe.querySelectorAll<HTMLElement>('i')]
         .filter((node) => getComputedStyle(node).display !== 'none')
         .map((node) => parseFloat(node.style.transform.slice('translateY('.length))),
+      heading: [...gallery.querySelectorAll<HTMLElement>('.gallery-writing-rise')].map((node) => ({
+        text: node.textContent!.trim(),
+        opacity: Number(getComputedStyle(node).opacity),
+        slotOverflow: getComputedStyle(node.parentElement!).overflow,
+      })),
       writing: [
         ...gallery.querySelectorAll<HTMLElement>('.gallery-writing-rise,.collection-tuner'),
       ].map((node) => node.style.transform),
@@ -62,8 +68,12 @@ test('five notches grow the curtain and bring the first card from the left to ce
     await settle(page);
     const state = await snapshot(page);
     states.push(state);
+    expect(state.heading.map((row) => row.text)).toEqual(['Building systems', 'worth explaining']);
+    expect(
+      state.heading.every((row) => row.opacity >= 0.72 && row.slotOverflow === 'visible'),
+    ).toBe(true);
     if (notch <= 4) {
-      expect(state.writing).toEqual(Array(3).fill('translateY(100%)'));
+      expect(state.writing).toEqual(['translateY(8%)', 'translateY(8%)', 'translateY(100%)']);
       expect(state.tunerHidden).toBe(true);
       expect(state.tunerInert).toBe(true);
     } else {
@@ -106,9 +116,9 @@ test('five notches grow the curtain and bring the first card from the left to ce
   const halfway = await snapshot(page);
   expect(halfway.bands.every((y) => y === 0)).toBe(true);
   expect(
-    halfway.writing.every((value) => {
+    halfway.writing.every((value, i) => {
       const y = parseFloat(value.slice('translateY('.length));
-      return y > 0 && y < 100;
+      return y > 0 && y < (i < 2 ? 8 : 100);
     }),
   ).toBe(true);
   expect(halfway.tunerHidden).toBe(false);
@@ -135,6 +145,7 @@ test('the gallery writing and tuner leave through their gates and retrace the fo
   await page
     .locator('.home-nav a[href="#work"]')
     .evaluate((node) => (node as HTMLAnchorElement).click());
+  await scrollToGalleryPreroll(page);
   await settle(page);
   await page.mouse.move(20, 650);
   const count = await page
@@ -160,16 +171,17 @@ test('the gallery writing and tuner leave through their gates and retrace the fo
   await settle(page);
   const halfway = await snapshot(page);
   expect(
-    halfway.writing.every((value) => {
+    halfway.writing.every((value, i) => {
       const y = parseFloat(value.slice('translateY('.length));
-      return y < 0 && y > -100;
+      return y < 0 && y > (i < 2 ? -10 : -100);
     }),
   ).toBe(true);
   await page.screenshot({ path: info.outputPath('footer-exit-in-progress.png'), scale: 'css' });
   await page.evaluate((y) => scrollTo(0, y), footer);
   await settle(page);
   const after = await snapshot(page);
-  expect(after.writing).toEqual(Array(3).fill('translateY(-100%)'));
+  expect(after.writing).toEqual(['translateY(-10%)', 'translateY(-10%)', 'translateY(-100%)']);
+  expect(after.heading.every((row) => row.opacity === 0)).toBe(true);
   expect(after.tunerHidden).toBe(true);
   expect(after.tunerInert).toBe(true);
   await page.evaluate((y) => scrollTo(0, y), halfwayY);

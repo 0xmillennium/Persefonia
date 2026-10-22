@@ -78,7 +78,7 @@ class AdminContactArchitectureTest {
 
         assertThat(templates)
                 .contains("csrfField")
-                .contains("<pre>${page.message().body()}</pre>")
+                .contains("<pre role=\"region\" aria-label=\"Message body\" tabindex=\"0\">${page.message().body()}</pre>")
                 .doesNotContain("${raw")
                 .doesNotContain("gg.jte.html")
                 .doesNotContain("href=\"\"")

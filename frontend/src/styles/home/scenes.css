@@ -1,10 +1,22 @@
-.home-viewport-probe {
+.home-viewport-probe,
+.home-composition-probe {
   position: fixed;
   inset: 0 auto auto 0;
   width: 100%;
   height: 100svh;
   visibility: hidden;
   pointer-events: none;
+}
+
+.home-composition-probe {
+  height: 100lvh;
+}
+
+[data-home-v2][data-enhanced='true'] .home-composition {
+  position: absolute;
+  top: calc((100dvh - var(--composition-viewport-height)) / 2);
+  width: 100%;
+  height: var(--composition-viewport-height);
 }
 
 /* Enhancement replaces scene presentation only; SSR retains every publication and route. */
@@ -49,7 +61,9 @@
 [data-home-v2][data-enhanced='true'] .scene-face {
   position: fixed;
   inset: 0;
-  height: 100svh;
+  top: calc((100dvh - var(--composition-viewport-height)) / 2);
+  bottom: auto;
+  height: var(--composition-viewport-height);
   padding: 130px var(--gutter) 80px;
   visibility: hidden;
   pointer-events: none;
@@ -72,7 +86,7 @@
   inset: 0;
   width: 100%;
   height: 100svh;
-  overflow: visible;
+  overflow: hidden;
   background: var(--paper);
   z-index: -1;
 }
@@ -203,7 +217,6 @@
 }
 
 @supports (height: 100dvh) {
-  [data-home-v2][data-enhanced='true'] .scene-face,
   [data-home-v2][data-enhanced='true'] .home-environment {
     height: 100dvh;
   }

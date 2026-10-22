@@ -1,4 +1,8 @@
 @media (prefers-reduced-motion: reduce) {
+  [data-home-v2][data-enhanced='true'] .home-composition {
+    top: 0;
+    height: 100%;
+  }
   .home-body .statement-word {
     filter: none !important;
     opacity: 1 !important;

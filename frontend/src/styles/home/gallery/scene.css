@@ -34,7 +34,7 @@
 }
 
 [data-home-v2][data-enhanced='true'][data-reduced='false'] .footer-slot {
-  overflow: hidden;
+  overflow: visible;
 }
 
 .footer-rise {

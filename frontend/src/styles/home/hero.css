@@ -106,7 +106,7 @@
   width: max-content;
   padding-block: 0.1em;
   margin-block: -0.1em;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .hero-writing-text {

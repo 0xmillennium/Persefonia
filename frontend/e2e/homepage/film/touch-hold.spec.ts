@@ -41,12 +41,12 @@ test('settled hold tolerates finger drift and changes the film only once until r
   await finger.start();
   await expect(countdown).toBeVisible();
   await page.waitForTimeout(450);
-  // A normal finger adjustment exceeded the previous 12px cancellation limit.
-  await finger.move(180, 418);
+  // Small jitter stays a hold candidate; directional motion remains a native pan.
+  await finger.move(181, 402);
   // Native input/trace delivery can take longer than the countdown on a software
   // renderer. Check ownership directly instead of requiring a transient digit.
   expect(await page.evaluate(() => Reflect.get(window, 'holdTouchProbe'))).toEqual({
-    prevented: true,
+    prevented: false,
     canceled: false,
   });
   expect(await page.evaluate(() => scrollY)).toBe(initialY);
@@ -58,6 +58,50 @@ test('settled hold tolerates finger drift and changes the film only once until r
   await finger.end();
   await finger.detach();
 });
+
+async function hesitantSwipe(page: Page) {
+  // Own the application clock: software-GPU/CDP delivery can turn a requested
+  // 220ms wait into several seconds, which would qualify a different gesture.
+  await page.clock.install();
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
+  await page.evaluate(() => {
+    const times = { start: 0, move: 0 };
+    Reflect.set(window, 'hesitantTouchTiming', times);
+    window.addEventListener(
+      'touchstart',
+      () => {
+        times.start = performance.now();
+      },
+      { once: true },
+    );
+    window.addEventListener(
+      'touchmove',
+      () => {
+        times.move = performance.now();
+      },
+      { once: true },
+    );
+  });
+  const finger = await touch(page);
+  const before = await page.evaluate(() => scrollY);
+  await finger.start(100, 620);
+  await page.clock.runFor(220);
+  for (let i = 1; i <= 6; i++) {
+    await finger.move(100 + i, 620 - i * 28);
+    await page.clock.runFor(16);
+  }
+  await finger.end();
+  const times = await page.evaluate(
+    () => Reflect.get(window, 'hesitantTouchTiming') as { start: number; move: number },
+  );
+  expect(times.move - times.start).toBeGreaterThanOrEqual(220);
+  expect(times.move - times.start).toBeLessThanOrEqual(252);
+  await page.clock.resume();
+  await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(before + 30);
+  await expect(page.locator('[data-hold-countdown]')).toBeHidden();
+  await expect(page.locator('[data-home-v2]')).toHaveAttribute('data-film', 'robotic-arm');
+  await finger.detach();
+}
 
 test('film long-press suppresses selection and its menu while links retain their native menu', async ({
   page,
@@ -112,6 +156,10 @@ test('quick swipes retain native scrolling and do not complete a film hold', asy
   await expect(page.locator('[data-hold-countdown]')).toBeHidden();
   await expect(page.locator('[data-home-v2]')).toHaveAttribute('data-film', 'robotic-arm');
   await finger.detach();
+  // Exercise the delayed intent boundary under the same native-phone policy.
+  await page.goto('/');
+  await expect(page.locator('[data-home-loader]')).toBeHidden();
+  await hesitantSwipe(page);
 });
 
 test('release and browser cancellation stop an unfinished hold', async ({ page }) => {

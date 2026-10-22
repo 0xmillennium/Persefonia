@@ -88,6 +88,25 @@ async function assertStructure(page: Page, language: string) {
     await page.evaluate(() => innerWidth + 1),
   );
 }
+async function assertGlobeControls(page: Page, unavailable = false): Promise<void> {
+  const controls = page.locator('.location-system .globe-controls');
+  await expect(controls).toHaveCount(1);
+  await expect(controls).toHaveAttribute('role', 'group');
+  await expect(controls).toHaveAttribute('aria-label', 'Globe controls');
+  await expect(controls.locator('button')).toHaveCount(6);
+  for (const name of [
+    'Rotate left',
+    'Rotate right',
+    'Tilt up',
+    'Tilt down',
+    'Pause rotation',
+    'Reset view',
+  ]) {
+    const button = controls.getByRole('button', { name, exact: true, includeHidden: true });
+    await expect(button).toHaveCount(1);
+    if (unavailable) await expect(button).toBeDisabled();
+  }
+}
 async function scene(page: Page, name: string, p = name === 'gallery' ? 0.55 : 0.3) {
   await page
     .locator(`[data-scene="${name}"]`)
@@ -137,11 +156,10 @@ test('SSR publications, metadata, public destinations, CSP and self-hosted asset
   await expect(page.locator('.home-projects__item')).toHaveCount(3);
   await expect(page.locator('.home-writing__list>.gallery-card')).toHaveCount(6);
   await expect(page.locator('.home-support, #architecture, #about')).toHaveCount(0);
-  await expect(
-    page.locator(
-      '.film-controls, [data-film-switch], [data-film-retry], .location-system .controls',
-    ),
-  ).toHaveCount(0);
+  await expect(page.locator('.film-controls, [data-film-switch], [data-film-retry]')).toHaveCount(
+    0,
+  );
+  await assertGlobeControls(page);
   await expect(page.locator("link[rel='canonical']")).toHaveAttribute(
     'href',
     `${process.env.PERSEFONIA_BROWSER_URL}/`,
@@ -353,6 +371,49 @@ test('standard public CSS remains coherently light when the theme resource fails
   expect(errors).toEqual([]);
   await context.close();
 });
+test('zero publications retain a reachable wheel reading stop and honest counter', async ({
+  page,
+}, info) => {
+  setSettings(
+    "DELETE FROM discovery.discoverable_resources WHERE source_context='CONTENT_PUBLISHING'; DELETE FROM portfolio.project_localizations; DELETE FROM portfolio.projects",
+  );
+  await visit(page);
+  await homepageReady(page);
+  await page
+    .locator('[data-scene="mark"]')
+    .evaluate((n) => scrollTo(0, n.getBoundingClientRect().top + scrollY + 1140));
+  await settlePresentation(page);
+  const scale = await page.evaluate(() =>
+    matchMedia('(pointer: coarse)').matches ? devicePixelRatio : 1,
+  );
+  let readable = false;
+  for (let i = 0; i < 10; i++) {
+    await page.mouse.wheel(0, 120 * scale);
+    await page.waitForTimeout(750);
+    readable = await page.locator('.gallery-face').evaluate((face) => {
+      const empty = face.querySelector<HTMLElement>('#work .home-empty')!;
+      const rect = empty.getBoundingClientRect();
+      const heading = face.querySelector<HTMLElement>('.gallery-writing-rise')!;
+      return (
+        !(face as HTMLElement).inert &&
+        getComputedStyle(face).visibility === 'visible' &&
+        rect.top > 0 &&
+        rect.bottom < innerHeight &&
+        Math.abs(new DOMMatrixReadOnly(getComputedStyle(heading).transform).m42) <
+          heading.clientHeight * 0.1
+      );
+    });
+    if (readable) break;
+  }
+  expect(readable).toBe(true);
+  await expect(page.locator('[data-gallery-position]')).toHaveText('0 / 0');
+  await expect(page.locator('#work .home-empty a')).toHaveAttribute('href', '/contact');
+  await page.screenshot({ path: info.outputPath('zero-wheel-reading.png') });
+  const readingY = await page.evaluate(() => scrollY);
+  await page.mouse.wheel(0, -120 * scale);
+  await expect.poll(() => page.evaluate(() => scrollY)).toBeLessThan(readingY);
+});
+
 test('enabled empty and disabled promotion retain honest content states', async ({ page }) => {
   setSettings(
     "DELETE FROM discovery.discoverable_resources WHERE source_context='CONTENT_PUBLISHING'; DELETE FROM portfolio.project_localizations; DELETE FROM portfolio.projects",
@@ -423,9 +484,8 @@ test('no JS and unavailable enhancement retain publications and contact', async 
     await expect(page.locator('.gallery-category:not([hidden])')).toHaveCount(4);
     await expect(page.locator('.home-project h3 a')).toHaveCount(3);
     await expect(page.locator('.home-writing__list h3 a')).toHaveCount(6);
-    await expect(
-      page.locator('.home-support, .film-controls, .location-system .controls'),
-    ).toHaveCount(0);
+    await expect(page.locator('.home-support, .film-controls')).toHaveCount(0);
+    await assertGlobeControls(page, true);
     await page.locator('.contact-entry').click();
     await expect(page).toHaveURL(/\/contact$/);
     await expect(page.getByLabel('Name')).toBeVisible();

@@ -70,8 +70,8 @@ export class SeekFilm {
       this.promote(film);
       this.changed();
     };
-    video.addEventListener('loadeddata', settled, options);
-    video.addEventListener('seeked', settled, options);
+    for (const event of ['loadeddata', 'seeked', 'canplay', 'canplaythrough'])
+      video.addEventListener(event, settled, options);
     video.addEventListener('error', () => this.fail(entry), options);
     video.addEventListener('loadedmetadata', () => this.seek(entry, entry.desired), options);
     video.addEventListener(

@@ -1,7 +1,8 @@
 @import dev.persefonia.webadmin.contact.AdminContactListPage
 @param AdminContactListPage page
-@template.admin.components.pageShell("Contact inbox | Persefonia Admin", page.chrome().admin(), page.chrome().navigation(), page.chrome().logoutForm(), false, content = @`
-    <main>
+@param java.util.List<String> adminStylesheetPaths = java.util.List.of()
+@template.admin.components.pageShell("Contact inbox | Persefonia Admin", page.chrome().admin(), page.chrome().navigation(), page.chrome().logoutForm(), false, adminStylesheetPaths = adminStylesheetPaths, content = @`
+    <main id="admin-content" tabindex="-1">
         <h1>Contact inbox</h1>
 
         <form method="get" action="/admin/contact">
@@ -17,7 +18,7 @@
         @if(page.messages().items().isEmpty())
             <p>No contact messages yet.</p>
         @else
-            <table>
+            <div class="admin-table-scroll" role="region" aria-label="Scrollable table" tabindex="0"><table>
                 <thead>
                     <tr>
                         <th>Submitted</th>
@@ -52,7 +53,7 @@
                     </tr>
                 @endfor
                 </tbody>
-            </table>
+            </table></div>
         @endif
 
         <nav aria-label="Contact message pages">

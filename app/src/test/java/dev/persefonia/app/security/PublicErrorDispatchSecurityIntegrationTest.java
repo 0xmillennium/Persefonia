@@ -62,6 +62,7 @@ class PublicErrorDispatchSecurityIntegrationTest {
             var response = get(path);
             assertThat(response.statusCode()).as(path).isEqualTo(404);
             assertThat(response.headers().firstValue("Location")).isEmpty();
+            assertThat(response.body()).as(path).contains("translate=\"no\"", "notranslate", "noindex");
         }
     }
 

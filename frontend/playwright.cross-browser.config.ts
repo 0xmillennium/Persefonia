@@ -5,6 +5,10 @@ import base from './playwright.config';
 export default defineConfig({
   ...base,
   testMatch: [
+    '**/homepage/finalization.spec.ts',
+    '**/homepage/writing-compositions.spec.ts',
+    '**/homepage/writing.spec.ts',
+    '**/public/contact-form.spec.ts',
     '**/public/homepage.spec.ts',
     '**/homepage/film/video.spec.ts',
     '**/homepage/loading.spec.ts',

@@ -3,8 +3,9 @@
 @param String publicNavigationScriptPath = null
 @param java.util.List<dev.persefonia.webpublic.navigation.PublicNavigationLink> navigationLinks = java.util.List.of()
 <!doctype html>
-<html lang="${page.htmlLanguage()}">
+<html translate="no" lang="${page.htmlLanguage()}">
 <head>
+    @template.site.components.translationPolicy()
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${page.title()}</title>
@@ -26,50 +27,50 @@
             <p role="${page.submitted() ? "status" : "alert"}">${page.message()}</p>
         @endif
         @if(page.hasErrors())
-            <div role="alert" aria-labelledby="contact-errors-title">
+            <div role="alert" aria-labelledby="contact-errors-title" tabindex="-1" autofocus>
                 <h2 id="contact-errors-title">Please correct the highlighted fields.</h2>
             </div>
         @endif
-        <form method="post" action="/contact">
+        <form class="contact-form" method="post" action="/contact">
             <input type="hidden" name="${page.csrfToken().getParameterName()}" value="${page.csrfToken().getToken()}">
 
             <div>
                 <label for="senderName">Name</label>
                 @if(page.hasFieldError("senderName"))
-                    <input id="senderName" name="senderName" type="text" value="${page.form().senderName()}" autocomplete="name" aria-describedby="senderName-error">
+                    <input id="senderName" name="senderName" required maxlength="120" type="text" value="${page.form().senderName()}" autocomplete="name" aria-describedby="senderName-error" aria-invalid="true">
                     <p id="senderName-error" role="alert">${page.fieldError("senderName")}</p>
                 @else
-                    <input id="senderName" name="senderName" type="text" value="${page.form().senderName()}" autocomplete="name">
+                    <input id="senderName" name="senderName" required maxlength="120" type="text" value="${page.form().senderName()}" autocomplete="name">
                 @endif
             </div>
 
             <div>
                 <label for="senderEmail">Email</label>
                 @if(page.hasFieldError("senderEmail"))
-                    <input id="senderEmail" name="senderEmail" type="email" value="${page.form().senderEmail()}" autocomplete="email" aria-describedby="senderEmail-error">
+                    <input id="senderEmail" name="senderEmail" required maxlength="254" type="email" value="${page.form().senderEmail()}" autocomplete="email" aria-describedby="senderEmail-error" aria-invalid="true">
                     <p id="senderEmail-error" role="alert">${page.fieldError("senderEmail")}</p>
                 @else
-                    <input id="senderEmail" name="senderEmail" type="email" value="${page.form().senderEmail()}" autocomplete="email">
+                    <input id="senderEmail" name="senderEmail" required maxlength="254" type="email" value="${page.form().senderEmail()}" autocomplete="email">
                 @endif
             </div>
 
             <div>
                 <label for="subject">Subject</label>
                 @if(page.hasFieldError("subject"))
-                    <input id="subject" name="subject" type="text" value="${page.form().subject()}" aria-describedby="subject-error">
+                    <input id="subject" name="subject" required maxlength="160" type="text" value="${page.form().subject()}" aria-describedby="subject-error" aria-invalid="true">
                     <p id="subject-error" role="alert">${page.fieldError("subject")}</p>
                 @else
-                    <input id="subject" name="subject" type="text" value="${page.form().subject()}">
+                    <input id="subject" name="subject" required maxlength="160" type="text" value="${page.form().subject()}">
                 @endif
             </div>
 
             <div>
-                <label for="body">Message</label>
+                <label for="body">Message <small>(up to 5,000 characters)</small></label>
                 @if(page.hasFieldError("body"))
-                    <textarea id="body" name="body" rows="8" aria-describedby="body-error">${page.form().body()}</textarea>
+                    <textarea id="body" name="body" rows="8" required maxlength="5000" aria-describedby="body-error" aria-invalid="true">${page.form().body()}</textarea>
                     <p id="body-error" role="alert">${page.fieldError("body")}</p>
                 @else
-                    <textarea id="body" name="body" rows="8">${page.form().body()}</textarea>
+                    <textarea id="body" name="body" rows="8" required maxlength="5000">${page.form().body()}</textarea>
                 @endif
             </div>
 

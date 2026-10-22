@@ -55,7 +55,10 @@ class PublicHomeChaptersTest {
         assertThat(html).contains("A real study", "A real note", "data-category=\"articles\"", "data-category=\"notes\"", "data-category=\"research\"");
         assertThat(html).doesNotContain("id=\"architecture\"", "id=\"about\"",
                 "href=\"#about\"", "href=\"#architecture\"", "class=\"film-controls\"",
-                "data-film-switch", "data-film-retry", "id=\"find-location\"", "id=\"tilt-up\"", "id=\"pause\"");
+                "data-film-switch", "data-film-retry", "id=\"find-location\"");
+        assertThat(html).contains("role=\"group\" aria-label=\"Globe controls\"",
+                "id=\"tilt-up\" aria-label=\"Tilt up\"", "id=\"pause\" aria-pressed=\"false\"",
+                "id=\"reset-view\"", "Pause rotation", "Reset view");
         assertThat(html).contains("class=\"home-cinema__image\" aria-hidden=\"true\"");
         assertThat(html).doesNotContain("[Published article title]", "[Published research title]", "ref. pending");
     }

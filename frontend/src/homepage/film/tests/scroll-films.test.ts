@@ -322,3 +322,16 @@ it('ignores a late obsolete higher tier but retains one that was already display
   expect(retained.presentation('tree', 0, 'opening')?.source).toBe(images[2]);
   retained.dispose();
 });
+
+it('qualifies a decoded paused seek from native enough-data state when ranges lag', () => {
+  const films = new ScrollFilms(parent, 1600, vi.fn());
+  const video = {
+    readyState: 4,
+    currentTime: 4.475,
+    duration: 6.4,
+    buffered: { length: 1, start: () => 0, end: () => 2.9 },
+  } as unknown as HTMLVideoElement;
+  native.get.mockReturnValue(video);
+  expect(films.readiness('robotic-arm', 134, 'final')).toEqual({ state: 'video', progress: 1 });
+  films.dispose();
+});
