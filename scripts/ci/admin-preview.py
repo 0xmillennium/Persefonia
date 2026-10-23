@@ -7,7 +7,6 @@ import struct
 import sys
 import zipfile
 import qualification as q
-import selection
 
 CLASSES = ['AdminBrowserPreview.class', 'AdminBrowserPreview$PreviewConfiguration.class',
            'AdminBrowserPreview$PreviewConfiguration$1.class']
@@ -64,23 +63,15 @@ def isolate_fixture(payload, root):
 
 def main():
     action=sys.argv[1] if len(sys.argv)==2 else ''
-    if action=='required':
-        required='admin' in selection.plan()['required']
-        output=os.environ.get('GITHUB_OUTPUT')
-        if output:
-            q.require(os.environ.get('GITHUB_JOB')=='build-jvm', 'Admin selection output belongs to its JVM producer')
-            with Path(output).open('a') as target: target.write('admin_required='+str(required).lower()+'\n')
-        else: print(str(required).lower())
-    elif action=='classpath':
-        ci=bool(os.environ.get('CI'))
-        if ci: q.require(os.environ.get('GITHUB_JOB')=='build-jvm', 'Admin native must not import another runner test classpath')
+    if action=='classpath':
+        q.require(not os.environ.get('CI'), 'Admin native diagnostics are explicit local operations')
+        ci=False
         payload=q.read(q.ROOT/'app/build/admin-preview/classpath.json')
         source=q.identity() if ci else None
-        if ci: q.require('admin' in selection.plan(source)['required'], 'Unselected admin native profile')
         witness=q.read(q.ROOT/'app/build/qualification/test.json') if ci else None
         validate_runtime(payload,q.ROOT,source['inputs'] if ci else None,witness,ci)
         print(isolate_fixture(payload,q.ROOT))
-    else: raise ValueError('Expected required or classpath; no qualification filters are accepted')
+    else: raise ValueError('Expected classpath for explicit local diagnostics')
 
 
 if __name__=='__main__':

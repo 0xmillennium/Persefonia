@@ -8,6 +8,8 @@
 | Supersedes | ADR 0022, ADR 0032 |
 | Superseded by | none |
 
+[ADR 0042](0042-use-fixed-lean-verification-and-explicit-diagnostics.md) changes the qualification inventory and receipt policy. Comparisons require current-policy native evidence validated by Gate, including raw discovery/execution reports; the retired browser-receipts job is not an admission prerequisite. Shadow remains the default and policy changes remain ineligible for reuse.
+
 ## Context
 
 Equal trees do not establish equal tested bytes or trusted policy. Delivery requires authoritative master candidates and immutable OCI promotion.

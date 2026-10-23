@@ -1,9 +1,6 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
-const skipMirror = JSON.parse(
-  readFileSync(new URL('./expected-skips.json', import.meta.url), 'utf8'),
-);
 import {
   policyHash,
   selectionPolicy,
@@ -11,15 +8,8 @@ import {
   validateNativeSelection,
 } from './selection-policy.mjs';
 const skipPolicy = selectionPolicy.expectedSkips;
-if (JSON.stringify(skipPolicy) !== JSON.stringify(skipMirror))
-  throw new Error('Ordinary skip mirror differs from source policy');
-const deepSkipPolicy = JSON.parse(
-  readFileSync(new URL('./deep-expected-skips.json', import.meta.url), 'utf8'),
-);
 export const partitions = requiredPartitions();
 export const groups = partitions.map((p) => ({ ...p, shards: 1 }));
-export const skipRules = (suite) =>
-  ['ordinary', 'admin'].includes(suite) ? skipPolicy : deepSkipPolicy;
 export const partitionKey = (partition) =>
   `${partition.name}-${partition.shard.replace('/', 'of')}`;
 export const digest = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -82,10 +72,10 @@ export function reportTests(report) {
             project: test.projectName,
             file: spec.file,
             title: spec.title,
-            expectedStatus: test.expectedStatus,
+            expectedStatus: test.expectedStatus ?? null,
             annotations: test.annotations,
             results: test.results,
-            status: test.status,
+            status: test.status ?? null,
           });
         }
       }
@@ -135,7 +125,7 @@ export function validateOutcomes(rows, policy = skipPolicy) {
 
 export function validateReceipt(receipt, expectedIdentity, policy = skipPolicy) {
   requireThat(
-    receipt?.schema === 2 &&
+    receipt?.schema === 3 &&
       receipt.policy === policyHash &&
       receipt.status === 'passed' &&
       receipt.exitCode === 0,
@@ -151,11 +141,6 @@ export function validateReceipt(receipt, expectedIdentity, policy = skipPolicy) 
       /^[a-f0-9]{64}$/.test(receipt.identity.artifactSha256),
     'Invalid artifact identity',
   );
-  if (receipt.partition?.suite === 'admin')
-    requireThat(
-      receipt.runner?.job === 'build-jvm',
-      'Admin native must execute in its own JVM workspace',
-    );
   const engine = receipt.partition?.project?.startsWith('firefox')
     ? 'firefox'
     : receipt.partition?.project?.startsWith('webkit')
@@ -201,11 +186,7 @@ export function joinReceipts(
     receipts.map((r) => partitionKey(r.partition)),
   );
   for (const receipt of receipts) {
-    validateReceipt(
-      receipt,
-      identity,
-      policy === skipPolicy ? skipRules(receipt.partition.suite) : policy,
-    );
+    validateReceipt(receipt, identity, policy);
     const expected = required.find((p) => partitionKey(p) === partitionKey(receipt.partition));
     requireThat(
       expected &&
@@ -255,7 +236,7 @@ export function joinReceipts(
 /** Gate validates the complete native receipt set through the same owner as the source join. */
 export function validateAcceptance(value, expectedIdentity) {
   requireThat(
-    value?.schema === 2 &&
+    value?.schema === 3 &&
       value.policy === policyHash &&
       value.status === 'passed' &&
       value.inventory &&
@@ -279,7 +260,7 @@ export function validateAcceptance(value, expectedIdentity) {
   );
   const required = requiredPartitions(value.profiles);
   const result = joinReceipts(value.inventory, value.receipts, expectedIdentity, required);
-  for (const part of required.filter((p) => ['ordinary', 'admin'].includes(p.suite)))
+  for (const part of required.filter((p) => p.suite === 'ordinary'))
     validateNativeSelection(
       value.inventory[part.suite].filter((r) => r.project === part.project),
       part.suite,
@@ -288,6 +269,36 @@ export function validateAcceptance(value, expectedIdentity) {
   requireThat(
     result.selected === value.selected && result.partitions === value.partitions,
     'Forged browser acceptance counts',
+  );
+  const raw = value.native;
+  requireThat(raw && raw.discovery && raw.execution, 'Missing raw native reports');
+  const compact = (rows) =>
+    rows
+      .map((row) => ({
+        id: row.id,
+        project: row.project,
+        file: row.file,
+        title: row.title,
+        expectedStatus: row.expectedStatus ?? null,
+        status: row.status ?? null,
+        annotations: row.annotations,
+        results: row.results.map(({ status, duration, retry, startTime }) => ({
+          status,
+          duration,
+          retry,
+          ...(startTime === undefined ? {} : { startTime }),
+        })),
+      }))
+      .sort((a, b) => a.id.localeCompare(b.id));
+  requireThat(
+    JSON.stringify(compact(reportTests(raw.discovery))) ===
+      JSON.stringify(compact(value.inventory.ordinary)),
+    'Forged raw discovery',
+  );
+  requireThat(
+    JSON.stringify(compact(reportTests(raw.execution))) ===
+      JSON.stringify(compact(value.receipts.flatMap((r) => r.outcomes))),
+    'Forged raw execution',
   );
   return result;
 }

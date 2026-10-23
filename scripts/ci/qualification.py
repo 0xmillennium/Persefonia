@@ -20,7 +20,7 @@ SCHEMA = 2
 SHA = re.compile(r'[0-9a-f]{40}')
 HASH = re.compile(r'[0-9a-f]{64}')
 CI_JOBS = ['Automation', 'Reuse eligibility', 'Comparison build', 'Build + JVM', 'Frontend verification',
-           'Verify', 'Browser receipts', 'Gate', 'Native browsers']
+           'Verify', 'Gate', 'Native browsers']
 
 
 def require(condition, message):
@@ -124,7 +124,7 @@ def policy(include_untracked=True):
         require(stage == '0', 'Unmerged policy')
         if protected(path):
             require(mode == '100644' or mode == '100755', 'Unsafe policy type')
-            entries.append([path, mode, file_hash(ROOT / path)])
+            entries.append([path, mode, file_hash(ROOT / path) if (ROOT / path).exists() else 'removed'])
     # Include untracked new verifier files in local receipts; hosted checkouts have none.
     for path in git('ls-files', '--others', '--exclude-standard').splitlines() if include_untracked else []:
         if protected(path): entries.append([path, '100755' if os.access(ROOT / path, os.X_OK) else '100644', file_hash(ROOT / path)])
@@ -332,7 +332,7 @@ def admission_policy(jobs):
 
 def job_results(mode, jobs, decision=None, expected=None, fresh_candidate=None):
     require(mode in {'executed', 'reused'}, 'Unknown admission mode')
-    required = {'automation', 'build-jvm', 'frontend', 'verify', 'browser', 'browser-receipts'}
+    required = {'automation', 'build-jvm', 'frontend', 'verify', 'browser'}
     require(set(jobs) == required, 'Missing or unexpected required jobs')
     if mode == 'reused':
         require(decision is not None and expected is not None, 'Claimed reused flag is not admission')

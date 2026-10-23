@@ -1,4 +1,5 @@
-import { spawnSync, execFileSync } from 'node:child_process';
+import { runProcess } from './process.mjs';
+import { execFileSync } from 'node:child_process';
 import { rmSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
@@ -7,7 +8,7 @@ import {
   writeJson,
   metadata,
   sourceContext,
-  riskPlan,
+  verificationPlan,
 } from './browser-runtime.mjs';
 import {
   validateUnitExecution,
@@ -24,9 +25,8 @@ const plan = comprehensive
       required: ['ordinary', 'physics-live', 'physics-scalar'],
       manual: true,
     }
-  : riskPlan();
-const physicsProfile =
-  comprehensive || plan.required.some((p) => p.startsWith('physics-')) ? 'deep' : 'ordinary';
+  : verificationPlan();
+const physicsProfile = comprehensive ? 'deep' : 'ordinary';
 process.env.PERSEFONIA_PHYSICS_PROFILE = physicsProfile;
 
 if ((!comprehensive && process.argv.length !== 2) || process.env.IDENTITY_SEED)
@@ -45,19 +45,20 @@ for (const file of [
 const cli = join(frontend, 'node_modules/vitest/vitest.mjs');
 const context = sourceContext();
 const started = performance.now();
-const discovery = spawnSync(
+const discovery = await runProcess(
   process.execPath,
   [cli, 'list', '--no-static-parse', '--json', '--allowOnly=false'],
   {
     cwd: frontend,
-    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
   },
+  30_000,
 );
-if (discovery.status !== 0) throw new Error(`Unit discovery failed: ${discovery.stderr}`);
+if (discovery.exitCode !== 0) throw new Error(`Unit discovery failed: ${discovery.stderr}`);
 const selected = JSON.parse(discovery.stdout);
 writeJson(join(output, 'unit-discovery.json'), selected);
 const discoveryMs = performance.now() - started;
-const execution = spawnSync(
+const execution = await runProcess(
   process.execPath,
   [
     cli,
@@ -78,8 +79,9 @@ const execution = spawnSync(
       PERSEFONIA_UNIT_PHASES: join(output, 'unit-phases.json'),
     },
   },
+  comprehensive ? 600_000 : 240_000,
 );
-if (execution.status !== 0) process.exit(execution.status ?? 1);
+if (execution.exitCode !== 0) process.exit(execution.exitCode ?? 1);
 const reconciliation = performance.now();
 const read = (path) => JSON.parse(readFileSync(join(output, path), 'utf8'));
 const cases = validateUnitExecution(

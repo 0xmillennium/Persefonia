@@ -1,42 +1,33 @@
 import { defineConfig, devices } from '@playwright/test';
-import base from './playwright.config';
 import policy from './scripts/verification/selection-policy.json' with { type: 'json' };
-
-const profile = process.env.PERSEFONIA_NATIVE_PROFILE ?? 'ordinary';
-const deep = policy.deep[profile as keyof typeof policy.deep];
-if (profile !== 'ordinary' && (!deep || deep.kind !== 'native'))
-  throw new Error('Unknown native qualification profile');
-const context = process.env.PERSEFONIA_NATIVE_PROJECT ?? 'all';
-if (context !== 'all' && !policy.native.some((p) => p.project === context))
-  throw new Error('Unsafe native output context');
-const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const matchOrdinary = (cases: readonly { file: string; title: string }[]) =>
-  new RegExp(cases.map((c) => `(?:^| )${escape(c.file)} (?:.* )?${escape(c.title)}$`).join('|'));
-const projects = policy.native.filter(
-  (p) => profile === 'ordinary' || ('projects' in deep && deep.projects.includes(p.project)),
-);
 export default defineConfig({
-  ...base,
-  testMatch: '**/*.spec.ts',
-  outputDir: `test-results/native-${profile}/${context}`,
+  testDir: './e2e',
+  testMatch: 'smoke/*.spec.ts',
+  forbidOnly: true,
+  fullyParallel: false,
+  workers: 1,
+  retries: 0,
+  repeatEach: 1,
+  timeout: 20_000,
+  globalTimeout: 210_000,
+  expect: { timeout: 5_000 },
   reporter: [
     ['list'],
-    ['html', { outputFolder: `playwright-report/${profile}/${context}`, open: 'never' }],
     ...(process.env.PERSEFONIA_VERIFICATION_REPORT
       ? [['json', { outputFile: process.env.PERSEFONIA_VERIFICATION_REPORT }] as const]
       : []),
   ],
-  projects: projects.map((p) => ({
+  outputDir: 'test-results/native',
+  use: {
+    baseURL: process.env.PERSEFONIA_BROWSER_URL ?? 'http://127.0.0.1:18080',
+    actionTimeout: 5_000,
+    navigationTimeout: 10_000,
+    trace: 'off',
+    screenshot: 'off',
+  },
+  projects: policy.native.map((p) => ({
     name: p.project,
-    testMatch:
-      profile === 'ordinary'
-        ? p.cases.map((c) => `**/${c.file}`)
-        : 'files' in deep
-          ? deep.files.map((f) => `**/${f}`)
-          : [],
-    ...(profile === 'ordinary' || ('excludeOrdinary' in deep && deep.excludeOrdinary)
-      ? { [profile === 'ordinary' ? 'grep' : 'grepInvert']: matchOrdinary(p.cases) }
-      : {}),
+    testMatch: [...new Set(p.cases.map((c) => c.file))],
     use: {
       ...devices[
         p.engine === 'firefox'

@@ -1,8 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
-import base from './playwright.config';
+import base from './playwright.native.config';
 
 const baseURL = process.env.PERSEFONIA_ADMIN_PREVIEW_URL;
-if (!baseURL || new URL(baseURL).hostname !== '127.0.0.1')
+if (!baseURL || new URL(baseURL).hostname !== '127.0.0.1' || new URL(baseURL).protocol !== 'http:')
   throw new Error(
     'Admin browser qualification requires the isolated loopback test-classpath preview',
   );
@@ -10,6 +10,8 @@ if (!baseURL || new URL(baseURL).hostname !== '127.0.0.1')
 export default defineConfig({
   ...base,
   testDir: './admin-e2e',
+  testMatch: '*.spec.ts',
+  globalTimeout: 180_000,
   outputDir: 'test-results/admin-browser',
   use: { ...base.use, baseURL },
   projects: [

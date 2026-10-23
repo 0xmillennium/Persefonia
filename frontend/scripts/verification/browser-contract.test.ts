@@ -10,6 +10,16 @@ import {
 } from './browser-contract.mjs';
 import { policyHash, selectionPolicy } from './selection-policy.mjs';
 const identity = { sourceSha: 'a'.repeat(40), artifactSha256: 'b'.repeat(64) };
+type Outcome = {
+  id: string;
+  project: string;
+  file: string;
+  title: string;
+  expectedStatus: string;
+  status: string;
+  annotations: { type: string; description: string }[];
+  results: { status: string; retry: number; duration: number }[];
+};
 function fixture() {
   const runner = { run: '100', attempt: '1' };
   const sourceContext = {
@@ -39,7 +49,7 @@ function fixture() {
           ffprobe: 'qualified ffprobe',
         },
         identity: { ...identity },
-        schema: 2,
+        schema: 3,
         policy: policyHash,
         partition: { ...partition },
         status: 'passed',
@@ -53,8 +63,46 @@ function fixture() {
       };
     },
   );
+  const rows: Outcome[] = receipts.flatMap((r: { outcomes: Outcome[] }) =>
+    structuredClone(r.outcomes),
+  );
+  const report = (rows: Outcome[]) => ({
+    config: {
+      forbidOnly: true,
+      fullyParallel: false,
+      workers: 1,
+      projects: selectionPolicy.native.map((p: { project: string }) => ({
+        name: p.project,
+        retries: 0,
+        repeatEach: 1,
+      })),
+    },
+    errors: [],
+    suites: [
+      {
+        specs: rows.map((r) => ({
+          id: r.id.split(':')[1],
+          file: r.file,
+          title: r.title,
+          tests: [
+            {
+              projectName: r.project,
+              expectedStatus: r.expectedStatus,
+              status: r.status,
+              annotations: r.annotations,
+              results: r.results,
+            },
+          ],
+        })),
+      },
+    ],
+  });
   return {
-    schema: 2,
+    native: {
+      discovery: report(rows.map((r) => ({ ...r, results: [] }))),
+      execution: report(rows),
+    },
+    schema: 3,
     policy: policyHash,
     profiles: ['ordinary'],
     status: 'passed',
@@ -63,7 +111,7 @@ function fixture() {
     sourceContext,
     receipts,
     inventory: {
-      ordinary: receipts.flatMap((r: { outcomes: unknown[] }) => structuredClone(r.outcomes)),
+      ordinary: rows.map((r) => ({ ...r, results: [] })),
     },
     partitions: receipts.length,
     selected: receipts.reduce((n: number, r: { selected: unknown[] }) => n + r.selected.length, 0),

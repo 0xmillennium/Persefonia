@@ -43,7 +43,7 @@ class SecurityPublicRouteTest {
 
     @Test
     void safePublicMissesReturnNotFoundWithoutAnAuthenticationRedirect() throws Exception {
-        for (String path : List.of("/not-a-public-route", "/contact/", "/search/", "/en/contact",
+        for (String path : List.of("/not-a-public-route", "/__admin_preview/session", "/contact/", "/search/", "/en/contact",
                 "/tr/contact", "/de/projects", "/de/articles/slug", "/en/projects/")) {
             for (String method : List.of("GET", "HEAD")) {
                 var response = httpClient.send(HttpRequest.newBuilder(uri(path)).header("Accept", "text/html")

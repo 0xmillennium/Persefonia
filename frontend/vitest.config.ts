@@ -6,6 +6,6 @@ export default defineConfig({
     environment: 'node',
     isolate: false,
     maxWorkers: 2,
-    testTimeout: 180_000,
+    testTimeout: process.env.PERSEFONIA_PHYSICS_PROFILE === 'deep' ? 30_000 : 10_000,
   },
 });

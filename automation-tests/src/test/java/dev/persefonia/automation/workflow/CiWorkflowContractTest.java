@@ -130,7 +130,7 @@ class CiWorkflowContractTest {
 
     @Test
     void automationFailsBeforeApplicationInfrastructureStarts() {
-        assertThat(workflow.jobs()).containsOnlyKeys("automation", "eligibility", "compare", "build-jvm", "frontend", "verify", "browser", "browser-receipts", "gate");
+        assertThat(workflow.jobs()).containsOnlyKeys("automation", "eligibility", "compare", "build-jvm", "frontend", "verify", "browser", "gate");
         Map<String, Object> automation = workflow.job("automation");
         Map<String, Object> verify = workflow.job("build-jvm");
         assertThat(WorkflowDocument.map(automation.get("permissions")))
@@ -283,21 +283,31 @@ class CiWorkflowContractTest {
     }
 
     @Test
-    void browserReceiptsRequireIndependentCompleteDiscoveryAndExactArtifactIdentity() {
-        var receipts = workflow.job("browser-receipts");
-        assertThat(receipts.get("if")).isEqualTo("always()");
-        assertThat(WorkflowDocument.list(receipts.get("needs"))).containsExactlyInAnyOrder("eligibility", "compare", "build-jvm", "browser");
-        assertThat(workflow.step("browser-receipts", "Reconcile independent discovery and execution").get("run"))
-                .asString().contains("npm ci --prefix frontend", "browser-join.mjs");
-        var download = WorkflowDocument.map(workflow.step("browser-receipts", "Download browser receipts").get("with"));
-        assertThat(download).containsEntry("pattern", "persefonia-browser-receipt-*-${{ github.sha }}")
-                .containsEntry("merge-multiple", true);
-        assertThat(WorkflowDocument.map(workflow.step("browser", "Upload browser verification receipts").get("with")))
-                .containsEntry("if-no-files-found", "error").containsEntry("retention-days", 14);
-        assertThat(workflow.step("browser", "Upload browser verification receipts").get("if")).isEqualTo("always()");
+    void trustedGateOwnsIndependentNativeAdmissionWithoutAnotherInstall() {
+        assertGateNativeAdmission(workflow);
+        assertThat(workflow.jobs()).doesNotContainKey("browser-receipts");
+        var changed = openCi();
+        changed.step("gate", "Download browser receipts and raw reports").put("if", "false");
+        final var filtered = changed;
+        assertThatThrownBy(() -> assertGateNativeAdmission(filtered)).isInstanceOf(AssertionError.class);
+        changed = openCi();
+        WorkflowDocument.map(changed.step("gate", "Download browser receipts and raw reports").get("with"))
+                .put("name", "persefonia-browser-acceptance-${{ github.sha }}");
+        final var forged = changed;
+        assertThatThrownBy(() -> assertGateNativeAdmission(forged)).isInstanceOf(AssertionError.class);
         assertFinalizedTimingHandoff(workflow);
-        assertThat(workflow.step("build-jvm", "Verify BootJar").get("run")).asString().contains("source-sha.txt", "$GITHUB_SHA");
-        assertThat(workflow.step("browser", "Stage verified browser artifact").get("run")).asString().contains("source-sha.txt", "$GITHUB_SHA");
+    }
+
+    private static void assertGateNativeAdmission(WorkflowDocument ci) {
+        var download = ci.step("gate", "Download browser receipts and raw reports");
+        assertThat(download.get("if")).isEqualTo("needs.compare.outputs.reuse != 'true'");
+        assertThat(WorkflowDocument.map(download.get("with")))
+                .containsEntry("name", "persefonia-browser-receipt-native-${{ github.sha }}")
+                .containsEntry("path", "app/build/browser/verification");
+        assertThat(ci.step("gate", "Require successful identity-bound qualification").get("run"))
+                .isEqualTo("python3 scripts/ci/verification-summary.py gate");
+        assertThat(ci.steps("gate").stream().map(WorkflowDocument::map))
+                .noneMatch(step -> String.valueOf(step.get("run")).contains("npm ci"));
     }
 
 
@@ -319,6 +329,8 @@ class CiWorkflowContractTest {
         assertThat(((String) WorkflowDocument.map(ci.step("browser", "Upload browser verification receipts")
                 .get("with")).get("path")).lines().toList())
                 .containsExactly("app/build/browser/verification/*-receipt.json",
+                        "app/build/browser/verification/native-discovery.json",
+                        "app/build/browser/verification/native-results.json",
                         "app/build/browser/verification/*-timings.jsonl");
     }
 
@@ -326,7 +338,7 @@ class CiWorkflowContractTest {
     void stableVerifyAndGateAlwaysReachStrictIdentityBoundAdmission() {
         assertThat(workflow.job("verify").get("name")).isEqualTo("Verify");
         assertThat(workflow.job("gate").get("name")).isEqualTo("Gate");
-        for (String job : List.of("verify", "gate", "browser-receipts")) {
+        for (String job : List.of("verify", "gate")) {
             assertThat(workflow.job(job).get("if")).isEqualTo("always()");
             assertThat(workflow.job(job)).doesNotContainKeys("services", "environment");
             assertThat(WorkflowDocument.map(workflow.job(job).get("permissions")))
@@ -335,7 +347,7 @@ class CiWorkflowContractTest {
         assertThat(WorkflowDocument.list(workflow.job("verify").get("needs")))
                 .containsExactlyInAnyOrder("automation", "eligibility", "compare", "build-jvm", "frontend");
         assertThat(WorkflowDocument.list(workflow.job("gate").get("needs")))
-                .containsExactlyInAnyOrder("automation", "eligibility", "compare", "build-jvm", "frontend", "verify", "browser", "browser-receipts");
+                .containsExactlyInAnyOrder("automation", "eligibility", "compare", "build-jvm", "frontend", "verify", "browser");
         assertThat(workflow.step("verify", "Validate producer identities and non-browser admission").get("run"))
                 .isEqualTo("python3 scripts/ci/verification-summary.py verify");
         assertThat(workflow.step("gate", "Require successful identity-bound qualification").get("run"))
@@ -352,7 +364,7 @@ class CiWorkflowContractTest {
         assertThat(workflow.job("frontend").get("if")).asString()
                 .contains("!cancelled()", "needs.automation.result == 'success'", "needs.eligibility.result == 'success'",
                         "needs.compare.result == 'skipped'", "needs.compare.result == 'success'", "needs.compare.outputs.reuse != 'true'");
-        assertThat(workflow.step("frontend", "Execute ordinary frontend and risk-required physics").get("run"))
+        assertThat(workflow.step("frontend", "Execute fixed ordinary frontend tests").get("run"))
                 .asString().contains("unit-run.mjs").doesNotContain("test:unit");
         assertThat(workflow.step("frontend", "Set up Temurin Java 25")).isNotEmpty();
         assertThat(workflow.step("frontend", "Prepare media tools").get("run"))
@@ -361,7 +373,7 @@ class CiWorkflowContractTest {
                 .containsEntry("CI_QUALIFICATION_REUSE", "${{ vars.CI_QUALIFICATION_REUSE }}");
         assertThat(workflow.job("compare").get("if")).isEqualTo("needs.eligibility.outputs.eligible == 'true'");
         assertThat(workflow.step("compare", "Build preliminary production candidate").get("run"))
-                .asString().contains("clean :app:bootJar qualificationInputs").doesNotContain("applicationJvmCheck");
+                .asString().contains(":app:bootJar qualificationInputs").doesNotContain("applicationJvmCheck");
         String root = Files.readString(Path.of("../build.gradle.kts"));
         String app = Files.readString(Path.of("../app/build.gradle.kts"));
         assertThat(root).contains("applicationJvmCheck", "applicationCheck", "frontendCheck", "automationCheck");
@@ -370,45 +382,39 @@ class CiWorkflowContractTest {
     }
 
     @Test
-    void adminNativeRetainsTheOwnJvmWorkspaceAndCannotBeReplacedByPublicSmoke() {
-        assertAdminNative(workflow);
-        for (String name : List.of("Select required admin native owner", "Export own-workspace admin test runtime",
-                "Qualify isolated required admin native forms", "Upload isolated admin native receipt")) {
+    void actualWorkflowNamesMatchReuseAndDeliveryAdmission() throws Exception {
+        var result = CommandRunner.command("python3").args("-B", "-c",
+                "import sys; sys.path.insert(0,'scripts/ci'); import qualification as q; print('\\n'.join(q.CI_JOBS))")
+                .directory(Path.of("..")).run();
+        result.requireSuccess();
+        assertThat(workflow.jobs().values().stream().map(WorkflowDocument::map)
+                .map(job -> (String) job.get("name")))
+                .containsExactlyInAnyOrderElementsOf(result.stdout().lines().toList());
+    }
+
+    @Test
+    void ordinaryJobsStayBoundedAndNeverInjectAdminOrDeepProfiles() throws IOException {
+        assertLeanContract(workflow);
+        for (String mutation : List.of("native-budget", "admin", "deep")) {
             var changed = openCi();
-            WorkflowDocument.list(changed.job("build-jvm").get("steps")).removeIf(step ->
-                    name.equals(WorkflowDocument.map(step).get("name")));
-            assertThatThrownBy(() -> assertAdminNative(changed)).isInstanceOfAny(AssertionError.class, IllegalArgumentException.class);
+            if (mutation.equals("native-budget")) changed.job("browser").put("timeout-minutes", 35);
+            else WorkflowDocument.list(changed.job("build-jvm").get("steps")).add(Map.of("name", "unwanted", "run",
+                    mutation.equals("admin") ? "python3 scripts/ci/admin-preview.py required" : "npm run test:unit:stress"));
+            assertThatThrownBy(() -> assertLeanContract(changed)).as(mutation).isInstanceOf(AssertionError.class);
         }
-        var changed = openCi();
-        changed.step("build-jvm", "Qualify isolated required admin native forms").put("run", "npm run test:browser");
-        assertThatThrownBy(() -> assertAdminNative(changed)).isInstanceOf(AssertionError.class);
-        var nested = openCi();
-        WorkflowDocument.map(nested.step("build-jvm", "Upload isolated admin native receipt").get("with"))
-                .put("path", "app/build/browser/verification/admin-*-receipt.json\napp/build/admin-browser/timings.jsonl");
-        assertThatThrownBy(() -> assertAdminNative(nested)).isInstanceOf(AssertionError.class);
+        String lifecycle = Files.readString(Path.of("../frontend/scripts/verification/browser-lifecycle.mjs"));
+        assertThat(lifecycle).contains("playwright('ordinary', [], discoveryPath, true)",
+                "playwright('ordinary', [], resultsPath)").doesNotContain("browser-run.mjs");
     }
 
-    private static void assertAdminNative(WorkflowDocument ci) {
-        assertThat(ci.step("build-jvm", "Select required admin native owner").get("run"))
-                .isEqualTo("python3 -B scripts/ci/admin-preview.py required");
-        var runtime = ci.step("build-jvm", "Export own-workspace admin test runtime");
-        assertThat(runtime.get("if")).isEqualTo("steps.admin_risk.outputs.admin_required == 'true'");
-        assertThat(runtime.get("run")).asString().contains(":app:writeAdminPreviewClasspath")
-                .doesNotContain("clean", "testClasses", "--rerun-tasks");
-        var nativeStep = ci.step("build-jvm", "Qualify isolated required admin native forms");
-        assertThat(nativeStep.get("if")).isEqualTo("steps.admin_risk.outputs.admin_required == 'true'");
-        assertThat(nativeStep.get("run")).isEqualTo("bash scripts/browser/check.sh");
-        assertThat(WorkflowDocument.map(nativeStep.get("env")))
-                .containsEntry("PERSEFONIA_BROWSER_SUITE", "admin").containsEntry("PERSEFONIA_BROWSER_PORT", "18081");
-        var upload = WorkflowDocument.map(ci.step("build-jvm", "Upload isolated admin native receipt").get("with"));
-        assertThat(upload).containsEntry("name", "persefonia-browser-receipt-admin-${{ github.sha }}")
-                .containsEntry("if-no-files-found", "error");
-        assertThat(upload.get("path")).asString()
-                .contains("app/build/browser/verification/admin-*-receipt.json",
-                        "app/build/browser/verification/admin-setup-timings.jsonl")
-                .doesNotContain("app/build/admin-browser");
-        assertThat(ci.step("build-jvm", "Retain finalized admin timings").get("if")).asString()
-                .contains("always()", "steps.admin_risk.outputs.admin_required == 'true'");
+    private static void assertLeanContract(WorkflowDocument ci) {
+        assertThat(((Number) ci.job("browser").get("timeout-minutes")).intValue()).isLessThanOrEqualTo(8);
+        assertThat(((Number) ci.step("browser", "Qualify shared native lifecycle").get("timeout-minutes")).intValue())
+                .isLessThanOrEqualTo(6);
+        for (String job : List.of("build-jvm", "frontend", "browser")) {
+            assertThat(ci.steps(job).stream().map(WorkflowDocument::map)
+                    .map(step -> String.valueOf(step.get("run"))))
+                    .noneMatch(run -> run.contains("admin-preview") || run.contains("test:unit:stress") || run.contains("--comprehensive"));
+        }
     }
-
 }

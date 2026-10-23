@@ -1,3 +1,4 @@
+import { runProcess } from './process.mjs';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync, mkdirSync, writeFileSync, renameSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -59,44 +60,40 @@ export function writeJson(path, value) {
   writeFileSync(`${path}.tmp`, JSON.stringify(value) + '\n');
   renameSync(`${path}.tmp`, path);
 }
-export function playwright(suite, selection, destination, discover = false) {
+export async function playwright(suite, selection, destination, discover = false) {
+  if (suite !== 'ordinary' || selection.length)
+    throw new Error('Mandatory native execution accepts no filters');
   const started = performance.now();
-  const result = spawnSync(
+  const result = await runProcess(
     process.execPath,
     [
       join(frontend, 'node_modules/@playwright/test/cli.js'),
       'test',
       '--config',
-      suite === 'admin' ? 'playwright.admin.required.config.ts' : 'playwright.native.config.ts',
+      'playwright.native.config.ts',
       '--forbid-only',
       '--fail-on-flaky-tests',
       '--workers=1',
       '--retries=0',
       ...selection,
-      ...(discover ? ['--list', '--reporter=json'] : ['--global-timeout=1500000']),
+      ...(discover ? ['--list', '--reporter=json'] : ['--global-timeout=210000']),
     ],
     {
       cwd: frontend,
-      timeout: discover ? 120_000 : 1_560_000,
-      killSignal: 'SIGTERM',
       stdio: discover ? ['ignore', 'pipe', 'pipe'] : 'inherit',
       encoding: 'utf8',
       env: {
         ...process.env,
         CI: 'true',
-        PERSEFONIA_NATIVE_PROFILE: suite,
-        PERSEFONIA_ADMIN_PREVIEW_URL:
-          process.env.PERSEFONIA_ADMIN_PREVIEW_URL ?? 'http://127.0.0.1:18081',
-        PERSEFONIA_NATIVE_PROJECT:
-          selection.find((s) => s.startsWith('--project='))?.slice('--project='.length) ?? 'all',
         PLAYWRIGHT_JSON_OUTPUT_NAME: destination,
         PERSEFONIA_VERIFICATION_REPORT: destination,
       },
     },
+    discover ? 30_000 : 215_000,
   );
-  if (discover && result.status !== 0) console.error(result.stdout, result.stderr);
+  if (discover && result.exitCode !== 0) console.error(result.stdout, result.stderr);
   return {
-    exitCode: result.status ?? 1,
+    exitCode: result.exitCode,
     signal: result.signal,
     durationMs: performance.now() - started,
   };
@@ -112,7 +109,7 @@ export function sourceContext() {
   );
 }
 
-export function riskPlan() {
+export function verificationPlan() {
   return JSON.parse(
     execFileSync('python3', ['-B', join(repository, 'scripts/ci/selection.py')], {
       cwd: repository,

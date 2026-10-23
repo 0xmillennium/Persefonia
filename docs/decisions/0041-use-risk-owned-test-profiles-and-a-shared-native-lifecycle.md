@@ -2,11 +2,13 @@
 
 | Field | Value |
 |---|---|
-| Status | Accepted |
+| Status | Superseded |
 | Date | 2026-10-22 |
 | Scope | architecture / testing / operations |
 | Supersedes | ADR 0039 (selection and browser partition topology only) |
-| Superseded by | none |
+| Superseded by | ADR 0042 |
+
+Superseded by [ADR 0042](0042-use-fixed-lean-verification-and-explicit-diagnostics.md). The historical risk routing and comprehensive local check semantics below are no longer active.
 
 ## Context
 

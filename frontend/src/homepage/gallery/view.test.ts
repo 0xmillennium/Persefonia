@@ -68,3 +68,40 @@ it.each([0, 1, 8])(
     expect(category.inert).toBe(false);
   },
 );
+
+it('moves focus out of a departing collection and marks only its replacement interactive', () => {
+  const focused = {},
+    focus = vi.fn();
+  const groups = ['projects', 'articles'].map((category, index) => {
+    const value = {
+      ...node(),
+      querySelector: () => null,
+      querySelectorAll: () => [],
+      contains: (n: unknown) => index === 0 && n === focused,
+    };
+    value.dataset.category = category;
+    return value;
+  });
+  const directory = { querySelector: () => ({ focus }) };
+  vi.stubGlobal('document', { activeElement: focused });
+  vi.stubGlobal('getComputedStyle', () => ({ opacity: '1', transform: 'none' }));
+  const root = {
+    ...node(),
+    querySelectorAll: (s: string) => (s === '.gallery-category' ? groups : []),
+    querySelector: (s: string) =>
+      s === '.gallery-instrument'
+        ? directory
+        : s === '.gallery-space'
+          ? { clientWidth: 1200 }
+          : node(),
+  };
+  const owner = galleryView(root as unknown as HTMLElement, new AbortController().signal);
+  owner.select(owner.groups[1]!, owner.groups[0]!);
+  expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+  expect(groups[0]!.hidden).toBe(true);
+  expect(groups[0]!.inert).toBe(true);
+  expect(groups[1]!.hidden).toBe(false);
+  expect(groups[1]!.inert).toBe(false);
+  expect(root.dataset.category).toBe('articles');
+  owner.dispose();
+});

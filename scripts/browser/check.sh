@@ -2,9 +2,9 @@
 set -euo pipefail
 
 project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-browser_suite="${PERSEFONIA_BROWSER_SUITE:-all}"
+browser_suite="${PERSEFONIA_BROWSER_SUITE:-native}"
 case "$browser_suite" in
-  all|chromium|cross|native|admin) ;;
+  native|diagnostics|admin) ;;
   *) printf 'Unknown browser suite: %s\n' "$browser_suite" >&2; exit 2 ;;
 esac
 # Refuse an existing local server before provisioning or reading any page.
@@ -17,10 +17,10 @@ try:
 except (OSError, ValueError, OverflowError):
     raise SystemExit('Browser application port is unavailable; refusing to test an existing server') from None
 PYTHON
-if [[ ( "$browser_suite" == native || "$browser_suite" == admin ) && $# -ne 0 ]]; then
+if [[ "$browser_suite" == native && $# -ne 0 ]]; then
   echo 'Native qualification does not accept project/file filters' >&2; exit 2
 fi
-if [[ -n "${CI:-}" && "$browser_suite" != native && "$browser_suite" != admin ]]; then
+if [[ -n "${CI:-}" && "$browser_suite" != native ]]; then
   echo 'CI requires the source-owned native lifecycle, not legacy suite filters' >&2; exit 2
 fi
 if [[ "$browser_suite" == native ]]; then
@@ -37,7 +37,7 @@ fi
 python3 "$project_root/scripts/ci/measure.py" browser-provision "$PERSEFONIA_TIMINGS_FILE" \
   bash "$project_root/scripts/browser/provision.sh" "$browser_suite" "$provision_project"
 browser_display=()
-if [[ "$OSTYPE" == linux* && -z "${DISPLAY:-}" && "$browser_suite" != admin && "$browser_suite" != chromium && "$provision_project" != webkit-desktop ]]; then
+if [[ "$OSTYPE" == linux* && -z "${DISPLAY:-}" && "$browser_suite" != admin && "$provision_project" != webkit-desktop ]]; then
   # Firefox still needs a display for software WebGL when launched headless.
   if ! command -v xvfb-run >/dev/null; then
     echo 'Firefox WebGL requires xvfb-run. Provision with PERSEFONIA_BROWSER_WITH_DEPS=1.' >&2
@@ -61,10 +61,10 @@ cleanup() {
   trap - EXIT
   cleanup_started_ns=$(python3 -c 'import time; print(time.monotonic_ns())')
   if [[ -n "$app_pid" ]]; then
-    kill -TERM "$app_pid" 2>/dev/null || true
+    kill -TERM -- "-$app_pid" 2>/dev/null || true
     deadline=$((SECONDS + 10))
     while kill -0 "$app_pid" 2>/dev/null && (( SECONDS < deadline )); do sleep 1; done
-    if kill -0 "$app_pid" 2>/dev/null; then kill -KILL "$app_pid" 2>/dev/null || true; fi
+    if kill -0 "$app_pid" 2>/dev/null; then kill -KILL -- "-$app_pid" 2>/dev/null || true; fi
     wait "$app_pid" 2>/dev/null || true
   fi
   if ! timeout 15s docker rm -f "$container_name" >/dev/null 2>&1; then
@@ -105,7 +105,7 @@ if [[ "$browser_suite" == admin ]]; then
   preview_arguments=(--persefonia.preview.disposable=true)
   export PERSEFONIA_ADMIN_PREVIEW_URL="$PERSEFONIA_BROWSER_URL"
 fi
-"${app_command[@]}" "${preview_arguments[@]}" \
+setsid "${app_command[@]}" "${preview_arguments[@]}" \
   --spring.profiles.active=test \
   --server.address=127.0.0.1 \
   "--spring.datasource.url=jdbc:postgresql://127.0.0.1:$db_port/persefonia_browser" \
@@ -140,22 +140,11 @@ fi
 python3 "$project_root/scripts/ci/record-timing.py" "$PERSEFONIA_TIMINGS_FILE" fixtures "$phase_started_ns"
 (
   cd "$project_root/frontend"
-  # Opt-in local receipts use the same guarded runner without requesting CI's OS provisioning.
-  if [[ "$browser_suite" == native || "$browser_suite" == admin || -n "${CI:-}" || -n "${PERSEFONIA_BROWSER_RECEIPTS:-}" ]]; then
-    if [[ "$browser_suite" == native ]]; then
-      "${browser_display[@]}" node scripts/verification/browser-lifecycle.mjs
-    elif [[ "$browser_suite" == admin ]]; then
-      node scripts/verification/browser-run.mjs admin --project admin-desktop
-    else
-      echo 'CI requires the source-owned native lifecycle, not legacy suite filters' >&2
-      exit 2
-    fi
-    exit
-  fi
-  if [[ "$browser_suite" != cross ]]; then
-    "${browser_display[@]}" npm run test:browser:comprehensive -- "$@"
-  fi
-  if [[ "$browser_suite" != chromium ]]; then
-    "${browser_display[@]}" npm run test:browser:cross:comprehensive -- "$@"
+  if [[ "$browser_suite" == native ]]; then
+    "${browser_display[@]}" node scripts/verification/browser-lifecycle.mjs
+  elif [[ "$browser_suite" == admin ]]; then
+    node node_modules/playwright/cli.js test --config playwright.admin.config.ts "$@"
+  else
+    "${browser_display[@]}" node node_modules/playwright/cli.js test --config playwright.diagnostics.config.ts "$@"
   fi
 )

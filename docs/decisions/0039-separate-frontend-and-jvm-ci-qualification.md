@@ -6,7 +6,9 @@
 | Date | 2026-10-21 |
 | Scope | architecture / testing / operations |
 | Supersedes | ADR 0031 |
-| Superseded by | ADR 0041 (selection and browser partition topology only) |
+| Superseded by | ADR 0042 (selection, browser topology and local check semantics) |
+
+[ADR 0042](0042-use-fixed-lean-verification-and-explicit-diagnostics.md) now governs fixed ordinary tests, explicit diagnostics and Gate-owned native admission. The historical stress and eight-partition topology below is superseded; separate Build/JVM, Frontend, Verify and Gate ownership remains.
 
 ## Context
 

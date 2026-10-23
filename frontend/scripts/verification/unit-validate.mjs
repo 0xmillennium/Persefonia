@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { frontend, riskPlan } from './browser-runtime.mjs';
+import { frontend, verificationPlan } from './browser-runtime.mjs';
 import {
   validateUnitAttempts,
   validateUnitExecution,
@@ -12,8 +12,8 @@ import {
 import { policyHash } from './selection-policy.mjs';
 const receipt = JSON.parse(readFileSync(process.argv[2], 'utf8'));
 const native = receipt.native;
-const plan = riskPlan();
-const physicsProfile = plan.required.some((p) => p.startsWith('physics-')) ? 'deep' : 'ordinary';
+const plan = verificationPlan();
+const physicsProfile = 'ordinary';
 if (
   receipt.unit.profile !== 'ordinary' ||
   receipt.unit.schema !== 2 ||

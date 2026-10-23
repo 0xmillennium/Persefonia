@@ -39,6 +39,22 @@ class BootJarContractTest {
         assertThat(run(empty, temporary.resolve("out-c")).status()).isNotZero();
     }
 
+    @Test
+    void rejectsTestOnlyAdminAuthenticationInsideTheProductionArtifact() throws Exception {
+        for (String entry : new String[] {
+                "BOOT-INF/classes/dev/persefonia/app/webadmin/preview/AdminBrowserPreview.class",
+                "BOOT-INF/lib/spring-boot-test-4.0.0.jar"}) {
+            Path source = jar(true, true);
+            Path extra = Files.createTempDirectory(temporary, "preview-");
+            Path member = extra.resolve(entry);
+            Files.createDirectories(member.getParent());
+            Files.writeString(member, "test-only fixture");
+            new CommandRunner(extra, temporary.resolve("home"), Duration.ofSeconds(10), Map.of())
+                    .run("zip", "-qr", source.toString(), ".").requireSuccess();
+            assertThat(run(source, temporary.resolve("rejected-preview")).status()).isNotZero();
+        }
+    }
+
     private Path jar(boolean libraries, boolean identity) throws Exception {
         return jar(libraries, identity, true);
     }

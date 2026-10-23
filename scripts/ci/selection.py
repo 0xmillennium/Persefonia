@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""Small ordered source-owned risk policy. Selection is recomputed from Git, never a job output."""
-import fnmatch
+"""Fixed ordinary verification contract, with Git provenance and no automatic diagnostics."""
 import hashlib
 import json
 import re
@@ -11,42 +10,30 @@ import qualification as q
 POLICY_PATH = Path(__file__).resolve().parents[2]/'frontend/scripts/verification/selection-policy.json'
 POLICY = q.read(POLICY_PATH)
 POLICY_HASH = hashlib.sha256(POLICY_PATH.read_bytes()).hexdigest()
-q.require(POLICY.get('schema') == 1 and POLICY.get('version') == 'ordinary-native-v1'
-          and POLICY.get('receiptSchema') == 2, 'Unknown selection policy schema/version')
-q.require(all(set(rule['require']) <= set(POLICY['deep']) for rule in POLICY['riskRules']),
-          'Unknown required deep family in source policy')
+q.require(POLICY.get('schema') == 2 and POLICY.get('version') == 'lean-native-v2'
+          and POLICY.get('receiptSchema') == 3, 'Unknown selection policy schema/version')
 
 
 def classify(changes, *, truncated=False):
-    q.require(not truncated and isinstance(changes, list) and 0 < len(changes) <= 5000,
-              'Empty/truncated/oversized changes: explicit classification required')
-    required = set()
-    owners = []
+    q.require(not truncated and isinstance(changes, list) and len(changes) <= 5000,
+              'Truncated/oversized changed-file inventory')
     seen = set()
     for row in changes:
         q.require(isinstance(row, dict), 'Malformed changed-file row')
         status = row.get('status')
-        ordinary = status in {'A', 'M'}
-        supported = isinstance(status, str) and (status in {'D', 'T'} or re.fullmatch(r'[RC](?:100|[0-9]{1,2})', status))
-        q.require(ordinary or (supported and row in POLICY['classifiedChanges']),
-                  'Deleted/renamed/type-changed path requires an exact reviewed classifiedChanges entry')
-        candidates = [row.get('path', '')]
-        if status and status.startswith(('R', 'C')): candidates.append(row.get('previous', ''))
-        for path in candidates:
+        q.require(isinstance(status, str) and (status in {'A', 'M', 'D', 'T'}
+                  or re.fullmatch(r'[RC](?:100|[0-9]{1,2})', status)), 'Malformed change status')
+        paths = [row.get('path', '')]
+        if status.startswith(('R', 'C')): paths.append(row.get('previous', ''))
+        for path in paths:
             q.require(isinstance(path, str) and path, 'Malformed changed path')
             pure = PurePosixPath(path)
             q.require(path == str(pure) and not pure.is_absolute() and '..' not in pure.parts
-                      and '\\' not in path and all(32 <= ord(c) < 127 for c in path),
-                      'Unsafe/ambiguous changed path: explicit classification required')
-            q.require(path not in seen, 'Duplicate/ambiguous changed path')
+                      and '\\' not in path and all(32 <= ord(c) < 127 for c in path), 'Unsafe changed path')
+            q.require(path not in seen, 'Duplicate changed path')
             seen.add(path)
-            # Narrow ordered owners win. Renames retain the union of old and new risks.
-            rule = next((r for r in POLICY['riskRules'] if any(fnmatch.fnmatchcase(path, p) for p in r['patterns'])), None)
-            q.require(rule is not None, f'Unclassified path: {path}; add a reviewed owner to selection-policy.json')
-            required.update(rule['require'])
-            owners.append({'path': path, 'owner': rule['owner']})
-    return {'schema': 1, 'policy': POLICY_HASH, 'required': ['ordinary', *sorted(required)],
-            'changes': q.digest(changes), 'owners': owners}
+    # Unknown, renamed and deleted source gets every ordinary check, never less coverage.
+    return {'schema': 2, 'policy': POLICY_HASH, 'required': ['ordinary'], 'changes': q.digest(changes)}
 
 
 def changed_paths(source):
@@ -57,6 +44,9 @@ def changed_paths(source):
     elif source['event'] == 'push' and source['ref'] == 'refs/heads/master':
         q.require(len(source['parents']) in (1, 2), 'Unknown master history: qualification blocked')
         base = source['parents'][0]
+    elif source['event'] == 'workflow_dispatch':
+        q.require(q.SHA.fullmatch(source.get('sourceSha', '')), 'Malformed dispatch source')
+        base = source['sourceSha']
     elif source['event'] == 'local':
         base = 'HEAD'
     else:

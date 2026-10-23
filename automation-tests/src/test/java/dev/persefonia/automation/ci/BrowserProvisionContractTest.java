@@ -35,10 +35,8 @@ class BrowserProvisionContractTest {
         record Selection(String suite, String project, List<String> engines) {}
         for (String optIn : List.of("local", "CI", "PERSEFONIA_BROWSER_WITH_DEPS")) {
             for (var selection : List.of(
-                    new Selection("chromium", "*", List.of("chromium")),
-                    new Selection("cross", "firefox-desktop", List.of("firefox")),
-                    new Selection("cross", "webkit-desktop", List.of("webkit")),
-                    new Selection("all", "*", List.of("chromium", "firefox", "webkit")),
+                    new Selection("admin", "*", List.of("chromium")),
+                    new Selection("diagnostics", "*", List.of("chromium", "firefox", "webkit")),
                     new Selection("native", "*", List.of("chromium", "firefox", "webkit")))) {
                 Files.deleteIfExists(packagesLog);
                 Files.deleteIfExists(Path.of(log + ".order"));

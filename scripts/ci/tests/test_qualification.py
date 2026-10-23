@@ -38,18 +38,27 @@ def browser_fixture(source, checksum):
             for i, c in enumerate(p['cases'])]
         ids = [r['id'] for r in outcomes]
         inventory.extend(copy.deepcopy(outcomes))
-        receipts.append({'schema': 2, 'policy': selection.POLICY_HASH, 'status': 'passed', 'exitCode': 0, 'errors': [],
+        receipts.append({'schema': 3, 'policy': selection.POLICY_HASH, 'status': 'passed', 'exitCode': 0, 'errors': [],
             'environment': {'browsers': {p['engine']: {'sha256': 'e'*64}}, 'ffmpeg': 'qualified ffmpeg', 'ffprobe': 'qualified ffprobe'},
             'partition': {'name': 'ordinary-'+p['name'], 'suite': 'ordinary', 'project': p['project'], 'shard': '1/1'},
             'identity': {'sourceSha': source['sourceSha'], 'artifactSha256': checksum}, 'sourceContext': source,
             'selectionPlan': fixture_plan(source), 'runner': {'run': source['run'], 'attempt': source['attempt']},
             'selected': ids, 'outcomes': outcomes,
             'selectionHash': __import__('hashlib').sha256(json.dumps(sorted(ids), separators=(',', ':')).encode()).hexdigest()})
-    return {'schema': 2, 'policy': selection.POLICY_HASH, 'profiles': ['ordinary'], 'status': 'passed',
+    return {'schema': 3, 'policy': selection.POLICY_HASH, 'profiles': ['ordinary'], 'status': 'passed',
         'sourceContext': source, 'selectionPlan': fixture_plan(source),
         'identity': {'sourceSha': source['sourceSha'], 'artifactSha256': checksum},
         'runner': {'run': source['run'], 'attempt': source['attempt']}, 'partitions': len(receipts),
-        'selected': len(inventory), 'receipts': receipts, 'inventory': {'ordinary': inventory}}
+        'selected': len(inventory), 'receipts': receipts, 'inventory': {'ordinary': [{**r,'results':[]} for r in inventory]},
+        'native': {'discovery': native_report([{**r,'results':[]} for r in inventory]), 'execution':native_report(inventory)}}
+
+
+def native_report(rows):
+    return {'config': {'forbidOnly':True,'fullyParallel':False,'workers':1,
+        'projects':[{'name':p['project'],'retries':0,'repeatEach':1} for p in selection.POLICY['native']]},
+        'errors':[], 'stats':{'expected':sum(bool(r['results']) for r in rows),'unexpected':0,'flaky':0,'skipped':0},
+        'suites':[{'specs':[{'id':r['id'].split(':',1)[1], 'file':r['file'],'title':r['title'],
+            'tests':[{'projectName':r['project'],**{k:r[k] for k in ['expectedStatus','annotations','results','status']}}]} for r in rows]}]}
 
 
 class GitIdentityFixture:
@@ -235,7 +244,7 @@ class QualificationContracts(unittest.TestCase):
 
     def test_admission_never_accepts_a_claimed_reuse_flag(self):
         jobs = {'automation': 'success', 'build-jvm': 'success', 'frontend': 'success',
-                'verify': 'success', 'browser': 'success', 'browser-receipts': 'success'}
+                'verify': 'success', 'browser': 'success'}
         q.job_results('executed', jobs)
         for key in jobs:
             for outcome in ('', 'failure', 'cancelled', 'skipped'):
@@ -321,7 +330,7 @@ class NativeReuseContracts(unittest.TestCase):
     def test_enforce_decision_is_source_bound_and_shadow_cannot_authorize_skips(self):
         q.validate_equivalence(self.decision, self.master, '2'*64)
         jobs = {'automation': 'success', 'build-jvm': 'skipped', 'frontend': 'skipped',
-                'verify': 'success', 'browser': 'skipped', 'browser-receipts': 'success'}
+                'verify': 'success', 'browser': 'skipped'}
         q.job_results('reused', jobs, self.decision, self.master, '2'*64)
         for key in ['tree', 'inputs', 'policy', 'workflowId', 'run', 'attempt', 'sourceSha']:
             bad = copy.deepcopy(self.decision); bad['master'][key] = 'wrong'
@@ -685,56 +694,76 @@ class NativePolicyAdmissionContracts(unittest.TestCase):
             elif mutation == 'missing-decoder': row['environment']['ffprobe'] = ''
             with self.subTest(mutation=mutation), self.assertRaises(ValueError): summary.validate_browser(bad,self.master,'2'*64)
 
-    def test_media_and_admin_risks_cannot_be_omitted_by_submitted_selection(self):
-        for path in ['frontend/src/homepage/film/seek-film.ts','web-admin/src/main/java/Form.java']:
-            required = {**selection.classify([{'status':'M','path':path}]), 'source':self.master}
-            submitted = browser_fixture(self.master,'2'*64)
-            submitted['selectionPlan'] = required
-            with patch.object(selection,'plan',return_value=required), self.assertRaises(ValueError):
-                self.reuse.summary.validate_browser(submitted,self.master,'2'*64)
-
-
-    def test_required_physics_cannot_be_claimed_without_both_actual_seed_inventories(self):
-        required = {**selection.classify([{'status':'M','path':'frontend/src/identity/physics/core.ts'}]),'source':self.master}
-        unit = {'schema':2,'policy':selection.POLICY_HASH,'status':'passed','profile':'ordinary',
-                'physicsProfile':'deep','sourceSha':self.master['sourceSha'],'sourceContext':self.master,
-                'selectionPlan':required,'runner':{'run':'300','attempt':'1'},'cases':unit_cases(range(1,101)),'attempts':[{}]}
-        with patch.object(selection,'plan',return_value=required):
-            self.reuse.summary.validate_unit(unit,self.master)
-            for mutation in ['ordinary-claim','missing-deep','missing-live','duplicate','cached-only','attempt']:
-                bad=copy.deepcopy(unit)
-                if mutation=='ordinary-claim': bad['physicsProfile']='ordinary'
-                elif mutation=='missing-deep': bad['cases']=unit_cases()
-                elif mutation=='missing-live': bad['cases']=bad['cases'][:100]
-                elif mutation=='duplicate': bad['cases'].append(copy.deepcopy(bad['cases'][0]))
-                elif mutation=='cached-only': bad['attempts']=[]
-                elif mutation=='attempt': bad['runner']['attempt']='2'
-                with self.subTest(mutation=mutation),self.assertRaises(ValueError):
-                    self.reuse.summary.validate_unit(bad,self.master)
-
-
-    def test_complete_required_admin_native_is_source_owned_and_cannot_use_public_evidence(self):
-        required = {**selection.classify([{'status':'M','path':'web-admin/src/main/java/Form.java'}]),'source':self.master}
+    def test_submitted_plan_cannot_expand_or_narrow_the_fixed_contract(self):
         value=browser_fixture(self.master,'2'*64)
-        value.update(profiles=['ordinary','admin'],selectionPlan=required)
-        for receipt in value['receipts']: receipt['selectionPlan']=required
-        owner=selection.POLICY['adminNative'][0]
-        admin=copy.deepcopy(value['receipts'][0])
-        admin['partition']={'name':'admin-preview','suite':'admin','project':'admin-desktop','shard':'1/1'}
-        admin['runner']['job']='build-jvm'
-        admin['outcomes']=[{**case,'id':'admin:'+str(i),'project':'admin-desktop','expectedStatus':'passed','status':'expected','annotations':[],'results':[{'status':'passed','retry':0,'duration':1}]} for i,case in enumerate(owner['cases'])]
-        admin['selected']=[row['id'] for row in admin['outcomes']]
-        admin['selectionHash']=__import__('hashlib').sha256(json.dumps(sorted(admin['selected']),separators=(',',':')).encode()).hexdigest()
-        value['receipts'].append(admin);value['inventory']['admin']=copy.deepcopy(admin['outcomes'])
-        value['partitions']+=1;value['selected']+=len(admin['selected'])
-        with patch.object(selection,'plan',return_value=required):
-            self.reuse.summary.validate_browser(value,self.master,'2'*64)
-            for mutation in ['missing','public','skip','foreign','attempt']:
-                bad=copy.deepcopy(value);receipt=bad['receipts'][-1]
-                if mutation=='missing': bad['receipts'].pop()
-                elif mutation=='public': receipt['outcomes']=copy.deepcopy(bad['receipts'][0]['outcomes'])
-                elif mutation=='skip': receipt['outcomes'][0]['results'][0]['status']='skipped'
-                elif mutation=='foreign': receipt['runner']['job']='browser'
-                elif mutation=='attempt': receipt['runner']['attempt']='2'
-                with self.subTest(mutation=mutation),self.assertRaises(ValueError):
-                    self.reuse.summary.validate_browser(bad,self.master,'2'*64)
+        for required in [[],['ordinary','media'],['ordinary','admin'],['ordinary','physics-live']]:
+            bad=copy.deepcopy(value);bad['selectionPlan']['required']=required
+            with self.subTest(required=required), self.assertRaises(ValueError):
+                self.reuse.summary.validate_browser(bad,self.master,'2'*64)
+
+    def test_ordinary_physics_requires_both_exact_representative_corpora_and_actual_attempts(self):
+        plan=fixture_plan(self.master)
+        unit={'schema':2,'policy':selection.POLICY_HASH,'status':'passed','profile':'ordinary',
+            'physicsProfile':'ordinary','sourceSha':self.master['sourceSha'],'sourceContext':self.master,
+            'selectionPlan':plan,'runner':{'run':'300','attempt':'1'},'cases':unit_cases(),'attempts':[{}]}
+        self.reuse.summary.validate_unit(unit,self.master)
+        for mutation in ['deep','missing','duplicate','cached-only','attempt']:
+            bad=copy.deepcopy(unit)
+            if mutation=='deep': bad['physicsProfile']='deep';bad['cases']=unit_cases(range(1,101))
+            elif mutation=='missing': bad['cases'].pop()
+            elif mutation=='duplicate': bad['cases'].append(copy.deepcopy(bad['cases'][0]))
+            elif mutation=='cached-only': bad['attempts']=[]
+            elif mutation=='attempt': bad['runner']['attempt']='2'
+            with self.subTest(mutation=mutation),self.assertRaises(ValueError):
+                self.reuse.summary.validate_unit(bad,self.master)
+
+    def test_gate_rejects_forged_raw_reports_even_with_valid_success_summaries(self):
+        valid=browser_fixture(self.master,'2'*64)
+        for mutation in ['no-raw','focus','parallel','project','retry-policy','runner-error','empty','missing','extra','renamed','failed','retried','stats','forged-id']:
+            bad=copy.deepcopy(valid)
+            report=bad['native']['execution']
+            spec=report['suites'][0]['specs'][0]
+            if mutation=='no-raw': bad.pop('native')
+            elif mutation=='focus': report['config']['forbidOnly']=False
+            elif mutation=='parallel': report['config']['workers']=2
+            elif mutation=='project': report['config']['projects'].pop()
+            elif mutation=='retry-policy': report['config']['projects'][0]['retries']=1
+            elif mutation=='runner-error': report['errors']=[{'message':'crashed'}]
+            elif mutation=='empty': report['suites']=[]
+            elif mutation=='missing': report['suites'][0]['specs'].pop()
+            elif mutation=='extra': report['suites'][0]['specs'].append(copy.deepcopy(spec))
+            elif mutation=='renamed': spec['title']='forged'
+            elif mutation=='failed': spec['tests'][0]['results'][0]['status']='failed'
+            elif mutation=='retried': spec['tests'][0]['results'].append({'status':'passed','retry':1,'duration':1})
+            elif mutation=='stats': report['stats']['unexpected']=1
+            elif mutation=='forged-id': spec['id']='forged'
+            with self.subTest(mutation=mutation),self.assertRaises(ValueError):
+                self.reuse.summary.validate_browser(bad,self.master,'2'*64)
+
+    def test_gate_join_reads_actual_report_files_and_rejects_extra_or_incomplete_artifacts(self):
+        from browser_evidence import join
+        valid=browser_fixture(self.master,'2'*64)
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)
+            for r in valid['receipts']: q.write(root/(r['partition']['name']+'-1of1-receipt.json'),r)
+            q.write(root/'native-discovery.json',valid['native']['discovery'])
+            q.write(root/'native-results.json',valid['native']['execution'])
+            self.assertEqual(join(root,self.master,'2'*64)['selected'],14)
+            q.write(root/'extra-receipt.json',valid['receipts'][0])
+            with self.assertRaises(ValueError): join(root,self.master,'2'*64)
+            (root/'extra-receipt.json').unlink()
+            (root/'native-discovery.json').unlink()
+            with self.assertRaises(ValueError): join(root,self.master,'2'*64)
+
+    def test_node_admission_accepts_gate_serialization_and_rejects_forged_execution(self):
+        with tempfile.TemporaryDirectory() as temp:
+            file=Path(temp)/'acceptance.json'
+            valid=browser_fixture(self.master,'2'*64)
+            q.write(file,valid)
+            command=['node','frontend/scripts/verification/browser-admit.mjs',str(file),self.master['sourceSha'],'2'*64]
+            good=subprocess.run(command,cwd=q.ROOT,capture_output=True,text=True,timeout=10)
+            self.assertEqual(good.returncode,0,good.stderr)
+            valid['native']['execution']['suites'][0]['specs'][0]['title']='forged'
+            q.write(file,valid)
+            bad=subprocess.run(command,cwd=q.ROOT,capture_output=True,text=True,timeout=10)
+            self.assertNotEqual(bad.returncode,0)

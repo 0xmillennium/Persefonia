@@ -64,3 +64,23 @@ describe('homepage wheel path', () => {
     expect(wheelDestination(stops, 9100, 1)).toBe(9100);
   });
 });
+
+it('balances arbitrary pending forward/reverse notch bursts without visiting the whole page', () => {
+  const stops = wheelPath(5341, [6900, 7100, 7300], 8200, 9100, 120);
+  for (const burst of [1, 2, 3, 4, 6, 10]) {
+    const origin = 5280,
+      glide = new WheelGlide();
+    let y = origin,
+      time = 0;
+    for (const direction of [...Array(burst).fill(1), ...Array(burst).fill(-1)]) {
+      const pending = glide.active ? glide.target : y;
+      const next = wheelDestination(stops, pending, direction);
+      glide.cancel();
+      glide.retarget(y, next - y, 0, 9100, time);
+      y = glide.sample(time + 5);
+      time += 10;
+    }
+    expect(glide.target).toBe(origin);
+    expect(glide.sample(time + 1000)).toBe(origin);
+  }
+});

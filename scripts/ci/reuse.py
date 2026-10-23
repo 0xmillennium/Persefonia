@@ -264,7 +264,7 @@ def validate_native(directory, tested, checksum, rediscover=True):
     q.require(record['automation'] == q.digest(automation), 'Automation receipt mismatch')
     if rediscover:
         subprocess.run(['node', 'frontend/scripts/verification/unit-validate.mjs', str(directory/'frontend.json')], cwd=q.ROOT, check=True)
-        subprocess.run(['node', 'frontend/scripts/verification/browser-validate.mjs', str(directory/'browser-acceptance.json')], cwd=q.ROOT, check=True)
+        subprocess.run(['node', 'frontend/scripts/verification/browser-admit.mjs', str(directory/'browser-acceptance.json'), tested['sourceSha'], checksum], cwd=q.ROOT, check=True)
     return jvm, frontend, browser
 
 
