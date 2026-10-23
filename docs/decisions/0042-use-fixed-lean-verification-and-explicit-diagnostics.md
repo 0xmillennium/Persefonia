@@ -5,8 +5,10 @@
 | Status | Accepted |
 | Date | 2026-10-23 |
 | Scope | architecture / testing / operations |
-| Supersedes | ADR 0041; ADR 0039 (test selection, browser topology and local check semantics) |
+| Supersedes | ADR 0041, ADR 0039 |
 | Superseded by | none |
+
+This record supersedes ADR 0041 and only ADR 0039's test selection, browser topology and local check semantics.
 
 ## Context
 
