@@ -123,10 +123,7 @@ export function decompose(polygon: readonly Vec[]): Vec[][] {
 }
 
 type Bounds = Readonly<{ minx: number; maxx: number; miny: number; maxy: number }>;
-const boundsCache = new WeakMap<readonly Vec[], Bounds>();
-export function polygonBounds(p: readonly Vec[]): Bounds {
-  const cached = boundsCache.get(p);
-  if (cached) return cached;
+function measureBounds(p: readonly Vec[]): Bounds {
   let minx = Infinity,
     maxx = -Infinity,
     miny = Infinity,
@@ -137,9 +134,16 @@ export function polygonBounds(p: readonly Vec[]): Bounds {
     miny = Math.min(miny, v.y);
     maxy = Math.max(maxy, v.y);
   }
-  const result = { minx, maxx, miny, maxy };
-  boundsCache.set(p, result);
-  return result;
+  return { minx, maxx, miny, maxy };
+}
+const boundsCache = new WeakMap<readonly Vec[], Bounds>();
+export function polygonBounds(p: readonly Vec[]): Bounds {
+  let bounds = boundsCache.get(p);
+  if (!bounds) {
+    bounds = measureBounds(p);
+    boundsCache.set(p, bounds);
+  }
+  return bounds;
 }
 function projectionRange(points: readonly Vec[], axis: Vec): { min: number; max: number } {
   let min = Infinity,
@@ -193,7 +197,9 @@ const partBoundsCache = new WeakMap<readonly (readonly Vec[])[], readonly Bounds
 function partBounds(parts: readonly (readonly Vec[])[]): readonly Bounds[] {
   let bounds = partBoundsCache.get(parts);
   if (!bounds) {
-    bounds = parts.map(polygonBounds);
+    // This list already owns each subpart's bounds for the immutable pose.
+    // Avoid a second WeakMap entry for every small transformed subpart.
+    bounds = parts.map(measureBounds);
     partBoundsCache.set(parts, bounds);
   }
   return bounds;

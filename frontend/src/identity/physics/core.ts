@@ -21,6 +21,7 @@ import {
   circleCast,
   compoundSeparation,
   polygonBounds,
+  boundsGap,
 } from './math';
 import type { Vec, Contact } from './math';
 
@@ -138,7 +139,7 @@ export class PhysicsCore {
   private recentContacts = new Map<string, Contact>();
   private polygonCache = new WeakMap<
     Body,
-    { x: number; y: number; angle: number; vertices: Vec[]; parts: Vec[][] }
+    { x: number; y: number; angle: number; vertices: Vec[]; parts?: Vec[][] }
   >();
 
   // One entry per body pair, retaining only its last immutable world contours.
@@ -225,13 +226,15 @@ export class PhysicsCore {
       y: b.position.y,
       angle: b.angle,
       vertices,
-      parts: transformedParts(b.geometry, vertices, b.position, b.angle),
     });
     return vertices;
   }
   parts(b: Body): readonly (readonly Vec[])[] {
     this.vertices(b);
-    return this.polygonCache.get(b)!.parts;
+    const cached = this.polygonCache.get(b)!;
+    // Boundary and navigator queries need only the outer contour. Build convex
+    // subparts only when this exact pose participates in a fragment query.
+    return (cached.parts ??= transformedParts(b.geometry, cached.vertices, b.position, b.angle));
   }
   anchors(b: Body): { current: Vec; target: Vec }[] {
     return b.geometry.anchors.map((a) => ({
@@ -326,7 +329,8 @@ export class PhysicsCore {
       bv = this.vertices(b),
       cached = this.contactCache.get(key);
     if (cached?.a === av && cached.b === bv) return cached.contact;
-    const contact = polygonContact(av, bv, this.parts(a), this.parts(b));
+    const contact =
+      boundsGap(av, bv) > 0 ? null : polygonContact(av, bv, this.parts(a), this.parts(b));
     this.contactCache.set(key, { a: av, b: bv, contact });
     return contact;
   }
@@ -827,6 +831,7 @@ export class PhysicsCore {
           b = this.bodies[j]!;
         if (
           !this.permissions.ghosted(pairKey(a.geometry.id, b.geometry.id)) &&
+          boundsGap(this.vertices(a), this.vertices(b)) === 0 &&
           (polygonContact(this.vertices(a), this.vertices(b), this.parts(a), this.parts(b))
             ?.depth ?? 0) > PHYSICS.solidTolerance
         )
@@ -1097,7 +1102,8 @@ export class PhysicsCore {
           key = pairKey(a.geometry.id, b.geometry.id);
         const av = this.vertices(a),
           bv = this.vertices(b);
-        const contacts = polygonContacts(av, bv, this.parts(a), this.parts(b));
+        const contacts =
+          boundsGap(av, bv) > 0 ? [] : polygonContacts(av, bv, this.parts(a), this.parts(b));
         const c = contacts.reduce<Contact | null>(
           (deepest, c) => (!deepest || c.depth > deepest.depth ? c : deepest),
           null,

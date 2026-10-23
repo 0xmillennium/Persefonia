@@ -6,13 +6,17 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.io.ByteArrayInputStream;
 import java.util.List;
+import java.util.Map;
+import java.util.zip.GZIPInputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import org.springframework.boot.env.YamlPropertySourceLoader;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.boot.web.server.autoconfigure.ServerProperties;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.junit.jupiter.api.Test;
@@ -24,6 +28,7 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import dev.persefonia.app.assets.ViteAssetResolver;
+import dev.persefonia.app.assets.ViteManifestEntry;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
@@ -39,6 +44,7 @@ class ImmutableAssetDeliveryTest {
     @Autowired MockMvc mvc;
     @Autowired ViteAssetResolver assets;
     @Autowired ObjectMapper mapper;
+    @Autowired ServerProperties serverProperties;
     @LocalServerPort int port;
 
     @DynamicPropertySource
@@ -53,14 +59,19 @@ class ImmutableAssetDeliveryTest {
 
     @Test
     void productionTextCompressionPreservesNativeVideoRanges() throws Exception {
+        String scriptPath = compressionEligibleScriptPath();
         try (var client = HttpClient.newHttpClient()) {
             var script = client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port
-                    + assets.scriptPath("src/home.ts"))).header("Accept-Encoding", "gzip").GET().build(),
+                    + scriptPath)).header("Accept-Encoding", "gzip").GET().build(),
                     HttpResponse.BodyHandlers.ofByteArray());
             org.junit.jupiter.api.Assertions.assertEquals(200, script.statusCode());
             org.junit.jupiter.api.Assertions.assertEquals("gzip", script.headers().firstValue("Content-Encoding").orElseThrow());
             org.junit.jupiter.api.Assertions.assertEquals(0x1f, script.body()[0] & 0xff);
             org.junit.jupiter.api.Assertions.assertEquals(0x8b, script.body()[1] & 0xff);
+            try (var decoded = new GZIPInputStream(new ByteArrayInputStream(script.body()));
+                    var original = new ClassPathResource("static" + scriptPath).getInputStream()) {
+                org.junit.jupiter.api.Assertions.assertArrayEquals(original.readAllBytes(), decoded.readAllBytes());
+            }
             List<String> paths;
             try (var input = new ClassPathResource("static/assets/.vite/immutable-assets.json").getInputStream()) {
                 paths = mapper.readValue(input, new TypeReference<List<String>>() {});
@@ -73,6 +84,23 @@ class ImmutableAssetDeliveryTest {
             org.junit.jupiter.api.Assertions.assertEquals(16, range.body().length);
             org.junit.jupiter.api.Assertions.assertTrue(range.headers().firstValue("Content-Encoding").isEmpty());
         }
+    }
+
+    private String compressionEligibleScriptPath() throws Exception {
+        Map<String, ViteManifestEntry> manifest;
+        try (var input = new ClassPathResource(ViteAssetResolver.MANIFEST_CLASSPATH_LOCATION).getInputStream()) {
+            manifest = mapper.readValue(input, new TypeReference<>() {});
+        }
+        long minimumBytes = serverProperties.getCompression().getMinResponseSize().toBytes();
+        // Entry scripts can be tiny loaders. Exercise compression with an eligible built chunk.
+        for (ViteManifestEntry entry : manifest.values()) {
+            String path = "/assets/" + entry.file();
+            if (path.endsWith(".js") && new ClassPathResource("static" + path).contentLength() >= minimumBytes) {
+                return path;
+            }
+        }
+        throw new AssertionError("No built JavaScript asset meets the production compression threshold of "
+                + minimumBytes + " bytes");
     }
 
     @Test
