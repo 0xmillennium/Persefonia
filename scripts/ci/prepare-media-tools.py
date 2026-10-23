@@ -12,6 +12,19 @@ import tempfile
 import time
 
 
+APT_MIRRORS = Path('/etc/apt/apt-mirrors.txt')
+
+
+def azure_mirror_removals(path):
+    if path.is_symlink() or not path.is_file(): return ''
+    entries = [line.split('#', 1)[0].split() for line in path.read_text(encoding='utf-8').splitlines()]
+    addresses = [entry[0].rstrip('/') if entry else '' for entry in entries]
+    if 'https://archive.ubuntu.com/ubuntu' not in addresses: return ''
+    return ';'.join(f'{index+1}d' for index, address in enumerate(addresses)
+                    if address in ('http://azure.archive.ubuntu.com/ubuntu',
+                                   'https://azure.archive.ubuntu.com/ubuntu'))
+
+
 def write_record(path, record):
     temporary = path.with_suffix('.tmp')
     temporary.write_text(json.dumps(record, indent=2)+'\n', encoding='utf-8')
@@ -102,17 +115,25 @@ def prepare(mode, report_dir):
                 sudo = shutil.which('sudo')
                 if not sudo: raise ValueError('install-policy: root or noninteractive sudo privilege is required')
                 privilege = [sudo, '-n']
-            # Use the runner's configured signed distribution repositories, without changing sources.
-            update, _, _ = command('apt-update', [*privilege, apt, 'update'], 180)
-            package_failure = update.get('failureReason')
+            package_failure = None
+            if os.environ.get('GITHUB_ACTIONS') == 'true' and os.environ.get('RUNNER_ENVIRONMENT') == 'github-hosted':
+                # Azure archive downloads can trickle indefinitely despite apt's idle timeout.
+                # Prefer the runner's existing signed HTTPS Ubuntu archive; local/self-hosted
+                # sources and unrecognized mirror configurations remain unchanged.
+                removals = azure_mirror_removals(APT_MIRRORS)
+                if removals:
+                    preference, _, _ = command('apt-mirror-preference',
+                        [*privilege, shutil.which('sed') or 'sed', '-i', removals, str(APT_MIRRORS)], 10)
+                    package_failure = preference.get('failureReason')
+            if package_failure is None:
+                update, _, _ = command('apt-update', [*privilege, apt, 'update'], 180)
+                package_failure = update.get('failureReason')
             if package_failure is None:
                 install, _, _ = command('apt-install', [*privilege, apt, 'install', '-y',
                                        '--no-install-recommends', 'ffmpeg'], 300)
                 package_failure = install.get('failureReason')
             post_failure = probe('post-install-check')
             failure = package_failure or post_failure or None
-            if package_failure and privilege:
-                failure += '; noninteractive sudo must permit the package operation'
         # Package metadata is diagnostic only; executable readiness remains authoritative.
         dpkg = shutil.which('dpkg-query')
         if dpkg and sys.platform == 'linux':
