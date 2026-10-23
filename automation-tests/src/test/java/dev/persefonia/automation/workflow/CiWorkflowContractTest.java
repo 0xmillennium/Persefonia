@@ -130,7 +130,7 @@ class CiWorkflowContractTest {
 
     @Test
     void automationFailsBeforeApplicationInfrastructureStarts() {
-        assertThat(workflow.jobs()).containsOnlyKeys("automation", "eligibility", "compare", "build-jvm", "frontend", "verify", "browser", "browser-receipts", "gate");
+        assertThat(workflow.jobs()).containsOnlyKeys("automation", "eligibility", "compare", "build-jvm", "frontend", "verify", "browser", "gate");
         Map<String, Object> automation = workflow.job("automation");
         Map<String, Object> verify = workflow.job("build-jvm");
         assertThat(WorkflowDocument.map(automation.get("permissions")))
@@ -196,7 +196,7 @@ class CiWorkflowContractTest {
     void browserMatrixRequiresTheVerifiedArtifactAndAllQualificationSteps() {
         assertBrowserQualification(workflow);
         for (String name : List.of("Download verified BootJar", "Stage verified browser artifact",
-                "Install browser matrix", "Qualify production homepage and browser matrix")) {
+                "Install locked native dependencies", "Qualify shared native lifecycle")) {
             WorkflowDocument missing = openCi();
             WorkflowDocument.list(missing.job("browser").get("steps")).removeIf(step ->
                     name.equals(WorkflowDocument.map(step).get("name")));
@@ -204,18 +204,20 @@ class CiWorkflowContractTest {
         }
         WorkflowDocument reordered = openCi();
         List<Object> steps = WorkflowDocument.list(reordered.job("browser").get("steps"));
-        int browserIndex = stepIndex(steps, "Qualify production homepage and browser matrix");
+        int browserIndex = stepIndex(steps, "Qualify shared native lifecycle");
         Collections.swap(steps, browserIndex, browserIndex - 1);
         assertThatThrownBy(() -> assertBrowserQualification(reordered)).isInstanceOf(AssertionError.class);
         WorkflowDocument bypassed = openCi();
-        bypassed.step("browser", "Qualify production homepage and browser matrix")
+        bypassed.step("browser", "Qualify shared native lifecycle")
                 .put("run", "cd frontend && npm run test:browser");
         assertThatThrownBy(() -> assertBrowserQualification(bypassed)).isInstanceOf(AssertionError.class);
-        WorkflowDocument missingViewport = openCi();
-        WorkflowDocument.list(WorkflowDocument.map(WorkflowDocument.map(
-                missingViewport.job("browser").get("strategy")).get("matrix")).get("include"))
-                .removeIf(value -> "mobile-390".equals(WorkflowDocument.map(value).get("project")));
-        assertThatThrownBy(() -> assertBrowserQualification(missingViewport)).isInstanceOf(AssertionError.class);
+        WorkflowDocument narrowed = openCi();
+        WorkflowDocument.map(narrowed.step("browser", "Qualify shared native lifecycle").get("env"))
+                .put("PERSEFONIA_BROWSER_SUITE", "chromium");
+        assertThatThrownBy(() -> assertBrowserQualification(narrowed)).isInstanceOf(AssertionError.class);
+        WorkflowDocument matrix = openCi();
+        matrix.job("browser").put("strategy", Map.of("matrix", Map.of("project", List.of("desktop-1440"))));
+        assertThatThrownBy(() -> assertBrowserQualification(matrix)).isInstanceOf(AssertionError.class);
     }
 
     @Test
@@ -233,7 +235,7 @@ class CiWorkflowContractTest {
                 .containsSubsequence("Build and test", "Verify production frontend ownership and generated assets",
                         "Set up Temurin Java 21", "Verify Java 21 compatibility", "Upload browser qualification input");
         assertThat(ci.step("build-jvm", "Build and test").get("run"))
-                .isEqualTo("python3 scripts/ci/measure.py build-and-test app/build/ci/timings.jsonl ./gradlew --no-daemon --stacktrace clean applicationJvmCheck :app:bootJar qualificationInputs --profile");
+                .isEqualTo("python3 scripts/ci/measure.py build-and-test app/build/ci/timings.jsonl ./gradlew --no-daemon --stacktrace applicationJvmCheck :app:bootJar qualificationInputs --profile");
         assertThat(ci.step("build-jvm", "Verify production frontend ownership and generated assets").get("run"))
                 .asString().contains("npm run check:boundaries", "npm run check:generated", "npm run format:check");
         assertBrowserQualification(ci);
@@ -248,28 +250,13 @@ class CiWorkflowContractTest {
 
     private static void assertBrowserQualification(WorkflowDocument ci) {
         assertBrowserScheduling(ci);
-        Map<String, Object> strategy = WorkflowDocument.map(ci.job("browser").get("strategy"));
-        assertThat(strategy.get("fail-fast")).isEqualTo(false);
-        var matrix = WorkflowDocument.list(WorkflowDocument.map(strategy.get("matrix")).get("include"));
-        var expected = new java.util.ArrayList<Map<String, Object>>();
-        for (var group : List.of(
-                Map.of("name", "desktop", "suite", "chromium", "project", "desktop-1440"),
-                Map.of("name", "tablet", "suite", "chromium", "project", "tablet-834"),
-                Map.of("name", "mobile", "suite", "chromium", "project", "mobile-390"))) {
-            for (int shard = 1; shard <= 2; shard++) {
-                expected.add(Map.of("name", group.get("name") + "-" + shard + "of2", "suite", group.get("suite"),
-                        "project", group.get("project"), "shard", shard + "/2"));
-            }
-        }
-        expected.add(Map.of("name", "firefox-1of1", "suite", "cross", "project", "firefox-desktop", "shard", "1/1"));
-        expected.add(Map.of("name", "webkit-1of1", "suite", "cross", "project", "webkit-desktop", "shard", "1/1"));
-        assertThat(matrix.stream().map(WorkflowDocument::map).toList()).containsExactlyInAnyOrderElementsOf(expected);
-        assertThat(strategy.get("max-parallel")).isEqualTo(8);
+        assertThat(ci.job("browser")).doesNotContainKey("strategy");
+        assertThat(ci.job("browser").get("name")).isEqualTo("Native browsers");
         assertThat(ci.steps("browser").stream().map(WorkflowDocument::map)
                 .map(step -> (String) step.get("name")))
                 .containsSubsequence("Set up Temurin Java 21", "Set up Node 22", "Download verified BootJar",
-                        "Stage verified browser artifact", "Install browser matrix",
-                        "Qualify production homepage and browser matrix");
+                        "Stage verified browser artifact", "Install locked native dependencies",
+                        "Qualify shared native lifecycle");
         var input = ci.step("build-jvm", "Upload browser qualification input");
         assertThat(input).doesNotContainKey("if");
         assertThat(WorkflowDocument.map(input.get("with")))
@@ -285,33 +272,42 @@ class CiWorkflowContractTest {
                 "cp app/build/ci/persefonia.jar app/build/libs/persefonia.jar",
                 "BOOT-INF/classes/static/assets/.vite/manifest.json");
         assertThat(stage.indexOf("sha256sum --check")).isLessThan(stage.indexOf("cp app/build/ci"));
-        assertThat(ci.step("browser", "Install browser matrix").get("run"))
+        assertThat(ci.step("browser", "Install locked native dependencies").get("run"))
                 .asString().contains("npm ci --prefix frontend", "scripts/ci/measure.py").doesNotContain("playwright install");
-        var qualification = ci.step("browser", "Qualify production homepage and browser matrix");
+        var qualification = ci.step("browser", "Qualify shared native lifecycle");
         assertThat(qualification.get("run")).asString()
-                .contains("bash scripts/browser/check.sh --project \"$BROWSER_PROJECT\"");
+                .contains("bash scripts/browser/check.sh").doesNotContain("--project", "--grep", "--shard");
         assertThat(WorkflowDocument.map(qualification.get("env")))
-                .containsEntry("PERSEFONIA_BROWSER_SUITE", "${{ matrix.suite }}")
-                .containsEntry("PERSEFONIA_BROWSER_SHARD", "${{ matrix.shard }}")
-                .containsEntry("BROWSER_PROJECT", "${{ matrix.project }}");
+                .containsEntry("PERSEFONIA_BROWSER_SUITE", "native")
+                .doesNotContainKeys("PERSEFONIA_BROWSER_SHARD", "BROWSER_PROJECT");
     }
 
     @Test
-    void browserReceiptsRequireIndependentCompleteDiscoveryAndExactArtifactIdentity() {
-        var receipts = workflow.job("browser-receipts");
-        assertThat(receipts.get("if")).isEqualTo("always()");
-        assertThat(WorkflowDocument.list(receipts.get("needs"))).containsExactlyInAnyOrder("eligibility", "compare", "build-jvm", "browser");
-        assertThat(workflow.step("browser-receipts", "Reconcile independent discovery and execution").get("run"))
-                .asString().contains("npm ci --prefix frontend", "browser-join.mjs");
-        var download = WorkflowDocument.map(workflow.step("browser-receipts", "Download browser receipts").get("with"));
-        assertThat(download).containsEntry("pattern", "persefonia-browser-receipt-*-${{ github.sha }}")
-                .containsEntry("merge-multiple", true);
-        assertThat(WorkflowDocument.map(workflow.step("browser", "Upload browser verification receipts").get("with")))
-                .containsEntry("if-no-files-found", "error").containsEntry("retention-days", 14);
-        assertThat(workflow.step("browser", "Upload browser verification receipts").get("if")).isEqualTo("always()");
+    void trustedGateOwnsIndependentNativeAdmissionWithoutAnotherInstall() {
+        assertGateNativeAdmission(workflow);
+        assertThat(workflow.jobs()).doesNotContainKey("browser-receipts");
+        var changed = openCi();
+        changed.step("gate", "Download browser receipts and raw reports").put("if", "false");
+        final var filtered = changed;
+        assertThatThrownBy(() -> assertGateNativeAdmission(filtered)).isInstanceOf(AssertionError.class);
+        changed = openCi();
+        WorkflowDocument.map(changed.step("gate", "Download browser receipts and raw reports").get("with"))
+                .put("name", "persefonia-browser-acceptance-${{ github.sha }}");
+        final var forged = changed;
+        assertThatThrownBy(() -> assertGateNativeAdmission(forged)).isInstanceOf(AssertionError.class);
         assertFinalizedTimingHandoff(workflow);
-        assertThat(workflow.step("build-jvm", "Verify BootJar").get("run")).asString().contains("source-sha.txt", "$GITHUB_SHA");
-        assertThat(workflow.step("browser", "Stage verified browser artifact").get("run")).asString().contains("source-sha.txt", "$GITHUB_SHA");
+    }
+
+    private static void assertGateNativeAdmission(WorkflowDocument ci) {
+        var download = ci.step("gate", "Download browser receipts and raw reports");
+        assertThat(download.get("if")).isEqualTo("needs.compare.outputs.reuse != 'true'");
+        assertThat(WorkflowDocument.map(download.get("with")))
+                .containsEntry("name", "persefonia-browser-receipt-native-${{ github.sha }}")
+                .containsEntry("path", "app/build/browser/verification");
+        assertThat(ci.step("gate", "Require successful identity-bound qualification").get("run"))
+                .isEqualTo("python3 scripts/ci/verification-summary.py gate");
+        assertThat(ci.steps("gate").stream().map(WorkflowDocument::map))
+                .noneMatch(step -> String.valueOf(step.get("run")).contains("npm ci"));
     }
 
 
@@ -327,12 +323,14 @@ class CiWorkflowContractTest {
         var retention = ci.step("browser", "Retain finalized browser timings");
         assertThat(retention.get("if")).isEqualTo("always()");
         assertThat(WorkflowDocument.map(retention.get("env")))
-                .containsEntry("BROWSER_PARTITION", "${{ matrix.name }}");
+                .containsEntry("BROWSER_PARTITION", "native");
         assertThat(retention.get("run")).asString().contains("app/build/browser/timings.jsonl",
                 "${BROWSER_PARTITION}-setup-timings.jsonl", "${BROWSER_PARTITION}-npm-timings.jsonl");
         assertThat(((String) WorkflowDocument.map(ci.step("browser", "Upload browser verification receipts")
                 .get("with")).get("path")).lines().toList())
                 .containsExactly("app/build/browser/verification/*-receipt.json",
+                        "app/build/browser/verification/native-discovery.json",
+                        "app/build/browser/verification/native-results.json",
                         "app/build/browser/verification/*-timings.jsonl");
     }
 
@@ -340,7 +338,7 @@ class CiWorkflowContractTest {
     void stableVerifyAndGateAlwaysReachStrictIdentityBoundAdmission() {
         assertThat(workflow.job("verify").get("name")).isEqualTo("Verify");
         assertThat(workflow.job("gate").get("name")).isEqualTo("Gate");
-        for (String job : List.of("verify", "gate", "browser-receipts")) {
+        for (String job : List.of("verify", "gate")) {
             assertThat(workflow.job(job).get("if")).isEqualTo("always()");
             assertThat(workflow.job(job)).doesNotContainKeys("services", "environment");
             assertThat(WorkflowDocument.map(workflow.job(job).get("permissions")))
@@ -349,7 +347,7 @@ class CiWorkflowContractTest {
         assertThat(WorkflowDocument.list(workflow.job("verify").get("needs")))
                 .containsExactlyInAnyOrder("automation", "eligibility", "compare", "build-jvm", "frontend");
         assertThat(WorkflowDocument.list(workflow.job("gate").get("needs")))
-                .containsExactlyInAnyOrder("automation", "eligibility", "compare", "build-jvm", "frontend", "verify", "browser", "browser-receipts");
+                .containsExactlyInAnyOrder("automation", "eligibility", "compare", "build-jvm", "frontend", "verify", "browser");
         assertThat(workflow.step("verify", "Validate producer identities and non-browser admission").get("run"))
                 .isEqualTo("python3 scripts/ci/verification-summary.py verify");
         assertThat(workflow.step("gate", "Require successful identity-bound qualification").get("run"))
@@ -366,7 +364,7 @@ class CiWorkflowContractTest {
         assertThat(workflow.job("frontend").get("if")).asString()
                 .contains("!cancelled()", "needs.automation.result == 'success'", "needs.eligibility.result == 'success'",
                         "needs.compare.result == 'skipped'", "needs.compare.result == 'success'", "needs.compare.outputs.reuse != 'true'");
-        assertThat(workflow.step("frontend", "Execute complete frontend discovery and stress").get("run"))
+        assertThat(workflow.step("frontend", "Execute fixed ordinary frontend tests").get("run"))
                 .asString().contains("unit-run.mjs").doesNotContain("test:unit");
         assertThat(workflow.step("frontend", "Set up Temurin Java 25")).isNotEmpty();
         assertThat(workflow.step("frontend", "Prepare media tools").get("run"))
@@ -375,11 +373,48 @@ class CiWorkflowContractTest {
                 .containsEntry("CI_QUALIFICATION_REUSE", "${{ vars.CI_QUALIFICATION_REUSE }}");
         assertThat(workflow.job("compare").get("if")).isEqualTo("needs.eligibility.outputs.eligible == 'true'");
         assertThat(workflow.step("compare", "Build preliminary production candidate").get("run"))
-                .asString().contains("clean :app:bootJar qualificationInputs").doesNotContain("applicationJvmCheck");
+                .asString().contains(":app:bootJar qualificationInputs").doesNotContain("applicationJvmCheck");
         String root = Files.readString(Path.of("../build.gradle.kts"));
         String app = Files.readString(Path.of("../app/build.gradle.kts"));
         assertThat(root).contains("applicationJvmCheck", "applicationCheck", "frontendCheck", "automationCheck");
         assertThat(app).contains("dependsOn(jvmCheck)", "dependsOn(frontendCheck)", "dependsOn(npmRunUnitTest)",
                 "dependsOn(tasks.test, integrationTest, migrationTest)");
+    }
+
+    @Test
+    void actualWorkflowNamesMatchReuseAndDeliveryAdmission() throws Exception {
+        var result = CommandRunner.command("python3").args("-B", "-c",
+                "import sys; sys.path.insert(0,'scripts/ci'); import qualification as q; print('\\n'.join(q.CI_JOBS))")
+                .directory(Path.of("..")).run();
+        result.requireSuccess();
+        assertThat(workflow.jobs().values().stream().map(WorkflowDocument::map)
+                .map(job -> (String) job.get("name")))
+                .containsExactlyInAnyOrderElementsOf(result.stdout().lines().toList());
+    }
+
+    @Test
+    void ordinaryJobsStayBoundedAndNeverInjectAdminOrDeepProfiles() throws IOException {
+        assertLeanContract(workflow);
+        for (String mutation : List.of("native-budget", "admin", "deep")) {
+            var changed = openCi();
+            if (mutation.equals("native-budget")) changed.job("browser").put("timeout-minutes", 35);
+            else WorkflowDocument.list(changed.job("build-jvm").get("steps")).add(Map.of("name", "unwanted", "run",
+                    mutation.equals("admin") ? "python3 scripts/ci/admin-preview.py required" : "npm run test:unit:stress"));
+            assertThatThrownBy(() -> assertLeanContract(changed)).as(mutation).isInstanceOf(AssertionError.class);
+        }
+        String lifecycle = Files.readString(Path.of("../frontend/scripts/verification/browser-lifecycle.mjs"));
+        assertThat(lifecycle).contains("playwright('ordinary', [], discoveryPath, true)",
+                "playwright('ordinary', [], resultsPath)").doesNotContain("browser-run.mjs");
+    }
+
+    private static void assertLeanContract(WorkflowDocument ci) {
+        assertThat(((Number) ci.job("browser").get("timeout-minutes")).intValue()).isLessThanOrEqualTo(8);
+        assertThat(((Number) ci.step("browser", "Qualify shared native lifecycle").get("timeout-minutes")).intValue())
+                .isLessThanOrEqualTo(6);
+        for (String job : List.of("build-jvm", "frontend", "browser")) {
+            assertThat(ci.steps(job).stream().map(WorkflowDocument::map)
+                    .map(step -> String.valueOf(step.get("run"))))
+                    .noneMatch(run -> run.contains("admin-preview") || run.contains("test:unit:stress") || run.contains("--comprehensive"));
+        }
     }
 }

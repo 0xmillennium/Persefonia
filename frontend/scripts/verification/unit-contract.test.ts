@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
-import { validateUnitExecution, unitEvidenceInventory } from './unit-contract.mjs';
+import { validateUnitExecution, unitEvidenceInventory, physicsSeeds } from './unit-contract.mjs';
 const seedResults = () =>
-  Array.from({ length: 100 }, (_, i) => ({ seed: i + 1, failure: null, passed: true, rest: true }));
+  physicsSeeds().map((seed: number) => ({ seed, failure: null, passed: true, rest: true }));
 function fixture() {
   return {
     discovered: [{ file: 'one.test.ts', name: 'one' }],
@@ -30,12 +30,12 @@ function fixture() {
     live: seedResults(),
   };
 }
-it('retains every scalar and coalesced seed and allows future additional cases', () => {
+it('requires the exact reviewed scalar and coalesced corpus', () => {
   const f = fixture();
   expect(validateUnitExecution(f.discovered, f.report, f.scalar, f.live)).toHaveLength(1);
   f.scalar.push({ seed: 101, failure: null, passed: true, rest: true });
   f.live.push({ seed: 101, failure: null, passed: true, rest: true });
-  expect(validateUnitExecution(f.discovered, f.report, f.scalar, f.live)).toHaveLength(1);
+  expect(() => validateUnitExecution(f.discovered, f.report, f.scalar, f.live)).toThrow();
 });
 it.each([
   'single-seed',
@@ -101,4 +101,16 @@ it('compares serialized native inventories independently of object key order', (
   expect(unitEvidenceInventory(collected)).not.toEqual(
     unitEvidenceInventory([{ ...serialized[0], name: 'substituted' }]),
   );
+});
+
+it('full scalar and live profiles still require all 100 seeds', () => {
+  const f = fixture();
+  expect(() => validateUnitExecution(f.discovered, f.report, f.scalar, f.live, 'deep')).toThrow();
+  const all = physicsSeeds('deep').map((seed: number) => ({
+    seed,
+    failure: null,
+    passed: true,
+    rest: true,
+  }));
+  expect(validateUnitExecution(f.discovered, f.report, all, all, 'deep')).toHaveLength(1);
 });

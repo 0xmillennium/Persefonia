@@ -1,7 +1,8 @@
 @import dev.persefonia.webadmin.contact.AdminContactDetailPage
 @param AdminContactDetailPage page
-@template.admin.components.pageShell("Contact message | Persefonia Admin", page.chrome().admin(), page.chrome().navigation(), page.chrome().logoutForm(), false, content = @`
-    <main>
+@param java.util.List<String> adminStylesheetPaths = java.util.List.of()
+@template.admin.components.pageShell("Contact message | Persefonia Admin", page.chrome().admin(), page.chrome().navigation(), page.chrome().logoutForm(), false, adminStylesheetPaths = adminStylesheetPaths, content = @`
+    <main id="admin-content" tabindex="-1">
         <h1>${page.message().subject()}</h1>
         <p><a href="/admin/contact">Back to contact inbox</a></p>
         @if(page.hasFlashMessage())
@@ -22,7 +23,7 @@
                 <dt>Submitted</dt><dd>${page.message().submittedAt().toString()}</dd>
                 <dt>Updated</dt><dd>${page.message().updatedAt().toString()}</dd>
             </dl>
-            <pre>${page.message().body()}</pre>
+            <pre role="region" aria-label="Message body" tabindex="0">${page.message().body()}</pre>
         </section>
 
         <section>
@@ -44,7 +45,7 @@
             @if(page.message().mailAttempts().isEmpty())
                 <p>No mail attempts.</p>
             @else
-                <table>
+                <div class="admin-table-scroll" role="region" aria-label="Scrollable table" tabindex="0"><table>
                     <thead><tr><th>Attempted</th><th>Result</th><th>Failure reason</th></tr></thead>
                     <tbody>
                     @for(var attempt : page.message().mailAttempts())
@@ -59,7 +60,7 @@
                         </tr>
                     @endfor
                     </tbody>
-                </table>
+                </table></div>
             @endif
         </section>
 
@@ -68,7 +69,7 @@
             @if(page.message().statusChanges().isEmpty())
                 <p>No status changes.</p>
             @else
-                <table>
+                <div class="admin-table-scroll" role="region" aria-label="Scrollable table" tabindex="0"><table>
                     <thead><tr><th>Changed</th><th>Previous</th><th>New</th><th>Changed by</th></tr></thead>
                     <tbody>
                     @for(var change : page.message().statusChanges())
@@ -80,7 +81,7 @@
                         </tr>
                     @endfor
                     </tbody>
-                </table>
+                </table></div>
             @endif
         </section>
     </main>

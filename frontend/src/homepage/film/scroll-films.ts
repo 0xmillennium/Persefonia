@@ -128,7 +128,7 @@ export class ScrollFilms {
   readiness(film: Film, index: number, pose: PosterPose): MediaReadiness {
     const presentation = this.presentation(film, index, pose);
     if (presentation?.kind === 'video')
-      return videoReadiness(presentation.source as HTMLVideoElement, true);
+      return videoReadiness(presentation.source as HTMLVideoElement, true, true, true);
     if (presentation?.kind === 'poster' && (this.reduced || this.video.failed(film)))
       return { state: this.reduced ? 'static' : 'fallback', progress: this.reduced ? 1 : 0 };
     return { state: this.unavailable(film, pose) ? 'unavailable' : 'loading', progress: 0 };

@@ -1,7 +1,8 @@
 @import dev.persefonia.webadmin.operations.AdminOperationsRecoveryPage
 @param AdminOperationsRecoveryPage page
-@template.admin.components.pageShell("Recovery readiness | Persefonia Admin", page.chrome().admin(), page.chrome().navigation(), page.chrome().logoutForm(), false, content = @`
-    <main>
+@param java.util.List<String> adminStylesheetPaths = java.util.List.of()
+@template.admin.components.pageShell("Recovery readiness | Persefonia Admin", page.chrome().admin(), page.chrome().navigation(), page.chrome().logoutForm(), false, adminStylesheetPaths = adminStylesheetPaths, content = @`
+    <main id="admin-content" tabindex="-1">
         <h1>Recovery readiness</h1>
         <p><a href="/admin/operations">Back to operations</a></p>
 
@@ -49,11 +50,11 @@
             @if(!page.report().media().reportedIssues().isEmpty())
                 <section>
                     <h2>Media issues</h2>
-                    <table><thead><tr><th>Category</th><th>Object kind</th><th>Asset ID</th><th>Variant</th></tr></thead><tbody>
+                    <div class="admin-table-scroll" role="region" aria-label="Scrollable table" tabindex="0"><table><thead><tr><th>Category</th><th>Object kind</th><th>Asset ID</th><th>Variant</th></tr></thead><tbody>
                     @for(var issue : page.report().media().reportedIssues())
                         <tr><td>${issue.category().name()}</td><td>${issue.objectKind().name()}</td><td>${issue.assetId().toString()}</td><td>${issue.variantName() == null ? "" : issue.variantName()}</td></tr>
                     @endfor
-                    </tbody></table>
+                    </tbody></table></div>
                 </section>
             @endif
             @if(page.report().media().reportedIssuesTruncated())
@@ -63,11 +64,11 @@
             @if(!page.report().assetReferences().reportedIssues().isEmpty())
                 <section>
                     <h2>Dangling durable Asset references</h2>
-                    <table><thead><tr><th>Reference kind</th><th>Source entity ID</th><th>Missing Asset ID</th></tr></thead><tbody>
+                    <div class="admin-table-scroll" role="region" aria-label="Scrollable table" tabindex="0"><table><thead><tr><th>Reference kind</th><th>Source entity ID</th><th>Missing Asset ID</th></tr></thead><tbody>
                     @for(var issue : page.report().assetReferences().reportedIssues())
                         <tr><td>${issue.referenceKind().name()}</td><td>${issue.sourceEntityId().toString()}</td><td>${issue.missingAssetId().toString()}</td></tr>
                     @endfor
-                    </tbody></table>
+                    </tbody></table></div>
                 </section>
             @endif
             @if(page.report().assetReferences().reportedIssuesTruncated())

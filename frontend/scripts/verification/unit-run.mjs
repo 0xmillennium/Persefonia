@@ -1,14 +1,35 @@
-import { spawnSync, execFileSync } from 'node:child_process';
+import { runProcess } from './process.mjs';
+import { execFileSync } from 'node:child_process';
 import { rmSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { frontend, repository, writeJson, metadata, sourceContext } from './browser-runtime.mjs';
+import {
+  frontend,
+  repository,
+  writeJson,
+  metadata,
+  sourceContext,
+  verificationPlan,
+} from './browser-runtime.mjs';
 import {
   validateUnitExecution,
   validateUnitAttempts,
   validateUnitPhases,
 } from './unit-contract.mjs';
 
-if (process.argv.length !== 2 || process.env.IDENTITY_SEED)
+import { policyHash } from './selection-policy.mjs';
+const comprehensive = process.argv.slice(2).join(' ') === '--comprehensive';
+const plan = comprehensive
+  ? {
+      schema: 1,
+      policy: policyHash,
+      required: ['ordinary', 'physics-live', 'physics-scalar'],
+      manual: true,
+    }
+  : verificationPlan();
+const physicsProfile = comprehensive ? 'deep' : 'ordinary';
+process.env.PERSEFONIA_PHYSICS_PROFILE = physicsProfile;
+
+if ((!comprehensive && process.argv.length !== 2) || process.env.IDENTITY_SEED)
   throw new Error('Mandatory unit verification cannot use filters or a single seed');
 const output = join(frontend, 'test-results');
 for (const file of [
@@ -24,19 +45,20 @@ for (const file of [
 const cli = join(frontend, 'node_modules/vitest/vitest.mjs');
 const context = sourceContext();
 const started = performance.now();
-const discovery = spawnSync(
+const discovery = await runProcess(
   process.execPath,
   [cli, 'list', '--no-static-parse', '--json', '--allowOnly=false'],
   {
     cwd: frontend,
-    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
   },
+  30_000,
 );
-if (discovery.status !== 0) throw new Error(`Unit discovery failed: ${discovery.stderr}`);
+if (discovery.exitCode !== 0) throw new Error(`Unit discovery failed: ${discovery.stderr}`);
 const selected = JSON.parse(discovery.stdout);
 writeJson(join(output, 'unit-discovery.json'), selected);
 const discoveryMs = performance.now() - started;
-const execution = spawnSync(
+const execution = await runProcess(
   process.execPath,
   [
     cli,
@@ -57,8 +79,9 @@ const execution = spawnSync(
       PERSEFONIA_UNIT_PHASES: join(output, 'unit-phases.json'),
     },
   },
+  comprehensive ? 600_000 : 240_000,
 );
-if (execution.status !== 0) process.exit(execution.status ?? 1);
+if (execution.exitCode !== 0) process.exit(execution.exitCode ?? 1);
 const reconciliation = performance.now();
 const read = (path) => JSON.parse(readFileSync(join(output, path), 'utf8'));
 const cases = validateUnitExecution(
@@ -66,6 +89,7 @@ const cases = validateUnitExecution(
   read('unit.json'),
   read('segmented-identity/unit-stress-summary.json'),
   read('segmented-identity/live-stress-summary.json'),
+  physicsProfile,
 );
 const attempts = read('unit-attempts.json');
 validateUnitAttempts(cases, attempts);
@@ -75,7 +99,11 @@ if (JSON.stringify(sourceContext()) !== JSON.stringify(context))
   throw new Error('Source changed during frontend verification');
 writeJson(join(output, 'unit-receipt.json'), {
   sourceContext: context,
-  schema: 1,
+  schema: 2,
+  policy: policyHash,
+  selectionPlan: plan,
+  physicsProfile,
+  profile: comprehensive ? 'comprehensive' : 'ordinary',
   status: 'passed',
   sourceSha: execFileSync('git', ['rev-parse', 'HEAD'], {
     cwd: repository,

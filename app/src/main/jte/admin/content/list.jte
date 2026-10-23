@@ -1,7 +1,8 @@
 @import dev.persefonia.webadmin.content.AdminContentListPage
 @param AdminContentListPage page
-@template.admin.components.pageShell("Content | Persefonia Admin", page.chrome().admin(), page.chrome().navigation(), page.chrome().logoutForm(), false, content = @`
-<main>
+@param java.util.List<String> adminStylesheetPaths = java.util.List.of()
+@template.admin.components.pageShell("Content | Persefonia Admin", page.chrome().admin(), page.chrome().navigation(), page.chrome().logoutForm(), false, adminStylesheetPaths = adminStylesheetPaths, content = @`
+<main id="admin-content" tabindex="-1">
     <h1>Content</h1>
     <p><a href="/admin/content/new">Create draft</a></p>
     @if(page.successMessage() != null)
@@ -10,7 +11,7 @@
     @if(page.items().isEmpty())
         <p>No manageable content yet.</p>
     @else
-        <table>
+        <div class="admin-table-scroll" role="region" aria-label="Scrollable table" tabindex="0"><table>
             <thead><tr><th>Title</th><th>Status</th><th>Visibility</th><th>Language</th><th>Updated</th><th>Actions</th></tr></thead>
             <tbody>
             @for(var item : page.items())
@@ -29,7 +30,7 @@
                 </tr>
             @endfor
             </tbody>
-        </table>
+        </table></div>
     @endif
 </main>
 `)

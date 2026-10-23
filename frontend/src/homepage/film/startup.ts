@@ -5,6 +5,7 @@ export function videoReadiness(
   video: HTMLVideoElement,
   decoded: boolean,
   playing = true,
+  pausedSeek = false,
 ): MediaReadiness {
   const target = Math.min(0.25, Math.max(0, video.duration - video.currentTime));
   let ahead = 0;
@@ -15,7 +16,10 @@ export function videoReadiness(
     )
       ahead = Math.max(ahead, video.buffered.end(i) - video.currentTime);
   }
-  const buffered = target > 0 ? Math.min(1, ahead / target) : 0;
+  // A completed seek can precede Firefox's TimeRanges update; HAVE_ENOUGH_DATA
+  // already guarantees data through the end, independently of that snapshot.
+  const buffered =
+    pausedSeek && video.readyState >= 4 ? 1 : target > 0 ? Math.min(1, ahead / target) : 0;
   const ready = decoded && playing && buffered === 1;
   return {
     state: ready ? 'video' : 'loading',

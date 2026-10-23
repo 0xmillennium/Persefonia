@@ -35,10 +35,9 @@ class BrowserProvisionContractTest {
         record Selection(String suite, String project, List<String> engines) {}
         for (String optIn : List.of("local", "CI", "PERSEFONIA_BROWSER_WITH_DEPS")) {
             for (var selection : List.of(
-                    new Selection("chromium", "*", List.of("chromium")),
-                    new Selection("cross", "firefox-desktop", List.of("firefox")),
-                    new Selection("cross", "webkit-desktop", List.of("webkit")),
-                    new Selection("all", "*", List.of("chromium", "firefox", "webkit")))) {
+                    new Selection("admin", "*", List.of("chromium")),
+                    new Selection("diagnostics", "*", List.of("chromium", "firefox", "webkit")),
+                    new Selection("native", "*", List.of("chromium", "firefox", "webkit")))) {
                 Files.deleteIfExists(packagesLog);
                 Files.deleteIfExists(Path.of(log + ".order"));
                 var command = CommandRunner.command("bash").args(script.toString(), selection.suite(), selection.project())
@@ -90,22 +89,34 @@ class BrowserProvisionContractTest {
             Files.writeString(executable, "#!/usr/bin/env bash\nset -euo pipefail\n" + command.getValue());
             assertThat(executable.toFile().setExecutable(true)).isTrue();
         }
-        record Lane(String suite, String project, String display, String expectedDisplay) {}
-        for (var lane : List.of(
-                new Lane("cross", "firefox-desktop", "", ":99"),
-                new Lane("cross", "firefox-desktop", ":42", ":42"),
-                new Lane("cross", "webkit-desktop", "", ""),
-                new Lane("chromium", "mobile-390", "", ""))) {
-            CommandRunner.command("bash").args(Path.of("../scripts/browser/check.sh").toAbsolutePath().toString(),
-                            "--project", lane.project()).pathPrepend(bin)
-                    .env("BROWSER_LOG", log.toString()).env("CI", "true").env("DISPLAY", lane.display())
-                    .env("PERSEFONIA_BROWSER_SUITE", lane.suite())
+        for (String display : List.of("", ":42")) {
+            CommandRunner.command("bash").args(Path.of("../scripts/browser/check.sh").toAbsolutePath().toString())
+                    .pathPrepend(bin).env("BROWSER_LOG", log.toString()).env("CI", "true").env("DISPLAY", display)
+                    .env("PERSEFONIA_BROWSER_SUITE", "native")
                     .env("PERSEFONIA_BROWSER_ARTIFACT_DIR", temporary.resolve("artifacts").toString())
                     .run().requireSuccess();
-            String display = System.getProperty("os.name").equals("Linux")
-                    ? lane.expectedDisplay() : lane.display();
-            assertThat(Files.readAllLines(log)).containsExactly(display,
-                    "scripts/verification/browser-run.mjs", lane.suite(), "--project", lane.project());
+            String expected = System.getProperty("os.name").equals("Linux") && display.isEmpty() ? ":99" : display;
+            assertThat(Files.readAllLines(log)).containsExactly(expected, "scripts/verification/browser-lifecycle.mjs");
+        }
+        for (String suite : List.of("cross", "chromium")) {
+            assertThat(CommandRunner.command("bash").args(Path.of("../scripts/browser/check.sh").toAbsolutePath().toString())
+                    .pathPrepend(bin).env("BROWSER_LOG", log.toString()).env("CI", "true")
+                    .env("PERSEFONIA_BROWSER_SUITE", suite).run().status()).isEqualTo(2);
         }
     }
+
+    @Test
+    void occupiedApplicationPortCannotQualifyAnUnrelatedExistingServer() throws Exception {
+        try (var listener = new java.net.ServerSocket(0, 1, java.net.InetAddress.getByName("127.0.0.1"))) {
+            var result = CommandRunner.command("bash")
+                    .args(Path.of("../scripts/browser/check.sh").toAbsolutePath().toString())
+                    .env("PERSEFONIA_BROWSER_SUITE", "native")
+                    .env("PERSEFONIA_BROWSER_PORT", String.valueOf(listener.getLocalPort()))
+                    .run();
+            assertThat(result.status()).isNotZero();
+            assertThat(result.stderr()).contains("refusing to test an existing server");
+            assertThat(result.stdout()).doesNotContain("Browser PostgreSQL image");
+        }
+    }
+
 }

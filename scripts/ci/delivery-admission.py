@@ -20,13 +20,12 @@ def validate(record, run, jobs, checksum, source_sha, run_id, attempt, *, expect
               and source['sourceSha'] == source_sha and source['run'] == run_id
               and source['attempt'] == attempt, 'Delivery record source/attempt mismatch')
     names = [job['name'] for job in jobs['jobs']]
-    q.require(jobs['total_count'] == len(names) == 16 and len(set(names)) == 16, 'Incomplete Delivery job inventory')
-    required = {'Automation', 'Reuse eligibility', 'Comparison build', 'Build + JVM', 'Frontend verification',
-                'Verify', 'Browser receipts', 'Gate', *['Browsers ('+p+')' for p in q.PARTITIONS]}
+    q.require(jobs['total_count'] == len(names) == len(q.CI_JOBS) and len(set(names)) == len(q.CI_JOBS), 'Incomplete Delivery job inventory')
+    required = set(q.CI_JOBS)
     q.require(set(names) == required, 'Unknown Delivery CI job policy')
     for job in jobs['jobs']:
         name = job['name']
-        wanted = 'skipped' if record['mode'] == 'reused' and (name in {'Build + JVM', 'Frontend verification'} or name.startswith('Browsers (')) else 'success'
+        wanted = 'skipped' if record['mode'] == 'reused' and (name in {'Build + JVM', 'Frontend verification'} or name == 'Native browsers') else 'success'
         allowed = {'success', 'skipped'} if name == 'Comparison build' and record['mode'] == 'executed' else {wanted}
         q.require(job['run_id'] == run['id'] and job['run_attempt'] == int(attempt)
                   and job['status'] == 'completed' and job['conclusion'] in allowed, 'Invalid Delivery job outcome/attempt')

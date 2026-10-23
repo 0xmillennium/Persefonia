@@ -13,7 +13,6 @@ export interface LazyGlobeOptions {
       stage: HTMLElement,
       mask: Uint8Array,
       diagnostics?: boolean,
-      controlsRoot?: ParentNode,
     ) => GlobeInstance;
   }>;
   loadMaskUrl?: () => Promise<{ default: string }>;
@@ -62,7 +61,7 @@ export function lazyGlobe(options: LazyGlobeOptions) {
         if (!response.ok) throw new Error('Geography unavailable');
         const mask = new Uint8Array(await response.arrayBuffer());
         if (isDisposed()) return false;
-        created = new GlobeController(stage, mask, false, stage);
+        created = new GlobeController(stage, mask, false);
         if (isDisposed()) {
           created.dispose();
           return false;

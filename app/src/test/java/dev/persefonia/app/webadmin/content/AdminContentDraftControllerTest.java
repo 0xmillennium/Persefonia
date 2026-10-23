@@ -77,7 +77,8 @@ class AdminContentDraftControllerTest {
                         .param("language", "")
                         .param("visibility", "PRIVATE"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("language: This field is required.")))
+                .andExpect(content().string(containsString("<li id=\"error-language\"><a href=\"#language\">This field is required.</a></li>")))
+                .andExpect(content().string(containsString("aria-describedby=\"error-language\"")))
                 .andExpect(content().string(containsString("value=\"ARTICLE\" selected")));
     }
 }

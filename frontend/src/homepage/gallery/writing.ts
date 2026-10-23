@@ -9,7 +9,10 @@ export function galleryWriting(root: HTMLElement) {
   const slot = instrument.querySelector<HTMLElement>('.tuner-reveal-slot')!;
   const button = instrument.querySelector<HTMLButtonElement>('.collection-tuner')!;
   const clear = () => {
-    for (const node of [...lines, button]) node.style.removeProperty('transform');
+    for (const node of [...lines, button]) {
+      node.style.removeProperty('transform');
+      node.style.removeProperty('opacity');
+    }
     slot.style.removeProperty('overflow');
     instrument.style.removeProperty('visibility');
     instrument.inert = false;
@@ -22,6 +25,7 @@ export function galleryWriting(root: HTMLElement) {
       }
       lines.forEach((line, i) => {
         line.style.transform = `translateY(${slitPosition(windowProgress(entry, i * 0.12, 0.76 + i * 0.12), exit)}%)`;
+        line.style.removeProperty('opacity');
       });
       const y = slitPosition(windowProgress(entry, 0.24, 1), exit);
       button.style.transform = `translateY(${y}%)`;

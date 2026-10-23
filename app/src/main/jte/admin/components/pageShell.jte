@@ -7,15 +7,19 @@
 @param LogoutFormViewModel logoutForm
 @param boolean showRoles
 @param gg.jte.html.HtmlContent content
+@param java.util.List<String> adminStylesheetPaths = java.util.List.of()
 <!doctype html>
-<html lang="en">
+<html translate="no" lang="en">
 <head>
+    @template.site.components.translationPolicy()
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="robots" content="noindex,nofollow,noarchive">
     <title>${title}</title>
+    @template.site.components.stylesheetLinks(adminStylesheetPaths)
 </head>
-<body>
+<body class="admin-body">
+    <a class="skip-link" href="#admin-content">Skip to admin content</a>
     @template.admin.components.adminHeader(admin, logoutForm, showRoles)
     @template.admin.components.adminNavigation(navigation)
     ${content}

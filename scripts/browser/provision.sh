@@ -4,18 +4,10 @@ set -euo pipefail
 # Cold local execution (including Linux libraries):
 # PERSEFONIA_BROWSER_WITH_DEPS=1 ./gradlew :app:browserCheck
 project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-suite="${1:-all}"
+suite="${1:-native}"
 case "$suite" in
-  chromium) engines=(chromium) ;;
-  cross)
-    case "${2:-*}" in
-      firefox-desktop) engines=(firefox) ;;
-      webkit-desktop) engines=(webkit) ;;
-      '*') engines=(firefox webkit) ;;
-      *) printf 'Unknown cross-browser project: %s\n' "$2" >&2; exit 2 ;;
-    esac
-    ;;
-  all) engines=(chromium firefox webkit) ;;
+  admin) engines=(chromium) ;;
+  native|diagnostics) engines=(chromium firefox webkit) ;;
   *) printf 'Unknown browser suite: %s\n' "$suite" >&2; exit 2 ;;
 esac
 args=(install --no-shell)
@@ -24,7 +16,7 @@ if [[ -n "${CI:-}" || -n "${PERSEFONIA_BROWSER_WITH_DEPS:-}" ]]; then
 fi
 media_mode=check
 if [[ "$OSTYPE" == linux* && ( -n "${CI:-}" || -n "${PERSEFONIA_BROWSER_WITH_DEPS:-}" ) ]]; then
-  media_mode=install
+  if [[ "${PERSEFONIA_MEDIA_TOOLS_READY:-}" != 1 ]]; then media_mode=install; fi
 fi
 media_reports=${PERSEFONIA_MEDIA_REPORT_DIR:-${RUNNER_TEMP:+$RUNNER_TEMP/persefonia-media-tools}}
 media_reports=${media_reports:-${PERSEFONIA_BROWSER_ARTIFACT_DIR:-$project_root/app/build/browser}/media-prerequisites}

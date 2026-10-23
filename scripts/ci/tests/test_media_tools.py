@@ -68,6 +68,119 @@ class MediaPreparationContracts(unittest.TestCase):
             'if [ "$1" = update ]; then exit '+str(update_code)+'; fi\n'+scripts+'exit '+str(exit_code)+'\n')
         self.executable('dpkg-query', 'echo "6.1.1-distro-fixture"\n')
 
+    def mirror_fixture(self):
+        mirror_list = self.root/'apt-mirrors.txt'
+        mirror_list.write_text('# Runner mirrors\nhttp://azure.archive.ubuntu.com/ubuntu/ priority:1\n'
+                               'https://archive.ubuntu.com/ubuntu/ priority:2\n'
+                               'https://security.ubuntu.com/ubuntu/ priority:3\n')
+        (self.bin/'sed').symlink_to('/usr/bin/sed')
+        return mirror_list
+
+    def test_hosted_install_prefers_configured_official_archive_before_package_commands(self):
+        mirror_list = self.mirror_fixture()
+        self.environment.update(GITHUB_ACTIONS='true', RUNNER_ENVIRONMENT='github-hosted')
+        self.installer()
+        self.executable('sudo', 'test "$1" = -n || exit 90\nshift\nexec "$@"\n')
+        real_run = subprocess.run
+        def run(command, **kwargs):
+            if str(self.bin/'apt-get') in command:
+                self.assertNotIn('azure.archive.ubuntu.com', mirror_list.read_text())
+            return real_run(command, **kwargs)
+        with patch.object(self.media, 'APT_MIRRORS', mirror_list, create=True), \
+                patch.object(self.media.subprocess, 'run', side_effect=run):
+            status, record, _ = self.invoke('install', uid=1000)
+        self.assertEqual(status, 0)
+        self.assertEqual(mirror_list.read_text(), '# Runner mirrors\n'
+                         'https://archive.ubuntu.com/ubuntu/ priority:2\n'
+                         'https://security.ubuntu.com/ubuntu/ priority:3\n')
+        self.assertEqual([row['phase'] for row in record['commands'][:3]],
+                         ['apt-mirror-preference', 'apt-update', 'apt-install'])
+        self.assertEqual([row['timeoutSeconds'] for row in record['commands'][:3]], [10, 180, 300])
+        # Healthy repeat invocations do not reconfigure mirrors or reinstall packages.
+        with patch.object(self.media, 'APT_MIRRORS', mirror_list, create=True):
+            self.assertEqual(self.invoke('install')[0], 0)
+
+    def test_local_and_self_hosted_install_leave_mirrors_untouched(self):
+        mirror_list = self.mirror_fixture()
+        original = mirror_list.read_bytes()
+        self.installer()
+        for github, runner in [('', ''), ('true', 'self-hosted'), ('false', 'github-hosted'), ('true', '')]:
+            self.environment.update(GITHUB_ACTIONS=github, RUNNER_ENVIRONMENT=runner)
+            for tool in ('ffmpeg', 'ffprobe'):
+                (self.bin/tool).unlink(missing_ok=True)
+            with self.subTest(github=github, runner=runner), \
+                    patch.object(self.media, 'APT_MIRRORS', mirror_list, create=True):
+                status, record, _ = self.invoke('install')
+            self.assertEqual(status, 0)
+            self.assertEqual(mirror_list.read_bytes(), original)
+            self.assertNotIn('apt-mirror-preference', [row['phase'] for row in record['commands']])
+
+    def test_check_mode_and_healthy_hosted_tools_do_not_change_mirrors(self):
+        mirror_list = self.mirror_fixture()
+        original = mirror_list.read_bytes()
+        self.environment.update(GITHUB_ACTIONS='true', RUNNER_ENVIRONMENT='github-hosted')
+        with patch.object(self.media, 'APT_MIRRORS', mirror_list, create=True):
+            self.assertNotEqual(self.invoke('check')[0], 0)
+            for tool in ('ffmpeg', 'ffprobe'): self.healthy(tool)
+            self.assertEqual(self.invoke('install')[0], 0)
+        self.assertEqual(mirror_list.read_bytes(), original)
+        self.assertFalse(any(line.startswith(('apt ', 'sudo ')) for line in self.lines()))
+
+    def test_hosted_preference_preserves_unknown_mirrors_and_requires_configured_https_archive(self):
+        mirror_list = self.mirror_fixture()
+        self.environment.update(GITHUB_ACTIONS='true', RUNNER_ENVIRONMENT='github-hosted')
+        self.installer()
+        for contents in [
+                'http://azure.archive.ubuntu.com/ubuntu/ priority:1\n',
+                'http://archive.ubuntu.com/ubuntu/ priority:2\nhttp://azure.archive.ubuntu.com/ubuntu/ priority:1\n',
+                '# https://archive.ubuntu.com/ubuntu/\nhttp://azure.archive.ubuntu.com/ubuntu/ priority:1\n',
+                'https://archive.ubuntu.com/ubuntu/ priority:2\nhttps://custom.example/ubuntu/ priority:1\n',
+        ]:
+            mirror_list.write_text(contents)
+            for tool in ('ffmpeg', 'ffprobe'):
+                (self.bin/tool).unlink(missing_ok=True)
+            with self.subTest(contents=contents), patch.object(self.media, 'APT_MIRRORS', mirror_list, create=True):
+                self.assertEqual(self.invoke('install')[0], 0)
+            self.assertEqual(mirror_list.read_text(), contents)
+        target = self.root/'target-mirrors'
+        target.write_text('http://azure.archive.ubuntu.com/ubuntu/ priority:1\n'
+                          'https://archive.ubuntu.com/ubuntu/ priority:2\n')
+        mirror_list.unlink()
+        for path in [mirror_list, self.root/'mirror-link']:
+            if path.name == 'mirror-link': path.symlink_to(target)
+            for tool in ('ffmpeg', 'ffprobe'):
+                (self.bin/tool).unlink(missing_ok=True)
+            with patch.object(self.media, 'APT_MIRRORS', path, create=True):
+                self.assertEqual(self.invoke('install')[0], 0)
+        self.assertIn('azure.archive.ubuntu.com', target.read_text())
+
+    def test_mirror_preference_failure_stops_package_commands_and_preserves_postchecks(self):
+        mirror_list = self.mirror_fixture()
+        self.environment.update(GITHUB_ACTIONS='true', RUNNER_ENVIRONMENT='github-hosted')
+        # Replace only this task-owned fixture link; never reach host package operations.
+        (self.bin/'sed').unlink()
+        self.executable('sed', 'exit 23\n')
+        self.installer()
+        with patch.object(self.media, 'APT_MIRRORS', mirror_list, create=True):
+            status, record, _ = self.invoke('install')
+        self.assertNotEqual(status, 0)
+        self.assertIn('apt-mirror-preference: exit 23', record['failureReason'])
+        self.assertEqual(self.lines(), [])
+        self.assertEqual(set(record['checks'][-1]['tools']), {'ffmpeg', 'ffprobe'})
+
+    def test_package_timeout_is_not_reported_as_a_sudo_permission_failure(self):
+        self.installer()
+        self.executable('sudo', 'test "$1" = -n || exit 90\nshift\nexec "$@"\n')
+        real_run = subprocess.run
+        def run(command, **kwargs):
+            if str(self.bin/'apt-get') in command and 'install' in command:
+                raise subprocess.TimeoutExpired(command, 300)
+            return real_run(command, **kwargs)
+        with patch.object(self.media.subprocess, 'run', side_effect=run):
+            status, record, _ = self.invoke('install', uid=1000)
+        self.assertNotEqual(status, 0)
+        self.assertEqual(record['failureReason'], 'apt-install: timeout after 300 seconds')
+
     def test_healthy_tools_recheck_without_installing_or_overwriting_evidence(self):
         for tool in ('ffmpeg', 'ffprobe'): self.healthy(tool)
         before = None

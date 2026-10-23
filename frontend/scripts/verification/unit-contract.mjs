@@ -1,4 +1,11 @@
 import { sameInventory } from './browser-contract.mjs';
+import { selectionPolicy } from './selection-policy.mjs';
+export const physicsSeeds = (profile = 'ordinary') => {
+  if (!['ordinary', 'deep'].includes(profile)) throw new Error('Unknown physics profile');
+  return profile === 'deep'
+    ? Array.from({ length: 100 }, (_, i) => i + 1)
+    : selectionPolicy.ordinaryPhysicsSeeds;
+};
 
 export function validateUnitAttempts(cases, attempts) {
   // Native parameterized cases may have identical expanded titles. Preserve their
@@ -23,7 +30,7 @@ export function validateUnitAttempts(cases, attempts) {
     throw new Error('Failed, retried or repeated first attempt');
 }
 
-export function validateUnitExecution(discovered, report, scalar, live) {
+export function validateUnitExecution(discovered, report, scalar, live, profile = 'ordinary') {
   if (
     !Array.isArray(discovered) ||
     !Array.isArray(report?.testResults) ||
@@ -68,14 +75,11 @@ export function validateUnitExecution(discovered, report, scalar, live) {
     scalar.map((r) => r.seed),
     live.map((r) => r.seed),
   );
-  // This is the preserved minimum signal, not a maximum count for future tests or seeds.
-  if (
-    !Array.from({ length: 100 }, (_, i) => i + 1).every((seed) =>
-      scalar.some((r) => r.seed === seed),
-    ) ||
-    scalar.some((r) => r.passed !== true) ||
-    live.some((r) => r.rest !== true)
-  )
+  sameInventory(
+    physicsSeeds(profile),
+    scalar.map((r) => r.seed),
+  );
+  if (scalar.some((r) => r.passed !== true) || live.some((r) => r.rest !== true))
     throw new Error('Incomplete scalar/live stress signal');
   return cases;
 }

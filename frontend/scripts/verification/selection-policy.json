@@ -1,0 +1,97 @@
+{
+  "schema": 2,
+  "version": "lean-native-v2",
+  "receiptSchema": 3,
+  "ordinaryPhysicsSeeds": [1, 2, 26, 27, 30, 45, 58, 74, 99, 100],
+  "expectedSkips": [],
+  "native": [
+    {
+      "name": "desktop",
+      "project": "desktop-1440",
+      "engine": "chromium",
+      "context": "desktop",
+      "cases": [
+        {
+          "file": "smoke/compatibility.spec.ts",
+          "title": "production assets boot without browser errors"
+        },
+        {
+          "file": "smoke/compatibility.spec.ts",
+          "title": "base writing paints without JavaScript"
+        },
+        {
+          "file": "smoke/compatibility.spec.ts",
+          "title": "Writing B completes its clipped presentation"
+        },
+        {
+          "file": "smoke/desktop.spec.ts",
+          "title": "keyboard hash navigation transfers focus"
+        },
+        {
+          "file": "smoke/desktop.spec.ts",
+          "title": "native film presents and seeks a decoded frame"
+        },
+        {
+          "file": "smoke/desktop.spec.ts",
+          "title": "isolated diagrams render under the production CSP"
+        }
+      ]
+    },
+    {
+      "name": "mobile",
+      "project": "mobile-390",
+      "engine": "chromium",
+      "context": "touch",
+      "cases": [
+        {
+          "file": "smoke/touch.spec.ts",
+          "title": "native pan yields while a settled hold changes film once"
+        },
+        {
+          "file": "smoke/touch.spec.ts",
+          "title": "tuner horizontal touch stays local and vertical touch scrolls"
+        }
+      ]
+    },
+    {
+      "name": "firefox",
+      "project": "firefox-desktop",
+      "engine": "firefox",
+      "context": "desktop",
+      "cases": [
+        {
+          "file": "smoke/compatibility.spec.ts",
+          "title": "production assets boot without browser errors"
+        },
+        {
+          "file": "smoke/compatibility.spec.ts",
+          "title": "base writing paints without JavaScript"
+        },
+        {
+          "file": "smoke/compatibility.spec.ts",
+          "title": "Writing B completes its clipped presentation"
+        }
+      ]
+    },
+    {
+      "name": "webkit",
+      "project": "webkit-desktop",
+      "engine": "webkit",
+      "context": "desktop",
+      "cases": [
+        {
+          "file": "smoke/compatibility.spec.ts",
+          "title": "production assets boot without browser errors"
+        },
+        {
+          "file": "smoke/compatibility.spec.ts",
+          "title": "base writing paints without JavaScript"
+        },
+        {
+          "file": "smoke/compatibility.spec.ts",
+          "title": "Writing B completes its clipped presentation"
+        }
+      ]
+    }
+  ]
+}

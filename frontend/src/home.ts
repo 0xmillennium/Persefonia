@@ -3,9 +3,7 @@ import { enhanceHomepage } from './homepage/home-experience';
 
 document.documentElement.dataset.persefoniaAssets = 'ready';
 
-try {
-  enhanceHomepage();
-} catch (error) {
+void enhanceHomepage().catch((error: unknown) => {
   // All content, navigation and native disclosures are already server rendered.
   console.error('Homepage enhancement could not initialize', error);
-}
+});

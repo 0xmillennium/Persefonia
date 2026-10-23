@@ -6,8 +6,9 @@
 @param java.util.List<dev.persefonia.webpublic.navigation.PublicNavigationLink> navigationLinks = java.util.List.of()
 @param java.util.List<dev.persefonia.webpublic.navigation.PublicNavigationLink> relatedLinks = java.util.List.of()
 <!doctype html>
-<html lang="${page.htmlLanguage()}">
+<html translate="no" lang="${page.htmlLanguage()}">
 <head>
+    @template.site.components.translationPolicy()
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${page.seoTitle()}</title>

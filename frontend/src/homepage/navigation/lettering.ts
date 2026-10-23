@@ -1,9 +1,13 @@
-export function siteName(link: HTMLElement) {
-  return letterReels(link);
-}
+export { letterReels as siteName };
 
 export function letterReels(link: HTMLElement, proportional = false) {
   const text = link.textContent ?? '';
+  // Foreign wrappers are valid semantic text, but are not our measurable glyph source.
+  if (
+    proportional &&
+    (link.childNodes.length !== 1 || link.firstChild?.nodeType !== Node.TEXT_NODE)
+  )
+    return { dispose() {} };
   const abort = new AbortController();
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   const label = document.createElement('span');
@@ -83,6 +87,18 @@ export function letterReels(link: HTMLElement, proportional = false) {
     else link.style.removeProperty('white-space');
   }
   link.replaceChildren(label, visual);
+  let decorated = true;
+  const observer = new MutationObserver(() => {
+    if (label.parentNode === link && visual.parentNode === link && label.textContent === text)
+      return;
+    observer.disconnect();
+    abort.abort();
+    decorated = false;
+    visual.remove();
+    if (link.contains(label)) label.classList.remove('sr-only');
+  });
+  observer.observe(link, { childList: true });
+  observer.observe(label, { childList: true, characterData: true, subtree: true });
   reduced.addEventListener(
     'change',
     () => {
@@ -92,8 +108,9 @@ export function letterReels(link: HTMLElement, proportional = false) {
   );
   return {
     dispose() {
+      observer.disconnect();
       abort.abort();
-      link.textContent = text;
+      if (decorated) link.textContent = text;
     },
   };
 }

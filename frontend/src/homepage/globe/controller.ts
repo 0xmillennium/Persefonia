@@ -31,7 +31,6 @@ export class GlobeController {
     private stage: HTMLElement,
     private mask: Uint8Array,
     private diagnostics = true,
-    private controlsRoot: ParentNode = stage.parentElement ?? stage,
   ) {
     this.canvas = stage.querySelector<HTMLCanvasElement>('canvas')!;
     try {
@@ -54,6 +53,20 @@ export class GlobeController {
             Math.hypot(x - this.location.projection.x, y - this.location.projection.y) < 32
           ) {
             this.location.pinned = !this.location.pinned;
+            return;
+          }
+          this.entrance.finish();
+          const dx = (x - this.camera.width / 2) / this.camera.radius;
+          const dy = (y - this.camera.height / 2) / this.camera.radius;
+          if (Math.hypot(dx, dy) < 0.3) {
+            this.orientation.paused = !this.orientation.paused;
+            this.preferences();
+          } else {
+            this.orientation.drag(
+              Math.abs(dx) >= Math.abs(dy) ? Math.sign(dx) * 0.16 : 0,
+              Math.abs(dy) > Math.abs(dx) ? Math.sign(dy) * 0.12 : 0,
+            );
+            this.invalidate();
           }
         },
       );
@@ -90,7 +103,7 @@ export class GlobeController {
             this.failure = null;
             this.measure();
             this.lifecycle.setAvailable(true);
-            this.controlsAvailable(true);
+            this.surfaceAvailable(true);
           } catch (error) {
             this.fail(`Graphics could not be restored: ${String(error)}`);
           }
@@ -100,29 +113,12 @@ export class GlobeController {
       window.addEventListener('resize', () => this.measure(), options);
       this.canvas.addEventListener('keydown', () => this.entrance.finish(), options);
       this.reduced.addEventListener('change', () => this.preferences(), options);
-      const pause = this.controlsRoot.querySelector<HTMLButtonElement>('#pause');
       const toggleRotation = () => {
         this.entrance.finish();
         this.input.cancel();
         this.orientation.paused = !this.orientation.paused;
         this.preferences();
       };
-      pause?.addEventListener('click', toggleRotation, options);
-      for (const [id, amount] of [
-        ['tilt-up', -0.12],
-        ['tilt-down', 0.12],
-      ] as const) {
-        this.controlsRoot.querySelector<HTMLButtonElement>(`#${id}`)?.addEventListener(
-          'click',
-          () => {
-            this.entrance.finish();
-            this.input.cancel();
-            this.orientation.drag(0, amount);
-            this.invalidate();
-          },
-          options,
-        );
-      }
       const findLocation = () => {
         this.entrance.finish();
         this.input.cancel();
@@ -133,9 +129,6 @@ export class GlobeController {
         this.location.pinned = true;
         this.invalidate();
       };
-      this.controlsRoot
-        .querySelector<HTMLButtonElement>('#find-location')
-        ?.addEventListener('click', findLocation, options);
       this.canvas.addEventListener(
         'keydown',
         (event) => {
@@ -160,7 +153,7 @@ export class GlobeController {
       );
       this.preferences();
       this.measure();
-      this.controlsAvailable(true);
+      this.surfaceAvailable(true);
       // Opt-in lifecycle probes for this isolated experiment. state() and RAF
       // perform no WebGL metadata queries or pixel readback.
       if (
@@ -198,31 +191,14 @@ export class GlobeController {
     this.input.cancel();
     this.orientation.reduced = this.reduced.matches;
     if (this.orientation.reduced) this.entrance.finish();
-    const pause = this.controlsRoot.querySelector<HTMLButtonElement>('#pause');
-    if (pause) {
-      pause.disabled = this.orientation.reduced;
-      pause.setAttribute(
-        'aria-pressed',
-        String(this.orientation.paused || this.orientation.reduced),
-      );
-      pause.textContent = this.orientation.reduced
-        ? 'Rotation off (reduced motion)'
-        : this.orientation.paused
-          ? 'Resume rotation'
-          : 'Pause rotation';
-    }
     this.invalidate();
   }
   private invalidate(): void {
     if (!this.disposed) this.lifecycle?.request();
   }
-  private controlsAvailable(available: boolean): void {
+  private surfaceAvailable(available: boolean): void {
     if (!available && document.activeElement === this.canvas) focusNavigation();
     this.canvas.tabIndex = available ? 0 : -1;
-    for (const control of this.controlsRoot.querySelectorAll<HTMLButtonElement>('.controls button'))
-      control.disabled = !available;
-    const pause = this.controlsRoot.querySelector<HTMLButtonElement>('#pause');
-    if (available && pause) pause.disabled = this.orientation.reduced;
   }
   private draw(seconds: number): boolean {
     if (!this.renderer || this.disposed) return false;
@@ -259,7 +235,7 @@ export class GlobeController {
   private fail(message: string): void {
     this.failure = message;
     this.location.clear();
-    this.controlsAvailable(false);
+    this.surfaceAvailable(false);
     this.stage.dataset.ready = 'false';
     this.stage.querySelector<HTMLElement>('#fallback')!.textContent =
       `Istanbul, Türkiye. ${message}`;
@@ -323,7 +299,7 @@ export class GlobeController {
     this.renderer = null;
     this.hover = null;
     this.location?.clear();
-    this.controlsAvailable(false);
+    this.surfaceAvailable(false);
     this.stage.dataset.ready = 'false';
     this.stage.style.removeProperty('--globe-focus-size');
   }

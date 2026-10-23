@@ -8,6 +8,7 @@ import subprocess
 import sys
 import xml.etree.ElementTree as ET
 import qualification as q
+import selection as selection
 
 ROOT = q.ROOT
 OUTPUT = ROOT / 'app/build/ci'
@@ -67,12 +68,24 @@ def base(lane, source):
 
 
 def validate_unit(unit, source):
-    q.require(unit.get('schema') == 1 and unit.get('status') == 'passed' and unit.get('sourceSha') == source['sourceSha'], 'Invalid unit source receipt')
+    q.require(unit.get('schema') == 2 and unit.get('policy') == selection.POLICY_HASH and unit.get('profile') == 'ordinary' and unit.get('status') == 'passed' and unit.get('sourceSha') == source['sourceSha'], 'Invalid unit source receipt')
     q.validate_identity(unit.get('sourceContext'), source)
+    expected_plan = selection.plan(source)
+    q.require(unit.get('selectionPlan') == expected_plan, 'Wrong fixed frontend plan')
+    expected_physics = 'ordinary'
+    q.require(unit.get('physicsProfile') == expected_physics,
+              'Wrong ordinary physics corpus')
     runner = unit['runner']
     q.require(str(runner['run']) == source['run'] and str(runner['attempt']) == source['attempt'], 'Wrong unit attempt')
     q.require(unit['cases'] and all(c['status'] == 'passed' for c in unit['cases']), 'Incomplete frontend cases')
     q.require(unit['attempts'], 'Missing first-attempt unit evidence')
+    seeds = selection.POLICY['ordinaryPhysicsSeeds']
+    for file, title in [('stress.test.ts', 'seed {} converges without invariant failures'),
+                        ('live-stress.test.ts', 'live seed {}: coalesced fast strokes preserve invariants and recover')]:
+        actual = [case.get('fullName') for case in unit['cases']
+                  if case.get('file', '').replace('\\', '/').endswith('/identity/physics/tests/'+file)]
+        q.require(sorted(actual) == sorted(title.format(seed) for seed in seeds),
+                  'Missing/duplicate/extra required scalar/live physics corpus')
 
 
 def validate_nonbrowser(directory, source, checksum):
@@ -86,14 +99,7 @@ def validate_nonbrowser(directory, source, checksum):
     return jvm, frontend
 
 
-def validate_browser(value, source, checksum):
-    q.require(value.get('schema') == 1 and value.get('status') == 'passed' and value.get('sourceContext') == source and
-              value.get('identity') == {'sourceSha': source['sourceSha'], 'artifactSha256': checksum}
-              and str(value.get('runner', {}).get('run')) == source['run']
-              and str(value.get('runner', {}).get('attempt')) == source['attempt']
-              and value.get('partitions') == 8 and value.get('selected', 0) > 0
-              and len(value.get('receipts', [])) == 8, 'Invalid browser acceptance')
-    return value
+from browser_evidence import validate_browser, join as join_browser
 
 
 def aggregate(source):
@@ -139,10 +145,10 @@ def gate(source):
     checksum = q.candidate(OUTPUT)
     q.require(verify['candidate'] == checksum, 'Gate candidate mismatch')
     jobs = q.load_json(os.environ['QUALIFICATION_NEEDS'].encode())
-    q.require(set(jobs) == {'automation', 'eligibility', 'compare', 'build-jvm', 'frontend', 'verify', 'browser', 'browser-receipts'}
+    q.require(set(jobs) == {'automation', 'eligibility', 'compare', 'build-jvm', 'frontend', 'verify', 'browser'}
               and jobs['eligibility']['result'] == 'success' and jobs['compare']['result'] in {'success', 'skipped'},
               'Incomplete/failed eligibility or comparison dependency')
-    results = {key: jobs[key]['result'] for key in ['automation', 'build-jvm', 'frontend', 'verify', 'browser', 'browser-receipts']}
+    results = {key: jobs[key]['result'] for key in ['automation', 'build-jvm', 'frontend', 'verify', 'browser']}
     q.require(q.admission_policy(jobs) == verify.get('reusePolicyMode'), 'Gate qualification policy differs from Verify')
     decision = verify.get('equivalence')
     q.job_results(verify['mode'], results, decision, source, checksum)
@@ -153,12 +159,14 @@ def gate(source):
         q.require(verify['producers'] == {'jvm': q.digest(jvm), 'frontend': q.digest(frontend)}, 'Forged producer references')
     automation = q.receipt(q.read(OUTPUT/'automation.json'), 'automation', source)
     validate_java(automation['javaCases'])
-    browser = q.read(OUTPUT/'browser-acceptance.json')
     if verify['mode'] == 'executed':
-        validate_browser(browser, source, checksum)
+        browser = join_browser(ROOT/'app/build/browser/verification', source, checksum)
+        q.write(OUTPUT/'browser-acceptance.json', browser)
         subprocess.run(['node', 'frontend/scripts/verification/browser-admit.mjs', str(OUTPUT/'browser-acceptance.json'),
                         source['sourceSha'], checksum], cwd=ROOT, check=True)
     else:
+        subprocess.run(['python3', '-B', 'scripts/ci/reuse.py', 'browser-admission'], cwd=ROOT, check=True)
+        browser = q.read(OUTPUT/'browser-acceptance.json')
         q.require(browser.get('mode') == 'reused' and browser.get('equivalence') == q.digest(decision)
                   and browser.get('identity') == source, 'Invalid reused browser admission')
     result = base('qualification', source)

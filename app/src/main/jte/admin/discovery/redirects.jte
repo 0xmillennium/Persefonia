@@ -1,7 +1,9 @@
+@import dev.persefonia.webadmin.FieldErrors
 @import dev.persefonia.webadmin.discovery.AdminRedirectPage
 @param AdminRedirectPage page
-@template.admin.components.pageShell("Redirects | Persefonia Admin", page.chrome().admin(), page.chrome().navigation(), page.chrome().logoutForm(), false, content = @`
-<main>
+@param java.util.List<String> adminStylesheetPaths = java.util.List.of()
+@template.admin.components.pageShell("Redirects | Persefonia Admin", page.chrome().admin(), page.chrome().navigation(), page.chrome().logoutForm(), false, adminStylesheetPaths = adminStylesheetPaths, content = @`
+<main id="admin-content" tabindex="-1">
     <h1>Redirects</h1>
     @if(page.successMessage() != null)
         <p role="status">${page.successMessage()}</p>
@@ -11,11 +13,7 @@
             @for(var error : page.globalErrors())
                 <p role="alert">${error}</p>
             @endfor
-            <ul>
-                @for(var error : page.fieldErrors())
-                    <li><a href="#${error.field()}">${error.field()}: ${error.message()}</a></li>
-                @endfor
-            </ul>
+            @template.admin.components.fieldErrors(page.fieldErrors())
         </section>
     @endif
     <section aria-label="Create redirect">
@@ -23,11 +21,11 @@
         <form method="post" action="/admin/discovery/redirects">
             @template.admin.components.csrfField(page.chrome().logoutForm())
             <label for="sourceUrl">Source path</label>
-            <input id="sourceUrl" name="sourceUrl" value="${page.form().getSourceUrl()}">
+            <input id="sourceUrl" name="sourceUrl" value="${page.form().getSourceUrl()}" aria-invalid="${FieldErrors.has(page.fieldErrors(), "sourceUrl") ? "true" : null}" aria-describedby="${FieldErrors.has(page.fieldErrors(), "sourceUrl") ? "error-sourceUrl" : null}">
             <label for="targetUrl">Target path</label>
-            <input id="targetUrl" name="targetUrl" value="${page.form().getTargetUrl()}">
+            <input id="targetUrl" name="targetUrl" value="${page.form().getTargetUrl()}" aria-invalid="${FieldErrors.has(page.fieldErrors(), "targetUrl") ? "true" : null}" aria-describedby="${FieldErrors.has(page.fieldErrors(), "targetUrl") ? "error-targetUrl" : null}">
             <label for="statusCode">Status code</label>
-            <select id="statusCode" name="statusCode">
+            <select id="statusCode" name="statusCode" aria-invalid="${FieldErrors.has(page.fieldErrors(), "statusCode") ? "true" : null}" aria-describedby="${FieldErrors.has(page.fieldErrors(), "statusCode") ? "error-statusCode" : null}">
                 @for(String value : java.util.List.of("301", "302", "307", "308"))
                     <option value="${value}" selected="${value.equals(page.form().getStatusCode())}">${value}</option>
                 @endfor
@@ -40,7 +38,7 @@
         @if(page.rules().isEmpty())
             <p>No redirect rules yet.</p>
         @else
-            <table>
+            <div class="admin-table-scroll" role="region" aria-label="Scrollable table" tabindex="0"><table>
                 <thead>
                     <tr>
                         <th>Source</th>
@@ -78,7 +76,7 @@
                     </tr>
                 @endfor
                 </tbody>
-            </table>
+            </table></div>
         @endif
     </section>
 </main>

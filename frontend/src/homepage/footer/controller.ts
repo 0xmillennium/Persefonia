@@ -25,9 +25,9 @@ export function mountFooter(root: HTMLElement) {
     node.inert = !available;
   };
   return {
-    update(phase: number, reduced: boolean) {
+    update(phase: number, reduced: boolean, writingPhase = phase) {
       for (const row of rows) {
-        const p = reduced ? 1 : footerRowProgress(phase, row.index, row.detail);
+        const p = reduced ? 1 : footerRowProgress(writingPhase, row.index, row.detail);
         if (reduced) {
           row.rise.style.removeProperty('transform');
           row.rise.style.removeProperty('opacity');

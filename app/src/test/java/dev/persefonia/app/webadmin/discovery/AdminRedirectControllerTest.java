@@ -138,9 +138,9 @@ class AdminRedirectControllerTest {
 
     @Test
     void invalidSourceTargetStatusAndSelfRedirectShowSafeErrors() throws Exception {
-        expectFormError("sourceUrl", "https://example.test/old", "/tr/articles/new", "301", "sourceUrl:");
-        expectFormError("targetUrl", "/tr/articles/old", "//external", "301", "targetUrl:");
-        expectFormError("statusCode", "/tr/articles/old", "/tr/articles/new", "303", "statusCode:");
+        expectFormError("sourceUrl", "https://example.test/old", "/tr/articles/new", "301", "id=\"error-sourceUrl\"");
+        expectFormError("targetUrl", "/tr/articles/old", "//external", "301", "id=\"error-targetUrl\"");
+        expectFormError("statusCode", "/tr/articles/old", "/tr/articles/new", "303", "id=\"error-statusCode\"");
         expectFormError("targetUrl", "/tr/articles/same", "/tr/articles/same", "301", "Target path must differ");
     }
 
@@ -197,7 +197,9 @@ class AdminRedirectControllerTest {
                         .param("targetUrl", targetUrl)
                         .param("statusCode", statusCode))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString(field)))
+                .andExpect(content().string(containsString("id=\"error-" + field + "\"")))
+                .andExpect(content().string(containsString("href=\"#" + field + "\"")))
+                .andExpect(content().string(containsString("aria-describedby=\"error-" + field + "\"")))
                 .andExpect(content().string(containsString(expectedText)))
                 .andExpect(content().string(containsString("Create manual redirect")));
     }

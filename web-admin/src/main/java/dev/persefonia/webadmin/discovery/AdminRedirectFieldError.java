@@ -2,7 +2,7 @@ package dev.persefonia.webadmin.discovery;
 
 import java.util.Objects;
 
-public record AdminRedirectFieldError(String field, String message) {
+public record AdminRedirectFieldError(String field, String message) implements dev.persefonia.webadmin.FieldError {
     public AdminRedirectFieldError {
         requireNonBlank(field, "field");
         requireNonBlank(message, "message");

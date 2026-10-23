@@ -1,5 +1,6 @@
 package dev.persefonia.app.webadmin.content;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -35,6 +36,83 @@ class AdminContentEditControllerTest {
     @Autowired AdminContentTagAssignmentTestSupport tags;
 
     @BeforeEach void reset() { items.reset(); tags.reset(); }
+
+    @Test
+    void populatedTagsHaveUniqueLabelsAndRetainArchivedAssignmentsOnSubmit() throws Exception {
+        var item = AdminContentTestFixtures.completeDraft();
+        items.add(item);
+        var first = tags.active("First active");
+        var second = tags.active("Second active");
+        var archived = tags.archived("Assigned archive");
+        tags.assign(item.id(), first);
+        tags.assign(item.id(), archived);
+        var owner = authentication(AdminAuthenticationTestSupport.authentication(AdminRole.OWNER));
+        String path = "/admin/content/" + item.id().value();
+        var result = mockMvc.perform(get(path + "/edit").with(owner))
+                .andExpect(status().isOk()).andReturn();
+        var document = AdminFormAssertions.accessibleDocument(result.getResponse().getContentAsString());
+        var group = document.selectFirst("fieldset#tagId");
+        assertThat(group).isNotNull();
+        assertThat(group.selectFirst("legend").text()).isEqualTo("Tags");
+        var controls = group.select("input[name=tagId]");
+        assertThat(controls.eachAttr("value"))
+                .containsExactly(first.value().toString(), second.value().toString(), archived.value().toString());
+        assertThat(controls.eachAttr("id")).doesNotHaveDuplicates();
+        assertThat(controls.get(0).parent().text()).isEqualTo("First active");
+        assertThat(controls.get(1).parent().text()).isEqualTo("Second active");
+        assertThat(controls.get(2).parent().text()).isEqualTo("Assigned archive ARCHIVED");
+        assertThat(controls.get(0).hasAttr("checked")).isTrue();
+        assertThat(controls.get(1).hasAttr("checked")).isFalse();
+        assertThat(controls.get(2).hasAttr("checked")).isTrue();
+        assertThat(group.hasAttr("aria-describedby")).isFalse();
+        mockMvc.perform(post(path + "/tags").with(owner).with(csrf())
+                        .param("tagId", second.value().toString(), archived.value().toString()))
+                .andExpect(redirectedUrl(path + "/edit?tagsSaved"));
+        assertThat(tags.assigned(item.id())).containsExactlyInAnyOrder(second, archived);
+    }
+
+    @Test
+    void tagErrorsDescribeOnlyTheTagGroupThroughTheRealPostPath() throws Exception {
+        var item = AdminContentTestFixtures.completeDraft();
+        items.add(item);
+        tags.active("Available");
+        var result = mockMvc.perform(post("/admin/content/" + item.id().value() + "/tags")
+                        .with(authentication(AdminAuthenticationTestSupport.authentication(AdminRole.OWNER)))
+                        .with(csrf()).param("tagId", "invalid-synthetic-tag"))
+                .andExpect(status().isOk()).andReturn();
+        var document = AdminFormAssertions.accessibleDocument(result.getResponse().getContentAsString());
+        var group = document.getElementById("tagId");
+        assertThat(group.tagName()).isEqualTo("fieldset");
+        assertThat(group.attr("tabindex")).isEqualTo("-1");
+        assertThat(group.attr("aria-invalid")).isEqualTo("true");
+        assertThat(group.attr("aria-describedby")).isEqualTo("content-tag-errors");
+        assertThat(document.getElementById("content-tag-errors").text())
+                .contains("One or more requested tags are invalid.");
+        assertThat(document.select(".field-errors")).isEmpty();
+        assertThat(tags.assigned(item.id())).isEmpty();
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void noAssignableTagsStillRendersAnAccessibleTagGroup(boolean assignedArchive) throws Exception {
+        var item = AdminContentTestFixtures.completeDraft();
+        items.add(item);
+        if (assignedArchive) {
+            tags.assign(item.id(), tags.archived("Retained archive"));
+        }
+        var result = mockMvc.perform(get("/admin/content/" + item.id().value() + "/edit")
+                        .with(authentication(AdminAuthenticationTestSupport.authentication(AdminRole.OWNER))))
+                .andExpect(status().isOk()).andReturn();
+        var document = AdminFormAssertions.accessibleDocument(result.getResponse().getContentAsString());
+        assertThat(document.select("fieldset#tagId legend").text()).isEqualTo("Tags");
+        if (assignedArchive) {
+            assertThat(document.select("input[name=tagId][checked]")).hasSize(1);
+            assertThat(document.select("fieldset#tagId").text()).contains("Retained archive ARCHIVED");
+        } else {
+            assertThat(document.text()).contains("No assignable tags are available.");
+            assertThat(document.select("input[name=tagId]")).isEmpty();
+        }
+    }
 
     @Test
     void editRendersDraftAndUnpublishedWithPublishAndArchiveControls() throws Exception {
@@ -190,7 +268,7 @@ class AdminContentEditControllerTest {
 
         mockMvc.perform(post(path).with(owner).with(csrf()).param("tagId", active.value().toString()))
                 .andExpect(status().is3xxRedirection());
-        org.assertj.core.api.Assertions.assertThat(tags.assigned(item.id())).containsExactly(active);
+        assertThat(tags.assigned(item.id())).containsExactly(active);
     }
 
     @Test
@@ -213,7 +291,7 @@ class AdminContentEditControllerTest {
         mockMvc.perform(post(path).with(owner).with(csrf()).param("tagId", archived.value().toString()))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Archived tags cannot be newly assigned.")));
-        org.assertj.core.api.Assertions.assertThat(tags.assigned(item.id())).isEmpty();
+        assertThat(tags.assigned(item.id())).isEmpty();
     }
 
     @Test
@@ -229,8 +307,8 @@ class AdminContentEditControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Tags cannot be changed for content that is not editable.")))
                 .andExpect(content().string(not(containsString("Exception"))));
-        org.assertj.core.api.Assertions.assertThat(tags.assigned(item.id())).isEmpty();
-        org.assertj.core.api.Assertions.assertThat(items.saveCount()).isZero();
+        assertThat(tags.assigned(item.id())).isEmpty();
+        assertThat(items.saveCount()).isZero();
     }
 
     private static org.springframework.util.LinkedMultiValueMap<String, String> validUpdate() {

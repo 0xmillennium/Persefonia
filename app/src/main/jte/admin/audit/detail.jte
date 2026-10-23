@@ -1,7 +1,8 @@
 @import dev.persefonia.webadmin.audit.AdminAuditDetailPage
 @param AdminAuditDetailPage page
-@template.admin.components.pageShell("Audit record | Persefonia Admin", page.chrome().admin(), page.chrome().navigation(), page.chrome().logoutForm(), false, content = @`
-    <main>
+@param java.util.List<String> adminStylesheetPaths = java.util.List.of()
+@template.admin.components.pageShell("Audit record | Persefonia Admin", page.chrome().admin(), page.chrome().navigation(), page.chrome().logoutForm(), false, adminStylesheetPaths = adminStylesheetPaths, content = @`
+    <main id="admin-content" tabindex="-1">
         <h1>Audit record</h1>
         <p><a href="/admin/audit">Back to audit history</a></p>
 
@@ -45,7 +46,7 @@
             @if(page.record().changes().isEmpty())
                 <p>No field changes recorded.</p>
             @else
-                <table>
+                <div class="admin-table-scroll" role="region" aria-label="Scrollable table" tabindex="0"><table>
                     <thead><tr><th>Field</th><th>Old</th><th>New</th></tr></thead>
                     <tbody>
                     @for(var change : page.record().changes())
@@ -56,7 +57,7 @@
                         </tr>
                     @endfor
                     </tbody>
-                </table>
+                </table></div>
             @endif
         </section>
 
@@ -65,14 +66,14 @@
             @if(page.record().metadata().isEmpty())
                 <p>No metadata recorded.</p>
             @else
-                <table>
+                <div class="admin-table-scroll" role="region" aria-label="Scrollable table" tabindex="0"><table>
                     <thead><tr><th>Key</th><th>Value</th></tr></thead>
                     <tbody>
                     @for(var entry : page.record().metadata())
                         <tr><td>${entry.key()}</td><td>${entry.value()}</td></tr>
                     @endfor
                     </tbody>
-                </table>
+                </table></div>
             @endif
         </section>
     </main>

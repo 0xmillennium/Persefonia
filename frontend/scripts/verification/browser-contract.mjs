@@ -1,22 +1,15 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
-const skipPolicy = JSON.parse(
-  readFileSync(new URL('./expected-skips.json', import.meta.url), 'utf8'),
-);
-export const groups = [
-  { name: 'desktop', suite: 'chromium', project: 'desktop-1440', shards: 2 },
-  { name: 'tablet', suite: 'chromium', project: 'tablet-834', shards: 2 },
-  { name: 'mobile', suite: 'chromium', project: 'mobile-390', shards: 2 },
-  { name: 'firefox', suite: 'cross', project: 'firefox-desktop', shards: 1 },
-  { name: 'webkit', suite: 'cross', project: 'webkit-desktop', shards: 1 },
-];
-export const partitions = groups.flatMap(({ shards, ...group }) =>
-  Array.from({ length: shards }, (_, index) => ({
-    ...group,
-    shard: `${index + 1}/${shards}`,
-  })),
-);
+import {
+  policyHash,
+  selectionPolicy,
+  requiredPartitions,
+  validateNativeSelection,
+} from './selection-policy.mjs';
+const skipPolicy = selectionPolicy.expectedSkips;
+export const partitions = requiredPartitions();
+export const groups = partitions.map((p) => ({ ...p, shards: 1 }));
 export const partitionKey = (partition) =>
   `${partition.name}-${partition.shard.replace('/', 'of')}`;
 export const digest = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -79,10 +72,10 @@ export function reportTests(report) {
             project: test.projectName,
             file: spec.file,
             title: spec.title,
-            expectedStatus: test.expectedStatus,
+            expectedStatus: test.expectedStatus ?? null,
             annotations: test.annotations,
             results: test.results,
-            status: test.status,
+            status: test.status ?? null,
           });
         }
       }
@@ -132,7 +125,10 @@ export function validateOutcomes(rows, policy = skipPolicy) {
 
 export function validateReceipt(receipt, expectedIdentity, policy = skipPolicy) {
   requireThat(
-    receipt?.schema === 1 && receipt.status === 'passed' && receipt.exitCode === 0,
+    receipt?.schema === 3 &&
+      receipt.policy === policyHash &&
+      receipt.status === 'passed' &&
+      receipt.exitCode === 0,
     'Missing, corrupt or failed receipt',
   );
   requireThat(
@@ -144,6 +140,20 @@ export function validateReceipt(receipt, expectedIdentity, policy = skipPolicy) 
     /^[a-f0-9]{40}$/.test(receipt.identity.sourceSha) &&
       /^[a-f0-9]{64}$/.test(receipt.identity.artifactSha256),
     'Invalid artifact identity',
+  );
+  const engine = receipt.partition?.project?.startsWith('firefox')
+    ? 'firefox'
+    : receipt.partition?.project?.startsWith('webkit')
+      ? 'webkit'
+      : 'chromium';
+  requireThat(
+    Object.keys(receipt.environment?.browsers ?? {}).join(',') === engine &&
+      /^[a-f0-9]{64}$/.test(receipt.environment.browsers[engine]?.sha256) &&
+      typeof receipt.environment.ffmpeg === 'string' &&
+      receipt.environment.ffmpeg.length > 0 &&
+      typeof receipt.environment.ffprobe === 'string' &&
+      receipt.environment.ffprobe.length > 0,
+    'Missing required engine/decoder prerequisite',
   );
   requireThat(
     Array.isArray(receipt.selected) && Array.isArray(receipt.outcomes),
@@ -189,7 +199,8 @@ export function joinReceipts(
       'Wrong viewport partition',
     );
   }
-  for (const suite of ['chromium', 'cross']) {
+  sameInventory([...new Set(required.map((p) => p.suite))], Object.keys(inventory));
+  for (const suite of [...new Set(required.map((p) => p.suite))]) {
     const matching = receipts.filter((r) => r.partition.suite === suite);
     sameInventory(
       inventory[suite].map((r) => r.id),
@@ -225,7 +236,8 @@ export function joinReceipts(
 /** Gate validates the complete native receipt set through the same owner as the source join. */
 export function validateAcceptance(value, expectedIdentity) {
   requireThat(
-    value?.schema === 1 &&
+    value?.schema === 3 &&
+      value.policy === policyHash &&
       value.status === 'passed' &&
       value.inventory &&
       Array.isArray(value.receipts) &&
@@ -240,10 +252,53 @@ export function validateAcceptance(value, expectedIdentity) {
         digest(receipt.sourceContext) === digest(value.sourceContext),
       'Mixed browser source/run/attempt',
     );
-  const result = joinReceipts(value.inventory, value.receipts, expectedIdentity);
+  requireThat(
+    Array.isArray(value.profiles) &&
+      value.profiles[0] === 'ordinary' &&
+      new Set(value.profiles).size === value.profiles.length,
+    'Invalid native profiles',
+  );
+  const required = requiredPartitions(value.profiles);
+  const result = joinReceipts(value.inventory, value.receipts, expectedIdentity, required);
+  for (const part of required.filter((p) => p.suite === 'ordinary'))
+    validateNativeSelection(
+      value.inventory[part.suite].filter((r) => r.project === part.project),
+      part.suite,
+      part.project,
+    );
   requireThat(
     result.selected === value.selected && result.partitions === value.partitions,
     'Forged browser acceptance counts',
+  );
+  const raw = value.native;
+  requireThat(raw && raw.discovery && raw.execution, 'Missing raw native reports');
+  const compact = (rows) =>
+    rows
+      .map((row) => ({
+        id: row.id,
+        project: row.project,
+        file: row.file,
+        title: row.title,
+        expectedStatus: row.expectedStatus ?? null,
+        status: row.status ?? null,
+        annotations: row.annotations,
+        results: row.results.map(({ status, duration, retry, startTime }) => ({
+          status,
+          duration,
+          retry,
+          ...(startTime === undefined ? {} : { startTime }),
+        })),
+      }))
+      .sort((a, b) => a.id.localeCompare(b.id));
+  requireThat(
+    JSON.stringify(compact(reportTests(raw.discovery))) ===
+      JSON.stringify(compact(value.inventory.ordinary)),
+    'Forged raw discovery',
+  );
+  requireThat(
+    JSON.stringify(compact(reportTests(raw.execution))) ===
+      JSON.stringify(compact(value.receipts.flatMap((r) => r.outcomes))),
+    'Forged raw execution',
   );
   return result;
 }

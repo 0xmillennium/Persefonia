@@ -98,7 +98,8 @@ class AdminMediaTemplateSmokeTest {
                         .with(owner()).with(csrf())
                         .param("visibility", "VISIBLE"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("visibility: Choose PRIVATE or PUBLIC.")));
+                .andExpect(content().string(containsString("<li id=\"error-visibility\"><a href=\"#visibility\">Choose PRIVATE or PUBLIC.</a></li>")))
+                .andExpect(content().string(containsString("aria-describedby=\"error-visibility\"")));
     }
 
     @Test

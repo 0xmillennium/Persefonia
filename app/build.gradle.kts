@@ -157,6 +157,11 @@ tasks.check {
 val frontendDirectory = rootProject.layout.projectDirectory.dir("frontend")
 val generatedViteDirectory = layout.buildDirectory.dir("generated/vite")
 
+val dependencyInputs = providers.exec {
+    workingDir(frontendDirectory)
+    commandLine("node", "scripts/verification/dependency-inputs.mjs")
+}.standardOutput.asText.map { it.trim() }
+
 val npmCi by tasks.registering(Exec::class) {
     workingDir(frontendDirectory)
     commandLine("npm", "ci")
@@ -166,9 +171,12 @@ val npmCi by tasks.registering(Exec::class) {
     )
     inputs.property("nodePlatform", System.getProperty("os.name") + "-" + System.getProperty("os.arch"))
     outputs.dir(frontendDirectory.dir("node_modules"))
-    // Effective npm configuration, lifecycle scripts and native packages are not a reusable
-    // output contract. Reinstall deterministically rather than fingerprinting node_modules.
-    outputs.upToDateWhen { false }
+    inputs.file(frontendDirectory.file("scripts/verification/dependency-inputs.mjs"))
+    inputs.property("effectiveDependencyInputs", dependencyInputs)
+    // Gradle fingerprints the actual installed outputs, including the hidden package lock.
+    // A bare node_modules directory or a separate success stamp cannot satisfy this task.
+    val allowLocalDependencyReuse = !providers.environmentVariable("CI").isPresent
+    outputs.upToDateWhen { allowLocalDependencyReuse }
 }
 
 val npmRunTypecheck by tasks.registering(Exec::class) {
@@ -178,6 +186,8 @@ val npmRunTypecheck by tasks.registering(Exec::class) {
     inputs.dir(frontendDirectory.dir("src"))
     inputs.dir(frontendDirectory.dir("scripts"))
     inputs.dir(frontendDirectory.dir("e2e"))
+    inputs.dir(frontendDirectory.dir("admin-e2e"))
+    inputs.files(frontendDirectory.asFileTree.matching { include("*.config.ts") })
     inputs.files(
         frontendDirectory.file("package.json"),
         frontendDirectory.file("tsconfig.json"),
@@ -185,17 +195,23 @@ val npmRunTypecheck by tasks.registering(Exec::class) {
         frontendDirectory.file("tsconfig.tooling.json"),
         frontendDirectory.file("tsconfig.tests.json")
     )
+    val typecheckOutput = layout.buildDirectory.file("frontend/typecheck.ok").get().asFile
+    inputs.property("effectiveDependencyInputs", dependencyInputs)
+    outputs.file(typecheckOutput)
+    doLast {
+        typecheckOutput.parentFile.mkdirs()
+        typecheckOutput.writeText("TypeScript build inputs checked.\n")
+    }
 }
 
 val npmRunUnitTest by tasks.registering(Exec::class) {
     group = "verification"
-    description = "Runs all frontend unit tests, including deterministic physics stress pipelines."
+    description = "Runs ordinary frontend units and the representative 10+10 physics corpus."
     dependsOn(npmCi)
     workingDir(frontendDirectory)
     commandLine("node", "scripts/verification/unit-run.mjs")
     inputs.dir(frontendDirectory.dir("src"))
     inputs.dir(frontendDirectory.dir("scripts"))
-    inputs.dir(frontendDirectory.dir("e2e"))
     inputs.files(
         frontendDirectory.file("package.json"),
         frontendDirectory.file("vitest.config.ts")
@@ -204,7 +220,7 @@ val npmRunUnitTest by tasks.registering(Exec::class) {
 
 val frontendCheck by tasks.registering {
     group = "verification"
-    description = "Runs independently reconciled full frontend unit and both 100-seed stress pipelines."
+    description = "Runs independently reconciled ordinary frontend tests, including 10+10 physics seeds."
     dependsOn(npmRunUnitTest)
 }
 
@@ -216,9 +232,14 @@ val viteBuild by tasks.registering(Exec::class) {
     dependsOn(npmRunTypecheck)
     workingDir(frontendDirectory)
     commandLine("npm", "run", "build")
-    inputs.dir(frontendDirectory.dir("src"))
+    inputs.files(frontendDirectory.dir("src").asFileTree.matching {
+        exclude("**/*.test.ts", "**/tests/**")
+    })
     inputs.dir(frontendDirectory.dir("public"))
-    inputs.dir(frontendDirectory.dir("scripts"))
+    inputs.files(frontendDirectory.dir("scripts").asFileTree.matching {
+        include("media/**", "checks/budgets.ts")
+        exclude("**/*.test.ts", "**/tests/**")
+    })
     inputs.files(
         frontendDirectory.file("package.json"),
         frontendDirectory.file("package-lock.json"),
@@ -228,9 +249,11 @@ val viteBuild by tasks.registering(Exec::class) {
         include("tsconfig*.json", ".npmrc")
     })
     outputs.dir(generatedViteDirectory)
-    // Always revalidate media and regenerate from the freshly installed toolchain. Exec
-    // outputs are not placed in a build cache; mandatory checks never reuse a success stamp.
-    outputs.upToDateWhen { false }
+    inputs.property("effectiveDependencyInputs", dependencyInputs)
+    inputs.files(rootProject.layout.projectDirectory.asFileTree.matching {
+        include("package.json", "package-lock.json", ".npmrc")
+    })
+    // Vite output fingerprints permit safe build reuse; test receipts always execute freshly.
 }
 
 tasks.processResources {
@@ -238,9 +261,17 @@ tasks.processResources {
     from(generatedViteDirectory)
 }
 
-tasks.register<Exec>("browserCheck") {
-    dependsOn(tasks.named("bootJar"), npmCi)
+val prepareNativeCandidate by tasks.registering(Exec::class) {
+    dependsOn(tasks.named("bootJar"))
     workingDir(rootProject.layout.projectDirectory)
+    commandLine("bash", "scripts/browser/stage-candidate.sh")
+}
+
+tasks.register<Exec>("browserCheck") {
+    description = "Runs explicit ordinary native compatibility; never part of check."
+    dependsOn(prepareNativeCandidate, npmCi)
+    workingDir(rootProject.layout.projectDirectory)
+    environment("PERSEFONIA_BROWSER_SUITE", "native")
     commandLine("bash", "scripts/browser/check.sh")
 }
 
@@ -270,4 +301,28 @@ tasks.named<BootRun>("bootRun") {
 
 tasks.named("jar") {
     enabled = false
+}
+
+// Data only, consumed in this producer workspace after its full JVM tests. No compile/install dependencies.
+val adminPreviewRuntime = sourceSets.test.get().runtimeClasspath + files(precompiledJteDirectory)
+val adminPreviewClasspathFile = layout.buildDirectory.file("admin-preview/classpath.json")
+tasks.register("writeAdminPreviewClasspath") {
+    group = "verification"
+    description = "Exports the already-built own-workspace test runtime for the guarded native admin preview."
+    doLast {
+        val destination = adminPreviewClasspathFile.get().asFile
+        destination.parentFile.mkdirs()
+        destination.writeText(groovy.json.JsonOutput.toJson(mapOf(
+            "schema" to 1, "classpath" to adminPreviewRuntime.files.map { it.absolutePath }
+        )) + "\n")
+    }
+}
+
+// Explicit exploration is never pulled into check/applicationCheck/frontendCheck.
+tasks.register<Exec>("frontendDeepCheck") {
+    group = "verification"
+    description = "Explicit full 100+100 physics and frontend diagnostics."
+    dependsOn(npmCi)
+    workingDir(frontendDirectory)
+    commandLine("node", "scripts/verification/unit-run.mjs", "--comprehensive")
 }

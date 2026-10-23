@@ -89,7 +89,7 @@ export class GlobeInput {
         if (!release.handled) return;
         if (this.surface.hasPointerCapture(s.id)) this.surface.releasePointerCapture(s.id);
         this.hover = s.touch ? null : { x: s.x, y: s.y };
-        if (s.touch && release.tap) this.tapped(s.x, s.y);
+        if (release.tap) this.tapped(s.x, s.y);
         this.changed();
       },
       options,

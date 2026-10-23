@@ -6,7 +6,9 @@
 | Date | 2026-10-21 |
 | Scope | architecture / testing / operations |
 | Supersedes | ADR 0031 |
-| Superseded by | none |
+| Superseded by | ADR 0042 |
+
+[ADR 0042](0042-use-fixed-lean-verification-and-explicit-diagnostics.md) supersedes test selection, browser topology and local check semantics below, defining ordinary tests, explicit diagnostics and Gate-owned native admission. Separate Build/JVM, Frontend, Verify and Gate ownership remains.
 
 ## Context
 

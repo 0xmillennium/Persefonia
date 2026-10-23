@@ -153,8 +153,7 @@ def validate_run(run, master_created):
 
 
 def validate_jobs(jobs, run):
-    expected = ['Automation', 'Reuse eligibility', 'Comparison build', 'Build + JVM', 'Frontend verification',
-                'Verify', 'Browser receipts', 'Gate'] + [f'Browsers ({p})' for p in q.PARTITIONS]
+    expected = q.CI_JOBS
     q.require(jobs.get('total_count') == len(expected) and len(jobs['jobs']) == len(expected), 'Incomplete native job inventory')
     names = [job['name'] for job in jobs['jobs']]
     q.require(sorted(names) == sorted(expected), 'Missing, duplicate or unexpected native jobs')
@@ -265,7 +264,7 @@ def validate_native(directory, tested, checksum, rediscover=True):
     q.require(record['automation'] == q.digest(automation), 'Automation receipt mismatch')
     if rediscover:
         subprocess.run(['node', 'frontend/scripts/verification/unit-validate.mjs', str(directory/'frontend.json')], cwd=q.ROOT, check=True)
-        subprocess.run(['node', 'frontend/scripts/verification/browser-validate.mjs', str(directory/'browser-acceptance.json')], cwd=q.ROOT, check=True)
+        subprocess.run(['node', 'frontend/scripts/verification/browser-admit.mjs', str(directory/'browser-acceptance.json'), tested['sourceSha'], checksum], cwd=q.ROOT, check=True)
     return jvm, frontend, browser
 
 

@@ -24,7 +24,7 @@ class MediaToolsWorkflowContractTest {
     void everyIndependentConsumerPreparesToolsBeforeRuntimeSetupAndRetainsEarlyDiagnostics() throws Exception {
         WorkflowDocument ci = WorkflowDocument.open("ci.yml");
         for (String job : UPLOADS.keySet()) assertMediaPreparation(ci, job);
-        for (String job : List.of("automation", "eligibility", "verify", "browser-receipts", "gate")) {
+        for (String job : List.of("automation", "eligibility", "verify", "gate")) {
             assertThat(ci.steps(job).stream().map(WorkflowDocument::map))
                     .noneMatch(step -> "media_tools".equals(step.get("id")));
         }

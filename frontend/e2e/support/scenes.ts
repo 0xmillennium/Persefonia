@@ -17,12 +17,11 @@ export async function position(page: Page, scene: string, p: number) {
 }
 
 export async function writingPosition(page: Page, scene: string, offset: number) {
-  await page
-    .locator(`[data-scene="${scene}"]`)
-    .evaluate(
-      (node, offset) => scrollTo(0, Math.ceil(node.getBoundingClientRect().top + scrollY + offset)),
-      offset,
-    );
+  await page.locator(`[data-scene="${scene}"]`).evaluate((node, offset) => {
+    // Layout readback noise must not move the same authored pose by one native pixel.
+    const top = Math.round((node.getBoundingClientRect().top + scrollY) * 1000) / 1000;
+    scrollTo(0, Math.ceil(top + offset));
+  }, offset);
   await settlePresentation(page);
 }
 

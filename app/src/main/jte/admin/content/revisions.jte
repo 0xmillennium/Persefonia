@@ -1,7 +1,8 @@
 @import dev.persefonia.webadmin.content.AdminContentRevisionListPage
 @param AdminContentRevisionListPage page
-@template.admin.components.pageShell("Revision history | Persefonia Admin", page.chrome().admin(), page.chrome().navigation(), page.chrome().logoutForm(), false, content = @`
-<main>
+@param java.util.List<String> adminStylesheetPaths = java.util.List.of()
+@template.admin.components.pageShell("Revision history | Persefonia Admin", page.chrome().admin(), page.chrome().navigation(), page.chrome().logoutForm(), false, adminStylesheetPaths = adminStylesheetPaths, content = @`
+<main id="admin-content" tabindex="-1">
     <h1>Revision history</h1>
     <p><a href="${page.editLink()}">Back to edit</a></p>
     <p>Content: <strong>${page.contentTitle()}</strong></p>
@@ -9,7 +10,7 @@
     @if(page.revisions().isEmpty())
         <p>No revisions have been created yet.</p>
     @else
-        <table>
+        <div class="admin-table-scroll" role="region" aria-label="Scrollable table" tabindex="0"><table>
             <thead>
             <tr><th>Revision</th><th>Type</th><th>Title</th><th>Slug</th><th>Created by</th><th>Created at</th><th>Change note</th><th>Rendered HTML</th></tr>
             </thead>
@@ -27,7 +28,7 @@
                 </tr>
             @endfor
             </tbody>
-        </table>
+        </table></div>
     @endif
 </main>
 `)

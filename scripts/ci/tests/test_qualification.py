@@ -13,6 +13,52 @@ import zipfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import qualification as q
+import selection
+
+
+def fixture_plan(source):
+    return {**selection.classify([{'status': 'M', 'path': 'frontend/src/product.ts'}]), 'source': source}
+
+
+def unit_cases(seeds=None):
+    seeds = selection.POLICY['ordinaryPhysicsSeeds'] if seeds is None else seeds
+    return [{'file': '/fixture/frontend/src/identity/physics/tests/'+file,
+             'fullName': title.format(seed), 'status': 'passed'}
+            for file, title in [('stress.test.ts', 'seed {} converges without invariant failures'),
+                                ('live-stress.test.ts', 'live seed {}: coalesced fast strokes preserve invariants and recover')]
+            for seed in seeds]
+
+
+def browser_fixture(source, checksum):
+    receipts = []
+    inventory = []
+    for p in selection.POLICY['native']:
+        outcomes = [{**c, 'id': p['project']+':'+str(i), 'project': p['project'], 'status': 'expected',
+            'expectedStatus': 'passed', 'annotations': [], 'results': [{'status': 'passed', 'retry': 0, 'duration': 1}]}
+            for i, c in enumerate(p['cases'])]
+        ids = [r['id'] for r in outcomes]
+        inventory.extend(copy.deepcopy(outcomes))
+        receipts.append({'schema': 3, 'policy': selection.POLICY_HASH, 'status': 'passed', 'exitCode': 0, 'errors': [],
+            'environment': {'browsers': {p['engine']: {'sha256': 'e'*64}}, 'ffmpeg': 'qualified ffmpeg', 'ffprobe': 'qualified ffprobe'},
+            'partition': {'name': 'ordinary-'+p['name'], 'suite': 'ordinary', 'project': p['project'], 'shard': '1/1'},
+            'identity': {'sourceSha': source['sourceSha'], 'artifactSha256': checksum}, 'sourceContext': source,
+            'selectionPlan': fixture_plan(source), 'runner': {'run': source['run'], 'attempt': source['attempt']},
+            'selected': ids, 'outcomes': outcomes,
+            'selectionHash': __import__('hashlib').sha256(json.dumps(sorted(ids), separators=(',', ':')).encode()).hexdigest()})
+    return {'schema': 3, 'policy': selection.POLICY_HASH, 'profiles': ['ordinary'], 'status': 'passed',
+        'sourceContext': source, 'selectionPlan': fixture_plan(source),
+        'identity': {'sourceSha': source['sourceSha'], 'artifactSha256': checksum},
+        'runner': {'run': source['run'], 'attempt': source['attempt']}, 'partitions': len(receipts),
+        'selected': len(inventory), 'receipts': receipts, 'inventory': {'ordinary': [{**r,'results':[]} for r in inventory]},
+        'native': {'discovery': native_report([{**r,'results':[]} for r in inventory]), 'execution':native_report(inventory)}}
+
+
+def native_report(rows):
+    return {'config': {'forbidOnly':True,'fullyParallel':False,'workers':1,
+        'projects':[{'name':p['project'],'retries':0,'repeatEach':1} for p in selection.POLICY['native']]},
+        'errors':[], 'stats':{'expected':sum(bool(r['results']) for r in rows),'unexpected':0,'flaky':0,'skipped':0},
+        'suites':[{'specs':[{'id':r['id'].split(':',1)[1], 'file':r['file'],'title':r['title'],
+            'tests':[{'projectName':r['project'],**{k:r[k] for k in ['expectedStatus','annotations','results','status']}}]} for r in rows]}]}
 
 
 class GitIdentityFixture:
@@ -198,7 +244,7 @@ class QualificationContracts(unittest.TestCase):
 
     def test_admission_never_accepts_a_claimed_reuse_flag(self):
         jobs = {'automation': 'success', 'build-jvm': 'success', 'frontend': 'success',
-                'verify': 'success', 'browser': 'success', 'browser-receipts': 'success'}
+                'verify': 'success', 'browser': 'success'}
         q.job_results('executed', jobs)
         for key in jobs:
             for outcome in ('', 'failure', 'cancelled', 'skipped'):
@@ -222,6 +268,9 @@ class NativeReuseContracts(unittest.TestCase):
     def setUp(self):
         import reuse
         self.reuse = reuse
+        plan_patch = patch.object(selection, 'plan', side_effect=fixture_plan)
+        plan_patch.start()
+        self.addCleanup(plan_patch.stop)
         self.master = {'schema': 2, 'repository': q.REPOSITORY, 'repositoryId': q.REPOSITORY_ID,
             'workflowId': q.WORKFLOW_ID, 'sourceSha': 'c'*40, 'tree': 'd'*40, 'parents': ['b'*40],
             'policy': 'a'*64, 'inputs': 'f'*64, 'dirty': False, 'run': '300', 'attempt': '1',
@@ -260,9 +309,8 @@ class NativeReuseContracts(unittest.TestCase):
             with self.assertRaises(ValueError): self.reuse.validate_run({**self.run, 'head_repository': head}, self.now)
 
     def test_every_native_job_is_required_and_carried_over_attempts_are_rejected(self):
-        names = ['Automation', 'Reuse eligibility', 'Comparison build', 'Build + JVM', 'Frontend verification',
-                 'Verify', 'Browser receipts', 'Gate'] + [f'Browsers ({p})' for p in q.PARTITIONS]
-        jobs = {'total_count': 16, 'jobs': [{'name': name, 'run_id': 200, 'run_attempt': 1,
+        names = q.CI_JOBS
+        jobs = {'total_count': len(q.CI_JOBS), 'jobs': [{'name': name, 'run_id': 200, 'run_attempt': 1,
             'status': 'completed', 'conclusion': 'skipped' if name == 'Comparison build' else 'success',
             'started_at': self.run['created_at'], 'completed_at': self.run['updated_at'],
             'steps': [{'conclusion': 'success'}]} for name in names]}
@@ -282,7 +330,7 @@ class NativeReuseContracts(unittest.TestCase):
     def test_enforce_decision_is_source_bound_and_shadow_cannot_authorize_skips(self):
         q.validate_equivalence(self.decision, self.master, '2'*64)
         jobs = {'automation': 'success', 'build-jvm': 'skipped', 'frontend': 'skipped',
-                'verify': 'success', 'browser': 'skipped', 'browser-receipts': 'success'}
+                'verify': 'success', 'browser': 'skipped'}
         q.job_results('reused', jobs, self.decision, self.master, '2'*64)
         for key in ['tree', 'inputs', 'policy', 'workflowId', 'run', 'attempt', 'sourceSha']:
             bad = copy.deepcopy(self.decision); bad['master'][key] = 'wrong'
@@ -349,9 +397,8 @@ class EligibilityFlowContracts(unittest.TestCase):
             'workflow_run': {'id': 200, 'repository_id': q.REPOSITORY_ID,
                 'head_repository_id': q.REPOSITORY_ID, 'head_sha': head_sha}}
         candidate = {**metadata, 'id': 2, 'name': 'persefonia-browser-input-'+self.pr['sourceSha']}
-        names = ['Automation', 'Reuse eligibility', 'Comparison build', 'Build + JVM', 'Frontend verification',
-                 'Verify', 'Browser receipts', 'Gate'] + [f'Browsers ({p})' for p in q.PARTITIONS]
-        jobs = {'total_count': 16, 'jobs': [{'name': name, 'run_id': 200, 'run_attempt': 1,
+        names = q.CI_JOBS
+        jobs = {'total_count': len(q.CI_JOBS), 'jobs': [{'name': name, 'run_id': 200, 'run_attempt': 1,
             'status': 'completed', 'conclusion': 'skipped' if name == 'Comparison build' else 'success',
             'started_at': self.run['created_at'], 'completed_at': self.run['updated_at'],
             'steps': [{'conclusion': 'success'}]} for name in names]}
@@ -385,14 +432,12 @@ class EligibilityFlowContracts(unittest.TestCase):
         java = [{'report': 'test.xml', 'id': 'case', 'status': 'passed'}]
         jvm = {**base, 'lane': 'jvm', 'candidate': record['candidate'], 'javaCases': java,
             'production': production, 'java21': {'passed': True, 'version': 'openjdk version "21"'}}
-        frontend = {**base, 'lane': 'frontend', 'unit': {'schema': 1, 'status': 'passed',
+        frontend = {**base, 'lane': 'frontend', 'unit': {'schema': 2, 'policy': selection.POLICY_HASH, 'selectionPlan': fixture_plan(self.pr), 'physicsProfile': 'ordinary', 'profile': 'ordinary', 'status': 'passed',
             'sourceSha': self.pr['sourceSha'], 'sourceContext': self.pr,
-            'runner': {'run': '200', 'attempt': '1'}, 'cases': [{'status': 'passed'}], 'attempts': [{}]}}
+            'runner': {'run': '200', 'attempt': '1'}, 'cases': unit_cases(), 'attempts': [{}]}}
         verify = {**base, 'lane': 'verify', 'candidate': record['candidate'], 'mode': 'executed',
             'producers': {'jvm': q.digest(jvm), 'frontend': q.digest(frontend)}}
-        browser = {'schema': 1, 'status': 'passed', 'sourceContext': self.pr,
-            'identity': {'sourceSha': self.pr['sourceSha'], 'artifactSha256': record['candidate']},
-            'runner': {'run': '200', 'attempt': '1'}, 'partitions': 8, 'selected': 1, 'receipts': [{}]*8}
+        browser = browser_fixture(self.pr, record['candidate'])
         automation = {**base, 'lane': 'automation', 'javaCases': java}
         record.update(verification=verify, browser=browser, automation=q.digest(automation))
         evidence = {'qualification.json': record, 'verification.json': verify, 'jvm.json': jvm,
@@ -492,16 +537,13 @@ class DeliveryContracts(unittest.TestCase):
         spec = importlib.util.spec_from_file_location('delivery_admission', Path(q.__file__).with_name('delivery-admission.py'))
         delivery = importlib.util.module_from_spec(spec); spec.loader.exec_module(delivery)
         checksum = '2'*64
-        browser = {'schema': 1, 'status': 'passed', 'sourceContext': self.master, 'identity': {'sourceSha': self.master['sourceSha'],
-                   'artifactSha256': checksum}, 'runner': {'run': '300', 'attempt': '1'},
-                   'partitions': 8, 'selected': 10, 'receipts': [{} for _ in range(8)]}
+        browser = browser_fixture(self.master, checksum)
         verify = {'schema': 2, 'status': 'passed', 'lane': 'verify', 'mode': 'executed', 'reusePolicyMode': 'shadow',
                   'identity': self.master, 'candidate': checksum}
         record = {**verify, 'lane': 'qualification', 'verification': verify, 'browser': browser}
         run = {**self.run, 'id': 300, 'event': 'push', 'head_branch': 'master', 'head_sha': self.master['sourceSha']}
-        names = ['Automation', 'Reuse eligibility', 'Comparison build', 'Build + JVM', 'Frontend verification',
-                 'Verify', 'Browser receipts', 'Gate'] + [f'Browsers ({p})' for p in q.PARTITIONS]
-        jobs = {'total_count': 16, 'jobs': [{'name': name, 'run_id': 300, 'run_attempt': 1,
+        names = q.CI_JOBS
+        jobs = {'total_count': len(q.CI_JOBS), 'jobs': [{'name': name, 'run_id': 300, 'run_attempt': 1,
                 'status': 'completed', 'conclusion': 'skipped' if name == 'Comparison build' else 'success'} for name in names]}
         delivery.validate(record, run, jobs, checksum, self.master['sourceSha'], '300', '1', expected_source=self.master)
         for key, value in [('event', 'pull_request'), ('workflow_id', 0), ('head_sha', '0'*40),
@@ -618,3 +660,110 @@ class BoundedApiContracts(unittest.TestCase):
 
 
 if __name__ == '__main__': unittest.main()
+
+class NativePolicyAdmissionContracts(unittest.TestCase):
+    setUp = NativeReuseContracts.setUp
+
+    def test_exact_native_inventory_and_first_attempts_reject_each_forgery(self):
+        summary = self.reuse.summary
+        valid = browser_fixture(self.master, '2'*64)
+        summary.validate_browser(valid, self.master, '2'*64)
+        for mutation in ['old-schema','missing-engine','extra-engine','duplicate-context','missing-case','extra-case','source','tree','candidate','policy','run','attempt','filter','skip','retry','flaky','cancelled','failed','empty','count','unsupported-engine','missing-decoder']:
+            bad = copy.deepcopy(valid); row = bad['receipts'][0]
+            if mutation == 'old-schema': bad['schema'] = 1
+            elif mutation == 'missing-engine': bad['receipts'].pop()
+            elif mutation == 'extra-engine': bad['receipts'].append(copy.deepcopy(row))
+            elif mutation == 'duplicate-context': bad['receipts'][1] = copy.deepcopy(row)
+            elif mutation == 'missing-case': row['outcomes'].pop()
+            elif mutation == 'extra-case': row['outcomes'].append(copy.deepcopy(row['outcomes'][0]))
+            elif mutation == 'source': row['identity']['sourceSha'] = '0'*40
+            elif mutation == 'tree': row['sourceContext']['tree'] = '0'*40
+            elif mutation == 'candidate': row['identity']['artifactSha256'] = '0'*64
+            elif mutation == 'policy': row['policy'] = '0'*64
+            elif mutation == 'run': row['runner']['run'] = '299'
+            elif mutation == 'attempt': row['runner']['attempt'] = '2'
+            elif mutation == 'filter': row['partition']['shard'] = '1/2'
+            elif mutation == 'skip': row['outcomes'][0]['results'][0]['status'] = 'skipped'
+            elif mutation == 'retry': row['outcomes'][0]['results'].append({'status':'passed','retry':1,'duration':1})
+            elif mutation == 'flaky': row['outcomes'][0]['status'] = 'flaky'
+            elif mutation == 'cancelled': row['outcomes'][0]['results'][0]['status'] = 'interrupted'
+            elif mutation == 'failed': row['status'] = 'failed'
+            elif mutation == 'empty': row['outcomes'] = []; row['selected'] = []
+            elif mutation == 'count': bad['selected'] -= 1
+            elif mutation == 'unsupported-engine': row['environment']['browsers'] = {}
+            elif mutation == 'missing-decoder': row['environment']['ffprobe'] = ''
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError): summary.validate_browser(bad,self.master,'2'*64)
+
+    def test_submitted_plan_cannot_expand_or_narrow_the_fixed_contract(self):
+        value=browser_fixture(self.master,'2'*64)
+        for required in [[],['ordinary','media'],['ordinary','admin'],['ordinary','physics-live']]:
+            bad=copy.deepcopy(value);bad['selectionPlan']['required']=required
+            with self.subTest(required=required), self.assertRaises(ValueError):
+                self.reuse.summary.validate_browser(bad,self.master,'2'*64)
+
+    def test_ordinary_physics_requires_both_exact_representative_corpora_and_actual_attempts(self):
+        plan=fixture_plan(self.master)
+        unit={'schema':2,'policy':selection.POLICY_HASH,'status':'passed','profile':'ordinary',
+            'physicsProfile':'ordinary','sourceSha':self.master['sourceSha'],'sourceContext':self.master,
+            'selectionPlan':plan,'runner':{'run':'300','attempt':'1'},'cases':unit_cases(),'attempts':[{}]}
+        self.reuse.summary.validate_unit(unit,self.master)
+        for mutation in ['deep','missing','duplicate','cached-only','attempt']:
+            bad=copy.deepcopy(unit)
+            if mutation=='deep': bad['physicsProfile']='deep';bad['cases']=unit_cases(range(1,101))
+            elif mutation=='missing': bad['cases'].pop()
+            elif mutation=='duplicate': bad['cases'].append(copy.deepcopy(bad['cases'][0]))
+            elif mutation=='cached-only': bad['attempts']=[]
+            elif mutation=='attempt': bad['runner']['attempt']='2'
+            with self.subTest(mutation=mutation),self.assertRaises(ValueError):
+                self.reuse.summary.validate_unit(bad,self.master)
+
+    def test_gate_rejects_forged_raw_reports_even_with_valid_success_summaries(self):
+        valid=browser_fixture(self.master,'2'*64)
+        for mutation in ['no-raw','focus','parallel','project','retry-policy','runner-error','empty','missing','extra','renamed','failed','retried','stats','forged-id']:
+            bad=copy.deepcopy(valid)
+            report=bad['native']['execution']
+            spec=report['suites'][0]['specs'][0]
+            if mutation=='no-raw': bad.pop('native')
+            elif mutation=='focus': report['config']['forbidOnly']=False
+            elif mutation=='parallel': report['config']['workers']=2
+            elif mutation=='project': report['config']['projects'].pop()
+            elif mutation=='retry-policy': report['config']['projects'][0]['retries']=1
+            elif mutation=='runner-error': report['errors']=[{'message':'crashed'}]
+            elif mutation=='empty': report['suites']=[]
+            elif mutation=='missing': report['suites'][0]['specs'].pop()
+            elif mutation=='extra': report['suites'][0]['specs'].append(copy.deepcopy(spec))
+            elif mutation=='renamed': spec['title']='forged'
+            elif mutation=='failed': spec['tests'][0]['results'][0]['status']='failed'
+            elif mutation=='retried': spec['tests'][0]['results'].append({'status':'passed','retry':1,'duration':1})
+            elif mutation=='stats': report['stats']['unexpected']=1
+            elif mutation=='forged-id': spec['id']='forged'
+            with self.subTest(mutation=mutation),self.assertRaises(ValueError):
+                self.reuse.summary.validate_browser(bad,self.master,'2'*64)
+
+    def test_gate_join_reads_actual_report_files_and_rejects_extra_or_incomplete_artifacts(self):
+        from browser_evidence import join
+        valid=browser_fixture(self.master,'2'*64)
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)
+            for r in valid['receipts']: q.write(root/(r['partition']['name']+'-1of1-receipt.json'),r)
+            q.write(root/'native-discovery.json',valid['native']['discovery'])
+            q.write(root/'native-results.json',valid['native']['execution'])
+            self.assertEqual(join(root,self.master,'2'*64)['selected'],14)
+            q.write(root/'extra-receipt.json',valid['receipts'][0])
+            with self.assertRaises(ValueError): join(root,self.master,'2'*64)
+            (root/'extra-receipt.json').unlink()
+            (root/'native-discovery.json').unlink()
+            with self.assertRaises(ValueError): join(root,self.master,'2'*64)
+
+    def test_node_admission_accepts_gate_serialization_and_rejects_forged_execution(self):
+        with tempfile.TemporaryDirectory() as temp:
+            file=Path(temp)/'acceptance.json'
+            valid=browser_fixture(self.master,'2'*64)
+            q.write(file,valid)
+            command=['node','frontend/scripts/verification/browser-admit.mjs',str(file),self.master['sourceSha'],'2'*64]
+            good=subprocess.run(command,cwd=q.ROOT,capture_output=True,text=True,timeout=10)
+            self.assertEqual(good.returncode,0,good.stderr)
+            valid['native']['execution']['suites'][0]['specs'][0]['title']='forged'
+            q.write(file,valid)
+            bad=subprocess.run(command,cwd=q.ROOT,capture_output=True,text=True,timeout=10)
+            self.assertNotEqual(bad.returncode,0)

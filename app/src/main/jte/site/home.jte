@@ -3,8 +3,9 @@
 @param String publicNavigationScriptPath = null
 @param java.util.List<dev.persefonia.webpublic.navigation.PublicNavigationLink> navigationLinks = java.util.List.of()
 <!doctype html>
-<html class="home-document" lang="${page.htmlLanguage()}">
+<html translate="no" class="home-document" lang="${page.htmlLanguage()}">
 <head>
+    @template.site.components.translationPolicy()
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="${page.defaultMetaDescription()}">
@@ -41,8 +42,10 @@
     <main id="main-content" class="homepage" tabindex="-1" data-home-v2>
         <p id="film-instructions" lang="en" class="sr-only" hidden>Hold the background to change film, or press F while the main content is focused. Repeat to retry if a film is unavailable.</p>
         <div class="home-environment" aria-hidden="true">
+            <div class="home-composition">
             <picture class="home-cinema__image" aria-hidden="true"><source media="(max-aspect-ratio: 4/5)" srcset="/assets/cloudy-turquoise-portrait-0283c0cd2e89.webp"><img src="/assets/cloudy-turquoise-desktop-af63954b8f41.webp" alt="" width="1920" height="1072" fetchpriority="high" data-hero-image></picture>
             <canvas class="home-film" data-film-canvas aria-hidden="true"></canvas>
+            </div>
         </div>
         <section class="home-scene home-identity" id="identity" data-scene="hero" aria-labelledby="identity-title">
             <div class="scene-face hero-face"><h1 id="identity-title" class="home-masthead">${page.ownerAlias()}</h1><h2 class="hero-statement" lang="en"><span class="hero-writing-row"><span class="hero-writing-text">Clarity is</span></span><span class="hero-writing-row"><em class="hero-writing-text">engineered</em></span></h2><p class="hero-scroll" lang="en">Scroll to explore</p></div>
@@ -99,7 +102,7 @@
                 </ol>
             @endif
             @if(page.promoteFeaturedProjects() && page.featuredProjects().isEmpty())
-                <p class="home-empty">${page.copy().projectsEmpty()}</p>
+                <p class="home-empty">${page.copy().projectsEmpty()} <a href="/contact">${page.copy().getInTouch()} ↗</a></p>
             @endif
                 </section>
                 <div id="writing" tabindex="-1">
@@ -125,7 +128,7 @@
                     </ol>
                     @endif
                     @if(collection.enabled() && collection.entries().isEmpty())
-                    <p class="home-empty">${collection.emptyMessage()}</p>
+                    <p class="home-empty">${collection.emptyMessage()} <a href="/contact">${page.copy().getInTouch()} ↗</a></p>
                     @endif
                 </section>
                 @endfor
@@ -133,10 +136,10 @@
             </div>
             <output class="sr-only" data-gallery-position aria-live="polite"></output>
         </div></section>
-        <section class="home-scene home-contact" id="contact" data-scene="location" aria-labelledby="contact-title"><div class="scene-face location-face">
+        <section class="home-scene home-contact" id="contact" data-scene="location" aria-labelledby="contact-title" tabindex="-1"><div class="scene-face location-face">
             <div class="location-links"><h2 id="contact-title" class="sr-only">${page.copy().contactTitle()}</h2><nav aria-label="Explore"><a href="/${page.htmlLanguage()}/projects">${page.copy().projects()}</a><a href="/search">${page.copy().writing()}</a><a href="/contact">${page.copy().contact()}</a></nav><p>Istanbul, Türkiye</p><a class="contact-entry" href="/contact">${page.copy().getInTouch()} ↗</a></div>
-            <div class="location-system">    <div class="location-globe" data-input-owner>
-      <canvas role="img" id="globe" aria-label="Interactive Earth. Use arrow keys to rotate and tilt." aria-describedby="globe-instructions" tabindex="-1"></canvas>
+            <div class="location-system" lang="en">    <div class="location-globe" data-input-owner>
+      <canvas role="img" id="globe" aria-label="Interactive Earth. Tap edges to turn or tilt, center to pause. Arrow keys rotate and tilt." aria-describedby="globe-instructions" tabindex="-1"></canvas>
       <span id="marker" aria-hidden="true" hidden>
         <span class="marker-core"></span>
         <span class="marker-signal">
@@ -155,7 +158,7 @@
       </div>
       <p id="fallback">Istanbul, Türkiye · 41.0082° N, 28.9784° E<br>The interactive globe requires JavaScript and WebGL 2.</p>
     </div>
-    <p id="globe-instructions" class="sr-only">Drag to turn and tilt. On touch screens, drag the globe to turn and tilt; swipe outside the globe to scroll. When the globe is focused, use arrow keys to turn and tilt, Space to pause or resume rotation, and Home to find Istanbul.</p>
+    <p id="globe-instructions" class="sr-only">Tap the globe edges to turn or tilt, or its center to pause or resume rotation. Drag to turn and tilt. On touch screens, drag the globe to turn and tilt; swipe outside the globe to scroll. When the globe is focused, use arrow keys to turn and tilt, Space to pause or resume rotation, and Home to find Istanbul.</p>
 </div>
             <div class="location-strip"><span>${page.ownerAlias()} / Persefonia</span><a href="/search">${page.copy().searchPublished()}</a>@for(var link : navigationLinks)<a lang="en" href="${link.url()}">${link.label()}</a>@endfor<a href="#identity">${page.copy().backToTop()} ↑</a></div>
         </div></section>

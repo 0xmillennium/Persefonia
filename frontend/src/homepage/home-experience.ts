@@ -28,21 +28,30 @@ import { windowProgress } from './contracts/progress';
 import { GALLERY_HANDOFF } from './contracts/choreography';
 import { navigationCover } from '../navigation/cover';
 import { scrollNavigation } from './timeline/scroll-navigation';
-import { firstWriting } from './writing/first';
-import { secondWriting } from './writing/second';
 import { galleryWriting } from './gallery/writing';
 import { laterWriting, galleryCurtain } from './writing/later';
 /** Native scroll owns choreography. Every region is measured independently. */
-export function enhanceHomepage(): () => void {
+export async function enhanceHomepage(): Promise<() => void> {
+  const [first, second] = await Promise.all([
+    import('./writing/first'),
+    import('./writing/second'),
+  ]);
   const scope = new DisposalScope();
   try {
-    return mountHomepage(scope);
+    return mountHomepage(scope, { ...first, ...second });
   } catch (error) {
     scope.dispose();
     throw error;
   }
 }
-function mountHomepage(scope: DisposalScope): () => void {
+function mountHomepage(
+  scope: DisposalScope,
+  {
+    firstWriting,
+    secondWriting,
+    WritingEntrance,
+  }: typeof import('./writing/first') & typeof import('./writing/second'),
+): () => void {
   const found = document.querySelector<HTMLElement>('[data-home-v2]');
   if (!found) return () => {};
   const root: HTMLElement = found;
@@ -55,6 +64,8 @@ function mountHomepage(scope: DisposalScope): () => void {
   });
   const touch = matchMedia('(pointer: coarse)');
   scope.add(() => historyState.dispose());
+  let pendingDestination = historyState.historyVisit ? '' : location.hash;
+  let handledHash = location.hash;
   const pacing = writingPacing();
   scope.add(() => {
     lifetime.abort();
@@ -120,6 +131,17 @@ function mountHomepage(scope: DisposalScope): () => void {
       delete link.dataset.previewActive;
     });
   }
+  const entrances = Array.from(
+    { length: 6 },
+    (_, i) => new WritingEntrance(i === 3 ? 1600 : 1000, i === 4 || i === 5),
+  );
+  scope.add(() => entrances.forEach((entrance) => entrance.dispose()));
+  const complete = (index: number, entry: number, exit: number, now: number) => {
+    const entrance = entrances[index]!;
+    const value = entrance.sample(entry, exit, now, reduced.matches);
+    if (entrance.running) schedule();
+    return value;
+  };
   const writing = firstWriting(root);
   scope.add(() => writing.dispose());
   const perspective = secondWriting(root);
@@ -143,6 +165,7 @@ function mountHomepage(scope: DisposalScope): () => void {
   let disposed = false,
     raf = 0,
     suspended = false;
+  let positionRevision = 0;
   scope.add(() => {
     disposed = true;
     cancelAnimationFrame(raf);
@@ -275,6 +298,11 @@ function mountHomepage(scope: DisposalScope): () => void {
     restorePosition();
   }
   function restorePosition() {
+    if (readiness.complete && pendingDestination && !historyState.restoring) {
+      const hash = pendingDestination;
+      pendingDestination = '';
+      return navigate(hash);
+    }
     historyState.restore(readiness.complete, (y) => {
       filmPacing.reset();
       filmHandoff.skip();
@@ -282,6 +310,7 @@ function mountHomepage(scope: DisposalScope): () => void {
       scrollTo({ top: y, behavior: 'instant' });
       schedule();
     });
+    return false;
   }
   const readiness = homepageReadiness(root, loading, historyState.historyVisit, reduced, measure);
   scope.add(() => readiness.dispose());
@@ -304,6 +333,8 @@ function mountHomepage(scope: DisposalScope): () => void {
   function update(now: number) {
     raf = 0;
     if (disposed || suspended) return;
+    const revision = positionRevision;
+    if (restorePosition()) return;
     // Keep the derived presentation flag consistent with the current query.
     // Scene wakeups and BFCache restoration reconcile it as well as change
     // notifications; stale derived state must not control measured measurements.geometry.
@@ -333,6 +364,7 @@ function mountHomepage(scope: DisposalScope): () => void {
     const firstBeat = writingBeat(y, filmRegion.top, true);
     writing.update(firstBeat.exit, reduced.matches);
     if (reduced.matches) {
+      entrances.forEach((entrance) => entrance.sample(1, 0, now, true));
       galleryText.update(1, 0, true);
       perspective.update(1, 0, true);
       later.third(1, 0, true);
@@ -347,6 +379,7 @@ function mountHomepage(scope: DisposalScope): () => void {
         openingProgress: 0,
         now,
       });
+      if (revision !== positionRevision) return;
       presentation.reduced();
       gallery.active(false);
       physical.active(false);
@@ -374,8 +407,13 @@ function mountHomepage(scope: DisposalScope): () => void {
     const curtainSolid = entrance.darkness;
     const locationPhase = footerPhase(y, locationRegion.top, locationRegion.height, innerHeight);
     const locationLead = innerHeight * 0.1;
-    galleryText.update(entrance.writing, windowProgress(galleryP, 0.83, 0.9), false);
-    const globeActive = footer.update(locationPhase, false);
+    const galleryExit = windowProgress(galleryP, 0.83, 0.9);
+    galleryText.update(complete(4, entrance.writing, galleryExit, now), galleryExit, false);
+    const globeActive = footer.update(
+      locationPhase,
+      false,
+      complete(5, Math.max(0, locationPhase), 0, now),
+    );
     const pastEnvironment = y >= galleryRegion.top;
     root.dataset.filmBackdrop = expansion === 1 && curtainSolid < 0.5 ? film.film : '';
     film.update({
@@ -387,11 +425,18 @@ function mountHomepage(scope: DisposalScope): () => void {
       now,
       fullyCovered: wipeBands.every((p) => p === 1),
     });
+    // Media readiness can synchronously navigate while film.update is running.
+    if (revision !== positionRevision) return;
     const { second: secondBeat, third: thirdBeat, fourth: fourthBeat } = frame;
     if (y + innerHeight >= markRegion.top - innerHeight) physical.prepare();
-    perspective.update(secondBeat.entry, secondBeat.exit, false);
-    later.third(thirdBeat.entry, thirdBeat.exit, false);
-    later.fourth(fourthBeat.entry, fourthBeat.exit, frame.logo, false);
+    perspective.update(complete(0, secondBeat.entry, secondBeat.exit, now), secondBeat.exit, false);
+    later.third(complete(1, thirdBeat.entry, thirdBeat.exit, now), thirdBeat.exit, false);
+    later.fourth(
+      complete(2, fourthBeat.entry, fourthBeat.exit, now),
+      fourthBeat.exit,
+      complete(3, frame.logo, fourthBeat.exit, now),
+      false,
+    );
     presentation.render({
       y,
       firstExit: firstBeat.exit,
@@ -432,6 +477,7 @@ function mountHomepage(scope: DisposalScope): () => void {
     } else resizeSurfaces();
   };
   window.addEventListener('resize', resized, { ...options, passive: true });
+  document.fonts.addEventListener('loadingdone', () => measure(), options);
   window.visualViewport?.addEventListener('resize', resizeSurfaces, { ...options, passive: true });
   touch.addEventListener('change', () => measure(), options);
   window.addEventListener(
@@ -448,27 +494,84 @@ function mountHomepage(scope: DisposalScope): () => void {
     },
     options,
   );
+  function navigate(hash: string, push = false) {
+    if (!['#work', '#writing', '#contact'].includes(hash)) return false;
+    if (!readiness.complete) {
+      pendingDestination = hash;
+      return false;
+    }
+    positionRevision++;
+    historyState.cancel();
+    scrolling.cancel();
+    filmHandoff.skip();
+    filmPacing.reset();
+    if (push && location.hash !== hash) {
+      save(true);
+      history.pushState(history.state, '', hash);
+    }
+    handledHash = hash;
+    if (hash !== '#contact') {
+      gallery.select(hash === '#writing' ? 'articles' : 'projects');
+      travel.resetEntry(gallery.count);
+    }
+    viewport.refresh();
+    measure();
+    const target = root.querySelector<HTMLElement>(hash)!;
+    const top = reduced.matches
+      ? target.getBoundingClientRect().top + scrollY
+      : hash === '#contact'
+        ? locationRegion.top + Math.min(viewport.height, locationRegion.height - viewport.height)
+        : travelFirst() + galleryStep() * 3;
+    scrollTo({ top: Math.round(top), behavior: 'instant' });
+    cancelAnimationFrame(raf);
+    update(performance.now());
+    target.focus({ preventScroll: true });
+    save(true);
+    return true;
+  }
+  window.addEventListener(
+    'hashchange',
+    () => {
+      if (location.hash === handledHash) return;
+      pendingDestination = location.hash;
+      schedule();
+    },
+    options,
+  );
+  window.addEventListener(
+    'popstate',
+    () => {
+      handledHash = location.hash;
+      pendingDestination = '';
+      const category = history.state?.homepageV2?.category;
+      if (typeof category === 'string') gallery.select(category);
+      historyState.pageshow(true);
+      if (historyState.restoring) restorePosition();
+      else {
+        pendingDestination = location.hash;
+        schedule();
+      }
+    },
+    options,
+  );
   document.addEventListener(
     'click',
     (e) => {
       const anchor = (e.target as Element).closest<HTMLAnchorElement>('a[href^="#"]');
-      if (!anchor) return;
-      if (anchor.hash === '#work' || anchor.hash === '#writing') {
-        // Apply pending viewport changes before measuring the hash destination.
-        resized();
-        gallery.select(anchor.hash === '#writing' ? 'articles' : 'projects');
-        travel.resetEntry(gallery.count);
-        measure();
+      if (
+        !anchor ||
+        e.defaultPrevented ||
+        e.button !== 0 ||
+        e.ctrlKey ||
+        e.metaKey ||
+        e.shiftKey ||
+        e.altKey ||
+        anchor.target === '_blank' ||
+        anchor.hasAttribute('download')
+      )
+        return;
+      if (navigate(anchor.hash, true)) {
         e.preventDefault();
-        historyState.cancel();
-        filmHandoff.skip();
-        filmPacing.reset();
-        // Match wheelPath's integer stops even in browsers that truncate scroll targets.
-        window.scrollTo({ top: Math.round(travelFirst()), behavior: 'instant' });
-        // Make the destination available before transferring keyboard focus.
-        cancelAnimationFrame(raf);
-        update(performance.now());
-        root.querySelector<HTMLElement>(anchor.hash)?.focus({ preventScroll: true });
       }
     },
     options,
@@ -488,6 +591,7 @@ function mountHomepage(scope: DisposalScope): () => void {
     () => {
       suspended = document.hidden;
       if (suspended) {
+        entrances.forEach((entrance) => entrance.suspend());
         scrolling.cancel();
         film.suspend();
         physical.active(false);
@@ -504,6 +608,7 @@ function mountHomepage(scope: DisposalScope): () => void {
       scrolling.cancel();
       save(true);
       suspended = true;
+      entrances.forEach((entrance) => entrance.suspend());
       film.suspend();
       physical.active(false);
       if (!e.persisted) dispose();

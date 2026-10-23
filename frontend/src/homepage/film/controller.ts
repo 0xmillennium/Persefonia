@@ -37,7 +37,7 @@ export interface FilmFrameState {
 /** Approved transport and material; native scene coordinator is the only scroll owner. */
 export function mountFilm({ root, ready, selectionChanged, mediaChanged }: FilmOptions) {
   const canvas = root.querySelector<HTMLCanvasElement>('[data-film-canvas]')!;
-  const environment = root.querySelector<HTMLElement>('.home-environment')!;
+  const environment = root.querySelector<HTMLElement>('.home-composition')!;
   const instructions = root.querySelector<HTMLElement>('#film-instructions')!;
   const sheetImage = root.querySelector<HTMLImageElement>('[data-hero-image]')!;
   const abort = new AbortController(),
@@ -88,27 +88,47 @@ export function mountFilm({ root, ready, selectionChanged, mediaChanged }: FilmO
   let covered = false;
   let expansion = 0;
   let prefetchedFrom: Background | null = null;
-  const video = new ScrollFilms(root.querySelector<HTMLElement>('.home-environment')!, tier, () => {
+  const video = new ScrollFilms(environment, tier, () => {
     request();
     wake();
     mediaChanged?.();
   });
   let loopDelivery = loopTier(width, height);
-  const loop = new ResponsiveLoop(
-    root.querySelector<HTMLElement>('.home-environment')!,
-    loopDelivery,
-    () => wake(),
-  );
+  const loop = new ResponsiveLoop(environment, loopDelivery, () => wake());
   const posterPose = () => (expansion < 1 ? ('opening' as const) : ('final' as const));
+  let userPaused = false;
   const presentation = new FilmPresentation(root, canvas, video, loop, () => wake());
   const syncLoop = (effects = false) => {
     const selected = isLoopBackground(transport.film);
     const menu = document.documentElement.dataset.menuOpen === 'true';
     loop.setPlayback(
-      selected && filmVisible && !covered && !suspended && !menu && !reduced.matches,
+      selected && filmVisible && !covered && !suspended && !menu && !reduced.matches && !userPaused,
       effects && selected,
     );
   };
+  const toggleMotion = () => {
+    if (!isLoopBackground(transport.film) || !filmVisible || covered || suspended) return;
+    userPaused = !userPaused;
+    syncLoop();
+    wake();
+  };
+  root.addEventListener(
+    'keydown',
+    (event) => {
+      if (
+        event.target === root &&
+        event.key.toLowerCase() === 'p' &&
+        !event.repeat &&
+        !event.ctrlKey &&
+        !event.metaKey &&
+        !event.altKey
+      ) {
+        event.preventDefault();
+        toggleMotion();
+      }
+    },
+    options,
+  );
   const menuObserver = new MutationObserver(() => {
     syncLoop();
     wake();
@@ -157,9 +177,11 @@ export function mountFilm({ root, ready, selectionChanged, mediaChanged }: FilmO
       field.clear();
       request();
     }
-    const instruction = reduced.matches
-      ? 'Press F while the main content is focused to change the static film image. Repeat to retry if a film is unavailable.'
-      : 'Hold the background to change film, or press F while the main content is focused. Repeat to retry if a film is unavailable.';
+    const instruction =
+      (reduced.matches
+        ? 'Press F while the main content is focused to change the static film image.'
+        : 'Hold the background to change film, or press F while the main content is focused.') +
+      ' Tap the background or press P to pause or resume background motion. Repeat F or hold to retry if a film is unavailable.';
     if (instructions.textContent !== instruction) instructions.textContent = instruction;
     const elapsed = previous ? (now - previous) / 1000 : 0;
     previous = now;
@@ -243,16 +265,25 @@ export function mountFilm({ root, ready, selectionChanged, mediaChanged }: FilmO
       covered,
       width,
       height,
+      get origin() {
+        const { left: x, top: y } = environment.getBoundingClientRect();
+        return { x, y };
+      },
       film: transport.film,
       prefetchedFrom,
     }),
     {
       request,
       changed: wake,
+      toggleMotion,
       invalidate() {
         presentation.invalidate();
       },
       retry(modality) {
+        const recoveringLoop =
+          modality === 'pointer' &&
+          isLoopBackground(transport.film) &&
+          (loop.failed || loop.blocked);
         if (video.hasError) {
           video.retry();
           hold.retry();
@@ -261,6 +292,7 @@ export function mountFilm({ root, ready, selectionChanged, mediaChanged }: FilmO
           isLoopBackground(modality === 'pointer' ? transport.film : nextBackground(transport.film))
         )
           loop.retry();
+        return recoveringLoop;
       },
       prefetch(from) {
         prefetchedFrom = from;
@@ -309,7 +341,7 @@ export function mountFilm({ root, ready, selectionChanged, mediaChanged }: FilmO
   );
   initialize();
   instructions.hidden = false;
-  root.setAttribute('aria-keyshortcuts', 'F');
+  root.setAttribute('aria-keyshortcuts', 'F P');
   root.setAttribute('aria-describedby', 'film-instructions');
   return {
     get frameInterval() {

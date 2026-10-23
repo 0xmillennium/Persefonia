@@ -1,3 +1,4 @@
+import { runProcess } from './process.mjs';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync, mkdirSync, writeFileSync, renameSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -59,26 +60,26 @@ export function writeJson(path, value) {
   writeFileSync(`${path}.tmp`, JSON.stringify(value) + '\n');
   renameSync(`${path}.tmp`, path);
 }
-export function playwright(suite, selection, destination, discover = false) {
+export async function playwright(suite, selection, destination, discover = false) {
+  if (suite !== 'ordinary' || selection.length)
+    throw new Error('Mandatory native execution accepts no filters');
   const started = performance.now();
-  const result = spawnSync(
+  const result = await runProcess(
     process.execPath,
     [
       join(frontend, 'node_modules/@playwright/test/cli.js'),
       'test',
       '--config',
-      suite === 'cross' ? 'playwright.cross-browser.config.ts' : 'playwright.config.ts',
+      'playwright.native.config.ts',
       '--forbid-only',
       '--fail-on-flaky-tests',
       '--workers=1',
       '--retries=0',
       ...selection,
-      ...(discover ? ['--list', '--reporter=json'] : ['--global-timeout=1500000']),
+      ...(discover ? ['--list', '--reporter=json'] : ['--global-timeout=210000']),
     ],
     {
       cwd: frontend,
-      timeout: discover ? 120_000 : 1_560_000,
-      killSignal: 'SIGTERM',
       stdio: discover ? ['ignore', 'pipe', 'pipe'] : 'inherit',
       encoding: 'utf8',
       env: {
@@ -88,10 +89,11 @@ export function playwright(suite, selection, destination, discover = false) {
         PERSEFONIA_VERIFICATION_REPORT: destination,
       },
     },
+    discover ? 30_000 : 215_000,
   );
-  if (discover && result.status !== 0) console.error(result.stdout, result.stderr);
+  if (discover && result.exitCode !== 0) console.error(result.stdout, result.stderr);
   return {
-    exitCode: result.status ?? 1,
+    exitCode: result.exitCode,
     signal: result.signal,
     durationMs: performance.now() - started,
   };
@@ -104,5 +106,32 @@ export function sourceContext() {
       encoding: 'utf8',
       maxBuffer: 1024 * 1024,
     }),
+  );
+}
+
+export function verificationPlan() {
+  return JSON.parse(
+    execFileSync('python3', ['-B', join(repository, 'scripts/ci/selection.py')], {
+      cwd: repository,
+      encoding: 'utf8',
+      maxBuffer: 2 * 1024 * 1024,
+    }),
+  );
+}
+
+/** Bounded unique-key JSON parsing is shared with artifact admission, without executing data. */
+export function readEvidence(path) {
+  return JSON.parse(
+    execFileSync(
+      'python3',
+      [
+        '-B',
+        '-c',
+        'import sys,json; sys.path.insert(0,sys.argv[1]); import qualification as q; print(json.dumps(q.read(sys.argv[2])))',
+        join(repository, 'scripts/ci'),
+        resolve(path),
+      ],
+      { cwd: repository, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 },
+    ),
   );
 }

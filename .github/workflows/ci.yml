@@ -35,6 +35,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 2
 
       - name: Install verified automation analysis tools
         run: ./scripts/ci/install-automation-tools.sh "$RUNNER_TEMP/automation-tools"
@@ -54,6 +55,7 @@ jobs:
           cache-provider: basic
 
       - name: Verify automation contracts
+        timeout-minutes: 5
         run: ./gradlew --no-daemon --stacktrace automationCheck
 
       - name: Verify build did not modify tracked files
@@ -99,6 +101,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 2
       - name: Evaluate inexpensive trusted master eligibility
         id: eligibility
         env:
@@ -125,7 +128,7 @@ jobs:
     outputs:
       reuse: ${{ steps.compare.outputs.reuse }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 15
     services:
       postgres:
         image: postgres:17.11-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73
@@ -155,6 +158,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 2
 
       - name: Prepare media tools
         id: media_tools
@@ -198,7 +202,7 @@ jobs:
             supported-platforms.txt contains
 
       - name: Build preliminary production candidate
-        run: python3 scripts/ci/measure.py build-and-test app/build/ci/timings.jsonl ./gradlew --no-daemon --stacktrace clean :app:bootJar qualificationInputs --profile
+        run: python3 scripts/ci/measure.py build-and-test app/build/ci/timings.jsonl ./gradlew --no-daemon --stacktrace :app:bootJar qualificationInputs --profile
 
       - name: Verify build did not modify tracked files
         run: git diff --exit-code
@@ -235,7 +239,7 @@ jobs:
           path: app/build/ci
       - name: Resolve comparison browser and decoder prerequisites
         run: |
-          if python3 scripts/ci/measure.py comparison-browser-provision app/build/ci/timings.jsonl bash scripts/browser/provision.sh all &&
+          if python3 scripts/ci/measure.py comparison-browser-provision app/build/ci/timings.jsonl bash scripts/browser/provision.sh native &&
              node frontend/scripts/verification/environment.mjs app/build/ci/comparison-environment.json --browsers; then
             :
           else
@@ -338,7 +342,7 @@ jobs:
     permissions:
       contents: read
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 15
     services:
       postgres:
         image: postgres:17.11-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73
@@ -368,6 +372,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 2
 
       - name: Prepare media tools
         id: media_tools
@@ -411,7 +416,8 @@ jobs:
             supported-platforms.txt contains
 
       - name: Build and test
-        run: python3 scripts/ci/measure.py build-and-test app/build/ci/timings.jsonl ./gradlew --no-daemon --stacktrace clean applicationJvmCheck :app:bootJar qualificationInputs --profile
+        timeout-minutes: 10
+        run: python3 scripts/ci/measure.py build-and-test app/build/ci/timings.jsonl ./gradlew --no-daemon --stacktrace applicationJvmCheck :app:bootJar qualificationInputs --profile
 
       - name: Verify build did not modify tracked files
         run: git diff --exit-code
@@ -531,7 +537,7 @@ jobs:
     if: ${{ !cancelled() && needs.automation.result == 'success' && needs.eligibility.result == 'success' && (needs.compare.result == 'skipped' || (needs.compare.result == 'success' && needs.compare.outputs.reuse != 'true')) }}
     needs: [automation, eligibility, compare]
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 8
     permissions:
       contents: read
     steps:
@@ -539,6 +545,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 2
       - name: Prepare media tools
         id: media_tools
         run: python3 scripts/ci/prepare-media-tools.py --mode install --report-dir "$RUNNER_TEMP/persefonia-media-tools"
@@ -557,7 +564,8 @@ jobs:
       - name: Restore locked frontend dependencies
         run: python3 scripts/ci/measure.py npm-ci app/build/ci/timings.jsonl npm ci --prefix frontend
 
-      - name: Execute complete frontend discovery and stress
+      - name: Execute fixed ordinary frontend tests
+        timeout-minutes: 5
         run: python3 scripts/ci/measure.py frontend-verification app/build/ci/timings.jsonl node frontend/scripts/verification/unit-run.mjs
 
       - name: Index frontend producer evidence
@@ -633,6 +641,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 2
       - name: Download final candidate
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -670,55 +679,19 @@ jobs:
           retention-days: 14
 
   browser:
-    name: Browsers (${{ matrix.name }})
+    name: Native browsers
     if: ${{ !cancelled() && needs.build-jvm.result == 'success' }}
     needs: build-jvm
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 8
     permissions:
       contents: read
-    strategy:
-      fail-fast: false
-      max-parallel: 8
-      matrix:
-        include:
-          - name: desktop-1of2
-            suite: chromium
-            project: 'desktop-1440'
-            shard: '1/2'
-          - name: desktop-2of2
-            suite: chromium
-            project: 'desktop-1440'
-            shard: '2/2'
-          - name: tablet-1of2
-            suite: chromium
-            project: 'tablet-834'
-            shard: '1/2'
-          - name: tablet-2of2
-            suite: chromium
-            project: 'tablet-834'
-            shard: '2/2'
-          - name: mobile-1of2
-            suite: chromium
-            project: 'mobile-390'
-            shard: '1/2'
-          - name: mobile-2of2
-            suite: chromium
-            project: 'mobile-390'
-            shard: '2/2'
-          - name: firefox-1of1
-            suite: cross
-            project: 'firefox-desktop'
-            shard: '1/1'
-          - name: webkit-1of1
-            suite: cross
-            project: 'webkit-desktop'
-            shard: '1/1'
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 2
 
       - name: Prepare media tools
         id: media_tools
@@ -751,17 +724,16 @@ jobs:
           cp app/build/ci/persefonia.jar app/build/libs/persefonia.jar
           unzip -p app/build/libs/persefonia.jar BOOT-INF/classes/static/assets/.vite/manifest.json > app/build/generated/vite/static/assets/.vite/manifest.json
 
-      - name: Install browser matrix
+      - name: Install locked native dependencies
         run: python3 scripts/ci/measure.py npm-ci app/build/browser/npm-timing.jsonl npm ci --prefix frontend
 
-      - name: Qualify production homepage and browser matrix
-        timeout-minutes: 28
+      - name: Qualify shared native lifecycle
+        timeout-minutes: 6
         env:
-          PERSEFONIA_BROWSER_SUITE: ${{ matrix.suite }}
-          PERSEFONIA_BROWSER_SHARD: ${{ matrix.shard }}
-          BROWSER_PROJECT: ${{ matrix.project }}
+          PERSEFONIA_BROWSER_SUITE: native
+          PERSEFONIA_MEDIA_TOOLS_READY: "1"
           PERSEFONIA_NPM_TIMINGS_FILE: app/build/browser/npm-timing.jsonl
-        run: bash scripts/browser/check.sh --project "$BROWSER_PROJECT"
+        run: bash scripts/browser/check.sh
 
       - name: Verify checks did not modify tracked files
         run: git diff --exit-code
@@ -769,7 +741,7 @@ jobs:
       - name: Retain finalized browser timings
         if: always()
         env:
-          BROWSER_PARTITION: ${{ matrix.name }}
+          BROWSER_PARTITION: native
         run: |
           mkdir -p app/build/browser/verification
           if test -f app/build/browser/timings.jsonl; then
@@ -783,9 +755,11 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: persefonia-browser-receipt-${{ matrix.name }}-${{ github.sha }}
+          name: persefonia-browser-receipt-native-${{ github.sha }}
           path: |
             app/build/browser/verification/*-receipt.json
+            app/build/browser/verification/native-discovery.json
+            app/build/browser/verification/native-results.json
             app/build/browser/verification/*-timings.jsonl
           if-no-files-found: error
           retention-days: 14
@@ -835,7 +809,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: persefonia-browser-${{ matrix.name }}-${{ github.sha }}
+          name: persefonia-browser-native-${{ github.sha }}
           path: |
             app/build/ci/media-prerequisites/**
             frontend/playwright-report/**
@@ -845,81 +819,10 @@ jobs:
           retention-days: 14
 
 
-  browser-receipts:
-    name: Browser receipts
-    if: always()
-    needs: [eligibility, compare, build-jvm, browser]
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    permissions:
-      contents: read
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Set up Temurin Java 25
-        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
-        with:
-          distribution: temurin
-          java-version: "25"
-
-      - name: Set up Node 22
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Download verified BootJar
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: persefonia-browser-input-${{ github.sha }}
-          path: app/build/ci
-
-      - name: Download browser receipts
-        if: needs.compare.outputs.reuse != 'true'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          pattern: persefonia-browser-receipt-*-${{ github.sha }}
-          path: app/build/browser/verification
-          merge-multiple: true
-
-      - name: Download equivalence decision
-        if: needs.compare.outputs.reuse == 'true'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: persefonia-equivalence-${{ github.sha }}
-          path: app/build/ci
-      - name: Reconcile independent discovery and execution
-        if: needs.compare.outputs.reuse != 'true'
-        env:
-          PRODUCER_RESULT: ${{ needs.build-jvm.result }}
-          BROWSER_RESULT: ${{ needs.browser.result }}
-        run: |
-          test "$PRODUCER_RESULT" = success
-          test "$BROWSER_RESULT" = success
-          npm ci --prefix frontend
-          node frontend/scripts/verification/browser-join.mjs
-          cp app/build/browser/verification/browser-acceptance.json app/build/ci/browser-acceptance.json
-
-      - name: Validate reused browser admission
-        if: needs.compare.outputs.reuse == 'true'
-        run: python3 scripts/ci/reuse.py browser-admission
-      - name: Upload browser acceptance
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: persefonia-browser-acceptance-${{ github.sha }}
-          path: |
-            app/build/ci/browser-acceptance.json
-          if-no-files-found: error
-          retention-days: 14
-
   gate:
     name: Gate
     if: always()
-    needs: [automation, eligibility, compare, build-jvm, frontend, verify, browser, browser-receipts]
+    needs: [automation, eligibility, compare, build-jvm, frontend, verify, browser]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -929,6 +832,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 2
       - name: Download candidate
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -939,11 +843,12 @@ jobs:
         with:
           name: persefonia-verification-${{ github.sha }}
           path: app/build/ci
-      - name: Download browser acceptance
+      - name: Download browser receipts and raw reports
+        if: needs.compare.outputs.reuse != 'true'
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: persefonia-browser-acceptance-${{ github.sha }}
-          path: app/build/ci
+          name: persefonia-browser-receipt-native-${{ github.sha }}
+          path: app/build/browser/verification
       - name: Download automation receipt
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -968,6 +873,12 @@ jobs:
         with:
           node-version: "22"
 
+      - name: Download equivalence decision
+        if: needs.compare.outputs.reuse == 'true'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: persefonia-equivalence-${{ github.sha }}
+          path: app/build/ci
       - name: Require successful identity-bound qualification
         env:
           QUALIFICATION_NEEDS: ${{ toJSON(needs) }}

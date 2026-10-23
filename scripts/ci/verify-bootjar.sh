@@ -38,6 +38,11 @@ if ! unzip -Z1 "$source_bootjar" > "$jar_entries"; then
   echo "Cannot inventory BootJar entries: $source_bootjar" >&2
   exit 1
 fi
+# Test-only authentication must never enter an immutable production candidate.
+if grep -Eq '^BOOT-INF/classes/dev/persefonia/app/webadmin/preview/.*\.class$|^BOOT-INF/lib/spring-boot-test-' "$jar_entries"; then
+  echo "BootJar contains test-only admin authentication or Spring test runtime" >&2
+  exit 1
+fi
 for runtime_library in spring-boot-flyway- flyway-core- flyway-database-postgresql-; do
   if ! grep -Eq "^BOOT-INF/lib/${runtime_library}[^/]+\\.jar$" "$jar_entries"; then
     echo "BootJar is missing runtime library: ${runtime_library}*.jar" >&2

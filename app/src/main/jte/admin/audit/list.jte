@@ -1,7 +1,8 @@
 @import dev.persefonia.webadmin.audit.AdminAuditListPage
 @param AdminAuditListPage page
-@template.admin.components.pageShell("Audit | Persefonia Admin", page.chrome().admin(), page.chrome().navigation(), page.chrome().logoutForm(), false, content = @`
-    <main>
+@param java.util.List<String> adminStylesheetPaths = java.util.List.of()
+@template.admin.components.pageShell("Audit | Persefonia Admin", page.chrome().admin(), page.chrome().navigation(), page.chrome().logoutForm(), false, adminStylesheetPaths = adminStylesheetPaths, content = @`
+    <main id="admin-content" tabindex="-1">
         <h1>Audit history</h1>
 
         <form method="get" action="/admin/audit">
@@ -42,7 +43,7 @@
         @if(page.records().items().isEmpty())
             <p>No audit records yet.</p>
         @else
-            <table>
+            <div class="admin-table-scroll" role="region" aria-label="Scrollable table" tabindex="0"><table>
                 <thead><tr><th>Occurred</th><th>Action</th><th>Actor</th><th>Entity</th><th>Details</th></tr></thead>
                 <tbody>
                 @for(var record : page.records().items())
@@ -55,7 +56,7 @@
                     </tr>
                 @endfor
                 </tbody>
-            </table>
+            </table></div>
         @endif
 
         <nav aria-label="Audit record pages">

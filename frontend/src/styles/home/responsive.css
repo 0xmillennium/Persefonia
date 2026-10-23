@@ -187,7 +187,7 @@
   }
 
   [data-home-v2][data-enhanced='true'][data-reduced='false'] .location-face {
-    padding: 128px 24px 100px;
+    padding: 128px 24px 114px;
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr);
     gap: 32px;
@@ -247,5 +247,24 @@
 
   .scene-face:not(.location-face) {
     padding-top: 90px !important;
+  }
+}
+
+@media (max-height: 600px) {
+  [data-home-v2][data-enhanced='true'][data-reduced='false'] .location-face {
+    padding: 80px 20px 96px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    gap: 24px;
+  }
+
+  [data-home-v2][data-enhanced='true'][data-reduced='false'] .location-system {
+    max-width: none;
+    height: 100%;
+    margin: 0;
+  }
+
+  [data-home-v2][data-enhanced='true'] .location-links nav {
+    font-size: clamp(24px, 7svh, 36px);
   }
 }

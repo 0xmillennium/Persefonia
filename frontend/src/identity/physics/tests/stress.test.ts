@@ -1,10 +1,13 @@
+import policy from '../../../../scripts/verification/selection-policy.json';
 import { it, expect, afterAll } from 'vitest';
 import { stressRun, seedFixture } from './scenarios';
 import { mkdirSync, writeFileSync } from 'node:fs';
 
 const seeds = process.env.IDENTITY_SEED
   ? [Number(process.env.IDENTITY_SEED)]
-  : Array.from({ length: 100 }, (_, i) => i + 1);
+  : process.env.PERSEFONIA_PHYSICS_PROFILE === 'deep'
+    ? Array.from({ length: 100 }, (_, i) => i + 1)
+    : policy.ordinaryPhysicsSeeds;
 const results: {
   seed: number;
   passed: boolean;

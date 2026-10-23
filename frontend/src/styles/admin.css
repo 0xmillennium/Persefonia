@@ -1,0 +1,178 @@
+/* Native administration shares the public palette, type and focus tokens. */
+.admin-body {
+  font-family: Archivo, Arial, sans-serif;
+  line-height: 1.6;
+}
+.admin-body * {
+  box-sizing: border-box;
+}
+.admin-body > header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem max(1rem, calc((100% - 80rem) / 2));
+  background: #080e11;
+  color: #eeeae1;
+}
+.admin-body > header p {
+  margin: 0;
+}
+.admin-body > header button {
+  border-color: #a4b9b6;
+  color: inherit;
+  background: transparent;
+}
+.admin-body > nav {
+  border-bottom: 1px solid var(--rule);
+  background: var(--surface);
+}
+.admin-body > nav ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  max-width: 82rem;
+  margin: auto;
+  padding: 1rem;
+  list-style: none;
+}
+.admin-body > nav :is(a, [aria-disabled]) {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0.25rem 0.5rem;
+  text-underline-offset: 0.3em;
+}
+.admin-body [aria-current='page'] {
+  font-weight: 600;
+  background: var(--page-bg);
+}
+.admin-body [aria-disabled] {
+  color: var(--muted);
+}
+.admin-body main {
+  max-width: 82rem;
+  min-width: 0;
+  padding: clamp(1rem, 3vw, 3rem);
+}
+.admin-body h1 {
+  font-size: clamp(1.75rem, 4vw, 3rem);
+  line-height: 1.15;
+  letter-spacing: -0.035em;
+}
+.admin-body h2 {
+  font-size: 1.25rem;
+}
+.admin-body :is(p, li, td, th, a, h1, h2, dd) {
+  overflow-wrap: anywhere;
+}
+.admin-body :is(input:not([type='hidden']), textarea, select, button) {
+  font: inherit;
+  color: inherit;
+  min-height: 2.75rem;
+  max-width: 100%;
+  border: 1px solid var(--muted);
+  border-radius: 0.25rem;
+  padding: 0.65rem 0.8rem;
+  background: var(--surface);
+}
+.admin-body :is(input:not([type='checkbox'], [type='radio'], [type='hidden']), select, textarea) {
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+.admin-body textarea {
+  min-height: 9rem;
+  resize: vertical;
+}
+.admin-body label {
+  display: block;
+  margin-top: 1rem;
+  margin-bottom: 0.35rem;
+  font-weight: 600;
+}
+.admin-body label:has(input:is([type='checkbox'], [type='radio'])) {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: fit-content;
+  max-width: 100%;
+}
+.admin-body input:is([type='checkbox'], [type='radio']) {
+  flex: 0 0 auto;
+  min-height: 1.25rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  accent-color: var(--accent);
+}
+.admin-body fieldset {
+  min-width: 0;
+  margin: 1.5rem 0;
+  padding: clamp(0.75rem, 2vw, 1.5rem);
+  border: 1px solid var(--rule);
+  background: var(--surface);
+}
+.admin-body legend {
+  font-weight: 600;
+  padding-inline: 0.5rem;
+}
+.admin-body button {
+  cursor: pointer;
+  margin-block: 0.5rem;
+}
+.admin-body button[type='submit'] {
+  background: var(--accent-strong);
+  color: var(--surface);
+}
+.admin-body :disabled {
+  cursor: default;
+  opacity: 0.65;
+}
+.admin-body :focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+.admin-body [aria-invalid='true'] {
+  border-width: 2px;
+}
+.admin-body :is([role='alert'], .field-errors) {
+  padding: 1rem;
+  background: var(--surface);
+  border-left: 3px solid var(--accent-strong);
+}
+.admin-body [role='status'] {
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--accent);
+}
+.admin-body .admin-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  margin-block: 1.5rem;
+  border: 1px solid var(--rule);
+  background: var(--surface);
+}
+.admin-body table {
+  width: 100%;
+  min-width: 40rem;
+  border-collapse: collapse;
+}
+.admin-body :is(th, td) {
+  text-align: left;
+  vertical-align: top;
+  padding: 0.8rem 1rem;
+  border-bottom: 1px solid var(--rule);
+}
+.admin-body th {
+  font-size: 0.875rem;
+  background: var(--page-bg);
+}
+.admin-body td form {
+  display: inline-block;
+}
+.admin-body pre {
+  max-width: 100%;
+  overflow: auto;
+  padding: 1rem;
+  background: var(--surface);
+}
