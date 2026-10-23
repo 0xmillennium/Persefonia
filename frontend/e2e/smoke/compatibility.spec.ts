@@ -1,4 +1,4 @@
-import { expect, test } from '../support/test';
+import { expect, test, type Page } from '../support/test';
 import { startOnFilm, openHomepage } from '../support/homepage';
 import { difference } from '../support/pixels';
 
@@ -27,8 +27,34 @@ test('base writing paints without JavaScript', async ({ browser }, info) => {
     javaScriptEnabled: false,
     viewport: { width: 1440, height: 900 },
   });
+  let ownedPage: Page | undefined;
+  let failed = false;
+  const diagnosticErrors: string[] = [];
+  const bounded = async (label: string, action: () => Promise<unknown>, milliseconds: number) => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        action(),
+        new Promise((_, reject) => {
+          timer = setTimeout(() => reject(new Error(`${label} deadline exceeded`)), milliseconds);
+        }),
+      ]);
+      return true;
+    } catch {
+      diagnosticErrors.push(label);
+      return false;
+    } finally {
+      clearTimeout(timer);
+    }
+  };
   try {
+    await bounded(
+      'trace start',
+      () => context.tracing.start({ screenshots: true, snapshots: true }),
+      1000,
+    );
     const page = await context.newPage();
+    ownedPage = page;
     await page.goto('/');
     await expect.poll(() => page.evaluate(() => document.fonts.status)).toBe('loaded');
     const heading = page.locator('.hero-statement');
@@ -70,8 +96,54 @@ test('base writing paints without JavaScript', async ({ browser }, info) => {
       expect(box.x).toBeGreaterThanOrEqual(0);
       expect(box.x + box.width).toBeLessThanOrEqual(321);
     }
+  } catch (error) {
+    failed = true;
+    const failedPage = ownedPage;
+    if (failedPage) {
+      const captured = await bounded(
+        'failure screenshot',
+        () => failedPage.screenshot({ path: info.outputPath('no-js-failure.png'), timeout: 2000 }),
+        2500,
+      );
+      if (captured)
+        await bounded(
+          'screenshot attachment',
+          () =>
+            info.attach('no-js-failure', {
+              path: info.outputPath('no-js-failure.png'),
+              contentType: 'image/png',
+            }),
+          1000,
+        );
+    }
+    throw error;
   } finally {
-    await context.close();
+    const traceStopped = await bounded(
+      'trace finalization',
+      () => context.tracing.stop(failed ? { path: info.outputPath('no-js-trace.zip') } : {}),
+      3000,
+    );
+    if (failed && traceStopped)
+      await bounded(
+        'trace attachment',
+        () =>
+          info.attach('no-js-trace', {
+            path: info.outputPath('no-js-trace.zip'),
+            contentType: 'application/zip',
+          }),
+        1000,
+      );
+    await bounded('context cleanup', () => context.close(), 2000);
+    if (diagnosticErrors.length)
+      await bounded(
+        'diagnostic errors attachment',
+        () =>
+          info.attach('no-js-diagnostic-errors', {
+            body: JSON.stringify({ failedOperations: diagnosticErrors }),
+            contentType: 'application/json',
+          }),
+        500,
+      );
   }
 });
 
@@ -83,15 +155,17 @@ test('Writing B completes its clipped presentation', async ({ page }) => {
     .evaluate((n) => scrollTo(0, Math.ceil(n.getBoundingClientRect().top + scrollY + 1)));
   await expect
     .poll(() =>
-      page
-        .locator('.statement-word-text')
-        .evaluateAll((nodes) =>
-          nodes.every(
-            (n) =>
-              new DOMMatrixReadOnly(getComputedStyle(n).transform).m42 === 0 &&
-              getComputedStyle(n).opacity === '1',
-          ),
-        ),
+      page.locator('.statement-word-text').evaluateAll(
+        (nodes) =>
+          nodes.length > 0 &&
+          nodes.every((n) => {
+            const style = getComputedStyle(n);
+            return (
+              (style.transform === 'none' || new DOMMatrixReadOnly(style.transform).m42 === 0) &&
+              style.opacity === '1'
+            );
+          }),
+      ),
     )
     .toBe(true);
   await expect(page.locator('.statement-word-slot').first()).toHaveCSS('overflow', 'hidden');
