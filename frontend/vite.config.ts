@@ -21,12 +21,16 @@ export default defineConfig({
     // package/size groups can read its bindings before initialization.
     chunkSizeWarningLimit: 650,
     rollupOptions: {
+      // Preserve module initialization across chunks without wrapping every
+      // module or pulling diagram vendors into the eager homepage closure.
+      experimental: { onDemandWrapping: true },
       input: {
         main: 'src/main.ts',
         home: 'src/home.ts',
         'mermaid-loader': 'src/mermaid-loader.ts',
       },
       output: {
+        strictExecutionOrder: true,
         codeSplitting: {
           groups: [
             {

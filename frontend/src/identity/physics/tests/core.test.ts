@@ -20,6 +20,31 @@ const g = (id: string, x: number): FragmentGeometry => ({
   inertia: polygonProperties(square).inertiaPerMass,
 });
 
+it.each([false, true])(
+  'keeps convex parts aligned after contour-only pose changes (independent parts: %s)',
+  (independent) => {
+    const triangle = square.slice(0, 3);
+    const geometry = {
+      ...g('a', 0),
+      parts: [independent ? triangle.map((point) => ({ ...point })) : triangle],
+    };
+    const core = new PhysicsCore([geometry]);
+    const body = core.bodies[0]!;
+    for (const pose of [
+      { position: { x: 100, y: 80 }, angle: 0.4 },
+      { position: { x: 200, y: 80 }, angle: 0.4 },
+      { position: { x: 200, y: 80 }, angle: -0.7 },
+      { position: { x: 100, y: 80 }, angle: 0.4 },
+    ]) {
+      body.position = pose.position;
+      body.angle = pose.angle;
+      const contour = core.vertices(body);
+      expect(core.parts(body)).toEqual([transform(triangle, pose.position, pose.angle)]);
+      expect(core.vertices(body)).toBe(contour);
+    }
+  },
+);
+
 const blockedBodies = () =>
   ['a', 'b', 'c'].map((id) => ({
     id,
