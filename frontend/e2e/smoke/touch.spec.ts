@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '../support/test';
 import { startOnFilm, openHomepage } from '../support/homepage';
+import { settleScroll } from '../support/scroll';
+
 async function touch(page: Page) {
   const session = await page.context().newCDPSession(page);
   return {
@@ -23,6 +25,8 @@ test('native pan yields while a settled hold changes film once', async ({ page }
     await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(30);
     await expect(page.locator('[data-hold-countdown]')).toBeHidden();
     await expect(page.locator('[data-home-v2]')).toHaveAttribute('data-film', 'robotic-arm');
+    // Finish the swipe's native momentum before placing a stationary hold.
+    await settleScroll(page);
     await page.evaluate(() => scrollTo(0, 0));
     await expect.poll(() => page.evaluate(() => scrollY)).toBe(0);
     await finger.send('touchStart', 180, 400);
