@@ -41,7 +41,12 @@ test('native pan yields while a settled hold changes film once', async ({ page }
 
 test('tuner horizontal touch stays local and vertical touch scrolls', async ({ page }) => {
   await openHomepage(page);
-  await page.locator('.home-nav a[href="#work"]').click();
+  const menu = page.locator('#home-mobile-menu');
+  await page.getByRole('button', { name: 'Open menu', exact: true }).click();
+  await expect(menu).toBeVisible();
+  await menu.locator('a[href="#work"]').click();
+  await expect(menu).toBeHidden();
+  await expect(page).toHaveURL(/#work$/);
   const root = page.locator('[data-scene="gallery"]');
   await expect(root).toHaveAttribute('data-gallery-index', '0');
   const tuner = page.locator('.collection-tuner');

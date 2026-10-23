@@ -13,7 +13,10 @@ test('production assets boot without browser errors', async ({ page }) => {
   await startOnFilm(page);
   await openHomepage(page);
   await expect(page.locator('[data-home-v2]')).toHaveAttribute('data-enhanced', 'true');
-  await expect(page.locator('.hero-statement')).toHaveText('Clarity isengineered');
+  await expect(page.locator('.hero-statement .hero-writing-text')).toHaveText([
+    'Clarity is',
+    'engineered',
+  ]);
   expect(
     await page.locator('.hero-statement').evaluate((n) => getComputedStyle(n).fontFamily),
   ).not.toBe('');
